@@ -1,12 +1,22 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { CloudAdapter, ConversationParameters, MeetingNotification, MessageFactory, TeamsActivityHandler, TeamsInfo, TeamsMember, TurnContext } from '@microsoft/agents-bot-hosting'
+import {
+  CloudAdapter,
+  ConversationParameters,
+  MeetingNotification,
+  MessageFactory,
+  TeamsActivityHandler,
+  TeamsInfo,
+  TeamsMember,
+  TurnContext
+}
+  from '@microsoft/agents-bot-hosting'
 
 export class TeamsJsBot extends TeamsActivityHandler {
   constructor () {
     super()
-    this.onMessage(async (context, next) => {
+    this.onMessage(async (context) => {
       const text = context.activity.text!.trim()
       if (text.includes('getMeetingParticipant')) {
         const meetingParticipant = await TeamsInfo.getMeetingParticipant(context)
@@ -102,10 +112,10 @@ export class TeamsJsBot extends TeamsActivityHandler {
     const membersResult = await TeamsInfo.getPagedMembers(context, 2)
     await Promise.all(membersResult.members.map(async (member) => {
       const message = MessageFactory.text(
-          `Hello ${member.givenName} ${member.surname}. I'm a Teams conversation bot. from ${author.email}`
+        `Hello ${member.givenName} ${member.surname}. I'm a Teams conversation bot. from ${author.email}`
       )
 
-      const convoParams : ConversationParameters = {
+      const convoParams: ConversationParameters = {
         members: [{ id: member.id }],
         isGroup: false,
         bot: context.activity.recipient!,
@@ -127,9 +137,6 @@ export class TeamsJsBot extends TeamsActivityHandler {
             ref,
             async (context) => {
               await context.sendActivity(message)
-              // const messageId = await context.sendActivity(message)
-              // member.messageId = messageId.id
-              // teamMemberDetails.push(member)
             })
         })
     }))
