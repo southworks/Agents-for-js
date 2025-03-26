@@ -6,7 +6,7 @@
 import { ConnectionSettings } from './connectionSettings'
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { getCopilotStudioConnectionUrl } from './powerPlatformEnvironment'
-import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-bot-activity'
+import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-activity'
 import { ExecuteTurnRequest } from './executeTurnRequest'
 import createDebug, { Debugger } from 'debug'
 
@@ -52,7 +52,7 @@ export class CopilotStudioClient {
         results.push(result)
         return results
       }
-      this.logger('Bot is typing...')
+      this.logger('Agent is typing...')
       result += value
 
       return await processEvents(await reader.read())

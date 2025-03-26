@@ -13,8 +13,7 @@
   },
   "description": "Microsoft 365 Agents SDK for JavaScript",
   "keywords": [
-    "Agents",
-    "bot"
+    "Agents"
   ],
   "private": true,
   "type": "module",
@@ -24,13 +23,14 @@
     "postclean": "npm ci",
     "prebuild": "npm run lint",
     "build": "tsc --build --verbose tsconfig.build.json",
+    "build:clean": "npm run clean && npm run build",
     "test": "node --test  --test-reporter=spec  --import tsx  --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-report.xml './packages/*/test/**/*.test.ts'",
     "docs": "typedoc --skipErrorChecking"
   },
   "license": "MIT",
   "workspaces": [
     "packages/*",
-    "test-bots/*"
+    "test-agents/*"
   ],
   "dependencies": {
   },
@@ -38,14 +38,14 @@
     "@types/debug": "^4.1.12",
     "@types/express": "^5.0.1",
     "@types/express-serve-static-core": "^5.0.5",
-    "@types/node": "^22.13.10",
+    "@types/node": "^22.13.13",
     "@types/sinon": "^17.0.4",
     "@types/uuid": "^10.0.0",
-    "eslint": "^9.22.0",
+    "eslint": "^9.23.0",
     "global": "4.4.0",
     "neostandard": "^0.12.1",
     "nerdbank-gitversioning": "^3.7.115",
-    "sinon": "^19.0.4",
+    "sinon": "^20.0.0",
     "tsx": "^4.19.3",
     "typedoc": "^0.28.1",
     "typescript": "^5.8.2"

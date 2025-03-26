@@ -12,15 +12,16 @@ The best to way to get started with these packages is to look at the samples ava
 
 ## Packages Overview
 
-We offer the following NPM packages to create conversational experiences based on bots:
+We offer the following NPM packages to create conversational experiences based on Agents:
 
 | Package Name | Description | Replaces|
 |--------------|-------------|---------|
-| `@microsoft/agents-bot-activity` | Types and validators implementing the Activity protocol spec. | `botframework-schema` |
-| `@microsoft/agents-bot-hosting` | Provides classes to host a bot in express.  | `botbuilder` |
-| `@microsoft/agents-bot-hosting-teams` | Provides classes to make use of Teams specific features.  | `botbuilder` |
-| `@microsoft/agents-bot-hosting-storage-blob` | Extension to use Azure Blob as storage.  | `botbuilder-azure` |
-| `@microsoft/agents-bot-hosting-storage-cosmos` | Extension to use CosmosDB as storage.  | `botbuilder-azure` |
+| `@microsoft/agents-activity` | Types and validators implementing the Activity protocol spec. | `botframework-schema` |
+| `@microsoft/agents-hosting` | Provides classes to host an Agent in express.  | `botbuilder` |
+| `@microsoft/agents-hosting-dialogs` | Provides classes to host an Agent in express.  | `botbuilder-dialogs` |
+| `@microsoft/agents-hosting-teams` | Provides classes to make use of Teams specific features.  | `botbuilder` |
+| `@microsoft/agents-hosting-storage-blob` | Extension to use Azure Blob as storage.  | `botbuilder-azure` |
+| `@microsoft/agents-hosting-storage-cosmos` | Extension to use CosmosDB as storage.  | `botbuilder-azure` |
 
 
 Additionally we provide a Copilot Studio Client, to interact with Agents created in CopilotStudio

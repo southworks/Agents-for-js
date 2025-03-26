@@ -1,0 +1,25 @@
+{
+  "name": "root-agent",
+  "version": "1.0.0",
+  "private": true,
+  "author": "Microsoft",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc --build",
+    "prestart": "npm run build",
+    "start": "node --env-file .env ./dist/index.js",
+    "prebundle": "npm run build",
+    "bundle": "esbuild dist/index.js --bundle --platform=node --metafile=dist/meta.json --outfile=dist/bundle.js --tree-shaking=true --keep-names",
+    "docker": "docker build -t botimages.azurecr.io/node-echo-bot:latest ."
+  },
+  "dependencies": {
+    "@microsoft/agents-hosting": "file:../../packages/agents-hosting",
+    "express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "typescript": "^5.7.3"
+  },
+  "keywords": []
+}
