@@ -7,7 +7,7 @@ import { Request, CloudAdapter, authorizeJWT, AuthConfiguration, loadAuthConfigF
 import { version as sdkVersion } from '@microsoft/agents-hosting/package.json'
 import { RootHandlerWithBlobStorageMemory } from './agent'
 import { BlobsStorage } from '@microsoft/agents-hosting-storage-blob'
-import { ConversationData, UserProfile } from './memoryData'
+import { ConversationData, UserProfile } from './state'
 
 const authConfig: AuthConfiguration = loadAuthConfigFromEnv()
 
@@ -27,11 +27,10 @@ app.use(express.json())
 app.use(authorizeJWT(authConfig))
 
 app.post('/api/messages', async (req: Request, res: Response) => {
-  console.log('jwt claims: ', req.user)
   await adapter.process(req, res, async (context) => await myAgent.run(context))
 })
 
-configureResponseController(app, adapter, myAgent)
+configureResponseController(app, adapter, myAgent, conversationState)
 
 const port = process.env.PORT || 3978
 app.listen(port, () => {
