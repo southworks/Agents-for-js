@@ -10,14 +10,15 @@ import {
   SigningResource,
   TokenExchangeRequest,
   TurnState,
-  Storage
+  Storage,
+  UserTokenClient,
+  TokenRequestStatus
 } from '@microsoft/agents-hosting'
-import { TeamsUserTokenClient } from '../../oauth'
 
 const logger = debug('agents:teams-oauth-flow-app-style')
 
 export class TeamsOAuthFlowAppStyle {
-  userTokenClient?: TeamsUserTokenClient
+  userTokenClient?: UserTokenClient
   tokenExchangeId: string | null = null
   storage: Storage
   appState: TurnState | null = null
@@ -48,7 +49,7 @@ export class TeamsOAuthFlowAppStyle {
     }
     const scope = 'https://api.botframework.com'
     const accessToken = await adapter.authProvider.getAccessToken(authConfig, scope)
-    this.userTokenClient = new TeamsUserTokenClient(accessToken)
+    this.userTokenClient = new UserTokenClient(accessToken)
     const retVal: string = ''
     await context.sendActivities([MessageFactory.text('authorizing user'), new Activity(ActivityTypes.Typing)])
     const signingResource: SigningResource = await this.userTokenClient.getSignInResource(authConfig.clientId!, authConfig.connectionName!, context.activity)
@@ -61,7 +62,7 @@ export class TeamsOAuthFlowAppStyle {
     return retVal
   }
 
-  public async continueFlow (context: TurnContext): Promise<string> {
+  public async continueFlow (context: TurnContext) {
     if (this.appState!.sso!.userToken !== '') {
       return ''
     }
@@ -81,12 +82,14 @@ export class TeamsOAuthFlowAppStyle {
     }
     this.tokenExchangeId = tokenExchangeRequest.id!
     const userTokenReq = await this.userTokenClient?.exchangeTokenAsync(contFlowActivity.from?.id!, authConfig.connectionName!, contFlowActivity.channelId!, tokenExchangeRequest)
-    logger.info('Token obtained')
-    this.appState!.sso!.userToken = userTokenReq.token
-    this.appState!.sso!.flowStarted = false
-    await context.sendActivity(MessageFactory.text('User signed in ' + new Date().toISOString()))
-    await this.appState!.save(context, this.storage)
-    return this.appState!.sso?.userToken!
+    if (userTokenReq?.status === TokenRequestStatus.Success) {
+      logger.info('Token obtained')
+      // this.appState!.sso!.userToken = userTokenReq.token
+      this.appState!.sso!.flowStarted = false
+      await context.sendActivity(MessageFactory.text('User signed in ' + new Date().toISOString()))
+      await this.appState!.save(context, this.storage)
+      return this.appState!.sso?.userToken!
+    }
   }
 
   public async signOut (context: TurnContext): Promise<void> {

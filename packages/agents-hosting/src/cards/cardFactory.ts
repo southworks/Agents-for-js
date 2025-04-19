@@ -13,7 +13,7 @@ import { O365ConnectorCard } from './o365ConnectorCard'
 import { ThumbnailCard } from './thumbnailCard'
 import { VideoCard } from './videoCard'
 import { CardImage } from './cardImage'
-import { OAuthCard } from '../oauth/oauthCard'
+import { OAuthCard } from '../oauth/oAuthCard'
 import { SigningResource } from '../oauth/signingResource'
 import { SigninCard } from './signinCard'
 
@@ -217,7 +217,12 @@ export class CardFactory {
    */
   static oauthCard (connectionName: string, title: string, text: string, signingResource: SigningResource) : Attachment {
     const card: Partial<OAuthCard> = {
-      buttons: [{ type: ActionTypes.Signin, title, value: signingResource.signingLink, channelData: undefined }],
+      buttons: [{
+        type: ActionTypes.Signin,
+        title,
+        value: signingResource.signInLink,
+        channelData: undefined
+      }],
       connectionName,
       tokenExchangeResource: signingResource.tokenExchangeResource,
       tokenPostResource: signingResource.tokenPostResource,

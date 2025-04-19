@@ -6,6 +6,8 @@ import { SigningResource } from './signingResource'
 import { Activity } from '@microsoft/agents-activity'
 import { debug } from '../logger'
 import { TokenExchangeRequest } from './tokenExchangeRequest'
+import { normalizeTokenExchangeState } from '../activityWireCompat'
+import { TokenRequestStatus, TokenResponse } from './tokenResponse'
 import { getProductInfo } from '../getProductInfo'
 
 const logger = debug('agents:user-token-client')
@@ -41,16 +43,19 @@ export class UserTokenClient {
    * @param code The optional code.
    * @returns A promise that resolves to the user token.
    */
-  async getUserToken (connectionName: string, channelId: string, userId: string, code?: string) {
+  async getUserToken (connectionName: string, channelId: string, userId: string, code?: string) : Promise<TokenResponse> {
     try {
       const params = { connectionName, channelId, userId, code }
       const response = await this.client.get('/api/usertoken/GetToken', { params })
-      return response.data
+      return { ...response.data, status: TokenRequestStatus.Success }
     } catch (error: any) {
       if (error.response?.status !== 404) {
         logger.error(error)
       }
-      return null
+      return {
+        status: TokenRequestStatus.Failed,
+        token: undefined
+      }
     }
   }
 
@@ -61,14 +66,16 @@ export class UserTokenClient {
    * @param channelId The channel ID.
    * @returns A promise that resolves when the sign-out operation is complete.
    */
-  async signOut (userId: string, connectionName: string, channelId: string) {
+  async signOut (userId: string, connectionName: string, channelId: string) : Promise<void> {
     try {
       const params = { userId, connectionName, channelId }
       const response = await this.client.delete('/api/usertoken/SignOut', { params })
-      return response.data
+      if (response.status !== 200) {
+        throw new Error('Failed to sign out')
+      }
     } catch (error: any) {
       logger.error(error)
-      return null
+      throw new Error('Failed to sign out')
     }
   }
 
@@ -82,12 +89,13 @@ export class UserTokenClient {
   async getSignInResource (appId: string, cnxName: string, activity: Activity) : Promise<SigningResource> {
     try {
       const tokenExchangeState = {
-        ConnectionName: cnxName,
-        Conversation: activity.getConversationReference(),
-        RelatesTo: activity.RelatesTo,
-        MsAppId: appId
+        connectionName: cnxName,
+        conversation: activity.getConversationReference(),
+        relatesTo: activity.RelatesTo,
+        msAppId: appId
       }
-      const state = Buffer.from(JSON.stringify(tokenExchangeState)).toString('base64')
+      const tokenExchangeStateNormalized = normalizeTokenExchangeState(tokenExchangeState)
+      const state = Buffer.from(JSON.stringify(tokenExchangeStateNormalized)).toString('base64')
       const params = { state }
       const response = await this.client.get('/api/botsignin/GetSignInResource', { params })
       return response.data as SigningResource
@@ -105,14 +113,14 @@ export class UserTokenClient {
    * @param tokenExchangeRequest The token exchange request.
    * @returns A promise that resolves to the exchanged token.
    */
-  async exchangeTokenAsync (userId: string, connectionName: string, channelId: string, tokenExchangeRequest: TokenExchangeRequest) {
+  async exchangeTokenAsync (userId: string, connectionName: string, channelId: string, tokenExchangeRequest: TokenExchangeRequest) : Promise<TokenResponse> {
     try {
       const params = { userId, connectionName, channelId }
       const response = await this.client.post('/api/usertoken/exchange', tokenExchangeRequest, { params })
-      return response.data
+      return { ...response.data, status: TokenRequestStatus.Success }
     } catch (error: any) {
       logger.error(error)
-      return null
+      return { status: TokenRequestStatus.Failed, token: undefined }
     }
   }
 }

@@ -7,7 +7,7 @@ import { Request, CloudAdapter, authorizeJWT, AuthConfiguration, loadAuthConfigF
 import { ConversationReference } from '@microsoft/agents-activity'
 
 import { AdaptiveCardHandler } from './adaptiveCards'
-import { CardFactoryHandler } from './cardFactory'
+import { CardFactoryHandler } from './cardFactoryHandler'
 import { MultiFeatureHandler } from './multiFeature'
 import { StateManagementHandler } from './state'
 import { WebChatSsoHandler } from './webChatSso'
@@ -23,7 +23,7 @@ const createAgent = (agentName: string) => {
       return new CardFactoryHandler()
     case 'MultiFeatureAgent':
       return new MultiFeatureHandler(conversationReferences)
-    case 'WebChatSSOAgent': {
+    case 'webChatSso': {
       const memoryStorage = new MemoryStorage()
       const userState = new UserState(memoryStorage)
       return new WebChatSsoHandler(userState)
