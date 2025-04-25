@@ -1,31 +1,34 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { Activity, ActivityTypes, EndOfConversationCodes } from '@microsoft/agents-activity'
-import { ActivityHandler, MessageFactory } from '@microsoft/agents-hosting'
+import { startServer } from '@microsoft/agents-hosting-express'
+import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 
-export class EmptyAgent extends ActivityHandler {
+class EmptyAgent extends AgentApplication<TurnState> {
   constructor () {
-    super()
-    this.onMessage(async (context, next) => {
-      if (context.activity.text!.includes('end') || context.activity.text!.includes('stop')) {
-        const messageText = 'agent: Ending conversation...'
-        await context.sendActivity(MessageFactory.text(messageText, messageText))
-        await context.sendActivity(Activity.fromObject(
-          {
-            type: ActivityTypes.EndOfConversation,
-            code: EndOfConversationCodes.CompletedSuccessfully
-          }
-        ))
-      } else {
-        const replyText = `empty-agent: ${context.activity.text}`
-        await context.sendActivity(MessageFactory.text(replyText, replyText))
-        const actWithRT = new Activity(ActivityTypes.Message)
-        actWithRT.relatesTo = context.activity.getConversationReference()
-        actWithRT.text = 'empty-agent: This is a reply with relatesTo'
-        await context.sendActivity(actWithRT)
-      }
-      await next()
-    })
+    super({ startTypingTimer: true, storage: new MemoryStorage() })
+
+    this.conversationUpdate('membersAdded', this.help)
+    this.message('/help', this.help)
+    this.message('/diag', this.diag)
+    this.activity('message', this.echo)
+  }
+
+  help = async (ctx: TurnContext) => {
+    const version = (await import('@microsoft/agents-hosting/package.json')).version
+    await ctx.sendActivity(`Empty Agent running on node sdk ${version}`)
+  }
+
+  echo = async (ctx: TurnContext, state: TurnState) => {
+    let counter: number = state.getValue('conversation.counter') || 0
+    await ctx.sendActivity(`[${counter++}]You said now: ${ctx.activity.text}`)
+    state.setValue('conversation.counter', counter)
+  }
+
+  diag = async (ctx: TurnContext, state: TurnState) => {
+    const md = (text: string) => '```\n' + text + '\n```'
+    await ctx.sendActivity(md(JSON.stringify(state, null, 2)))
   }
 }
+
+startServer(new EmptyAgent())
