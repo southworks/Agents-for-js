@@ -7,7 +7,7 @@ import { AgentApplication } from './agentApplication'
 import { AgentApplicationOptions } from './agentApplicationOptions'
 import { TurnState } from './turnState'
 import { Storage } from '../storage'
-import { UserIdentityOptions } from './oauth/userIdentity'
+import { AuthorizationHandlers } from './oauth/authorization'
 
 /**
  * Builder class for creating and configuring AgentApplication instances.
@@ -49,18 +49,18 @@ export class AgentApplicationBuilder<TState extends TurnState = TurnState> {
    * @param startTypingTimer Whether to show typing indicators
    * @returns This builder instance for chaining
    */
-  public setStartTypingTimer (startTypingTimer: boolean): this {
-    this._options.startTypingTimer = startTypingTimer
-    return this
-  }
+  // public setStartTypingTimer (startTypingTimer: boolean): this {
+  //   this._options.startTypingTimer = startTypingTimer
+  //   return this
+  // }
 
   /**
    * Sets authentication options for the AgentApplication.
-   * @param authenticationOptions The user identity authentication options
+   * @param authHandlers The user identity authentication options
    * @returns This builder instance for chaining
    */
-  public withAuthentication (authenticationOptions: UserIdentityOptions): this {
-    this._options.authentication = authenticationOptions
+  public withAuthorization (authHandlers: AuthorizationHandlers): this {
+    this._options.authorization = authHandlers
     return this
   }
 

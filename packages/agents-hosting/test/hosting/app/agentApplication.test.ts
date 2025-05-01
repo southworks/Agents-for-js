@@ -40,8 +40,8 @@ describe('Application', () => {
     assert.notEqual(app.options, undefined)
     assert.equal(app.options.adapter, undefined)
     assert.equal(app.options.storage, undefined)
-    assert.equal(app.options.authentication, undefined)
-    assert.equal(app.options.startTypingTimer, true)
+    assert.equal(app.options.authorization, undefined)
+    assert.equal(app.options.startTypingTimer, false)
   })
 
   it('should route to an activity handler', async () => {
