@@ -31,84 +31,84 @@ export const app = new TeamsApplication<ApplicationTurnState>({
   taskModules: { taskDataFilter: 'data' }
 })
 
-app.messageEventUpdate('editMessage', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onMessageEventUpdate('editMessage', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('You edited a message')
   await context.sendActivity(reply)
 })
 
-app.messageEventUpdate('softDeleteMessage', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onMessageEventUpdate('softDeleteMessage', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('You deleted a message')
   await context.sendActivity(reply)
 })
 
-app.messageEventUpdate('undeleteMessage', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onMessageEventUpdate('undeleteMessage', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('You undeleted a message')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('membersAdded', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('membersAdded', async (context: TurnContext, state: ApplicationTurnState) => {
   const newMember = JSON.stringify(context.activity.membersAdded)
   const reply = MessageFactory.text('Hi there! You are a new member' + newMember)
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('membersRemoved', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('membersRemoved', async (context: TurnContext, state: ApplicationTurnState) => {
   const removedMember = JSON.stringify(context.activity.membersRemoved)
   const reply = MessageFactory.text('Hi there! A team member was removed' + removedMember)
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('teamRenamed', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('teamRenamed', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the team was renamed')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('teamArchived', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('teamArchived', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the team was archived')
   console.log('Hi, the team was archived')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('teamDeleted', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('teamDeleted', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the team was deleted')
   console.log('Hi, the team was deleted')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('teamHardDeleted', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('teamHardDeleted', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the team was hard deleted')
   console.log('Hi, the team was hard deleted')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('teamRestored', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('teamRestored', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the team has been restored')
   console.log('Hi, the team has been restored')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('teamUnarchived', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('teamUnarchived', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the team has been unarchived')
   console.log('Hi, the team has been unarchived')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('channelCreated', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('channelCreated', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the channel has been created')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('channelDeleted', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('channelDeleted', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the channel has been deleted')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('channelRenamed', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('channelRenamed', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the channel has been renamed')
   await context.sendActivity(reply)
 })
 
-app.conversationUpdate('channelRestored', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onConversationUpdate('channelRestored', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.text('Hi, the channel has been restored')
   console.log('Hi, the channel has been restored')
   await context.sendActivity(reply)
@@ -258,7 +258,7 @@ app.messageExtensions.submitAction('createCard', async (context: TurnContext, st
   }
 })
 
-app.message('/teamsinfo', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onMessage('/teamsinfo', async (context: TurnContext, state: ApplicationTurnState) => {
   const channels = await TeamsInfo.getTeamChannels(context)
   const msg1 = `Meeting Participant: ${JSON.stringify(channels)}}`
   await context.sendActivity(MessageFactory.text(msg1))
@@ -268,7 +268,7 @@ app.message('/teamsinfo', async (context: TurnContext, state: ApplicationTurnSta
   await context.sendActivity(MessageFactory.text(msg2))
 })
 
-app.message('/taskModule', async (context: TurnContext, state: ApplicationTurnState) => {
+app.onMessage('/taskModule', async (context: TurnContext, state: ApplicationTurnState) => {
   const reply = MessageFactory.attachment(getTaskModuleHeroCardOptions())
   await context.sendActivity(reply)
 })
@@ -305,7 +305,7 @@ app.taskModules.submit(async (context: TurnContext) => true, async (context: Tur
   return 'Thanks!'
 })
 
-app.activity(ActivityTypes.Message, async (context: TurnContext, state: ApplicationTurnState) => {
+app.onActivity(ActivityTypes.Message, async (context: TurnContext, state: ApplicationTurnState) => {
   await context.sendActivity(MessageFactory.text('Type "/teamsinfo" or "/taskModule"'))
 })
 
