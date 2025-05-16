@@ -6,7 +6,7 @@
 import { Strategy } from "./strategy";
 
 export interface PublishedBotStrategySettings {
-  readonly host: string;
+  readonly host: URL;
   readonly schema: string;
 }
 
@@ -19,19 +19,19 @@ export class PublishedBotStrategy implements Strategy {
     const { schema, host } = settings;
 
     this.#baseURL = new URL(
-      `/powervirtualagents/dataverse-backed/authenticated/bots/${schema}`,
+      `/copilotstudio/dataverse-backed/authenticated/bots/${schema}`,
       host
     );
     this.#baseURL.searchParams.append("api-version", this.API_VERSION);
   }
 
   public getConversationUrl(conversationId?: string): string {
-    const url = `${this.#baseURL.href}/conversations`;
+    this.#baseURL.pathname = `${this.#baseURL.pathname}/conversations`;
 
     if (conversationId) {
-      return `${url}/${conversationId}`;
+       this.#baseURL.pathname = `${this.#baseURL.pathname}/${conversationId}`;
     }
 
-    return url;
+    return this.#baseURL.href;
   }
 }

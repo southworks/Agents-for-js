@@ -6,7 +6,7 @@
 import { Strategy } from "./strategy";
 
 export interface PrebuiltBotStrategySettings {
-  readonly host: string;
+  readonly host: URL;
   readonly identifier: string;
 }
 
@@ -19,19 +19,19 @@ export class PrebuiltBotStrategy implements Strategy {
     const { identifier, host } = settings;
 
     this.#baseURL = new URL(
-      `/powervirtualagents/prebuilt/authenticated/bots/${identifier}`,
+      `/copilotstudio/prebuilt/authenticated/bots/${identifier}`,
       host
     );
     this.#baseURL.searchParams.append("api-version", this.API_VERSION);
   }
 
   public getConversationUrl(conversationId?: string): string {
-    const url = `${this.#baseURL.href}/conversations`;
+    this.#baseURL.pathname = `${this.#baseURL.pathname}/conversations`;
 
     if (conversationId) {
-      return `${url}/${conversationId}`;
+       this.#baseURL.pathname = `${this.#baseURL.pathname}/${conversationId}`;
     }
 
-    return url;
+    return this.#baseURL.href;
   }
 }

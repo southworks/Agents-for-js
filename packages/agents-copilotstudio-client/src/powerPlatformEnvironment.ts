@@ -100,7 +100,7 @@ function getEnvironmentEndpoint (
   cloud: PowerPlatformCloud,
   environmentId: string,
   cloudBaseAddress?: string
-): string {
+): URL {
   if (cloud === PowerPlatformCloud.Other && (!cloudBaseAddress || !cloudBaseAddress.trim())) {
     throw new Error('cloudBaseAddress must be provided when PowerPlatformCloud is Other')
   }
@@ -112,7 +112,7 @@ function getEnvironmentEndpoint (
   const hexPrefix = normalizedResourceId.substring(0, normalizedResourceId.length - idSuffixLength)
   const hexSuffix = normalizedResourceId.substring(normalizedResourceId.length - idSuffixLength)
 
-  return `${hexPrefix}.${hexSuffix}.environment.${getEndpointSuffix(cloud, cloudBaseAddress)}`
+  return new URL(`https://${hexPrefix}.${hexSuffix}.environment.${getEndpointSuffix(cloud, cloudBaseAddress)}`);
 }
 
 function getEndpointSuffix (
