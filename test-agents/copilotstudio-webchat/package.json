@@ -1,0 +1,26 @@
+{
+  "name": "copilotstudio-webchat",
+  "version": "1.0.0",
+  "private": true,
+  "author": "Microsoft",
+  "license": "MIT",
+  "main": "copilotstudio/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file copilotstudio/.env copilotstudio/index.js",
+    "dev": "node --env-file copilotstudio/.env --watch copilotstudio/index.js"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^3.5.3",
+    "@microsoft/agents-copilotstudio-client": "file:../../packages/agents-copilotstudio-client",
+    "axios": "^1.9",
+    "botframework-webchat": "^4.15.1",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "open": "^10.1.2",
+    "react": "16.8.6",
+    "react-dom": "16.8.6",
+    "vite": "^6.3.5",
+    "vite-express": "^0.21.1"
+  }
+}
