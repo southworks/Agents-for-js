@@ -53,7 +53,7 @@ This step requires permissions to create application identities in your Azure te
         4. Click **Add Permissions**.
     4. (Optional) Click **Grant Admin consent** for your app.
 
-> **Tip:**  
+> [!TIP]  
 > If you do not see `Power Platform API` in the list, you need to add it to your tenant. See [Power Platform API Authentication](https://learn.microsoft.com/power-platform/admin/programmability-authentication-v2#step-2-configure-api-permissions) and follow Step 2 to add the API.
 
 ## 4. Configure the Example Application
@@ -118,7 +118,7 @@ This step requires permissions to create application identities in your Azure te
 
 The Copilot Studio Client requires a user token to operate. This sample uses a user interactive flow to get the user token for the application ID created above.
 
-> **Important:**  
+> [!IMPORTANT]  
 > The token is cached on the user machine in `$TEMP/mcssample.usercache.json`.
 
 ## 10. Troubleshooting
