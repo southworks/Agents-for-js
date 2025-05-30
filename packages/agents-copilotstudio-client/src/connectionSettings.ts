@@ -3,24 +3,24 @@
  * Licensed under the MIT License.
  */
 
+import { AgentType } from "./agentType"
+import { CopilotStudioConnectionSettings } from "./copilotStudioConnectionSettings"
+import { PowerPlatformCloud } from "./powerPlatformCloud"
+
 /**
  * Represents the settings required to establish a connection to Copilot Studio.
  */
-export class ConnectionSettings {
-  /** The client ID of the application. */
-  public appClientId: string = ''
-  /** The tenant ID of the application. */
-  public tenantId: string = ''
-  /** The environment ID of the application. */
-  public environmentId: string = ''
-  /** The cloud environment of the application. */
-  public cloud: string = ''
-  /** The custom Power Platform cloud URL, if any. */
+export class ConnectionSettings implements CopilotStudioConnectionSettings{
+  public appClientId?: string
+  public tenantId?: string
+  public environmentId?: string
+  public cloud?: PowerPlatformCloud
   public customPowerPlatformCloud?: string
-  /** The identifier of the agent. */
   public agentIdentifier?: string
-  /** The type of the Copilot agent. */
-  public copilotAgentType?: string
+  public copilotAgentType?: AgentType
+  public directConnectUrl?: string
+  public useExperimentalEndpoint: boolean = false
+  public enableDiagnostics: boolean = false
 }
 
 /**
@@ -35,6 +35,9 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
     cloud: process.env.cloud,
     customPowerPlatformCloud: process.env.customPowerPlatformCloud,
     agentIdentifier: process.env.agentIdentifier,
-    copilotAgentType: process.env.copilotAgentType
+    copilotAgentType: process.env.copilotAgentType,
+    directConnectUrl: process.env.directConnectUrl,
+    useExperimentalEndpoint: process.env.useExperimentalEndpoint === 'true',
+    enableDiagnostics: process.env.enableDiagnostics === 'true'
   } as ConnectionSettings
 }

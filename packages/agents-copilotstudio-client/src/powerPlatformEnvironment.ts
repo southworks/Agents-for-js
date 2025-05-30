@@ -22,20 +22,35 @@ export function getCopilotStudioConnectionUrl (
 ): string {
   let cloudValue: PowerPlatformCloud = PowerPlatformCloud.Prod
 
-  const isNotEmptyCloud = settings.cloud && settings.cloud.trim() !== ''
+  if(settings.directConnectUrl?.trim()){
+    if (!isValidUri(settings.directConnectUrl)) {
+      throw new Error('directConnectUrl must be a valid URL')
+    }
+
+    // FIX for Missing Tenant ID
+    if (settings.directConnectUrl.toLocaleLowerCase().includes("tenants/00000000-0000-0000-0000-000000000000"))
+    {
+      // Direct connection cannot be used, ejecting and forcing the normal settings flow: 
+      return getCopilotStudioConnectionUrl({...settings, directConnectUrl: ''}, conversationId);
+    }
+
+    return createURL(settings.directConnectUrl, conversationId).href
+  }
+
+  const isNotEmptyCloud = settings.cloud && settings.cloud.toString().trim() !== ''
   const isNotEmptyCustomPowerPlatformCloud = settings.customPowerPlatformCloud !== undefined && settings.customPowerPlatformCloud.trim() !== ''
 
-  if (isNotEmptyCloud && !Object.values(PowerPlatformCloud).includes(settings.cloud)) {
+  if (isNotEmptyCloud && !Object.values(PowerPlatformCloud).includes(settings.cloud?.toString() ?? '')) {
     throw new Error('Invalid PowerPlatformCloud enum key')
   }
 
-  const cloudSetting = isNotEmptyCloud ? PowerPlatformCloud[settings.cloud as keyof typeof PowerPlatformCloud] : PowerPlatformCloud.Unknown
+  const cloudSetting = isNotEmptyCloud ? settings.cloud! : PowerPlatformCloud.Unknown
 
   if (cloudSetting === PowerPlatformCloud.Other && isNotEmptyCustomPowerPlatformCloud) {
     throw new Error('customPowerPlatformCloud must be provided when PowerPlatformCloud is Other')
   }
 
-  if (settings.environmentId.trim() === '') {
+  if (!settings.environmentId?.trim()) {
     throw new Error('EnvironmentId must be provided')
   }
 
@@ -59,11 +74,11 @@ export function getCopilotStudioConnectionUrl (
 
   let agentType: AgentType
 
-  if (settings.copilotAgentType && settings.copilotAgentType.trim() !== '') {
-    if (!Object.values(AgentType).includes(settings.copilotAgentType as unknown as AgentType)) {
+  if (settings.copilotAgentType && settings.copilotAgentType.toString().trim() !== '') {
+    if (!Object.values(AgentType).includes(settings.copilotAgentType)) {
       throw new Error('Invalid AgentType enum key')
     } else {
-      agentType = AgentType[settings.copilotAgentType as keyof typeof AgentType]
+      agentType = settings.copilotAgentType
     }
   } else {
     agentType = AgentType.Published
@@ -94,6 +109,26 @@ function isValidUri (uri: string): boolean {
   } catch {
     return false
   }
+}
+
+function createURL(base: string, conversationId?: string): URL {
+  const url = new URL(base)
+
+  if(url.pathname.endsWith('/')) {
+    url.pathname = url.pathname.slice(0, -1);
+  }
+
+  if(url.pathname.includes('/conversations')) {
+    url.pathname = url.pathname.substring(0, url.pathname.indexOf('/conversations') - 1);
+  }
+  
+  url.pathname = `${url.pathname}/conversations`;
+  if (conversationId) {
+    url.pathname = `${url.pathname}/${conversationId}`;
+  }
+
+  return url
+
 }
 
 function getEnvironmentEndpoint (
@@ -153,6 +188,35 @@ function getEndpointSuffix (
       return cloudBaseAddress
     default:
       throw new Error(`Invalid cluster category value: ${category}`)
+  }
+}
+
+function decodeCloudFromURL(url: URL): PowerPlatformCloud {
+  switch (url.host.toLocaleLowerCase()) {
+    case "api.powerplatform.localhost":
+        return PowerPlatformCloud.Local;
+    case "api.exp.powerplatform.com":
+        return PowerPlatformCloud.Exp;
+    case "api.dev.powerplatform.com":
+        return PowerPlatformCloud.Dev;
+    case "api.prv.powerplatform.com":
+        return PowerPlatformCloud.Prv;
+    case "api.test.powerplatform.com":
+        return PowerPlatformCloud.Test;
+    case "api.preprod.powerplatform.com":
+        return PowerPlatformCloud.Preprod;
+    case "api.powerplatform.com":
+        return PowerPlatformCloud.Prod;
+    case "api.gov.powerplatform.microsoft.us":
+        return PowerPlatformCloud.GovFR;
+    case "api.high.powerplatform.microsoft.us":
+        return PowerPlatformCloud.High;
+    case "api.appsplatform.us":
+        return PowerPlatformCloud.DoD;
+    case "api.powerplatform.partner.microsoftonline.cn":
+        return PowerPlatformCloud.Mooncake;
+    default:
+        return PowerPlatformCloud.Unknown;
   }
 }
 
