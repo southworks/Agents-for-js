@@ -31,8 +31,6 @@ export class CopilotStudioClient {
   private readonly client: AxiosInstance
   /** The logger for debugging. */
   private readonly logger: Debugger
-  /** Island Experimental URL for Copilot Studio */
-  private isLandExperimentatlUrl: string = ''
 
   /**
    * Creates an instance of CopilotStudioClient.
@@ -56,10 +54,10 @@ export class CopilotStudioClient {
     const response = await this.client(axiosConfig)
 
     if(this.settings.useExperimentalEndpoint && !this.settings.directConnectUrl?.trim()){
-      this.isLandExperimentatlUrl = response.headers?.[CopilotStudioClient.islandExperimentalUrlHeaderKey];
-      if(this.isLandExperimentatlUrl){
-        this.settings.directConnectUrl = this.isLandExperimentatlUrl
-        this.logger(`Island Experimental URL: ${this.isLandExperimentatlUrl}`)
+      const isLandExperimentatlUrl = response.headers?.[CopilotStudioClient.islandExperimentalUrlHeaderKey];
+      if(isLandExperimentatlUrl){
+        this.settings.directConnectUrl = isLandExperimentatlUrl
+        this.logger(`Island Experimental URL: ${isLandExperimentatlUrl}`)
       }
     }
 

@@ -113,6 +113,7 @@ function isValidUri (uri: string): boolean {
 
 function createURL(base: string, conversationId?: string): URL {
   const url = new URL(base)
+  url.searchParams.append("api-version", "2022-03-01-preview");
 
   if(url.pathname.endsWith('/')) {
     url.pathname = url.pathname.slice(0, -1);
@@ -188,35 +189,6 @@ function getEndpointSuffix (
       return cloudBaseAddress
     default:
       throw new Error(`Invalid cluster category value: ${category}`)
-  }
-}
-
-function decodeCloudFromURL(url: URL): PowerPlatformCloud {
-  switch (url.host.toLocaleLowerCase()) {
-    case "api.powerplatform.localhost":
-        return PowerPlatformCloud.Local;
-    case "api.exp.powerplatform.com":
-        return PowerPlatformCloud.Exp;
-    case "api.dev.powerplatform.com":
-        return PowerPlatformCloud.Dev;
-    case "api.prv.powerplatform.com":
-        return PowerPlatformCloud.Prv;
-    case "api.test.powerplatform.com":
-        return PowerPlatformCloud.Test;
-    case "api.preprod.powerplatform.com":
-        return PowerPlatformCloud.Preprod;
-    case "api.powerplatform.com":
-        return PowerPlatformCloud.Prod;
-    case "api.gov.powerplatform.microsoft.us":
-        return PowerPlatformCloud.GovFR;
-    case "api.high.powerplatform.microsoft.us":
-        return PowerPlatformCloud.High;
-    case "api.appsplatform.us":
-        return PowerPlatformCloud.DoD;
-    case "api.powerplatform.partner.microsoftonline.cn":
-        return PowerPlatformCloud.Mooncake;
-    default:
-        return PowerPlatformCloud.Unknown;
   }
 }
 
