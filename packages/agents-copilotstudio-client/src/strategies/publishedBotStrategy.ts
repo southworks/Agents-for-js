@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { Strategy } from "./strategy";
+import { Strategy } from './strategy'
 
 export interface PublishedBotStrategySettings {
   readonly host: URL;
@@ -11,27 +11,27 @@ export interface PublishedBotStrategySettings {
 }
 
 export class PublishedBotStrategy implements Strategy {
-  private readonly API_VERSION = "2022-03-01-preview";
+  private readonly API_VERSION = '2022-03-01-preview'
 
-  #baseURL: URL;
+  #baseURL: URL
 
-  constructor(settings: PublishedBotStrategySettings) {
-    const { schema, host } = settings;
+  constructor (settings: PublishedBotStrategySettings) {
+    const { schema, host } = settings
 
     this.#baseURL = new URL(
       `/copilotstudio/dataverse-backed/authenticated/bots/${schema}`,
       host
-    );
-    this.#baseURL.searchParams.append("api-version", this.API_VERSION);
+    )
+    this.#baseURL.searchParams.append('api-version', this.API_VERSION)
   }
 
-  public getConversationUrl(conversationId?: string): string {
-    this.#baseURL.pathname = `${this.#baseURL.pathname}/conversations`;
+  public getConversationUrl (conversationId?: string): string {
+    this.#baseURL.pathname = `${this.#baseURL.pathname}/conversations`
 
     if (conversationId) {
-       this.#baseURL.pathname = `${this.#baseURL.pathname}/${conversationId}`;
+      this.#baseURL.pathname = `${this.#baseURL.pathname}/${conversationId}`
     }
 
-    return this.#baseURL.href;
+    return this.#baseURL.href
   }
 }

@@ -3,14 +3,14 @@
  * Licensed under the MIT License.
  */
 
-import { AgentType } from "./agentType"
-import { CopilotStudioConnectionSettings } from "./copilotStudioConnectionSettings"
-import { PowerPlatformCloud } from "./powerPlatformCloud"
+import { AgentType } from './agentType'
+import { CopilotStudioConnectionSettings } from './copilotStudioConnectionSettings'
+import { PowerPlatformCloud } from './powerPlatformCloud'
 
 /**
  * Represents the settings required to establish a connection to Copilot Studio.
  */
-export class ConnectionSettings implements CopilotStudioConnectionSettings{
+export class ConnectionSettings implements CopilotStudioConnectionSettings {
   public appClientId?: string
   public tenantId?: string
   public environmentId?: string

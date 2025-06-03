@@ -22,16 +22,15 @@ export function getCopilotStudioConnectionUrl (
 ): string {
   let cloudValue: PowerPlatformCloud = PowerPlatformCloud.Prod
 
-  if(settings.directConnectUrl?.trim()){
+  if (settings.directConnectUrl?.trim()) {
     if (!isValidUri(settings.directConnectUrl)) {
       throw new Error('directConnectUrl must be a valid URL')
     }
 
     // FIX for Missing Tenant ID
-    if (settings.directConnectUrl.toLocaleLowerCase().includes("tenants/00000000-0000-0000-0000-000000000000"))
-    {
-      // Direct connection cannot be used, ejecting and forcing the normal settings flow: 
-      return getCopilotStudioConnectionUrl({...settings, directConnectUrl: ''}, conversationId);
+    if (settings.directConnectUrl.toLocaleLowerCase().includes('tenants/00000000-0000-0000-0000-000000000000')) {
+      // Direct connection cannot be used, ejecting and forcing the normal settings flow:
+      return getCopilotStudioConnectionUrl({ ...settings, directConnectUrl: '' }, conversationId)
     }
 
     return createURL(settings.directConnectUrl, conversationId).href
@@ -87,7 +86,7 @@ export function getCopilotStudioConnectionUrl (
   settings.customPowerPlatformCloud = isNotEmptyCustomPowerPlatformCloud ? settings.customPowerPlatformCloud : 'api.unknown.powerplatform.com'
 
   const host = getEnvironmentEndpoint(cloudValue, settings.environmentId, settings.customPowerPlatformCloud)
-  
+
   const strategy = {
     [AgentType.Published]: () => new PublishedBotStrategy({
       host,
@@ -111,25 +110,24 @@ function isValidUri (uri: string): boolean {
   }
 }
 
-function createURL(base: string, conversationId?: string): URL {
+function createURL (base: string, conversationId?: string): URL {
   const url = new URL(base)
-  url.searchParams.append("api-version", "2022-03-01-preview");
+  url.searchParams.append('api-version', '2022-03-01-preview')
 
-  if(url.pathname.endsWith('/')) {
-    url.pathname = url.pathname.slice(0, -1);
+  if (url.pathname.endsWith('/')) {
+    url.pathname = url.pathname.slice(0, -1)
   }
 
-  if(url.pathname.includes('/conversations')) {
-    url.pathname = url.pathname.substring(0, url.pathname.indexOf('/conversations'));
+  if (url.pathname.includes('/conversations')) {
+    url.pathname = url.pathname.substring(0, url.pathname.indexOf('/conversations'))
   }
-  
-  url.pathname = `${url.pathname}/conversations`;
+
+  url.pathname = `${url.pathname}/conversations`
   if (conversationId) {
-    url.pathname = `${url.pathname}/${conversationId}`;
+    url.pathname = `${url.pathname}/${conversationId}`
   }
 
   return url
-
 }
 
 function getEnvironmentEndpoint (
@@ -148,7 +146,7 @@ function getEnvironmentEndpoint (
   const hexPrefix = normalizedResourceId.substring(0, normalizedResourceId.length - idSuffixLength)
   const hexSuffix = normalizedResourceId.substring(normalizedResourceId.length - idSuffixLength)
 
-  return new URL(`https://${hexPrefix}.${hexSuffix}.environment.${getEndpointSuffix(cloud, cloudBaseAddress)}`);
+  return new URL(`https://${hexPrefix}.${hexSuffix}.environment.${getEndpointSuffix(cloud, cloudBaseAddress)}`)
 }
 
 function getEndpointSuffix (

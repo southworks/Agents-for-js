@@ -47,29 +47,29 @@ export class CopilotStudioClient {
   private async postRequestAsync (axiosConfig: AxiosRequestConfig): Promise<Activity[]> {
     const activities: Activity[] = []
 
-    if(this.settings.enableDiagnostics){
+    if (this.settings.enableDiagnostics) {
       this.logger(`>>> SEND TO ${axiosConfig.url}`)
     }
 
     const response = await this.client(axiosConfig)
 
-    if(this.settings.useExperimentalEndpoint && !this.settings.directConnectUrl?.trim()){
-      const isLandExperimentatlUrl = response.headers?.[CopilotStudioClient.isLandExperimentalUrlHeaderKey];
-      if(isLandExperimentatlUrl){
+    if (this.settings.useExperimentalEndpoint && !this.settings.directConnectUrl?.trim()) {
+      const isLandExperimentatlUrl = response.headers?.[CopilotStudioClient.isLandExperimentalUrlHeaderKey]
+      if (isLandExperimentatlUrl) {
         this.settings.directConnectUrl = isLandExperimentatlUrl
         this.logger(`Island Experimental URL: ${isLandExperimentatlUrl}`)
       }
     }
 
-    this.conversationId = response.headers?.[CopilotStudioClient.conversationIdHeaderKey] ?? '';
-    if(this.conversationId) {
+    this.conversationId = response.headers?.[CopilotStudioClient.conversationIdHeaderKey] ?? ''
+    if (this.conversationId) {
       this.logger(`Conversation ID: ${this.conversationId}`)
     }
 
-    if(this.settings.enableDiagnostics){
-      this.logger("=====================================================");
-      this.logger(`Headers: ${JSON.stringify(response.headers, null, 2)}`);
-      this.logger("=====================================================");
+    if (this.settings.enableDiagnostics) {
+      this.logger('=====================================================')
+      this.logger(`Headers: ${JSON.stringify(response.headers, null, 2)}`)
+      this.logger('=====================================================')
     }
 
     const stream = response.data
@@ -100,8 +100,8 @@ export class CopilotStudioClient {
           const act = Activity.fromJson(ve.substring(5, ve.length))
           if (act.type === ActivityTypes.Message) {
             activities.push(act)
-            if(!this.conversationId.trim()){
-              // Did not get it from the header. 
+            if (!this.conversationId.trim()) {
+              // Did not get it from the header.
               this.conversationId = act.conversation?.id ?? ''
               this.logger(`Conversation ID: ${this.conversationId}`)
             }
