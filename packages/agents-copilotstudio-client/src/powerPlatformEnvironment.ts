@@ -40,7 +40,7 @@ export function getCopilotStudioConnectionUrl (
   const isNotEmptyCloud = settings.cloud && settings.cloud.toString().trim() !== ''
   const isNotEmptyCustomPowerPlatformCloud = settings.customPowerPlatformCloud !== undefined && settings.customPowerPlatformCloud.trim() !== ''
 
-  if (isNotEmptyCloud && !Object.values(PowerPlatformCloud).includes(settings.cloud?.toString() ?? '')) {
+  if (isNotEmptyCloud && !Object.values(PowerPlatformCloud).includes(settings.cloud!)) {
     throw new Error('Invalid PowerPlatformCloud enum key')
   }
 
@@ -120,7 +120,7 @@ function createURL(base: string, conversationId?: string): URL {
   }
 
   if(url.pathname.includes('/conversations')) {
-    url.pathname = url.pathname.substring(0, url.pathname.indexOf('/conversations') - 1);
+    url.pathname = url.pathname.substring(0, url.pathname.indexOf('/conversations'));
   }
   
   url.pathname = `${url.pathname}/conversations`;

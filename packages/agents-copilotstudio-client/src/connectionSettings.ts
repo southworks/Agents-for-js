@@ -28,16 +28,19 @@ export class ConnectionSettings implements CopilotStudioConnectionSettings{
  * @returns The connection settings.
  */
 export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSettings = () => {
+  const cloudStr = process.env.cloud as keyof typeof PowerPlatformCloud | undefined
+  const agentStr = process.env.copilotAgentType as keyof typeof AgentType | undefined
+
   return {
-    appClientId: process.env.appClientId ?? '',
-    tenantId: process.env.tenantId ?? '',
-    environmentId: process.env.environmentId ?? '',
-    cloud: process.env.cloud,
+    appClientId: process.env.appClientId,
+    tenantId: process.env.tenantId,
+    environmentId: process.env.environmentId,
+    cloud: cloudStr ? PowerPlatformCloud[cloudStr] : undefined,
     customPowerPlatformCloud: process.env.customPowerPlatformCloud,
     agentIdentifier: process.env.agentIdentifier,
-    copilotAgentType: process.env.copilotAgentType,
+    copilotAgentType: agentStr ? AgentType[agentStr] : undefined,
     directConnectUrl: process.env.directConnectUrl,
-    useExperimentalEndpoint: process.env.useExperimentalEndpoint === 'true',
-    enableDiagnostics: process.env.enableDiagnostics === 'true'
-  } as ConnectionSettings
+    useExperimentalEndpoint: process.env.useExperimentalEndpoint?.toLocaleLowerCase() === 'true',
+    enableDiagnostics: process.env.enableDiagnostics?.toLocaleLowerCase() === 'true'
+  } satisfies ConnectionSettings
 }
