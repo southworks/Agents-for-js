@@ -19,8 +19,8 @@ export class ConnectionSettings implements CopilotStudioConnectionSettings {
   public agentIdentifier?: string
   public copilotAgentType?: AgentType
   public directConnectUrl?: string
-  public useExperimentalEndpoint: boolean = false
-  public enableDiagnostics: boolean = false
+  public useExperimentalEndpoint?: boolean = false
+  public enableDiagnostics?: boolean = false
 }
 
 /**

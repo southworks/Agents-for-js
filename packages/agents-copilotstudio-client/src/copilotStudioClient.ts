@@ -54,10 +54,10 @@ export class CopilotStudioClient {
     const response = await this.client(axiosConfig)
 
     if (this.settings.useExperimentalEndpoint && !this.settings.directConnectUrl?.trim()) {
-      const islandExperimentatlUrl = response.headers?.[CopilotStudioClient.islandExperimentalUrlHeaderKey]
-      if (islandExperimentatlUrl) {
-        this.settings.directConnectUrl = islandExperimentatlUrl
-        this.logger(`Island Experimental URL: ${islandExperimentatlUrl}`)
+      const islandExperimentalUrl = response.headers?.[CopilotStudioClient.islandExperimentalUrlHeaderKey]
+      if (islandExperimentalUrl) {
+        this.settings.directConnectUrl = islandExperimentalUrl
+        this.logger(`Island Experimental URL: ${islandExperimentalUrl}`)
       }
     }
 

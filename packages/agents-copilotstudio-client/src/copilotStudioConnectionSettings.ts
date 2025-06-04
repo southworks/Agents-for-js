@@ -29,8 +29,8 @@ export interface CopilotStudioConnectionSettings {
   directConnectUrl?: string
 
   /** Directs Copilot Studio Client to use the experimental endpoint if available. */
-  useExperimentalEndpoint: boolean
+  useExperimentalEndpoint?: boolean
 
   /** When enabled, writes out diagnostic information to the logsink. */
-  enableDiagnostics: boolean
+  enableDiagnostics?: boolean
 }
