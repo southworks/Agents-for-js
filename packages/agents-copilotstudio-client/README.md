@@ -71,7 +71,7 @@ The `ConnectionSettings` class can be configured using either instantiating the 
 
 There are a few options for configuring the `ConnectionSettings` class. The following are the most _common_ options:
 
-Using Envrionment ID and Copilot Studio Agent Schema Name:
+Using Environment ID and Copilot Studio Agent Schema Name:
 
 ```ts
 const settings: ConnectionSettings = {

@@ -26,12 +26,13 @@ export class PublishedBotStrategy implements Strategy {
   }
 
   public getConversationUrl (conversationId?: string): string {
-    this.#baseURL.pathname = `${this.#baseURL.pathname}/conversations`
+    const conversationUrl = new URL(this.#baseURL.href);
+    conversationUrl.pathname = `${conversationUrl.pathname}/conversations`;
 
     if (conversationId) {
-      this.#baseURL.pathname = `${this.#baseURL.pathname}/${conversationId}`
+      conversationUrl.pathname = `${conversationUrl.pathname}/${conversationId}`;
     }
 
-    return this.#baseURL.href
+    return conversationUrl.href;
   }
 }
