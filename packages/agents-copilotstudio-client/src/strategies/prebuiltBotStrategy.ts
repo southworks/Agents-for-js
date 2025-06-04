@@ -26,13 +26,13 @@ export class PrebuiltBotStrategy implements Strategy {
   }
 
   public getConversationUrl (conversationId?: string): string {
-    const conversationUrl = new URL(this.#baseURL.href);
-    conversationUrl.pathname = `${conversationUrl.pathname}/conversations`;
+    const conversationUrl = new URL(this.#baseURL.href)
+    conversationUrl.pathname = `${conversationUrl.pathname}/conversations`
 
     if (conversationId) {
-      conversationUrl.pathname = `${conversationUrl.pathname}/${conversationId}`;
+      conversationUrl.pathname = `${conversationUrl.pathname}/${conversationId}`
     }
 
-    return conversationUrl.href;
+    return conversationUrl.href
   }
 }
