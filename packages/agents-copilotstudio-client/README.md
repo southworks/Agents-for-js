@@ -56,7 +56,7 @@ This step will require permissions to edit application identities in your Azure 
         1.  For _Service Principal/Confidential Client_, choose `Application Permissions`
             1. In the permissions list choose `CopilotStudio` and Check `CopilotStudio.Copilots.Invoke`
             1. Click `Add Permissions`
-            1. A appropiate administrator must then `Grant Admin consent for copilotsdk` before the permissions will be available to the application.
+            1. An appropriate administrator must then `Grant Admin consent for copilotsdk` before the permissions will be available to the application.
     1.  Close Azure Portal
 
 > [!TIP]
@@ -89,7 +89,7 @@ const settings: ConnectionSettings = {
 ```
 
 > [!NOTE]
-> By default, its asumed your agent is in the Microsoft Public Cloud. If you are using a different cloud, you will need to set the `Cloud` property to the appropriate value. See the `PowerPlatformCloud` enum for the supported values
+> By default, it's assumed your agent is in the Microsoft Public Cloud. If you are using a different cloud, you will need to set the `Cloud` property to the appropriate value. See the `PowerPlatformCloud` enum for the supported values
 
 #### Using the .env file
 
@@ -97,7 +97,7 @@ You can use the `loadCopilotStudioConnectionSettingsFromEnv` function to load th
 
 The following are the most _common_ options:
 
-Using Envrionment ID and Copilot Studio Agent Schema Name:
+Using Environment ID and Copilot Studio Agent Schema Name:
 
 ```ini
 environmentId= your-environment-id
