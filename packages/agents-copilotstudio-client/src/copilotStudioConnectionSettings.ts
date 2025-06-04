@@ -25,7 +25,7 @@ export interface CopilotStudioConnectionSettings {
   /** The type of the Copilot agent. */
   copilotAgentType?: AgentType
 
-  /** URL provided to connect direclty to Copilot Studio endpoint, When provided all other settings are ignored. */
+  /** URL provided to connect direclty to Copilot Studio endpoint. When provided all other settings are ignored. */
   directConnectUrl?: string
 
   /** Directs Copilot Studio Client to use the experimental endpoint if available. */

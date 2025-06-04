@@ -21,7 +21,7 @@ export class CopilotStudioClient {
   /** Header key for conversation ID. */
   private static readonly conversationIdHeaderKey: string = 'x-ms-conversationid'
   /** Island Header key */
-  private static readonly isLandExperimentalUrlHeaderKey: string = 'x-ms-d2e-experimental'
+  private static readonly islandExperimentalUrlHeaderKey: string = 'x-ms-d2e-experimental'
 
   /** The ID of the current conversation. */
   private conversationId: string = ''
@@ -54,10 +54,10 @@ export class CopilotStudioClient {
     const response = await this.client(axiosConfig)
 
     if (this.settings.useExperimentalEndpoint && !this.settings.directConnectUrl?.trim()) {
-      const isLandExperimentatlUrl = response.headers?.[CopilotStudioClient.isLandExperimentalUrlHeaderKey]
-      if (isLandExperimentatlUrl) {
-        this.settings.directConnectUrl = isLandExperimentatlUrl
-        this.logger(`Island Experimental URL: ${isLandExperimentatlUrl}`)
+      const islandExperimentatlUrl = response.headers?.[CopilotStudioClient.islandExperimentalUrlHeaderKey]
+      if (islandExperimentatlUrl) {
+        this.settings.directConnectUrl = islandExperimentatlUrl
+        this.logger(`Island Experimental URL: ${islandExperimentatlUrl}`)
       }
     }
 
