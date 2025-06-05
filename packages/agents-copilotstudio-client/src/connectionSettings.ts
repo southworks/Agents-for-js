@@ -11,9 +11,9 @@ import { PowerPlatformCloud } from './powerPlatformCloud'
  * Represents the settings required to establish a connection to Copilot Studio.
  */
 export class ConnectionSettings implements CopilotStudioConnectionSettings {
-  public appClientId?: string
-  public tenantId?: string
-  public environmentId?: string
+  public appClientId: string = ''
+  public tenantId: string = ''
+  public environmentId: string = ''
   public cloud?: PowerPlatformCloud
   public customPowerPlatformCloud?: string
   public agentIdentifier?: string
@@ -32,9 +32,9 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
   const agentStr = process.env.copilotAgentType as keyof typeof AgentType | undefined
 
   return {
-    appClientId: process.env.appClientId,
-    tenantId: process.env.tenantId,
-    environmentId: process.env.environmentId,
+    appClientId: process.env.appClientId ?? '',
+    tenantId: process.env.tenantId ?? '',
+    environmentId: process.env.environmentId ?? '',
     cloud: cloudStr ? PowerPlatformCloud[cloudStr] : undefined,
     customPowerPlatformCloud: process.env.customPowerPlatformCloud,
     agentIdentifier: process.env.agentIdentifier,
