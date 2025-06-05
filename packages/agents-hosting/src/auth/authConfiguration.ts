@@ -84,6 +84,7 @@ export const loadAuthConfigFromEnv: () => AuthConfiguration = () => {
     certKeyFile: process.env.certKeyFile,
     connectionName: process.env.connectionName,
     FICClientId: process.env.FICClientId,
+    WIDAssertionFile: process.env.WIDAssertionFile,
     issuers: [
       'https://api.botframework.com',
       `https://sts.windows.net/${process.env.tenantId}/`,
