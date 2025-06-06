@@ -19,7 +19,6 @@ interface S2SConnectionSettings extends ConnectionSettings {
 }
 
 async function acquireS2SToken (baseConfig: msal.Configuration, settings: S2SConnectionSettings): Promise<string> {
-  console.log('Acquiring token using S2S connection...', settings.appClientSecret)
   const cca = new msal.ConfidentialClientApplication({
     ...baseConfig,
     auth: {
@@ -132,7 +131,6 @@ const askQuestion = async (copilotClient: CopilotStudioClient, conversationId: s
 const main = async () => {
   const copilotClient = await createClient()
   const act: Activity = await copilotClient.startConversationAsync(true)
-  console.log('\nSuggested Actions: ')
   act.suggestedActions?.actions.forEach((action: CardAction) => console.log(action.value))
   await askQuestion(copilotClient, act.conversation?.id!)
 }
