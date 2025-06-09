@@ -47,9 +47,7 @@ export class CopilotStudioClient {
   private async postRequestAsync (axiosConfig: AxiosRequestConfig): Promise<Activity[]> {
     const activities: Activity[] = []
 
-    if (this.settings.enableDiagnostics) {
-      this.logger(`>>> SEND TO ${axiosConfig.url}`)
-    }
+    this.logger(`>>> SEND TO ${axiosConfig.url}`)
 
     const response = await this.client(axiosConfig)
 
@@ -66,11 +64,9 @@ export class CopilotStudioClient {
       this.logger(`Conversation ID: ${this.conversationId}`)
     }
 
-    if (this.settings.enableDiagnostics) {
-      this.logger('=====================================================')
-      this.logger(`Headers: ${JSON.stringify(response.headers, null, 2)}`)
-      this.logger('=====================================================')
-    }
+    this.logger('=====================================================')
+    this.logger(`Headers: ${JSON.stringify(response.headers, null, 2)}`)
+    this.logger('=====================================================')
 
     const stream = response.data
     const reader = stream.pipeThrough(new TextDecoderStream()).getReader()

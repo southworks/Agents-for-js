@@ -30,7 +30,4 @@ export interface CopilotStudioConnectionSettings {
 
   /** Directs Copilot Studio Client to use the experimental endpoint if available. */
   useExperimentalEndpoint?: boolean
-
-  /** When enabled, writes out diagnostic information to the logsink. */
-  enableDiagnostics?: boolean
 }

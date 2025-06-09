@@ -112,7 +112,10 @@ function isValidUri (uri: string): boolean {
 
 function createURL (base: string, conversationId?: string): URL {
   const url = new URL(base)
-  url.searchParams.append('api-version', '2022-03-01-preview')
+
+  if (!url.searchParams.has('api-version')) {
+    url.searchParams.append('api-version', '2022-03-01-preview')
+  }
 
   if (url.pathname.endsWith('/')) {
     url.pathname = url.pathname.slice(0, -1)
