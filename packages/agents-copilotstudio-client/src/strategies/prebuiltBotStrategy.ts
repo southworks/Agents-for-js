@@ -12,21 +12,20 @@ export interface PrebuiltBotStrategySettings {
 
 export class PrebuiltBotStrategy implements Strategy {
   private readonly API_VERSION = '2022-03-01-preview'
-
-  #baseURL: URL
+  private baseURL: URL
 
   constructor (settings: PrebuiltBotStrategySettings) {
     const { identifier, host } = settings
 
-    this.#baseURL = new URL(
+    this.baseURL = new URL(
       `/copilotstudio/prebuilt/authenticated/bots/${identifier}`,
       host
     )
-    this.#baseURL.searchParams.append('api-version', this.API_VERSION)
+    this.baseURL.searchParams.append('api-version', this.API_VERSION)
   }
 
   public getConversationUrl (conversationId?: string): string {
-    const conversationUrl = new URL(this.#baseURL.href)
+    const conversationUrl = new URL(this.baseURL.href)
     conversationUrl.pathname = `${conversationUrl.pathname}/conversations`
 
     if (conversationId) {
