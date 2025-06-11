@@ -83,6 +83,11 @@ export class CopilotStudioClient {
   }
 
   private static getProductInfo (): string {
+    // TODO: check if this could be done differently
+    if (typeof window !== "undefined") {
+      return `CopilotStudioClient.agents-sdk-js/${pjson.version} ${os.platform()}-${os.arch()}/${os.release()}`
+    }
+
     return `CopilotStudioClient.agents-sdk-js/${pjson.version} nodejs/${process.version}  ${os.platform()}-${os.arch()}/${os.release()}`
   }
 
