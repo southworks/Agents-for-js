@@ -83,12 +83,8 @@ export class CopilotStudioClient {
   }
 
   private static getProductInfo (): string {
-    // TODO: check if this could be done differently
-    if (typeof window !== "undefined") {
-      return `CopilotStudioClient.agents-sdk-js/${pjson.version} ${os.platform()}-${os.arch()}/${os.release()}`
-    }
-
-    return `CopilotStudioClient.agents-sdk-js/${pjson.version} nodejs/${process.version}  ${os.platform()}-${os.arch()}/${os.release()}`
+    const info = typeof window !== 'undefined' && window.navigator ? navigator.userAgent : `nodejs/${process.version} ${os.platform()}-${os.arch()}/${os.release()}`
+    return `CopilotStudioClient.agents-sdk-js/${pjson.version} ${info}`
   }
 
   /**
@@ -145,7 +141,8 @@ export class CopilotStudioClient {
       url: uriExecute,
       headers: {
         Accept: 'text/event-stream',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': CopilotStudioClient.getProductInfo(),
       },
       data: qbody,
       responseType: 'stream',
