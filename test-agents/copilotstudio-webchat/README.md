@@ -37,7 +37,7 @@ This step requires permissions to create application identities in your Azure te
 3. Create a new App Registration:
     1. Provide a Name.
     2. Choose "Accounts in this organization directory only".
-    3. In "Select a Platform", choose "Public Client/native (mobile & desktop)".
+    3. In "Select a Platform", choose "Single-page application".
     4. In the Redirect URI box, enter `http://localhost` (**use HTTP, not HTTPS**).
     5. Click Register.
 4. In your new application:
