@@ -14,7 +14,7 @@ const require = createRequire(import.meta.url)
 export function dependency (library: string): RequestHandler {
   return (req, res, next) => {
     if (req.url !== `/${library}`) {
-      next()
+      return next()
     }
 
     return res.sendFile(require.resolve(library))
