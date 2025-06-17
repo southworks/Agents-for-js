@@ -16,7 +16,7 @@ Promise.all([
   }),
   build({
     platform: 'browser',
-    target: ['esnext'],
+    target: ['es2019'],
     format: 'esm',
     outExtension: { '.js': '.mjs' },
     sourcemap: true,
