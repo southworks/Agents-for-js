@@ -123,7 +123,7 @@ export class CopilotStudioClient {
   private static getProductInfo (): string {
     const version = `CopilotStudioClient.agents-sdk-js/${pjson.version}`
 
-    if(typeof window !== 'undefined' && window.navigator) {
+    if (typeof window !== 'undefined' && window.navigator) {
       return `${version} ${navigator.userAgent}`
     }
 
