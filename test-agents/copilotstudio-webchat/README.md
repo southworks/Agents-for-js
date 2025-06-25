@@ -55,6 +55,8 @@ This step requires permissions to create application identities in your Azure te
     - `agentIdentifier`: The Copilot Studio Schema name.
     - `tenantId`: The App Registration Directory (tenant) ID.
     - `appClientId`: The App Registration Application (client) ID.
+3. Alternatively, you can provide a direct URL to connect to Copilot Studio instead of specifying the `environmentId` and `agentIdentifier` values:
+    - `directConnectUrl`: The URL to connect to the Copilot Studio service.
 
 ## 5. Run the Sample
 
