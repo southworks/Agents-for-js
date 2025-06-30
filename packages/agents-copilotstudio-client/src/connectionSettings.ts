@@ -5,7 +5,10 @@
 
 import { AgentType } from './agentType'
 import { CopilotStudioConnectionSettings } from './copilotStudioConnectionSettings'
+import { debug } from './logger'
 import { PowerPlatformCloud } from './powerPlatformCloud'
+
+const logger = debug('copilot-studio:settings')
 
 /**
  * Represents the settings required to establish a connection to Copilot Studio.
@@ -39,7 +42,7 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
   const cloudStr = process.env.cloud as keyof typeof PowerPlatformCloud | undefined
   const agentStr = process.env.copilotAgentType as keyof typeof AgentType | undefined
 
-  return {
+  const settings = {
     appClientId: process.env.appClientId ?? '',
     tenantId: process.env.tenantId ?? '',
     environmentId: process.env.environmentId ?? '',
@@ -50,4 +53,7 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
     directConnectUrl: process.env.directConnectUrl,
     useExperimentalEndpoint: process.env.useExperimentalEndpoint?.toLocaleLowerCase() === 'true'
   } satisfies ConnectionSettings
+
+  logger.debug('Loading Copilot Studio connection settings from environment variables ...', settings)
+  return settings;
 }
