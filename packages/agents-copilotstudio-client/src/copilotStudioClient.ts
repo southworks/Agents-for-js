@@ -100,7 +100,7 @@ export class CopilotStudioClient {
               logger.debug(`Conversation ID: ${this.conversationId}`)
             }
           } else {
-            logger.debug(`Activity type: ${act.type}`, )
+            logger.debug(`Activity type: ${act.type}`)
           }
         } catch (e) {
           logger.error('Error: ', e)
@@ -128,7 +128,7 @@ export class CopilotStudioClient {
     }
 
     logger.debug(`User-Agent: ${userAgent}`)
-    return userAgent;
+    return userAgent
   }
 
   /**
@@ -152,7 +152,7 @@ export class CopilotStudioClient {
       adapter: 'fetch'
     }
 
-    logger.info(`Starting conversation ...`)
+    logger.info('Starting conversation ...')
     const values = await this.postRequestAsync(config)
     const act = values[0]
     logger.info(`Conversation '${act.conversation?.id}' started. Received ${values.length} activities.`, values)

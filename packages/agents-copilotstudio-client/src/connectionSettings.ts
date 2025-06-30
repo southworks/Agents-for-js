@@ -55,5 +55,5 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
   } satisfies ConnectionSettings
 
   logger.debug('Loading Copilot Studio connection settings from environment variables ...', settings)
-  return settings;
+  return settings
 }
