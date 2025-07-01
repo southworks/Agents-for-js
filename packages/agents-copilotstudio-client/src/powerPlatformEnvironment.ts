@@ -162,11 +162,11 @@ export function getTokenAudience (
 }
 function isValidUri (uri: string): boolean {
   try {
-    const newUri = new URL(uri)
+    const absoluteUrl = uri.startsWith('http') ? uri : `https://${uri}`
+    const newUri = new URL(absoluteUrl)
     return !!newUri
   } catch {
-    // Accept hostnames without scheme as "relative"
-    return /^[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})?$/.test(uri)
+    return false
   }
 }
 
