@@ -18,6 +18,9 @@ import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
 import { TurnEvents } from './turnEvents'
 import { TurnState } from './turnState'
+import { TranscriptLoggerMiddleware } from '../transcript'
+import { CloudAdapter } from '../cloudAdapter'
+import { AuthConfiguration, loadAuthConfigFromEnv } from '../auth'
 
 const logger = debug('agents:app')
 
@@ -108,6 +111,7 @@ export class AgentApplication<TState extends TurnState> {
       startTypingTimer: options?.startTypingTimer !== undefined ? options.startTypingTimer : false,
       longRunningMessages: options?.longRunningMessages !== undefined ? options.longRunningMessages : false,
       removeRecipientMention: options?.removeRecipientMention !== undefined ? options.removeRecipientMention : true,
+      transcriptLogger: options?.transcriptLogger || undefined,
     }
 
     this._adaptiveCards = new AdaptiveCardsActions<TState>(this)
@@ -123,6 +127,15 @@ export class AgentApplication<TState extends TurnState> {
     if (this._options.longRunningMessages && !this._adapter && !this._options.agentAppId) {
       throw new Error('The Application.longRunningMessages property is unavailable because no adapter was configured in the app.')
     }
+
+    if (this._options.transcriptLogger) {
+      if (!this._adapter) {
+        const authConfig: AuthConfiguration = loadAuthConfigFromEnv()
+        this._adapter = new CloudAdapter(authConfig)
+      }
+      this._adapter.use(new TranscriptLoggerMiddleware(this._options.transcriptLogger))
+    }
+
     logger.debug('AgentApplication created with options:', this._options)
   }
 
