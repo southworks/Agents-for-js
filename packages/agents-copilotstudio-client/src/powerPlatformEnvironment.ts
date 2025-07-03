@@ -5,7 +5,7 @@
 
 import { AgentType } from './agentType'
 import { ConnectionSettings } from './connectionSettings'
-import { debug } from './logger'
+import { debug } from '@microsoft/agents-activity/src/logger'
 import { PowerPlatformCloud } from './powerPlatformCloud'
 import { PrebuiltBotStrategy } from './strategies/prebuiltBotStrategy'
 import { PublishedBotStrategy } from './strategies/publishedBotStrategy'

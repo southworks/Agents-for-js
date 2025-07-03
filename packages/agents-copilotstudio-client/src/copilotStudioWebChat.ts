@@ -9,7 +9,7 @@ import { Activity, ConversationAccount } from '@microsoft/agents-activity'
 import { Observable, BehaviorSubject, type Observer } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
-import { debug } from './logger'
+import { debug } from '@microsoft/agents-activity/src/logger'
 
 const logger = debug('copilot-studio:webchat')
 

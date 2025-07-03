@@ -8,7 +8,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { getCopilotStudioConnectionUrl } from './powerPlatformEnvironment'
 import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-activity'
 import { ExecuteTurnRequest } from './executeTurnRequest'
-import { debug } from './logger'
+import { debug } from '@microsoft/agents-activity/src/logger'
 import pjson from '@microsoft/agents-copilotstudio-client/package.json'
 import os from 'os'
 
