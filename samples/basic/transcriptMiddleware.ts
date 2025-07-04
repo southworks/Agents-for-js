@@ -1,5 +1,5 @@
 import { startServer } from '@microsoft/agents-hosting-express'
-import { AgentApplication, TranscriptLogger, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { AgentApplication, CloudAdapter, loadAuthConfigFromEnv, TranscriptLogger, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { Activity } from '@microsoft/agents-activity'
 
 class TestLogger implements TranscriptLogger {
@@ -19,8 +19,9 @@ class TestLogger implements TranscriptLogger {
 }
 
 const logger: TestLogger = new TestLogger()
+const adapter = new CloudAdapter(loadAuthConfigFromEnv())
 
-const agent = new AgentApplication({ transcriptLogger: logger })
+const agent = new AgentApplication({ adapter, transcriptLogger: logger })
 
 agent.onConversationUpdate('membersAdded', async (context: TurnContext) => {
   await context.sendActivity('Welcome to the TranscriptMiddleware sample, send "list" to see the logged transcripts and "delete" to clean up the list.')

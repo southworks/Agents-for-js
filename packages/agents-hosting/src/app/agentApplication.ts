@@ -19,8 +19,6 @@ import { RouteSelector } from './routeSelector'
 import { TurnEvents } from './turnEvents'
 import { TurnState } from './turnState'
 import { TranscriptLoggerMiddleware } from '../transcript'
-import { CloudAdapter } from '../cloudAdapter'
-import { AuthConfiguration, loadAuthConfigFromEnv } from '../auth'
 
 const logger = debug('agents:app')
 
@@ -100,7 +98,8 @@ export class AgentApplication<TState extends TurnState> {
    *   storage: myStorage,
    *   adapter: myAdapter,
    *   startTypingTimer: true,
-   *   authorization: { connectionName: 'oauth' }
+   *   authorization: { connectionName: 'oauth' },
+   *   transcriptLogger: myTranscriptLogger,
    * });
    * ```
    */
@@ -129,13 +128,12 @@ export class AgentApplication<TState extends TurnState> {
     }
 
     if (this._options.transcriptLogger) {
-      if (!this._adapter) {
-        const authConfig: AuthConfiguration = loadAuthConfigFromEnv()
-        this._adapter = new CloudAdapter(authConfig)
+      if (!this._options.adapter) {
+        throw new Error('The Application.transcriptLogger property is unavailable because no adapter was configured in the app.')
+      } else {
+        this._adapter?.use(new TranscriptLoggerMiddleware(this._options.transcriptLogger))
       }
-      this._adapter.use(new TranscriptLoggerMiddleware(this._options.transcriptLogger))
     }
-
     logger.debug('AgentApplication created with options:', this._options)
   }
 

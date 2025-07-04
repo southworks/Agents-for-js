@@ -190,4 +190,10 @@ describe('Application', () => {
     const calledWith = useStub.getCall(0).args[0]
     assert.equal(calledWith.constructor.name, 'TranscriptLoggerMiddleware')
   })
+
+  it('should throw for transcriptLogger when no adapter is provided', async () => {
+    const logger = new ConsoleTranscriptLogger()
+
+    assert.throws(() => new AgentApplication({ transcriptLogger: logger }))
+  })
 })
