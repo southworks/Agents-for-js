@@ -28,7 +28,7 @@ agent.onActivity('message', async (context: TurnContext, state: TurnState) => {
   await context.streamingResponse.queueInformativeUpdate('starting streaming response')
   await sleep(1000)
   for (let i = 0; i < 5; i++) {
-    console.log(`Streaming chunk ${i + 1}`)
+    // console.log(`Streaming chunk ${i + 1}`)
     await context.streamingResponse.queueTextChunk(`part [${i + 1}] `)
     await sleep(i * 500)
   }
