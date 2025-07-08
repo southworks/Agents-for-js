@@ -1,24 +1,17 @@
+/*
+ **********************************************************************************************************
+ * This sample requires the Storage emulator to be running or an Azure Storage account connection string.
+ **********************************************************************************************************
+ */
+
 import { startServer } from '@microsoft/agents-hosting-express'
-import { AgentApplication, CloudAdapter, loadAuthConfigFromEnv, TranscriptLogger, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { Activity } from '@microsoft/agents-activity'
+import { AgentApplication, CloudAdapter, loadAuthConfigFromEnv, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { BlobsTranscriptStore } from '@microsoft/agents-hosting-storage-blob'
 
-class TestLogger implements TranscriptLogger {
-  transcripts: Activity[] = []
+const logger: BlobsTranscriptStore = new BlobsTranscriptStore(
+  'UseDevelopmentStorage=true', // or your Azure Storage connection string
+  'transcripts') // container name
 
-  logActivity (activity: any): void {
-    this.transcripts.push(activity)
-  }
-
-  getTranscripts (): Activity[] {
-    return this.transcripts || []
-  }
-
-  deleteTranscript (): void {
-    this.transcripts = []
-  }
-}
-
-const logger: TestLogger = new TestLogger()
 const adapter = new CloudAdapter(loadAuthConfigFromEnv())
 
 const agent = new AgentApplication({ adapter, transcriptLogger: logger })
@@ -28,15 +21,16 @@ agent.onConversationUpdate('membersAdded', async (context: TurnContext) => {
 })
 
 agent.onMessage('list', async (context: TurnContext) => {
-  const transcripts = logger.getTranscripts()
+  const activity = context.activity
+  const transcripts = await logger.getTranscriptActivities(activity.channelId ?? '', activity.conversation?.id ?? '')
   await context.sendActivity('This is the list of logged transcripts:')
-  for (const activity of transcripts) {
-    await context.sendActivity(`Type: ${activity.type}, Text: ${activity.text || 'No text'}`)
+  for (const activity of transcripts.items) {
+    await context.sendActivity(`Type: ${activity.type}, Text: ${activity.text ?? 'no text'}`)
   }
 })
 
 agent.onMessage('delete', async (context: TurnContext) => {
-  logger.deleteTranscript()
+  logger.deleteTranscript(context.activity.channelId ?? '', context.activity.conversation?.id ?? '')
   await context.sendActivity('Transcripts deleted!')
 })
 
