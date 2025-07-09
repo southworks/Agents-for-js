@@ -161,13 +161,12 @@ export class CopilotStudioWebChat {
 }
 
 /**
- * Creates an obserbable that allows executing an asynchronous function.
+ * Creates an observable that allows executing an asynchronous function.
  * @param fn - The function to execute.
  * @returns A new observable.
  */
 function createObservable<T> (fn: (subscriber: Subscriber<T>) => void): Observable<T> {
   return new Observable<T>((subscriber) => {
-    // Do not return a promise to the Observable, as it will not work with the TeardownLogic it receives.
-    fn(subscriber)
+    Promise.resolve(fn(subscriber)).catch((error) => subscriber.error(error))
   })
 }
