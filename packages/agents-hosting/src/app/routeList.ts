@@ -5,7 +5,7 @@
 
 import { AppRoute } from './appRoute'
 import { RouteHandler } from './routeHandler'
-import { RouteRank } from './RouteRank'
+import { RouteRank } from './routeRank'
 import { RouteSelector } from './routeSelector'
 import { TurnState } from './turnState'
 

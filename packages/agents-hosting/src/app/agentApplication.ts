@@ -17,7 +17,7 @@ import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
 import { TurnEvents } from './turnEvents'
 import { TurnState } from './turnState'
-import { RouteRank } from './RouteRank'
+import { RouteRank } from './routeRank'
 import { RouteList } from './routeList'
 
 const logger = debug('agents:app')
