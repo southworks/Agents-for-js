@@ -6,7 +6,7 @@
 import { v4 as uuid } from 'uuid'
 
 import { Activity, ConversationAccount } from '@microsoft/agents-activity'
-import { Observable, BehaviorSubject, type Observer } from 'rxjs'
+import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
 import { debug } from '@microsoft/agents-activity/src/logger'
@@ -80,27 +80,25 @@ export class CopilotStudioWebChat {
   ):CopilotStudioWebChatConnection {
     logger.info('--> Creating connection between Copilot Studio and WebChat ...')
     let sequence = 0
-    let activityObserver: Observer<Partial<Activity>> | undefined
+    let activitySubscriber: Subscriber<Partial<Activity>> | undefined
     let conversation: ConversationAccount | undefined
 
     const connectionStatus$ = new BehaviorSubject(0)
-    const activity$ = Observable.create(
-      async (observer: Observer<Partial<Activity>>) => {
-        activityObserver = observer
+    const activity$ = createObservable<Partial<Activity>>(async (subscriber) => {
+      activitySubscriber = subscriber
 
-        if (connectionStatus$.value < 2) {
-          connectionStatus$.next(2)
-          return
-        }
-
-        logger.info('--> Connection established.')
-        notifyTyping()
-        const activity = await client.startConversationAsync()
-        conversation = activity.conversation
-        sequence = 0
-        notifyActivity(activity)
+      if (connectionStatus$.value < 2) {
+        connectionStatus$.next(2)
+        return
       }
-    )
+
+      logger.info('--> Connection established.')
+      notifyTyping()
+      const activity = await client.startConversationAsync()
+      conversation = activity.conversation
+      sequence = 0
+      notifyActivity(activity)
+    })
 
     const notifyActivity = (activity: Partial<Activity>) => {
       const newActivity = {
@@ -112,7 +110,7 @@ export class CopilotStudioWebChat {
         },
       }
       logger.debug(`Notify '${newActivity.type}' activity to WebChat:`, newActivity)
-      activityObserver?.next(newActivity)
+      activitySubscriber?.next(newActivity)
     }
 
     const notifyTyping = () => {
@@ -136,11 +134,11 @@ export class CopilotStudioWebChat {
           throw new Error('Activity text cannot be empty.')
         }
 
-        if (!activityObserver) {
-          throw new Error('Activity observer is not initialized.')
+        if (!activitySubscriber) {
+          throw new Error('Activity subscriber is not initialized.')
         }
 
-        return Observable.create(async (observer: Observer<string>) => {
+        return createObservable<string>(async (subscriber) => {
           try {
             const id = uuid()
 
@@ -154,12 +152,12 @@ export class CopilotStudioWebChat {
               notifyActivity(responseActivity)
             }
 
-            observer.next(id)
-            observer.complete()
+            subscriber.next(id)
+            subscriber.complete()
             logger.info('--> Activity received correctly from Copilot Studio.')
           } catch (error) {
             logger.error('Error sending Activity to Copilot Studio:', error)
-            observer.error(error)
+            subscriber.error(error)
           }
         })
       },
@@ -167,12 +165,22 @@ export class CopilotStudioWebChat {
       end () {
         logger.info('--> Ending connection between Copilot Studio and WebChat ...')
         connectionStatus$.complete()
-        activity$.complete()
-        if (activityObserver) {
-          activityObserver.complete()
-          activityObserver = undefined
+        if (activitySubscriber) {
+          activitySubscriber.complete()
+          activitySubscriber = undefined
         }
       },
     }
   }
+}
+
+/**
+ * Creates an observable that allows executing an asynchronous function.
+ * @param fn - The function to execute.
+ * @returns A new observable.
+ */
+function createObservable<T> (fn: (subscriber: Subscriber<T>) => void): Observable<T> {
+  return new Observable<T>((subscriber) => {
+    Promise.resolve(fn(subscriber)).catch((error) => subscriber.error(error))
+  })
 }
