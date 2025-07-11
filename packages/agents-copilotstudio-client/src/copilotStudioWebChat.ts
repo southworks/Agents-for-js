@@ -92,7 +92,7 @@ export class CopilotStudioWebChat {
         return
       }
 
-      logger.info('--> Connection established.')
+      logger.debug('--> Connection established.')
       notifyTyping()
       const activity = await client.startConversationAsync()
       conversation = activity.conversation

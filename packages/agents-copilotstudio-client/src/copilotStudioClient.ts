@@ -70,7 +70,10 @@ export class CopilotStudioClient {
       logger.debug(`Conversation ID: ${this.conversationId}`)
     }
 
-    logger.debug('Headers received:', response.headers)
+    const sanitizedHeaders = { ...response.headers }
+    delete sanitizedHeaders['Authorization']
+    delete sanitizedHeaders[CopilotStudioClient.conversationIdHeaderKey]
+    logger.debug('Headers received:', sanitizedHeaders)
 
     const stream = response.data
     const reader = stream.pipeThrough(new TextDecoderStream()).getReader()
@@ -79,7 +82,7 @@ export class CopilotStudioClient {
 
     const processEvents = async ({ done, value }: streamRead): Promise<string[]> => {
       if (done) {
-        logger.info('Stream complete')
+        logger.debug('Stream complete')
         result += value
         results.push(result)
         return results

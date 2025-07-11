@@ -32,7 +32,7 @@ export function getCopilotStudioConnectionUrl (
     }
 
     // FIX for Missing Tenant ID
-    if (settings.directConnectUrl.toLocaleLowerCase().includes('tenants/00000000-0000-0000-0000-000000000000')) {
+    if (settings.directConnectUrl.toLowerCase().includes('tenants/00000000-0000-0000-0000-000000000000')) {
       logger.debug(`Direct connection cannot be used, forcing default settings flow. Tenant ID is missing in the URL: ${settings.directConnectUrl}`)
       // Direct connection cannot be used, ejecting and forcing the normal settings flow:
       return getCopilotStudioConnectionUrl({ ...settings, directConnectUrl: '' }, conversationId)
@@ -108,7 +108,7 @@ export function getCopilotStudioConnectionUrl (
   }[agentType]()
 
   const url = strategy.getConversationUrl(conversationId)
-  logger.debug(`Generated Copilot Studio connection URL: ${url}`, url)
+  logger.debug(`Generated Copilot Studio connection URL: ${url}`)
   return url
 }
 
