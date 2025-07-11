@@ -8,7 +8,7 @@ import { MessageFactory } from '../../../src/messageFactory'
 import { TurnContext } from '../../../src/turnContext'
 import { RouteList } from './../../../src/app/routeList'
 import { TurnState } from '../../app/turnState'
-import { RouteRank } from './../../../src/app/RouteRank'
+import { RouteRank } from './../../../src/app/routeRank'
 
 const createTestActivity = () => Activity.fromObject({
   type: 'message',

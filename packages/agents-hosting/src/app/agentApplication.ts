@@ -241,6 +241,7 @@ export class AgentApplication<TState extends TurnState> {
    * @param type - The activity type(s) to handle. Can be a string, RegExp, RouteSelector, or array of these types.
    * @param handler - The handler function that will be called when the specified activity type is received.
    * @param authHandlers - Array of authentication handler names for this activity. Defaults to empty array.
+   * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -257,11 +258,12 @@ export class AgentApplication<TState extends TurnState> {
   public onActivity (
     type: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: string[] = []
+    authHandlers: string[] = [],
+    rank: RouteRank = RouteRank.Unspecified
   ): this {
     (Array.isArray(type) ? type : [type]).forEach((t) => {
       const selector = this.createActivitySelector(t)
-      this.addRoute(selector, handler, false, RouteRank.Unspecified, authHandlers)
+      this.addRoute(selector, handler, false, rank, authHandlers)
     })
     return this
   }
@@ -272,6 +274,7 @@ export class AgentApplication<TState extends TurnState> {
    * @param event - The conversation update event to handle (e.g., 'membersAdded', 'membersRemoved').
    * @param handler - The handler function that will be called when the specified event occurs.
    * @param authHandlers - Array of authentication handler names for this event. Defaults to empty array.
+   * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    * @throws Error if the handler is not a function.
    *
@@ -293,7 +296,8 @@ export class AgentApplication<TState extends TurnState> {
   public onConversationUpdate (
     event: ConversationUpdateEvents,
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: string[] = []
+    authHandlers: string[] = [],
+    rank: RouteRank = RouteRank.Unspecified
   ): this {
     if (typeof handler !== 'function') {
       throw new Error(
@@ -302,7 +306,7 @@ export class AgentApplication<TState extends TurnState> {
     }
 
     const selector = this.createConversationUpdateSelector(event)
-    this.addRoute(selector, handler, false, RouteRank.Unspecified, authHandlers)
+    this.addRoute(selector, handler, false, rank, authHandlers)
     return this
   }
 
@@ -346,6 +350,7 @@ export class AgentApplication<TState extends TurnState> {
    *                  Can be a string, RegExp, RouteSelector, or array of these types.
    * @param handler - The handler function that will be called when a matching message is received.
    * @param authHandlers - Array of authentication handler names for this message handler. Defaults to empty array.
+   * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -368,11 +373,12 @@ export class AgentApplication<TState extends TurnState> {
   public onMessage (
     keyword: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: string[] = []
+    authHandlers: string[] = [],
+    rank: RouteRank = RouteRank.Unspecified
   ): this {
     (Array.isArray(keyword) ? keyword : [keyword]).forEach((k) => {
       const selector = this.createMessageSelector(k)
-      this.addRoute(selector, handler, false, RouteRank.Unspecified, authHandlers)
+      this.addRoute(selector, handler, false, rank, authHandlers)
     })
     return this
   }
@@ -439,6 +445,7 @@ export class AgentApplication<TState extends TurnState> {
    * Adds a handler for message reaction added events.
    *
    * @param handler - The handler function that will be called when a message reaction is added.
+   * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -455,14 +462,16 @@ export class AgentApplication<TState extends TurnState> {
    * });
    * ```
    */
-  public onMessageReactionAdded (handler: (context: TurnContext, state: TState) => Promise<void>): this {
+  public onMessageReactionAdded (
+    handler: (context: TurnContext, state: TState) => Promise<void>,
+    rank: RouteRank = RouteRank.Unspecified): this {
     const selector = async (context: TurnContext): Promise<boolean> => {
       return context.activity.type === ActivityTypes.MessageReaction &&
              Array.isArray(context.activity.reactionsAdded) &&
              context.activity.reactionsAdded.length > 0
     }
 
-    this.addRoute(selector, handler)
+    this.addRoute(selector, handler, false, rank)
     return this
   }
 
@@ -470,6 +479,7 @@ export class AgentApplication<TState extends TurnState> {
    * Adds a handler for message reaction removed events.
    *
    * @param handler - The handler function that will be called when a message reaction is removed.
+   * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -486,14 +496,16 @@ export class AgentApplication<TState extends TurnState> {
    * });
    * ```
    */
-  public onMessageReactionRemoved (handler: (context: TurnContext, state: TState) => Promise<void>): this {
+  public onMessageReactionRemoved (
+    handler: (context: TurnContext, state: TState) => Promise<void>,
+    rank: RouteRank = RouteRank.Unspecified): this {
     const selector = async (context: TurnContext): Promise<boolean> => {
       return context.activity.type === ActivityTypes.MessageReaction &&
              Array.isArray(context.activity.reactionsRemoved) &&
              context.activity.reactionsRemoved.length > 0
     }
 
-    this.addRoute(selector, handler)
+    this.addRoute(selector, handler, false, rank)
     return this
   }
 
