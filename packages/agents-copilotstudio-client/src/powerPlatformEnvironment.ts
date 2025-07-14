@@ -23,9 +23,7 @@ export function getCopilotStudioConnectionUrl (
   settings: ConnectionSettings,
   conversationId?: string
 ): string {
-  let cloudValue: PowerPlatformCloud = PowerPlatformCloud.Prod
-
-  if (settings.directConnectUrl?.trim()) {
+  if (!!settings.directConnectUrl?.trim()) {
     logger.debug(`Using direct connection: ${settings.directConnectUrl}`)
     if (!isValidUri(settings.directConnectUrl)) {
       throw new Error('directConnectUrl must be a valid URL')
@@ -41,36 +39,25 @@ export function getCopilotStudioConnectionUrl (
     return createURL(settings.directConnectUrl, conversationId).href
   }
 
-  const isNotEmptyCloud = settings.cloud && settings.cloud.toString().trim() !== ''
-  const isNotEmptyCustomPowerPlatformCloud = settings.customPowerPlatformCloud !== undefined && settings.customPowerPlatformCloud.trim() !== ''
+  const cloudSetting = settings.cloud ?? PowerPlatformCloud.Prod
+  const agentType = settings.copilotAgentType ?? AgentType.Published
 
-  if (isNotEmptyCloud && !Object.values(PowerPlatformCloud).includes(settings.cloud!)) {
-    throw new Error('Invalid PowerPlatformCloud enum key')
-  }
-
-  const cloudSetting = isNotEmptyCloud ? settings.cloud! : PowerPlatformCloud.Unknown
-
-  if (cloudSetting === PowerPlatformCloud.Other && isNotEmptyCustomPowerPlatformCloud) {
-    throw new Error('customPowerPlatformCloud must be provided when PowerPlatformCloud is Other')
-  }
+  logger.debug(`Using cloud setting: ${cloudSetting}`)
+  logger.debug(`Using agent type: ${agentType}`)
 
   if (!settings.environmentId?.trim()) {
     throw new Error('EnvironmentId must be provided')
   }
 
-  if (settings.agentIdentifier === undefined || settings.agentIdentifier.trim() === '') {
+  if (!settings.agentIdentifier?.trim()) {
     throw new Error('AgentIdentifier must be provided')
   }
 
-  if (cloudSetting !== PowerPlatformCloud.Unknown) {
-    logger.debug(`Using specified cloud setting: ${cloudSetting}`)
-    cloudValue = cloudSetting
-  }
-
   if (cloudSetting === PowerPlatformCloud.Other) {
-    if (isNotEmptyCustomPowerPlatformCloud && isValidUri(settings.customPowerPlatformCloud!)) {
+    if(!settings.customPowerPlatformCloud?.trim()) {
+      throw new Error('customPowerPlatformCloud must be provided when PowerPlatformCloud is Other')
+    } else if (isValidUri(settings.customPowerPlatformCloud)) {
       logger.debug(`Using custom Power Platform cloud: ${settings.customPowerPlatformCloud}`)
-      cloudValue = PowerPlatformCloud.Other
     } else {
       throw new Error(
         'customPowerPlatformCloud must be a valid URL'
@@ -78,23 +65,7 @@ export function getCopilotStudioConnectionUrl (
     }
   }
 
-  let agentType: AgentType
-
-  if (settings.copilotAgentType && settings.copilotAgentType.toString().trim() !== '') {
-    if (!Object.values(AgentType).includes(settings.copilotAgentType)) {
-      throw new Error('Invalid AgentType enum key')
-    } else {
-      logger.debug(`Using specified agent type: ${settings.copilotAgentType}`)
-      agentType = settings.copilotAgentType
-    }
-  } else {
-    logger.debug('Using default agent type: Published')
-    agentType = AgentType.Published
-  }
-
-  settings.customPowerPlatformCloud = isNotEmptyCustomPowerPlatformCloud ? settings.customPowerPlatformCloud : 'api.unknown.powerplatform.com'
-
-  const host = getEnvironmentEndpoint(cloudValue, settings.environmentId, settings.customPowerPlatformCloud)
+  const host = getEnvironmentEndpoint(cloudSetting, settings.environmentId, settings.customPowerPlatformCloud)
 
   const strategy = {
     [AgentType.Published]: () => new PublishedBotStrategy({

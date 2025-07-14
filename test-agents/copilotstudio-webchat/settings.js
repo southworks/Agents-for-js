@@ -3,11 +3,13 @@
  * Licensed under the MIT License.
  */
 
+import { ConnectionSettings } from '@microsoft/agents-copilotstudio-client'
+
 // Flag to enable debug mode, which will store the debug information in localStorage.
 // Copilot Studio Client uses the "debug" library for logging (https://github.com/debug-js/debug?tab=readme-ov-file#browser-support).
 window.localStorage.debug = 'copilot-studio:*'
 
-export const settings = {
+export const settings = new ConnectionSettings({
   // App ID of the App Registration used to log in, this should be in the same tenant as the Copilot.
   appClientId: '',
   // Tenant ID of the App Registration used to log in, this should be in the same tenant as the Copilot.
@@ -17,13 +19,13 @@ export const settings = {
   // Schema Name of the Copilot to use.
   agentIdentifier: '',
   // PowerPlatformCloud enum key.
-  cloud: '',
+  cloud: null,
   // Power Platform API endpoint to use if Cloud is configured as "Other".
-  customPowerPlatformCloud: '',
+  customPowerPlatformCloud: null,
   // AgentType enum key.
-  copilotAgentType: '',
+  copilotAgentType: null,
   // URL used to connect to the Copilot Studio service.
-  directConnectUrl: '',
+  directConnectUrl: null,
   // Flag to use the "x-ms-d2e-experimental" header URL on subsequent calls to the Copilot Studio service.
   useExperimentalEndpoint: false,
-}
+})
