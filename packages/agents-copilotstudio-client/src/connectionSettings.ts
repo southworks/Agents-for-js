@@ -43,32 +43,32 @@ export class ConnectionSettings extends ConnectionOptions {
   /**
    * Default constructor for the ConnectionSettings class.
    */
-  constructor()
+  constructor ()
 
   /**
    * Creates an instance of ConnectionSettings.
    * @param options Represents the settings required to establish a direct connection to the engine.
    */
-  constructor(options: ConnectionOptions)
+  constructor (options: ConnectionOptions)
 
   /**
    * @private
    */
-  constructor(options?: ConnectionOptions){
+  constructor (options?: ConnectionOptions) {
     super()
 
-    if(!options){
-      return this;
+    if (!options) {
+      return this
     }
 
     const cloud = options.cloud ?? PowerPlatformCloud.Prod
     const copilotAgentType = options.copilotAgentType ?? AgentType.Published
 
-    if(!Object.values(PowerPlatformCloud).includes(cloud as PowerPlatformCloud)){
+    if (!Object.values(PowerPlatformCloud).includes(cloud as PowerPlatformCloud)) {
       throw new Error(`Invalid PowerPlatformCloud: '${cloud}'. Supported values: ${Object.values(PowerPlatformCloud).join(', ')}`)
     }
 
-    if(!Object.values(AgentType).includes(copilotAgentType as AgentType)){
+    if (!Object.values(AgentType).includes(copilotAgentType as AgentType)) {
       throw new Error(`Invalid AgentType: '${copilotAgentType}'. Supported values: ${Object.values(AgentType).join(', ')}`)
     }
 

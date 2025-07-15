@@ -23,7 +23,7 @@ export function getCopilotStudioConnectionUrl (
   settings: ConnectionSettings,
   conversationId?: string
 ): string {
-  if (!!settings.directConnectUrl?.trim()) {
+  if (settings.directConnectUrl?.trim()) {
     logger.debug(`Using direct connection: ${settings.directConnectUrl}`)
     if (!isValidUri(settings.directConnectUrl)) {
       throw new Error('directConnectUrl must be a valid URL')
@@ -54,7 +54,7 @@ export function getCopilotStudioConnectionUrl (
   }
 
   if (cloudSetting === PowerPlatformCloud.Other) {
-    if(!settings.customPowerPlatformCloud?.trim()) {
+    if (!settings.customPowerPlatformCloud?.trim()) {
       throw new Error('customPowerPlatformCloud must be provided when PowerPlatformCloud is Other')
     } else if (isValidUri(settings.customPowerPlatformCloud)) {
       logger.debug(`Using custom Power Platform cloud: ${settings.customPowerPlatformCloud}`)
