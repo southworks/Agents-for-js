@@ -29,6 +29,8 @@ export class ConnectionSettings implements CopilotStudioConnectionSettings {
   public directConnectUrl?: string
   /** Flag to use the experimental endpoint if available */
   public useExperimentalEndpoint?: boolean = false
+  /** The login authority to use for the connection */
+  public authority?: string = ''
 }
 
 /**
@@ -48,6 +50,7 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
     agentIdentifier: process.env.agentIdentifier,
     copilotAgentType: agentStr ? AgentType[agentStr] : AgentType.Published,
     directConnectUrl: process.env.directConnectUrl,
-    useExperimentalEndpoint: process.env.useExperimentalEndpoint?.toLocaleLowerCase() === 'true'
+    useExperimentalEndpoint: process.env.useExperimentalEndpoint?.toLocaleLowerCase() === 'true',
+    authority: process.env.authorityEndpoint ?? 'https://login.microsoftonline.com'
   } satisfies ConnectionSettings
 }

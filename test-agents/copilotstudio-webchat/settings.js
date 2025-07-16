@@ -26,4 +26,5 @@ export const settings = {
   directConnectUrl: '',
   // Flag to use the "x-ms-d2e-experimental" header URL on subsequent calls to the Copilot Studio service.
   useExperimentalEndpoint: false,
+  authority: 'https://login.microsoftonline.com', // Authority endpoint for the Azure AD login. Default is 'https://login.microsoftonline.com'.
 }
