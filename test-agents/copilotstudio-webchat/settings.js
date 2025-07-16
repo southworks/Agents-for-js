@@ -19,13 +19,13 @@ export const settings = new ConnectionSettings({
   // Schema Name of the Copilot to use.
   agentIdentifier: '',
   // PowerPlatformCloud enum key.
-  cloud: null,
+  cloud: undefined,
   // Power Platform API endpoint to use if Cloud is configured as "Other".
-  customPowerPlatformCloud: null,
+  customPowerPlatformCloud: undefined,
   // AgentType enum key.
-  copilotAgentType: null,
+  copilotAgentType: undefined,
   // URL used to connect to the Copilot Studio service.
-  directConnectUrl: null,
+  directConnectUrl: undefined,
   // Flag to use the "x-ms-d2e-experimental" header URL on subsequent calls to the Copilot Studio service.
   useExperimentalEndpoint: false,
 })

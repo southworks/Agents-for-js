@@ -58,7 +58,7 @@ export class ConnectionSettings extends ConnectionOptions {
     super()
 
     if (!options) {
-      return this
+      return
     }
 
     const cloud = options.cloud ?? PowerPlatformCloud.Prod
