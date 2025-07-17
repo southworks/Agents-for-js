@@ -15,7 +15,7 @@ export const settings = new ConnectionSettings({
   // Tenant ID of the App Registration used to log in, this should be in the same tenant as the Copilot.
   tenantId: '',
   // Authority endpoint for the Azure AD login. Default is 'https://login.microsoftonline.com'.
-  authority: 'https://login.microsoftonline.com',
+  authority: '',
   // Environment ID of the environment with the Copilot Studio App.
   environmentId: '',
   // Schema Name of the Copilot to use.
