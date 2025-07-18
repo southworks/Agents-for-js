@@ -29,7 +29,7 @@ export function getHeadersToPropagate (headers: Record<string, string | string[]
   // Add headers if not present
   for (const [key, value] of Object.entries(definition.add ?? {})) {
     const lowerKey = key.toLowerCase()
-    if (!normalizedHeaders[lowerKey] || !result[lowerKey]) {
+    if (!normalizedHeaders[lowerKey] && !result[lowerKey]) {
       result[lowerKey] = value
     }
   }
@@ -37,7 +37,7 @@ export function getHeadersToPropagate (headers: Record<string, string | string[]
   // Concat headers if present
   for (const [key, value] of Object.entries(definition.concat ?? {})) {
     const lowerKey = key.toLowerCase()
-    if (normalizedHeaders[lowerKey] || !result[lowerKey]) {
+    if (normalizedHeaders[lowerKey] && !result[lowerKey]) {
       result[lowerKey] = `${normalizedHeaders[lowerKey]} ${value}`
     }
   }
@@ -73,25 +73,25 @@ function normalizeHeaders (headers: Record<string, string | string[] | undefined
 interface FilterDefinition {
   /**
    * Propagates the incoming header value to the header to propagate collection based on the header definition key.
-   * If the header does not exists in the collection, it will be ignored.
+   * If the header does not exist in the collection, it will be ignored.
    */
   propagate?: string[];
 
   /**
    * Adds a header definition to the header to propagate collection.
-   * If the header already exists in the collection, it will be ignored.
+   * If the header already exist in the collection, it will be ignored.
    */
   add?: Record<string, string>;
 
   /**
    * Concat a header definition to the header to propagate collection.
-   * If the header does not exists in the collection, it will be ignored.
+   * If the header does not exist in the collection, it will be ignored.
    */
   concat?: Record<string, string>;
 
   /**
    * Overrides a header definition to the header to propagate collection.
-   * If the header does not exists in the collection, it will add it.
+   * If the header does not exist in the collection, it will add it.
    */
   override?: Record<string, string>;
 }

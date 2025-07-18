@@ -205,7 +205,7 @@ export class CloudAdapter extends BaseAdapter {
     res: Response,
     logic: (context: TurnContext) => Promise<void>): Promise<void> {
     const headers = getHeadersToPropagate(request.headers)
-    if (headers.length) {
+    if (Object.keys(headers).length > 0) {
       logger.debug('Headers to propagate: ', headers)
     }
 
