@@ -3,95 +3,127 @@
  * Licensed under the MIT License.
  */
 
-const definition: FilterDefinition = {
-  propagate: [
-    'x-ms-correlation-id',
-  ],
+/**
+ * A function type that defines how headers should be propagated.
+ */
+export interface HeaderPropagationDefinition {
+  (headers: HeaderPropagationCollection): void
 }
 
 /**
- * Filters the headers to propagate based on the definition.
- * @param headers The headers to filter based on the definition.
- * @returns The filtered headers.
+ * Defines the interface for managing header propagation.
  */
-export function getHeadersToPropagate (headers: Record<string, string | string[] | undefined>) {
-  const result: Record<string, string> = {}
-  const normalizedHeaders = normalizeHeaders(headers)
-
-  // Propagate headers
-  for (const key of definition.propagate ?? []) {
-    const lowerKey = key.toLowerCase()
-    if (normalizedHeaders[lowerKey]) {
-      result[lowerKey] = normalizedHeaders[lowerKey]
-    }
-  }
-
-  // Add headers if not present
-  for (const [key, value] of Object.entries(definition.add ?? {})) {
-    const lowerKey = key.toLowerCase()
-    if (!normalizedHeaders[lowerKey] && !result[lowerKey]) {
-      result[lowerKey] = value
-    }
-  }
-
-  // Concat headers if present
-  for (const [key, value] of Object.entries(definition.concat ?? {})) {
-    const lowerKey = key.toLowerCase()
-    if (normalizedHeaders[lowerKey] && !result[lowerKey]) {
-      result[lowerKey] = `${normalizedHeaders[lowerKey]} ${value}`
-    }
-  }
-
-  // Override headers (always set)
-  for (const [key, value] of Object.entries(definition.override ?? {})) {
-    const lowerKey = key.toLowerCase()
-    result[lowerKey] = value
-  }
-
-  return result
+export interface HeaderPropagationCollection {
+  /**
+   * The collection of incoming headers from the incoming request.
+   * @remarks This collection is built based on the headers received in the request.
+   */
+  incoming: Record<string, string>
+  /**
+   * The collection of headers that will be propagated to outgoing requests.
+   * @remarks This collection is built based on the incoming headers and the definition provided.
+   */
+  outgoing: Record<string, string>
+  /**
+   * Propagates the incoming header value to the outgoing collection based on the header definition key.
+   * @param headers List of header keys to propagate.
+   * @remarks If the header does not exist in the incoming headers, it will be ignored.
+   */
+  propagate(headers: string[]): void
+  /**
+   * Adds a header definition to the outgoing collection.
+   * @param headers Headers to add to the outgoing collection.
+   * @remarks If the header already exists, it will not be added.
+   */
+  add(headers: Record<string, string>): void
+  /**
+   * Concatenates a header definition to the outgoing collection.
+   * @param headers Headers to concatenate to the outgoing collection.
+   * @remarks If the header does not exist in the incoming headers, it will be ignored. Unless the header is already present in the outgoing collection.
+   */
+  concat(headers: Record<string, string>): void
+  /**
+   * Overrides a header definition in the outgoing collection.
+   * @param headers Headers to override in the outgoing collection.
+   * @remarks If the header does not exist in the incoming headers, it will be added to the outgoing collection.
+   */
+  override(headers: Record<string, string>): void
 }
 
 /**
- * Normalizes the headers by lowercasing the keys and ensuring the values are strings.
+ * A class that implements the HeaderPropagationCollection interface.
+ * It filters the incoming request headers based on the definition provided and loads them into the outgoing headers collection.
  */
-function normalizeHeaders (headers: Record<string, string | string[] | undefined>) {
-  return Object.entries(headers).reduce((acc, [key, value]) => {
-    if (value) {
-      acc[key.toLowerCase()] = Array.isArray(value) ? value.join(' ') : value
+export class HeaderPropagation implements HeaderPropagationCollection {
+  private _incomingRequests: Record<string, string>
+  private _outgoingHeaders: Record<string, string> = {}
+
+  public get incoming (): Record<string, string> {
+    return this._incomingRequests
+  }
+
+  public get outgoing (): Record<string, string> {
+    this.propagateInternal(['x-ms-correlation-id'], true)
+    return this._outgoingHeaders
+  }
+
+  constructor (headers: Record<string, string | string[] | undefined>) {
+    if (!headers) {
+      throw new Error('Headers must be provided.')
     }
-    return acc
-  }, {} as Record<string, string>)
-}
 
-/**
- * Definition to filter which headers to propagate to outgoing requests based on certain criterias:
- * - **propagate**: the incoming header can be passed as outgoing request.
- * - **add**: if there is no incoming header, a new header can be added and be passed as outgoing request.
- * - **concat**: takes the incoming header and concats a new value that can be passed as outgoing request.
- * - **override**: replaces the incoming header with a new one that can be passed as outgoing request.
- */
-interface FilterDefinition {
-  /**
-   * Propagates the incoming header value to the header to propagate collection based on the header definition key.
-   * If the header does not exist in the collection, it will be ignored.
-   */
-  propagate?: string[];
+    this._incomingRequests = this.normalizeHeaders(headers)
+  }
+
+  propagate (headers: string[]) {
+    this.propagateInternal(headers)
+  }
+
+  add (headers: Record<string, string>) {
+    for (const [key, value] of Object.entries(headers ?? {})) {
+      const lowerKey = key.toLowerCase()
+      if (!this._incomingRequests[lowerKey] && !this._outgoingHeaders[lowerKey]) {
+        this._outgoingHeaders[lowerKey] = value
+      }
+    }
+  }
+
+  concat (headers: Record<string, string>) {
+    for (const [key, value] of Object.entries(headers ?? {})) {
+      const lowerKey = key.toLowerCase()
+      if (this._incomingRequests[lowerKey]) {
+        this._outgoingHeaders[lowerKey] = `${this._outgoingHeaders[lowerKey] ?? this._incomingRequests[lowerKey]} ${value}`.trim()
+      }
+    }
+  }
+
+  override (headers: Record<string, string>) {
+    for (const [key, value] of Object.entries(headers ?? {})) {
+      const lowerKey = key.toLowerCase()
+      this._outgoingHeaders[lowerKey] = value
+    }
+  }
+
+  private propagateInternal (headers: string[], override: boolean = false) {
+    for (const key of headers ?? []) {
+      const lowerKey = key.toLowerCase()
+      if (this._incomingRequests[lowerKey] && (!this._outgoingHeaders[lowerKey] || override)) {
+        this._outgoingHeaders[lowerKey] = this._incomingRequests[lowerKey]
+      }
+    }
+  }
 
   /**
-   * Adds a header definition to the header to propagate collection.
-   * If the header already exist in the collection, it will be ignored.
+   * Normalizes the headers by lowercasing the keys and ensuring the values are strings.
+   * @param headers The headers to normalize.
+   * @returns A new object with normalized headers.
    */
-  add?: Record<string, string>;
-
-  /**
-   * Concat a header definition to the header to propagate collection.
-   * If the header does not exist in the collection, it will be ignored.
-   */
-  concat?: Record<string, string>;
-
-  /**
-   * Overrides a header definition to the header to propagate collection.
-   * If the header does not exist in the collection, it will add it.
-   */
-  override?: Record<string, string>;
+  private normalizeHeaders (headers: Record<string, string | string[] | undefined>) {
+    return Object.entries(headers).reduce((acc, [key, value]) => {
+      if (value) {
+        acc[key.toLowerCase()] = Array.isArray(value) ? value.join(' ') : value
+      }
+      return acc
+    }, {} as Record<string, string>)
+  }
 }

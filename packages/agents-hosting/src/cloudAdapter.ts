@@ -22,7 +22,7 @@ import { AttachmentInfo } from './connector-client/attachmentInfo'
 import { AttachmentData } from './connector-client/attachmentData'
 import { normalizeIncomingActivity } from './activityWireCompat'
 import { UserTokenClient } from './oauth'
-import { getHeadersToPropagate } from './headerPropagation'
+import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefinition } from './headerPropagation'
 
 const logger = debug('agents:cloud-adapter')
 
@@ -85,14 +85,14 @@ export class CloudAdapter extends BaseAdapter {
    *
    * @param serviceUrl - The URL of the service to connect to
    * @param scope - The authentication scope to use
-   * @param headers - The headers to include in the request
+   * @param headers - Optional headers to propagate in the request
    * @returns A promise that resolves to a ConnectorClient instance
    * @protected
    */
   protected async createConnectorClient (
     serviceUrl: string,
     scope: string,
-    headers?: Record<string, string | string[]>
+    headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
     return ConnectorClient.createClientWithAuthAsync(
       serviceUrl,
@@ -199,13 +199,16 @@ export class CloudAdapter extends BaseAdapter {
    * @param request - The incoming request.
    * @param res - The response to send.
    * @param logic - The logic to execute.
+   * @param headerPropagation - Optional function to handle header propagation.
    */
   public async process (
     request: Request,
     res: Response,
-    logic: (context: TurnContext) => Promise<void>): Promise<void> {
-    const headers = getHeadersToPropagate(request.headers)
-    if (Object.keys(headers).length > 0) {
+    logic: (context: TurnContext) => Promise<void>,
+    headerPropagation?: HeaderPropagationDefinition): Promise<void> {
+    const headers = new HeaderPropagation(request.headers)
+    if (headerPropagation && typeof headerPropagation === 'function') {
+      headerPropagation(headers)
       logger.debug('Headers to propagate: ', headers)
     }
 
