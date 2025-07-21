@@ -11,6 +11,7 @@ import { AttachmentInfo } from './attachmentInfo'
 import { AttachmentData } from './attachmentData'
 import { normalizeOutgoingActivity } from '../activityWireCompat'
 import { getProductInfo } from '../getProductInfo'
+import { HeaderPropagation, HeaderPropagationCollection } from '../headerPropagation'
 const logger = debug('agents:connector-client')
 
 export { getProductInfo }
@@ -80,20 +81,23 @@ export class ConnectorClient {
    * @param authConfig - The authentication configuration.
    * @param authProvider - The authentication provider.
    * @param scope - The scope for the authentication token.
+   * @param headers - Optional headers to propagate in the request.
    * @returns A new instance of ConnectorClient.
    */
   static async createClientWithAuthAsync (
     baseURL: string,
     authConfig: AuthConfiguration,
     authProvider: AuthProvider,
-    scope: string
+    scope: string,
+    headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
+    const headerPropagation = headers ?? new HeaderPropagation({ 'User-Agent': '' })
+    headerPropagation.concat({ 'User-Agent': getProductInfo() })
+    headerPropagation.override({ Accept: 'application/json' })
+
     const axiosInstance = axios.create({
       baseURL,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': getProductInfo(),
-      },
+      headers: headerPropagation.outgoing,
       transformRequest: [
         (data, headers) => {
           return JSON.stringify(normalizeOutgoingActivity(data))

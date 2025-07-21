@@ -42,6 +42,9 @@ export const startServer = (agent: AgentApplication<TurnState<any, any>> | Activ
   } else {
     adapter = agent.adapter as CloudAdapter
   }
+
+  const headerPropagation = (agent as AgentApplication<TurnState<any, any>>)?.options.headerPropagation
+
   const server = express()
   server.use(express.json())
   server.use(authorizeJWT(authConfig))
@@ -49,7 +52,7 @@ export const startServer = (agent: AgentApplication<TurnState<any, any>> | Activ
   server.post('/api/messages', (req: Request, res: Response) =>
     adapter.process(req, res, (context) =>
       agent.run(context)
-    )
+    , headerPropagation)
   )
 
   const port = process.env.PORT || 3978
