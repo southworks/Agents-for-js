@@ -74,7 +74,7 @@ export const authorizeJWT = (authConfig: AuthConfiguration) => {
     logger.debug('authorizing jwt')
     if (req.method !== 'POST' && req.method !== 'GET') {
       failed = true
-      logger.error('Method not allowed', req.method)
+      logger.warn('Method not allowed', req.method)
       res.status(405).send({ 'jwt-auth-error': 'Method not allowed' })
     } else {
       const authHeader = req.headers.authorization as string
