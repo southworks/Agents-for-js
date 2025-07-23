@@ -17,7 +17,6 @@ export class UserTokenClient {
   client: AxiosInstance
   /**
    * Creates a new instance of UserTokenClient.
-   * @param token The token to use for authentication.
    * @param msAppId The Microsoft application ID.
    */
   constructor (private msAppId: string) {
@@ -116,7 +115,8 @@ export class UserTokenClient {
    * Gets the sign-in resource.
    * @param msAppId The application ID.
    * @param connectionName The connection name.
-   * @param activity The activity.
+   * @param conversation The conversation reference.
+   * @param relatesTo Optional. The related conversation reference.
    * @returns A promise that resolves to the signing resource.
    */
   async getSignInResource (msAppId: string, connectionName: string, conversation: ConversationReference, relatesTo?: ConversationReference) : Promise<SignInResource> {

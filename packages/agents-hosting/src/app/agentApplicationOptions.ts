@@ -120,7 +120,7 @@ export interface AgentApplicationOptions<TState extends TurnState> {
    * Whether to automatically normalize mentions in incoming messages.
    * When enabled, user mentions and other entity mentions in messages will be
    * standardized to a consistent format, making them easier to process and understand.
-   * This includes formatting @mentions and channel references consistently.
+   * This includes formatting mentions and channel references consistently.
    *
    * @default true
    */

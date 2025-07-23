@@ -48,7 +48,7 @@ const ACTIVITY_RECEIVED_EMITTED = Symbol('ActivityReceivedEmitted')
  * Contains dialog state, information about the state of the dialog stack, for a specific {@link DialogSet}.
  *
  * @remarks
- * State is read from and saved to storage each turn, and state cache for the turn is managed through the {@link @microsoft/agents-hosting.TurnContext}.
+ * State is read from and saved to storage each turn, and state cache for the turn is managed through the {@link TurnContext}.
  *
  * For more information, see the articles on
  * [Managing state](https://docs.microsoft.com/azure/bot-service/bot-builder-concept-state) and
@@ -360,7 +360,7 @@ export class DialogContext {
      *
      * @param dialogId ID of the prompt dialog to start.
      * @param promptOrOptions The text of the initial prompt to send the user,
-     * the {@link @microsoft/agents-activity.Activity} to send as the initial prompt, or
+     * the {@link Activity} to send as the initial prompt, or
      * the object with which to format the prompt dialog.
      * @param choices Optional. Array of choices for the user to choose from,
      * for use with a {@link ChoicePrompt}.
@@ -381,7 +381,7 @@ export class DialogContext {
      *
      * @param dialogId ID of the prompt dialog to start.
      * @param promptOrOptions The text of the initial prompt to send the user,
-     * or the {@link @microsoft/agents-activity.Activity} to send as the initial prompt.
+     * or the {@link Activity} to send as the initial prompt.
      * @param choices Optional. Array of choices for the user to choose from,
      * for use with a {@link ChoicePrompt}.
      * @returns {Promise<DialogTurnResult>} a promise resolving to the dialog turn result.
@@ -420,7 +420,7 @@ export class DialogContext {
      * @returns {Promise<DialogTurnResult>} a promise resolving to the dialog turn result.
      *
      * @remarks
-     * After the call completes, you can check the turn context's {@link @microsoft/agents-hosting.TurnContext.responded | TurnContext.responded}
+     * After the call completes, you can check the turn context's {@link TurnContext.responded}
      * property to determine if the dialog sent a reply to the user.
      *
      * The {@link DialogTurnResult.status} of returned object describes

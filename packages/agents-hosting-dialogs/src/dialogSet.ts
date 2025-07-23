@@ -64,7 +64,7 @@ export interface DialogDependencies {
  * persist the dialog stack for the set:
  *
  * To interact with the sets dialogs you can call `createcontext` with the
- * current {@link @microsoft/agents-hosting.TurnContext}. That will create a {@link DialogContext} that can be used to start or continue
+ * current {@link TurnContext}. That will create a {@link DialogContext} that can be used to start or continue
  * execution of the sets dialogs:
  *
  */

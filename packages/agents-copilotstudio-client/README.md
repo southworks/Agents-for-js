@@ -101,14 +101,14 @@ The following are the most _common_ options:
 
 Using Environment ID and Copilot Studio Agent Schema Name:
 
-```env
-environmentId= your-environment-id
+```
+environmentId=your-environment-id
 agentIdentifier=your-agent-schema-name
 ```
 
 Using the DirectConnectUrl:
 
-```env
+```
 directConnectUrl=https://direct.connect.url
 ```
 
