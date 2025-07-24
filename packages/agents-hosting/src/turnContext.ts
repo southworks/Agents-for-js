@@ -44,11 +44,6 @@ export type DeleteActivityHandler = (context: TurnContext, reference: Conversati
 export const AgentCallbackHandlerKey = 'agentCallbackHandler'
 
 /**
- * Interface for TurnContext.
- */
-export interface TurnContext {}
-
-/**
  * Represents the context for a single turn in a conversation between a user and an agent.
  *
  * @remarks

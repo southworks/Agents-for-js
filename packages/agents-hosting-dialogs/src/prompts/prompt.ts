@@ -144,8 +144,8 @@ export interface PromptValidatorContext<T> {
      * Result returned from the prompts recognizer function.
      *
      * @remarks
-     * The {@link @microsoft/agents-hosting-dialogs.PromptRecognizerResult.succeeded | recognized.succeeded} field can be checked to determine of the recognizer found
-     * anything and then the value can be retrieved from {@link @microsoft/agents-hosting-dialogs.PromptRecognizerResult.value | recognized.value}.
+     * The {@link PromptRecognizerResult.succeeded | recognized.succeeded} field can be checked to determine of the recognizer found
+     * anything and then the value can be retrieved from {@link PromptRecognizerResult.value | recognized.value}.
      *
      */
   readonly recognized: PromptRecognizerResult<T>;

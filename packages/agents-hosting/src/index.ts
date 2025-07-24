@@ -25,5 +25,6 @@ export * from './statusCodes'
 export * from './turnContext'
 export * from './turnContextStateCollection'
 export * from './storage/storage'
+export * from './headerPropagation'
 
 export * from './agent-client'
