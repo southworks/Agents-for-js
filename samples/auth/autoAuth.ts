@@ -2,7 +2,8 @@
 // Licensed under the MIT License.
 
 import { startServer } from '@microsoft/agents-hosting-express'
-import { AgentApplication, CardFactory, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { AgentApplication, CardFactory, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { BlobsStorage } from '@microsoft/agents-hosting-storage-blob'
 import { Template } from 'adaptivecards-templating'
 import { getUserInfo } from '../_shared/userGraphClient.js'
 import { getCurrentProfile, getPullRequests } from '../_shared/githubApiClient.js'
@@ -10,7 +11,7 @@ import { getCurrentProfile, getPullRequests } from '../_shared/githubApiClient.j
 class OneProvider extends AgentApplication<TurnState> {
   constructor () {
     super({
-      storage: new MemoryStorage(),
+      storage: new BlobsStorage('test', 'UseDevelopmentStorage=true'),
       authorization: {
         graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In' },
         github: { text: 'Sign in with GitHub', title: 'GitHub Sign In' },
@@ -18,8 +19,8 @@ class OneProvider extends AgentApplication<TurnState> {
     })
     this.onConversationUpdate('membersAdded', this._status)
     this.authorization.onSignInSuccess(this._singinSuccess)
-    // this.authorization.onSignInFailure(this._singinFailure)
-    this.onMessage('/logout', this._logout)
+    this.authorization.onSignInFailure(this._singinFailure)
+    this.onMessage(/^\/logout/, this._logout)
     this.onMessage('/me', this._profileRequest, ['graph'])
     this.onMessage('/prs', this._pullRequests, ['github'])
     this.onMessage('/status', this._status, ['graph', 'github'])
@@ -37,8 +38,15 @@ class OneProvider extends AgentApplication<TurnState> {
   }
 
   private _logout = async (context: TurnContext, state: TurnState): Promise<void> => {
-    await this.authorization.signOut(context, state)
-    await context.sendActivity(MessageFactory.text('user logged out'))
+    // /logout <github|graph> (e.g. /logout github) to log out from a specific handler.
+    // /logout (e.g. /logout) to log out from all handlers.
+    const handlerId = context.activity.text?.split(/\s/)?.[1]?.trim()
+    await this.authorization.signOut(context, state, handlerId)
+    if (handlerId) {
+      await context.sendActivity(MessageFactory.text(`User logged out from '${handlerId}' handler`))
+    } else {
+      await context.sendActivity(MessageFactory.text('User logged out from all handlers'))
+    }
   }
 
   private _invoke = async (context: TurnContext, state: TurnState): Promise<void> => {
