@@ -194,6 +194,7 @@ export class OAuthFlow {
       logger.warn(`OAuth flow expired at ${new Date(this.state.flowExpires!).toISOString()}.`)
       await context.sendActivity(MessageFactory.text('Sign-in session expired. Please try again.'))
       this.state!.flowStarted = false
+      this.state!.flowExpires = 0
       return { token: undefined }
     }
     const contFlowActivity = context.activity

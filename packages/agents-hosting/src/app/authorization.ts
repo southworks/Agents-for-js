@@ -217,7 +217,10 @@ export class Authorization {
    */
   public async getToken (context: TurnContext, authHandlerId: string): Promise<TokenResponse> {
     const signInContext = await this.createSignInContext(context, authHandlerId)
-    return signInContext?.getUserToken(context)!
+    if (!signInContext) {
+      throw new Error(`Auth handler '${authHandlerId}' not found or not configured`)
+    }
+    return signInContext.getUserToken(context)
   }
 
   /**
@@ -246,7 +249,10 @@ export class Authorization {
    */
   public async exchangeToken (context: TurnContext, scopes: string[], authHandlerId: string): Promise<TokenResponse> {
     const signInContext = await this.createSignInContext(context, authHandlerId)
-    return signInContext?.exchangeToken(context, scopes)!
+    if (!signInContext) {
+      throw new Error(`Auth handler '${authHandlerId}' not found or not configured`)
+    }
+    return signInContext.exchangeToken(context, scopes)
   }
 
   /**
@@ -449,7 +455,7 @@ class SignInContext {
 
   async getUserToken (context: TurnContext): Promise<TokenResponse> {
     this.logger.info('Getting token from user token service.')
-    await this.loadState()
+    await this.loadHandler()
     return this.authHandler.flow!.getUserToken(context)
   }
 
@@ -471,10 +477,7 @@ class SignInContext {
   }
 
   async getToken (): Promise<TokenResponse | undefined> {
-    const created = await this.loadState()
-    if (!created) {
-      return
-    }
+    await this.loadHandler()
 
     this.logger.debug('Processing authorization flow.')
     this.logger.debug(`Uses Storage state: ${this.useStorageState}`)
@@ -518,13 +521,13 @@ class SignInContext {
     return this.handler
   }
 
-  private async loadState (): Promise<boolean> {
+  private async loadHandler (): Promise<void> {
     this.handler = await this.storage.getOne(this.handler.id) ?? this.handler
 
     if (!this.useStorageState && this.authHandler.flow?.state?.flowStarted === true) {
       this.setStatus('success')
       this.logger.debug('OAuth flow success, using existing state.')
-      return true
+      return
     }
 
     if (this.handler.status === 'begin') {
@@ -535,8 +538,6 @@ class SignInContext {
       // If there is not active handler state, reset.
       await this.authHandler.flow?.setFlowState(this.context, this.handler.state ?? {} as FlowState)
     }
-
-    return true
   }
 
   private async begin (): Promise<undefined> {

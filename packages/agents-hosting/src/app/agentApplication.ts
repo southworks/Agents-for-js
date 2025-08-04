@@ -444,7 +444,7 @@ export class AgentApplication<TState extends TurnState> {
    * });
    * ```
    */
-  public onSignInFailure (handler: (context: TurnContext, state: TurnState, id?: string) => Promise<void>): this {
+  public onSignInFailure (handler: (context: TurnContext, state: TurnState, id?: string, errorMessage?: string) => Promise<void>): this {
     if (this.options.authorization) {
       this.authorization.onSignInFailure(handler)
     } else {
@@ -628,17 +628,18 @@ export class AgentApplication<TState extends TurnState> {
             continue
           }
 
-          let isSignedIn = true
-          for (const authHandlerId of route.authHandlers ?? []) {
+          let isSignedIn = false
+          const authHandlers = route.authHandlers ?? []
+          for (const authHandlerId of authHandlers) {
             logger.info(`Executing route handler for authHandlerId: '${authHandlerId}'`)
             const flow = await this._authorization?.beginOrContinueFlow(turnContext, state, authHandlerId)
-            if (flow?.handler?.status !== 'success') {
-              isSignedIn = false
+            isSignedIn = flow?.handler?.status === 'success'
+            if (!isSignedIn) {
               break
             }
           }
 
-          if (isSignedIn) {
+          if (isSignedIn || authHandlers.length === 0) {
             await route.handler(context, state)
           }
 
