@@ -216,7 +216,7 @@ export class CopilotStudioClient {
       responseType: 'stream',
       adapter: 'fetch'
     }
-    logger.info(`Sending activity: ${JSON.stringify(activity)} ...`)
+    logger.info(`Sending activity...`, activity)
     const values = await this.postRequestAsync(config)
     logger.info(`Received ${values.length} activities.`, values)
     return values
