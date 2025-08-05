@@ -575,13 +575,13 @@ export class AgentApplication<TState extends TurnState> {
    * ```
    */
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
-    if (turnContext.activity.type === ActivityTypes.Typing) {
-      // Ignore typing activities
-      return false
-    }
-
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
+      if (turnContext.activity.type === ActivityTypes.Typing) {
+        // Ignore typing activities
+        return false
+      }
+
       try {
         if (this._options.startTypingTimer) {
           this.startTypingTimer(context)
