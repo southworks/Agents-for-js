@@ -107,13 +107,13 @@ export class Authorization {
    * Private handler for successful sign-in events.
    * @private
    */
-  private _signInSuccessHandler: ((context: TurnContext, state: TurnState, authHandlerId?: string) => Promise<void> | void) | null = null
+  private _signInSuccessHandler: Parameters<Authorization['onSignInSuccess']>[0] | null = null
 
   /**
    * Private handler for failed sign-in events.
    * @private
    */
-  private _signInFailureHandler: ((context: TurnContext, state: TurnState, authHandlerId?: string, errorMessage?: string) => Promise<void> | void) | null = null
+  private _signInFailureHandler: Parameters<Authorization['onSignInFailure']>[0] | null = null
   /**
    * Storage instance used for managing sign-in state.
    * @private
@@ -171,7 +171,8 @@ export class Authorization {
       currentAuthHandler.title = currentAuthHandler.title ?? process.env[ah + '_connectionTitle'] as string
       currentAuthHandler.text = currentAuthHandler.text ?? process.env[ah + '_connectionText'] as string
       currentAuthHandler.cnxPrefix = currentAuthHandler.cnxPrefix ?? process.env[ah + '_cnxPrefix'] as string
-      // Add MemoryStorage to OAuthFlow since this class handles the storage state.
+      // Intentionally use MemoryStorage for OAuthFlow: persistent storage for OAuth state is managed separately by the Authorization class.
+      // This avoids mixing persistent and in-memory state; OAuthFlow only needs in-memory storage for its internal state.
       currentAuthHandler.flow = new OAuthFlow(new MemoryStorage(), currentAuthHandler.name, userTokenClient, currentAuthHandler.title, currentAuthHandler.text)
     }
     logger.info('Authorization handlers configured with', Object.keys(this.authHandlers).length, 'handlers')
@@ -183,7 +184,7 @@ export class Authorization {
    *
    * @param context - The context object for the current turn.
    * @param handlerId - Optional ID of the auth handler to use.
-   * @param useStorageState - Whether to use storage state for the sign-in handler.
+   * @param useStorageState - Whether to use storage state for the sign-in handler. Defaults to true.
    * @private
    */
   private createSignInContext (context: TurnContext, handlerId?: string, useStorageState: boolean = true): SignInContext {
@@ -196,7 +197,6 @@ export class Authorization {
    * @param context - The context object for the current turn.
    * @param authHandlerId - ID of the auth handler to use.
    * @returns A promise that resolves to the token response from the OAuth provider.
-   * @throws {Error} If the auth handler is not configured.
    *
    * @remarks
    * This method retrieves an existing token for the specified auth handler.
@@ -224,7 +224,6 @@ export class Authorization {
    * @param scopes - Array of scopes to request for the new token.
    * @param authHandlerId - ID of the auth handler to use.
    * @returns A promise that resolves to the exchanged token response.
-   * @throws {Error} If the auth handler is not configured.
    *
    * @remarks
    * This method handles token exchange scenarios, particularly for on-behalf-of (OBO) flows.
@@ -253,8 +252,8 @@ export class Authorization {
    * @param context - The context object for the current turn.
    * @param state - The state object for the current turn.
    * @param authHandlerId - ID of the auth handler to use.
+   * @param useStorageState - Whether to use storage state for the sign-in handler. Defaults to true.
    * @returns A promise that resolves to the token response from the OAuth provider.
-   * @throws {Error} If the auth handler is not configured.
    *
    * @remarks
    * This method manages the complete OAuth authentication flow:
@@ -292,7 +291,6 @@ export class Authorization {
    * @param state - The state object for the current turn.
    * @param authHandlerId - Optional ID of the auth handler to use for sign out. If not provided, signs out from all handlers.
    * @returns A promise that resolves when sign out is complete.
-   * @throws {Error} If the specified auth handler is not configured.
    *
    * @remarks
    * This method clears the user's token and resets the authentication state.
@@ -377,113 +375,6 @@ export class Authorization {
   }
 }
 
-class SignInStorage {
-  private _baseKey: string = ''
-  private _handlerKeys: string[] = []
-
-  /**
-   * Creates a new instance of SignInStorage.
-   *
-   * @param storage - The storage system to use for sign-in state management.
-   * @param handlers - Dictionary of configured authentication handlers.
-   * @throws {Error} If storage is null/undefined.
-   */
-  constructor (private storage: Storage, private handlers?: Record<string, AuthHandler>) {
-    if (!storage) {
-      throw new Error('Storage is required')
-    }
-  }
-
-  /**
-   * Creates a storage key for a specific sign-in handler.
-   *
-   * @param id - The ID of the sign-in handler.
-   * @returns The storage key for the sign-in handler.
-   * @throws {Error} If the base key is not set.
-   * @remarks
-   * This method generates a unique storage key for the specified sign-in handler by appending its ID to the base key.
-   */
-  private createKey (id: string): string {
-    if (!this._baseKey.trim()) {
-      throw new Error('Base key is not set, make sure to call setKey() first.')
-    }
-    return `${this._baseKey}/${id}`
-  }
-
-  /**
-   * Sets the base key for sign-in handler storage.
-   *
-   * @param context - The TurnContext for the current turn.
-   * @throws {Error} If 'channelId' or 'from.id' properties are not set in the activity.
-   * @remarks
-   * This method sets the base key for all sign-in handler states based on the channel and user ID.
-   * It is typically called at the beginning of a turn to ensure the correct context is used for storage.
-   */
-  setKey (context: TurnContext) {
-    const channelId = context.activity.channelId
-    const userId = context.activity.from?.id
-    if (!channelId || !userId) {
-      throw new Error('Activity \'channelId\' and \'from.id\' properties must be set.')
-    }
-    this._baseKey = `auth/${channelId}/${userId}`
-    this._handlerKeys = Object.keys(this.handlers ?? {}).map(e => this.createKey(e))
-  }
-
-  /**
-   * Retrieves the active sign-in handler state.
-   *
-   * @returns A promise that resolves to the active sign-in handler state, or undefined if not found.
-   * @remarks
-   * This method reads all sign-in handler states from storage and returns the first one that is not in 'success' status.
-   * It is typically used to check if there is an ongoing OAuth flow that needs to be continued.
-   */
-  async getActive (): Promise<SignInHandlerState | undefined> {
-    const data = await this.storage.read(this._handlerKeys) as Record<string, SignInHandlerState>
-    return Object.values(data).find(({ status }) => status !== 'success')
-  }
-
-  /**
-   * Retrieves a sign-in handler state by its ID.
-   *
-   * @param id - The ID of the sign-in handler to retrieve.
-   * @returns A promise that resolves to the sign-in handler state, or undefined if not found.
-   * @remarks
-   * This method reads the sign-in handler state from storage using the provided ID.
-   * It is typically used to load the current state of an ongoing OAuth flow.
-   */
-  async getOne (id: string): Promise<SignInHandlerState | undefined> {
-    const key = this.createKey(id)
-    const data = await this.storage.read([key]) as Record<string, SignInHandlerState>
-    return data[key]
-  }
-
-  /**
-   * Sets a sign-in handler state in storage.
-   *
-   * @param value - The sign-in handler state to set.
-   * @returns A promise that resolves when the state is set.
-   * @remarks
-   * This method writes the provided sign-in handler state to storage.
-   * It is typically used to save the current state of an ongoing OAuth flow.
-   */
-  async setOne (value: SignInHandlerState) {
-    return this.storage.write({ [this.createKey(value.id)]: value })
-  }
-
-  /**
-   * Deletes a sign-in handler state by its ID.
-   *
-   * @param id - The ID of the sign-in handler to delete.
-   * @returns A promise that resolves when the deletion is complete.
-   * @remarks
-   * This method removes the specified sign-in handler state from storage.
-   * It is typically used to clear the state after a successful sign-out or when the flow is no longer needed.
-   */
-  async deleteOne (id:string) {
-    return this.storage.delete([this.createKey(id)])
-  }
-}
-
 /**
  * Context for managing sign-in operations.
  * Handles the OAuth flow, token retrieval, and sign-out operations.
@@ -500,8 +391,8 @@ class SignInStorage {
  * - Allows custom success/failure handlers
  */
 class SignInContext {
-  private _onSuccessHandler: (() => Promise<void> | void) | undefined = undefined
-  private _onFailureHandler: ((err:string) => Promise<void> | void) | undefined = undefined
+  private _onSuccessHandler: Parameters<SignInContext['onSuccess']>[0] = undefined
+  private _onFailureHandler: Parameters<SignInContext['onFailure']>[0] = undefined
   private _authHandler: AuthHandler = {}
   private _handler: SignInHandlerState | undefined = undefined
 
@@ -525,10 +416,10 @@ class SignInContext {
    * Creates a new instance of SignInContext.
    *
    * @param storage - The storage system to use for sign-in state management.
+   * @param authHandler - Dictionary of configured authentication handlers.
    * @param context - The TurnContext for the current turn.
    * @param handlerId - ID of the auth handler to use.
-   * @param authHandler - The authentication handler to use for OAuth flows.
-   * @param useStorageState - Whether to use storage state for the sign-in handler.
+   * @param useStorageState - Whether to use storage state for the sign-in handler. Defaults to true.
    */
   constructor (public storage: SignInStorage, private authHandlers: AuthorizationHandlers, private context: TurnContext, private handlerId?: string, private useStorageState: boolean = true) {
     if (!this.useStorageState && !this.handlerId) {
@@ -544,7 +435,7 @@ class SignInContext {
    * Sets the handler to be called when sign-in is successful.
    * @param handler - The handler function to call on sign-in success.
    */
-  onSuccess (handler: SignInContext['_onSuccessHandler']) {
+  onSuccess (handler: (() => Promise<void> | void) | undefined = undefined) {
     this._onSuccessHandler = handler
   }
 
@@ -552,7 +443,7 @@ class SignInContext {
    * Sets the handler to be called when sign-in fails.
    * @param handler - The handler function to call on sign-in failure.
    */
-  onFailure (handler: SignInContext['_onFailureHandler']) {
+  onFailure (handler: ((err:string) => Promise<void> | void) | undefined = undefined) {
     this._onFailureHandler = handler
   }
 
@@ -593,7 +484,7 @@ class SignInContext {
 
   /**
    * Signs out the user from the current OAuth flow.
-   * @returns A promise that resolves when sign out is complete.
+   * @returns {Promise<void>} A promise that resolves when sign out is complete.
    * @remarks
    * This method clears the user's token and resets the authentication state.
    * It also removes the handler state from storage if `useStorageState` is true.
@@ -605,7 +496,7 @@ class SignInContext {
 
     this.logger.info('Signing out from the authorization flow.')
     if (this.useStorageState) {
-      await this.storage.deleteOne(this.handler.id)
+      await this.storage.handler.delete(this.handler.id)
     }
     return this._authHandler.flow?.signOut(this.context)
   }
@@ -679,12 +570,12 @@ class SignInContext {
    * Loads the current handler state from storage or initializes it.
    * If the flow has already started and `useStorageState` is false, it uses the existing state.
    * If no active flow state is found, it starts a new OAuth flow.
-   * @returns {Promise<void>} A promise that resolves when the handler is loaded.
+   * @returns {Promise<boolean>} A promise that resolves to true if the handler was successfully loaded or initialized, false otherwise.
    * @private
    */
   private async loadHandler (): Promise<boolean> {
     if (this.useStorageState) {
-      this._handler = this.handlerId ? await this.storage.getOne(this.handlerId) : await this.storage.getActive()
+      this._handler = this.handlerId ? await this.storage.handler.get(this.handlerId) : await this.storage.handler.active()
     }
 
     if (!this._handler) {
@@ -727,7 +618,7 @@ class SignInContext {
     this.logger.debug('OAuth flow started, waiting on continuation ...')
     this.setStatus('continue')
     if (this.useStorageState) {
-      await this.storage.setOne(this.handler)
+      await this.storage.handler.set(this.handler)
     }
   }
 
@@ -743,7 +634,7 @@ class SignInContext {
       this.setStatus('success')
       this.logger.debug('OAuth flow success.')
       if (this.useStorageState) {
-        await this.storage.setOne(this.handler)
+        await this.storage.handler.set(this.handler)
       }
       if (this._onSuccessHandler) {
         await this._onSuccessHandler()
@@ -794,7 +685,7 @@ class SignInContext {
     if (errors.reset) {
       await this._authHandler.flow?.signOut(this.context)
       if (this.useStorageState) {
-        await this.storage.deleteOne(this.handler.id)
+        await this.storage.handler.delete(this.handler.id)
       }
     }
 
@@ -821,7 +712,6 @@ class SignInContext {
   /**
    * Handles on-behalf-of token exchange using MSAL.
    *
-   * @param context - The context object for the current turn.
    * @param token - The token to exchange.
    * @param scopes - Array of scopes to request for the new token.
    * @returns A promise that resolves to the exchanged token response.
@@ -850,5 +740,122 @@ class SignInContext {
       throw new Error(`AuthHandler with ID ${handlerId} not configured`)
     }
     return this.authHandlers[handlerId]
+  }
+}
+
+class SignInStorage {
+  private _baseKey: string = ''
+  private _handlerKeys: string[] = []
+
+  /**
+   * Creates a new instance of SignInStorage.
+   *
+   * @param storage - The storage system to use for sign-in state management.
+   * @param handlers - Dictionary of configured authentication handlers.
+   * @throws {Error} If storage is null/undefined.
+   */
+  constructor (private storage: Storage, private handlers?: Record<string, AuthHandler>) {
+    if (!storage) {
+      throw new Error('Storage is required')
+    }
+  }
+
+  /**
+   * Creates a storage key for a specific sign-in handler.
+   *
+   * @param id - The ID of the sign-in handler.
+   * @returns The storage key for the sign-in handler.
+   * @throws {Error} If the base key is not set.
+   * @remarks
+   * This method generates a unique storage key for the specified sign-in handler by appending its ID to the base key.
+   */
+  private createKey (id: string): string {
+    if (!this._baseKey?.trim()) {
+      throw new Error('Base key is not set, make sure to call setKey() first.')
+    }
+    return `${this._baseKey}/${id}`
+  }
+
+  /**
+   * Sets the base key for sign-in handler storage.
+   *
+   * @param context - The TurnContext for the current turn.
+   * @throws {Error} If 'channelId' or 'from.id' properties are not set in the activity.
+   * @remarks
+   * This method sets the base key for all sign-in handler states based on the channel and user ID.
+   * It is typically called at the beginning of a turn to ensure the correct context is used for storage.
+   */
+  setKey (context: TurnContext) {
+    const channelId = context.activity.channelId
+    const userId = context.activity.from?.id
+    if (!channelId || !userId) {
+      throw new Error('Activity \'channelId\' and \'from.id\' properties must be set.')
+    }
+    this._baseKey = `auth/${channelId}/${userId}`
+    this._handlerKeys = Object.keys(this.handlers ?? {}).map(e => this.createKey(e))
+  }
+
+  /**
+   * Gets the sign-in handler for the current context.
+   *
+   * @returns An object containing methods to manage sign-in handler states.
+   * @remarks
+   * This method provides access to the sign-in handler state management functions,
+   * allowing retrieval, setting, and deletion of sign-in handler states in storage.
+   */
+  handler = {
+    /**
+     * Retrieves the active sign-in handler state.
+     *
+     * @returns A promise that resolves to the active sign-in handler state, or undefined if not found.
+     * @remarks
+     * This method reads all sign-in handler states from storage and returns the first one that is not in 'success' status.
+     * It is typically used to check if there is an ongoing OAuth flow that needs to be continued.
+     */
+    active: async (): Promise<SignInHandlerState | undefined> => {
+      const data = await this.storage.read(this._handlerKeys) as Record<string, SignInHandlerState>
+      return Object.values(data).find(({ status }) => status !== 'success')
+    },
+
+    /**
+     * Retrieves a sign-in handler state by its ID.
+     *
+     * @param id - The ID of the sign-in handler to retrieve.
+     * @returns A promise that resolves to the sign-in handler state, or undefined if not found.
+     * @remarks
+     * This method reads the sign-in handler state from storage using the provided ID.
+     * It is typically used to load the current state of an ongoing OAuth flow.
+     */
+    get: async (id: string): Promise<SignInHandlerState | undefined> => {
+      const key = this.createKey(id)
+      const data = await this.storage.read([key]) as Record<string, SignInHandlerState>
+      return data[key]
+    },
+
+    /**
+     * Sets a sign-in handler state in storage.
+     *
+     * @param value - The sign-in handler state to set.
+     * @returns A promise that resolves when the state is set.
+     * @remarks
+     * This method writes the provided sign-in handler state to storage.
+     * It is typically used to save the current state of an ongoing OAuth flow.
+     */
+    set: async (value: SignInHandlerState) => {
+      return this.storage.write({ [this.createKey(value.id)]: value })
+    },
+
+    /**
+     * Deletes a sign-in handler state by its ID.
+     *
+     * @param id - The ID of the sign-in handler to delete.
+     * @returns A promise that resolves when the deletion is complete.
+     * @remarks
+     * This method removes the specified sign-in handler state from storage.
+     * It is typically used to clear the state after a successful sign-out or when the flow is no longer needed.
+     */
+    delete: async (id: string) => {
+      return this.storage.delete([this.createKey(id)])
+    }
   }
 }

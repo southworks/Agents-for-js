@@ -39,7 +39,7 @@ class OneProvider extends AgentApplication<TurnState> {
   private _logout = async (context: TurnContext, state: TurnState): Promise<void> => {
     // /logout <github|graph> (e.g. /logout github) to log out from a specific handler.
     // /logout (e.g. /logout) to log out from all handlers.
-    const handlerId = context.activity.text?.split(/\s/)?.[1]?.trim()
+    const handlerId = context.activity.text?.split(' ', 2)?.[1]?.trim()
     await this.authorization.signOut(context, state, handlerId)
     if (handlerId) {
       await context.sendActivity(MessageFactory.text(`User logged out from '${handlerId}' handler`))

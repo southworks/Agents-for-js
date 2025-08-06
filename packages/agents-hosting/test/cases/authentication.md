@@ -105,26 +105,24 @@ User lets the flow expire, and then tries again, resulting in a session expired 
 
 **Steps:**
 
-2. 🧑 → Sends `/me` message
-3. 🤖 → Shows `oAuthCard`
-6. 🧑 → Waits for the flow to expire (or expires it manually from the Storage `flowExpires` property)
-7. 🧑 → Sends magic code
-8. 🤖 → Shows session expired message
-
-### 7. Invalid Magic Code with Expired Session
+1. 🧑 → Sends `/me` message
+2. 🤖 → Shows `oAuthCard`
+3. 🧑 → Waits for the flow to expire (or expires it manually from the Storage `flowExpires` property)
+4. 🧑 → Sends magic code
+5. 🤖 → Shows session expired message### 7. Invalid Magic Code with Expired Session
 
 **Description:**
 User enters an invalid magic code, lets the flow expire, and then tries again, resulting in a session expired message.
 
 **Steps:**
 
-2. 🧑 → Sends `/me` message
-3. 🤖 → Shows `oAuthCard`
-4. 🧑 → Sends invalid magic code (e.g., `abc`)
-5. 🤖 → Shows invalid magic code format message
-6. 🧑 → Waits for the flow to expire (or expires it manually from the Storage `flowExpires` property)
-7. 🧑 → Sends magic code
-8. 🤖 → Shows session expired message
+1. 🧑 → Sends `/me` message
+2. 🤖 → Shows `oAuthCard`
+3. 🧑 → Sends invalid magic code (e.g., `abc`)
+4. 🤖 → Shows invalid magic code format message
+5. 🧑 → Waits for the flow to expire (or expires it manually from the Storage `flowExpires` property)
+6. 🧑 → Sends magic code
+7. 🤖 → Shows session expired message
 
 ### 8. Restart Conversation During Sign-In
 
@@ -163,7 +161,7 @@ User checks status, logs out of one handler, and logs in again to verify multi-h
 
 **Steps:**
 
-1. 🧑 → Already logged in (see [Multi-Handler Login](#8-multi-handler-login))
+1. 🧑 → Already logged in (see [Multi-Handler Login](#9-multi-handler-login))
 2. 🧑 → Sends `/logout github` message
 3. 🤖 → Shows `github` auth handler logged out message
 4. 🧑 → Sends `/status` message
@@ -178,10 +176,10 @@ User logs out of all handlers and logs in again to both, confirming full session
 
 **Steps:**
 
-1. 🧑 → Already logged in (see [Multi-Handler Login](#8-multi-handler-login))
+1. 🧑 → Already logged in (see [Multi-Handler Login](#9-multi-handler-login))
 2. 🧑 → Sends `/logout` message
 3. 🤖 → Shows all handlers logged out message
-4. 🧑 → Logs in to both handlers again (see [Multi-Handler Login](#8-multi-handler-login))
+4. 🧑 → Logs in to both handlers again (see [Multi-Handler Login](#9-multi-handler-login))
 
 ### 12. Multi-Server Instances
 
