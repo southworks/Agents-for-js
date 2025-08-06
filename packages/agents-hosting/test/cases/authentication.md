@@ -14,11 +14,12 @@ This document presents a comprehensive suite of test cases for authentication ha
 
 - 🧑: User interaction
 - 🤖: Bot interaction
-- `oAuthCard`: ![oAuthCard](https://github.com/user-attachments/assets/5a5a124b-5247-4715-a9f6-2f750059a466)
 - `magic code`: 6-digit code gathered from the `oAuthCard`
 - `/me`: Login route for `graph` auth handler
 - `/status`: Login route for `graph` and `github` auth handlers
 - `/logout`: Logout route for `graph` and `github` auth handlers
+- `oAuthCard`: <br>
+  ![oAuthCard](https://github.com/user-attachments/assets/5a5a124b-5247-4715-a9f6-2f750059a466)
 
 ## Test Cases
 
@@ -109,7 +110,9 @@ User lets the flow expire, and then tries again, resulting in a session expired 
 2. 🤖 → Shows `oAuthCard`
 3. 🧑 → Waits for the flow to expire (or expires it manually from the Storage `flowExpires` property)
 4. 🧑 → Sends magic code
-5. 🤖 → Shows session expired message### 7. Invalid Magic Code with Expired Session
+5. 🤖 → Shows session expired message
+
+### 7. Invalid Magic Code with Expired Session
 
 **Description:**
 User enters an invalid magic code, lets the flow expire, and then tries again, resulting in a session expired message.
