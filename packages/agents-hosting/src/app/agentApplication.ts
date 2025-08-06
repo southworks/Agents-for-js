@@ -613,8 +613,8 @@ export class AgentApplication<TState extends TurnState> {
 
         const flow = await this._authorization?.beginOrContinueFlow(turnContext, state)
         if (flow?.handler?.status === 'success' && flow?.token?.trim()) {
-          const savedAct = Activity.fromObject(flow.handler?.continuationActivity!)
-          logger.info(`Resending continuation activity for authHandlerId:'${flow.handler?.id}'`, savedAct.text)
+          const savedAct = Activity.fromObject(flow.handler.continuationActivity!)
+          logger.info(`Resending continuation activity for authHandlerId:'${flow.handler.id}'`, savedAct.text)
           await this.run(new TurnContext(context.adapter, savedAct))
           return true
         } else if (flow?.handler?.status === 'failure') {

@@ -422,12 +422,16 @@ class SignInContext {
    * @param useStorageState - Whether to use storage state for the sign-in handler. Defaults to true.
    */
   constructor (public storage: SignInStorage, private authHandlers: AuthorizationHandlers, private context: TurnContext, private handlerId?: string, private useStorageState: boolean = true) {
-    if (!this.useStorageState && !this.handlerId) {
+    if (!useStorageState && !handlerId) {
       throw new Error('Cannot begin or continue OAuth flow without handlerId when useStorageState is false.')
     }
 
-    if (this.useStorageState) {
-      this.storage.setKey(this.context)
+    if (!context?.activity || typeof context.activity !== 'object') {
+      throw new Error('TurnContext.Activity is required for SignInContext')
+    }
+
+    if (useStorageState) {
+      storage.setKey(context)
     }
   }
 
@@ -673,7 +677,9 @@ class SignInContext {
     let errors = { reason: 'token was not received', reset: false }
     if (!this.handler.continuationActivity) {
       errors = { reason: 'no continuation activity available', reset: true }
-    } else if (this.handler.continuationActivity?.conversation?.id !== this.context.activity.conversation?.id) {
+    } else if (!this.handler.continuationActivity.conversation || !this.context.activity.conversation) {
+      errors = { reason: 'conversation missing during the continuation flow', reset: true }
+    } else if (this.handler.continuationActivity.conversation.id !== this.context.activity.conversation.id) {
       errors = { reason: 'conversation changed during the continuation flow', reset: true }
     } else if (!this.handler.state?.flowStarted) {
       errors = { reason: 'flow was restarted', reset: true }
@@ -786,8 +792,8 @@ class SignInStorage {
    * It is typically called at the beginning of a turn to ensure the correct context is used for storage.
    */
   setKey (context: TurnContext) {
-    const channelId = context.activity.channelId
-    const userId = context.activity.from?.id
+    const channelId = context?.activity.channelId
+    const userId = context?.activity.from?.id
     if (!channelId || !userId) {
       throw new Error('Activity \'channelId\' and \'from.id\' properties must be set.')
     }
