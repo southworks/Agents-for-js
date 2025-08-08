@@ -2,9 +2,7 @@ import fs from 'fs'
 import path from 'path'
 
 import { Extractor, ExtractorConfig } from '@microsoft/api-extractor'
-import { Colorize } from "@rushstack/terminal";
-
-import tsconfigReferences from './tsconfig.build.json' with { type: 'json' }
+import { Colorize } from '@rushstack/terminal'
 
 const folders = {
   root: import.meta.dirname,
@@ -12,14 +10,18 @@ const folders = {
   packages: 'packages/'
 }
 
+const tsconfigReferences = JSON.parse(fs.readFileSync(path.join(folders.root, 'tsconfig.build.json'), 'utf-8'))
+
 fs.mkdirSync(path.join(folders.reports, 'etc'), { recursive: true })
 fs.mkdirSync(path.join(folders.reports, 'temp'), { recursive: true })
 
 const settings = loadSettings()
 
-const packages = settings.package ? [settings.package] : tsconfigReferences.references
-  .filter(ref => ref.path.startsWith(folders.packages))
-  .map(ref => ref.path)
+const packages = settings.package
+  ? [settings.package]
+  : tsconfigReferences.references
+    .filter(ref => ref.path.startsWith(folders.packages))
+    .map(ref => ref.path)
 
 console.time('Total Duration')
 
@@ -61,7 +63,7 @@ for (const projectFolder of packages) {
     }
   })
 
-  console.log(`\r`)
+  console.log('\r')
 
   const extractorResult = Extractor.invoke(extractorConfig, {
     localBuild: settings.local,
@@ -69,7 +71,7 @@ for (const projectFolder of packages) {
     showDiagnostics: settings.diagnostics,
   })
 
-  console.log(`\r`)
+  console.log('\r')
 
   if (extractorResult.succeeded) {
     _console.log(`└─ ${Colorize.green('passed')}`)
@@ -96,7 +98,7 @@ if (packagesWithFailures.length === 0) {
   process.exit(1)
 }
 
-function stubConsole() {
+function stubConsole () {
   const _console = { ...console }
   console.log = (...args) => _console.log('│ ', ...args)
   console.warn = (...args) => _console.warn('│ ', ...args)
@@ -111,7 +113,7 @@ function stubConsole() {
   }
 }
 
-function loadSettings() {
+function loadSettings () {
   let [, , packageName, ...args] = process.argv
 
   packageName = packageName?.trim() ?? ''
@@ -121,7 +123,7 @@ function loadSettings() {
     args.push(packageName)
     packageName = ''
   } else if (packageName) {
-    packageName.startsWith(folders.packages) ? packageName : `${folders.packages}${packageName}`
+    packageName = packageName.startsWith(folders.packages) ? packageName : `${folders.packages}${packageName}`
   }
 
   return {
