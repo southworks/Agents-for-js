@@ -19,8 +19,8 @@ const paths = {
   _: import.meta.dirname,
   reports: {
     _: path.join(import.meta.dirname, folders.reports._),
-    temp: path.join(import.meta.dirname, folders.reports._, folders.reports.generated),
-    etc: path.join(import.meta.dirname, folders.reports._, folders.reports.baseline)
+    baseline: path.join(import.meta.dirname, folders.reports._, folders.reports.baseline),
+    generated: path.join(import.meta.dirname, folders.reports._, folders.reports.generated),
   },
 }
 
@@ -31,8 +31,8 @@ const packagesFromTsConfig = JSON.parse(fs.readFileSync(path.join(paths._, 'tsco
   .map(ref => ref.path)
 
 // Ensure report directories exist
-fs.mkdirSync(paths.reports.etc, { recursive: true })
-fs.mkdirSync(paths.reports.temp, { recursive: true })
+fs.mkdirSync(paths.reports.baseline, { recursive: true })
+fs.mkdirSync(paths.reports.generated, { recursive: true })
 
 const helpMessage = `
 ${Colorize.cyan('Usage:')}
@@ -54,7 +54,7 @@ ${Colorize.cyan('Examples:')}
 console.log(`${Colorize.magenta('API Compatibility Report')}
 
 ${Colorize.cyan('Tips:')}
-  ${Colorize.dim(`- use --local to syncronize the ${folders.reports._} folder from ${folders.reports.generated} to ${folders.reports.baseline}.`)}
+  ${Colorize.dim(`- use --local to synchronize the ${folders.reports._} folder from ${folders.reports.generated} to ${folders.reports.baseline}.`)}
   ${Colorize.dim('- run "npm run compat -- --help" for more information.')}`)
 
 const settings = loadSettings()
@@ -86,8 +86,8 @@ for (const projectFolder of packages) {
       },
       apiReport: {
         enabled: true,
-        reportFolder: paths.reports.etc,
-        reportTempFolder: paths.reports.temp,
+        reportFolder: paths.reports.baseline,
+        reportTempFolder: paths.reports.generated,
       },
       docModel: {
         enabled: false
