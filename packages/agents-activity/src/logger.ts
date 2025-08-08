@@ -25,7 +25,7 @@ export class Logger {
    * Creates a new Logger instance with the specified namespace.
    * @param namespace The namespace to use for the logger
    */
-  constructor (namespace: string = '', testing: boolean = false) {
+  constructor (namespace: string = '') {
     this.initializeLoggers(namespace)
   }
 

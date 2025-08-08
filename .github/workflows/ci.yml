@@ -37,7 +37,7 @@ jobs:
       - name: Build TS
         run: npm run build
 
-      - name: Run tests
+      - name: Run compatibility checks
         run: npm run compat
 
       - name: Run tests

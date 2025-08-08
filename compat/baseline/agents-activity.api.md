@@ -1052,7 +1052,7 @@ export enum InputHints {
 
 // @public
 export class Logger {
-    constructor(namespace?: string);
+    constructor(namespace?: string, testing?: boolean);
     debug(message: string, ...args: any[]): void;
     error(message: string, ...args: any[]): void;
     info(message: string, ...args: any[]): void;

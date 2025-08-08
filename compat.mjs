@@ -1,3 +1,5 @@
+// @ts-check
+
 import fs from 'fs'
 import path from 'path'
 
@@ -5,15 +7,32 @@ import { Extractor, ExtractorConfig } from '@microsoft/api-extractor'
 import { Colorize } from '@rushstack/terminal'
 
 const folders = {
-  root: import.meta.dirname,
-  reports: path.join(import.meta.dirname, 'api-reports'),
-  packages: 'packages/'
+  reports: {
+    _: 'compat',
+    baseline: 'baseline',
+    generated: 'generated',
+  },
+  packages: 'packages'
 }
 
-const tsconfigReferences = JSON.parse(fs.readFileSync(path.join(folders.root, 'tsconfig.build.json'), 'utf-8'))
+const paths = {
+  _: import.meta.dirname,
+  reports: {
+    _: path.join(import.meta.dirname, folders.reports._),
+    temp: path.join(import.meta.dirname, folders.reports._, folders.reports.generated),
+    etc: path.join(import.meta.dirname, folders.reports._, folders.reports.baseline)
+  },
+}
 
-fs.mkdirSync(path.join(folders.reports, 'etc'), { recursive: true })
-fs.mkdirSync(path.join(folders.reports, 'temp'), { recursive: true })
+// Load tsconfig references
+const packagesFromTsConfig = JSON.parse(fs.readFileSync(path.join(paths._, 'tsconfig.build.json'), 'utf-8'))
+  .references
+  .filter(ref => ref.path.startsWith(folders.packages))
+  .map(ref => ref.path)
+
+// Ensure report directories exist
+fs.mkdirSync(paths.reports.etc, { recursive: true })
+fs.mkdirSync(paths.reports.temp, { recursive: true })
 
 const helpMessage = `
 ${Colorize.cyan('Usage:')}
@@ -21,7 +40,7 @@ ${Colorize.cyan('Usage:')}
 
 ${Colorize.cyan('Options:')}
   ${Colorize.blue('[package]')}          ${Colorize.dim('Name of the package to analyze (e.g. agents-hosting). If omitted, all packages are analyzed.')}
-  -l, --local        ${Colorize.dim('Copy temporary API report files to the final report folder (api-reports/etc).')}
+  -l, --local        ${Colorize.dim(`Copy temporary API report files to the final report folder (${folders.reports._}/${folders.reports.baseline}).`)}
   -v, --verbose      ${Colorize.dim('Show verbose output from API Extractor.')}
   -d, --diagnostics  ${Colorize.dim('Show diagnostics output from API Extractor.')}
   -h, --help         ${Colorize.dim('Show this help message.')}
@@ -35,8 +54,8 @@ ${Colorize.cyan('Examples:')}
 console.log(`${Colorize.magenta('API Compatibility Report')}
 
 ${Colorize.cyan('Tips:')}
-  ${Colorize.dim('- use --local to syncronize reports from temp to etc.')}
-  ${Colorize.dim('- run "npm run compat --help" for more information.')}`)
+  ${Colorize.dim(`- use --local to syncronize the ${folders.reports._} folder from ${folders.reports.generated} to ${folders.reports.baseline}.`)}
+  ${Colorize.dim('- run "npm run compat -- --help" for more information.')}`)
 
 const settings = loadSettings()
 
@@ -45,11 +64,7 @@ if (settings.help) {
   process.exit(0)
 }
 
-const packages = settings.package
-  ? [settings.package]
-  : tsconfigReferences.references
-    .filter(ref => ref.path.startsWith(folders.packages))
-    .map(ref => ref.path)
+const packages = settings.package ? [settings.package] : packagesFromTsConfig
 
 console.time('Total Duration')
 
@@ -58,10 +73,11 @@ const { _console, restore } = stubConsole()
 
 for (const projectFolder of packages) {
   _console.log(`\n┌─ [${Colorize.blue(projectFolder)}] analyzing compatibility...`)
-  const packageJsonFullPath = path.resolve(folders.root, projectFolder, 'package.json')
+  const packageJsonFullPath = path.resolve(paths._, projectFolder, 'package.json')
 
   const extractorConfig = ExtractorConfig.prepare({
     packageJsonFullPath,
+    configObjectFullPath: undefined,
     configObject: {
       projectFolder,
       mainEntryPointFilePath: 'dist/src/index.d.ts',
@@ -70,8 +86,8 @@ for (const projectFolder of packages) {
       },
       apiReport: {
         enabled: true,
-        reportFolder: path.join(folders.reports, 'etc'),
-        reportTempFolder: path.join(folders.reports, 'temp'),
+        reportFolder: paths.reports.etc,
+        reportTempFolder: paths.reports.temp,
       },
       docModel: {
         enabled: false
@@ -118,8 +134,6 @@ for (const projectFolder of packages) {
 
 restore()
 
-// console.log('\n', separator, '\r')
-
 if (packagesWithFailures.length === 0) {
   console.log(`\n${Colorize.green(`${packages.length} package(s) passed the compatibility analysis!`)}\n`)
 } else {
@@ -134,6 +148,10 @@ if (packagesWithFailures.length === 0) {
   process.exit(1)
 }
 
+/**
+ * Stub console methods to prefix messages with a pipe character.
+ * Useful to make the API extractor output more readable in the terminal.
+ */
 function stubConsole () {
   const _console = { ...console }
   console.log = (...args) => _console.log('│ ', ...args)
@@ -149,6 +167,9 @@ function stubConsole () {
   }
 }
 
+/**
+ * Load settings from command line arguments.
+ */
 function loadSettings () {
   let [, , packageName, ...args] = process.argv
 
@@ -159,7 +180,7 @@ function loadSettings () {
     args.push(packageName)
     packageName = ''
   } else if (packageName) {
-    packageName = packageName.startsWith(folders.packages) ? packageName : `${folders.packages}${packageName}`
+    packageName = packageName.startsWith(folders.packages) ? packageName : `${folders.packages}/${packageName}`
   }
 
   return {

@@ -6,4 +6,4 @@ dist/
 test-report.xml
 tsconfig.tsbuildinfo
 devTools/
-temp
+generated
