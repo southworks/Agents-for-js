@@ -25,8 +25,20 @@ const paths = {
 }
 
 // Load tsconfig references
-const packagesFromTsConfig = JSON.parse(fs.readFileSync(path.join(paths._, 'tsconfig.build.json'), 'utf-8'))
-  .references
+const tsconfigPath = path.join(paths._, 'tsconfig.build.json')
+if (!fs.existsSync(tsconfigPath)) {
+  console.error(Colorize.red(`Error: ${tsconfigPath} not found.`))
+  process.exit(1)
+}
+const tsconfigContent = fs.readFileSync(tsconfigPath, 'utf-8')
+let packagesFromTsConfig
+try {
+  packagesFromTsConfig = JSON.parse(tsconfigContent)
+} catch (error) {
+  console.error(Colorize.red(`Error parsing tsconfig.build.json: ${error.message}`))
+  process.exit(1)
+}
+packagesFromTsConfig.references
   .filter(ref => ref.path.startsWith(folders.packages))
   .map(ref => ref.path)
 
