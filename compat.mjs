@@ -34,13 +34,13 @@ const tsconfigContent = fs.readFileSync(tsconfigPath, 'utf-8')
 let packagesFromTsConfig
 try {
   packagesFromTsConfig = JSON.parse(tsconfigContent)
+    .references
+    .filter(ref => ref.path.startsWith(folders.packages))
+    .map(ref => ref.path)
 } catch (error) {
   console.error(Colorize.red(`Error parsing tsconfig.build.json: ${error.message}`))
   process.exit(1)
 }
-packagesFromTsConfig.references
-  .filter(ref => ref.path.startsWith(folders.packages))
-  .map(ref => ref.path)
 
 // Ensure report directories exist
 fs.mkdirSync(paths.reports.baseline, { recursive: true })
