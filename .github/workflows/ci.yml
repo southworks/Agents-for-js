@@ -37,11 +37,14 @@ jobs:
       - name: Build TS
         run: npm run build
 
-      - name: Build samples
-        run: npm run build:samples
+      - name: Run compatibility checks
+        run: npm run compat
 
       - name: Run tests
         run: npm test
+
+      - name: Build samples
+        run: npm run build:samples
       
       - name: Set Version
         run: node setVersion.js
