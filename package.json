@@ -27,7 +27,8 @@
     "build:clean": "npm run clean:dist && npm run build",
     "postbuild": "npm run build:browser",
     "test": "node --test  --test-reporter=spec  --import tsx  --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-report.xml './packages/*/test/**/*.test.ts'",
-    "docs": "typedoc --skipErrorChecking"
+    "docs": "typedoc --skipErrorChecking",
+    "compat": "node compat.mjs"
   },
   "license": "MIT",
   "workspaces": [
@@ -35,6 +36,7 @@
     "test-agents/*"
   ],
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.52.10",
     "@microsoft/microsoft-graph-types": "^2.40.0",
     "@types/debug": "^4.1.12",
     "@types/express": "^5.0.3",
