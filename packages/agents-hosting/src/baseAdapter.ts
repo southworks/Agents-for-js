@@ -169,6 +169,17 @@ export abstract class BaseAdapter {
     return this
   }
 
+  /**
+   * This method creates a revocable proxy for the given target object.
+   * If the environment does not support Proxy.revocable, it returns the original object.
+   * @remarks
+   * This is used to enhance security by allowing the proxy to be revoked after use,
+   * preventing further access to the underlying object.
+   *
+   * @param target The target object to be proxied.
+   * @param handler Optional proxy handler to customize behavior.
+   * @returns An object containing the proxy and a revoke function.
+   */
   private makeRevocable<T extends Record<string, any>>(
     target: T,
     handler?: ProxyHandler<T>
@@ -200,6 +211,7 @@ export abstract class BaseAdapter {
       context.locale = context.activity.locale
     }
 
+    // Create a revocable proxy for the context which will automatically be revoked upon completion of the turn.
     const pContext = this.makeRevocable(context)
 
     try {
@@ -216,6 +228,8 @@ export abstract class BaseAdapter {
       }
     } finally {
       pContext.revoke()
+      // Accessing the context after this point, will throw a TypeError.
+      // e.g.: "TypeError: Cannot perform 'get' on a proxy that has been revoked"
     }
   }
 }
