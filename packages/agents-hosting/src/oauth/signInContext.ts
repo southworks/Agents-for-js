@@ -233,13 +233,18 @@ export class SignInContext {
 
     this._authHandler = this.getAuthHandlerOrThrow(this.handler.id)
 
-    if (!this.isStartedFromRoute && this._authHandler.flow?.state?.flowStarted === true) {
-      this.setStatus('success')
-      this.logger.debug('OAuth flow success, using existing state.')
-      return true
-    }
-
     if (this.handler.status === 'begin') {
+      // When the flow is initiated with the isStartedFromRoute flag,
+      // subsequent calls (regardless of the flag's value) will use the success status
+      // to determine whether to retrieve the token directly or continue the OAuth flow.
+      this._authHandler.flow!.state = await this._authHandler.flow?.getFlowState(this.context) ?? {} as FlowState
+      if (this._authHandler.flow?.state?.flowStarted === true) {
+        this.logger.debug('OAuth flow success, using existing state.')
+        this.setStatus('success')
+        await this.storage.handler.set(this.handler)
+        return true
+      }
+
       this.logger.debug('No active flow state, starting a new OAuth flow.')
       await this._authHandler.flow?.signOut(this.context)
     } else {
