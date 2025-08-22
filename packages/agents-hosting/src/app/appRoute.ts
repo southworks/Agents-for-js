@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { AuthHandlerContext } from './agentApplication'
 import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
 import { TurnState } from './turnState'
@@ -87,5 +88,5 @@ export interface AppRoute<TState extends TurnState> {
    * ```
    *
    */
-  authHandlers?: string[]
+  authHandlers?: AuthHandlerContext[]
 }

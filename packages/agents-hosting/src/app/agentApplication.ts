@@ -12,7 +12,7 @@ import { AdaptiveCardsActions } from './adaptiveCards'
 import { AgentApplicationOptions } from './agentApplicationOptions'
 import { ConversationUpdateEvents } from './conversationUpdateEvents'
 import { AgentExtension } from './extensions'
-import { Authorization, SignInState } from './authorization'
+import { AuthHandler } from './authorization'
 import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
 import { TurnEvents } from './turnEvents'
@@ -21,6 +21,8 @@ import { RouteRank } from './routeRank'
 import { RouteList } from './routeList'
 import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
+import { UserTokenClient } from '../oauth'
+import { MemoryStorage } from '../storage'
 
 const logger = debug('agents:app')
 
@@ -68,13 +70,14 @@ export type ApplicationEventHandler<TState extends TurnState> = (context: TurnCo
  * ```
  *
  */
-export class AgentApplication<TState extends TurnState> {
+export class AgentApplication<TState extends TurnState, TOptions extends Partial<AgentApplicationOptions<TState>> = Partial<AgentApplicationOptions<TState>>> {
   protected readonly _options: AgentApplicationOptions<TState>
   protected readonly _routes: RouteList<TState> = new RouteList<TState>()
   protected readonly _beforeTurn: ApplicationEventHandler<TState>[] = []
   protected readonly _afterTurn: ApplicationEventHandler<TState>[] = []
   private readonly _adapter?: CloudAdapter
-  private readonly _authorization?: Authorization
+  // private readonly _authorization: Record<string, Record<string, AuthorizationHandlerContext>> = {}
+  private readonly _authManager: AuthorizationHandlerManager[] = []
   private _typingTimer: NodeJS.Timeout | undefined
   protected readonly _extensions: AgentExtension<TState>[] = []
   private readonly _adaptiveCards: AdaptiveCardsActions<TState>
@@ -106,7 +109,7 @@ export class AgentApplication<TState extends TurnState> {
    * });
    * ```
    */
-  public constructor (options?: Partial<AgentApplicationOptions<TState>>) {
+  public constructor (options?: TOptions) {
     this._options = {
       ...options,
       turnStateFactory: options?.turnStateFactory || (() => new TurnState() as TState),
@@ -124,9 +127,13 @@ export class AgentApplication<TState extends TurnState> {
       this._adapter = new CloudAdapter()
     }
 
-    if (this._options.authorization) {
-      this._authorization = new Authorization(this._options.storage!, this._options.authorization, this._adapter?.userTokenClient!)
-    }
+    // for (const [handlerId, handler] of Object.entries(options?.authorization ?? {})) {
+    //   this._authManager.push(new AuthorizationHandlerManager(this.adapter.userTokenClient!, handlerId, handler))
+    // }
+
+    // if (this._options.authorization) {
+    //   this._authorization = new Authorization(this._options.storage!, this._options.authorization, this._adapter?.userTokenClient!)
+    // }
 
     if (this._options.longRunningMessages && !this._adapter && !this._options.agentAppId) {
       throw new Error('The Application.longRunningMessages property is unavailable because no adapter was configured in the app.')
@@ -148,11 +155,15 @@ export class AgentApplication<TState extends TurnState> {
    * @returns The authorization instance.
    * @throws Error if no authentication options were configured.
    */
-  public get authorization (): Authorization {
-    if (!this._authorization) {
+  public get authorization (): any {
+    if (this._authManager.length === 0) {
       throw new Error('The Application.authorization property is unavailable because no authorization options were configured.')
     }
-    return this._authorization
+
+    return this._authManager.reduce((acc, manager) => {
+      // acc[manager.id] = { context: manager.context.bind(manager) }
+      return acc
+    }, {} as any)
   }
 
   /**
@@ -160,8 +171,8 @@ export class AgentApplication<TState extends TurnState> {
    *
    * @returns The application options.
    */
-  public get options (): AgentApplicationOptions<TState> {
-    return this._options
+  public get options (): TOptions {
+    return this._options as TOptions
   }
 
   /**
@@ -247,7 +258,9 @@ export class AgentApplication<TState extends TurnState> {
    * ```
    *
    */
-  public addRoute (selector: RouteSelector, handler: RouteHandler<TState>, isInvokeRoute: boolean = false, rank: number = RouteRank.Unspecified, authHandlers: string[] = []): this {
+  public addRoute (selector: RouteSelector, handler: RouteHandler<TState>, isInvokeRoute: boolean = false, rank: number = RouteRank.Unspecified, authHandlers: AuthHandlerContext[] = []): this {
+    // const handlers = this._authManager.filter(e => authHandlers.includes(e.id))
+    // new AuthorizationHandlerManager(this.adapter.userTokenClient!, handlerId, handler)
     this._routes.addRoute(selector, handler, isInvokeRoute, rank, authHandlers)
     return this
   }
@@ -276,7 +289,7 @@ export class AgentApplication<TState extends TurnState> {
   public onActivity (
     type: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: string[] = [],
+    authHandlers: AuthorizationHandler[] = [],
     rank: RouteRank = RouteRank.Unspecified
   ): this {
     (Array.isArray(type) ? type : [type]).forEach((t) => {
@@ -315,7 +328,7 @@ export class AgentApplication<TState extends TurnState> {
   public onConversationUpdate (
     event: ConversationUpdateEvents,
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: string[] = [],
+    authHandlers: AuthorizationHandler[] = [],
     rank: RouteRank = RouteRank.Unspecified
   ): this {
     if (typeof handler !== 'function') {
@@ -393,7 +406,7 @@ export class AgentApplication<TState extends TurnState> {
   public onMessage (
     keyword: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: string[] = [],
+    authHandlers: AuthHandlerContext[] = [],
     rank: RouteRank = RouteRank.Unspecified
   ): this {
     (Array.isArray(keyword) ? keyword : [keyword]).forEach((k) => {
@@ -424,7 +437,7 @@ export class AgentApplication<TState extends TurnState> {
    */
   public onSignInSuccess (handler: (context: TurnContext, state: TurnState, id?: string) => Promise<void>): this {
     if (this.options.authorization) {
-      this.authorization.onSignInSuccess(handler)
+      // this.authorization.onSignInSuccess(handler)
     } else {
       throw new Error(
         'The Application.authorization property is unavailable because no authorization options were configured.'
@@ -454,7 +467,7 @@ export class AgentApplication<TState extends TurnState> {
    */
   public onSignInFailure (handler: (context: TurnContext, state: TurnState, id?: string) => Promise<void>): this {
     if (this.options.authorization) {
-      this.authorization.onSignInFailure(handler)
+      // this.authorization.onSignInFailure(handler)
     } else {
       throw new Error(
         'The Application.authorization property is unavailable because no authorization options were configured.'
@@ -606,24 +619,61 @@ export class AgentApplication<TState extends TurnState> {
         const state = turnStateFactory()
         await state.load(context, storage)
 
-        const signInState : SignInState = state.getValue('user.__SIGNIN_STATE_')
-        logger.debug('SignIn State:', signInState)
-        if (this._authorization && signInState && signInState.completed === false) {
-          const flowState = await this._authorization.authHandlers[signInState.handlerId!]?.flow?.getFlowState(context)
-          logger.debug('Flow State:', flowState)
-          if (flowState && flowState.flowStarted === true) {
-            const tokenResponse = await this._authorization.beginOrContinueFlow(turnContext, state, signInState?.handlerId!)
-            const savedAct = Activity.fromObject(signInState?.continuationActivity!)
-            if (tokenResponse?.token && tokenResponse.token.length > 0) {
-              logger.info('resending continuation activity:', savedAct.text)
-              await this.run(new TurnContext(context.adapter, savedAct))
-              await state.deleteValue('user.__SIGNIN_STATE_')
-              return true
+        // continue: flow started flag + magic code (retry)
+        // begin: no token from service
+        // continue: signin/verifyState activity
+        // exchange: signing/tokenExchange activity
+
+        // TODO: this could be a function that returns the cleanup, authenticated, and route.
+
+        let selectedRoute = await [...this._routes].find(route => route.selector(context))
+
+        for (const authHandler of selectedRoute?.authHandlers ?? []) {
+          if (authHandler instanceof AuthorizationHandler) {
+            const manager = new AuthorizationHandlerManager(this.adapter.userTokenClient!, authHandler)
+            const { authenticated, activity } = await manager.handler(context)
+            if (!authenticated) {
+              return false
+            }
+            if (activity) {
+              selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, activity)))
             }
           }
-
-          // return true
         }
+
+        await selectedRoute?.handler(context, state)
+
+        // for (const manager of selectedRoute?.authHandlers ?? []) {
+        //   const handler = await manager.handler(context)
+        //   if (!handler.authenticated) {
+        //     return false
+        //   }
+        //   if (handler.activity) {
+        //     selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, handler.activity)))
+        //   }
+        // }
+        // const manager = await selectedRoute?.authHandlers?.find(handler => handler.selector(context))
+
+        // if (manager) {
+        //   const handler = await manager.handler(context)
+        //   if (!handler.authenticated) {
+        //     return false
+        //   }
+        //   if (handler.activity) {
+        //     selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, handler.activity)))
+        //   }
+        // }
+
+        // for (const handler of selectedRoute?.authHandlers ?? []) {
+        //   const flow = await handler.decide(context)
+        //   if (!flow?.authenticated) {
+        //     return false
+        //   }
+        //   if (flow?.activity) {
+        //     selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, flow.activity)))
+        //   }
+        //   this._authorization[handler.id] = flow.handler
+        // }
 
         if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
           await state.save(context, storage)
@@ -639,36 +689,79 @@ export class AgentApplication<TState extends TurnState> {
           state.temp.inputFiles = inputFiles
         }
 
-        for (const route of this._routes) {
-          if (await route.selector(context)) {
-            if (route.authHandlers === undefined || route.authHandlers.length === 0) {
-              await route.handler(context, state)
-            } else {
-              let signInComplete = false
-              for (const authHandlerId of route.authHandlers) {
-                logger.info(`Executing route handler for authHandlerId: ${authHandlerId}`)
-                const tokenResponse = await this._authorization?.beginOrContinueFlow(turnContext, state, authHandlerId)
-                signInComplete = (tokenResponse?.token !== undefined && tokenResponse?.token.length > 0)
-                if (!signInComplete) {
-                  break
-                }
-              }
-              if (signInComplete) {
-                await route.handler(context, state)
-              }
-            }
-
-            if (await this.callEventHandlers(context, state, this._afterTurn)) {
-              await state.save(context, storage)
-            }
-
-            return true
-          }
-        }
+        // Use await to ensure async handlers are executed correctly.
+        await selectedRoute?.handler.bind(this, context, state)()
 
         if (await this.callEventHandlers(context, state, this._afterTurn)) {
           await state.save(context, storage)
         }
+
+        // TODO: do cleanup of handlers
+        // manager?.cleanup(context)
+
+        // const signInState : SignInState = state.getValue('user.__SIGNIN_STATE_')
+        // logger.debug('SignIn State:', signInState)
+        // if (this._authorization && signInState && signInState.completed === false) {
+        //   const flowState = await this._authorization.authHandlers[signInState.handlerId!]?.flow?.getFlowState(context)
+        //   logger.debug('Flow State:', flowState)
+        //   if (flowState && flowState.flowStarted === true) {
+        //     const tokenResponse = await this._authorization.beginOrContinueFlow(turnContext, state, signInState?.handlerId!)
+        //     const savedAct = Activity.fromObject(signInState?.continuationActivity!)
+        //     if (tokenResponse?.token && tokenResponse.token.length > 0) {
+        //       logger.info('resending continuation activity:', savedAct.text)
+        //       await this.run(new TurnContext(context.adapter, savedAct))
+        //       await state.deleteValue('user.__SIGNIN_STATE_')
+        //       return true
+        //     }
+        //   }
+
+        //   // return true
+        // }
+
+        // if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
+        //   await state.save(context, storage)
+        //   return false
+        // }
+
+        // if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
+        //   const inputFiles = state.temp.inputFiles ?? []
+        //   for (let i = 0; i < this._options.fileDownloaders.length; i++) {
+        //     const files = await this._options.fileDownloaders[i].downloadFiles(context, state)
+        //     inputFiles.push(...files)
+        //   }
+        //   state.temp.inputFiles = inputFiles
+        // }
+
+        // for (const route of this._routes) {
+        //   if (await route.selector(context)) {
+        //     if (route.authHandlers === undefined || route.authHandlers.length === 0) {
+        //       await route.handler(context, state)
+        //     } else {
+        //       let signInComplete = false
+        //       for (const authHandlerId of route.authHandlers) {
+        //         logger.info(`Executing route handler for authHandlerId: ${authHandlerId}`)
+        //         const tokenResponse = await this._authorization?.beginOrContinueFlow(turnContext, state, authHandlerId)
+        //         signInComplete = (tokenResponse?.token !== undefined && tokenResponse?.token.length > 0)
+        //         if (!signInComplete) {
+        //           break
+        //         }
+        //       }
+        //       if (signInComplete) {
+        //         await route.handler(context, state)
+        //       }
+        //     }
+
+        //     if (await this.callEventHandlers(context, state, this._afterTurn)) {
+        //       await state.save(context, storage)
+        //     }
+
+        //     return true
+        //   }
+        // }
+
+        // if (await this.callEventHandlers(context, state, this._afterTurn)) {
+        //   await state.save(context, storage)
+        // }
 
         return false
       } catch (err: any) {
@@ -1013,3 +1106,189 @@ export class AgentApplication<TState extends TurnState> {
     }
   }
 }
+
+interface AuthorizationHandlerOptions {
+  id: string;
+  token: string;
+}
+
+export class AuthorizationHandlerContext {
+  constructor (private options: AuthorizationHandlerOptions) {
+  }
+
+  get id (): string {
+    return this.options.id
+  }
+
+  get token (): string {
+    return this.options.token
+  }
+
+  async logout () {
+    console.log('logout')
+  }
+}
+
+export interface AuthHandlerContext {
+  register<T>(context: TurnContext, handlerContext: T): void
+}
+
+export class AuthorizationHandler implements AuthHandlerContext {
+  constructor (public id: string, public properties: AuthHandler) {
+  }
+
+  private key () {
+    return `__AUTHORIZATION__${this.id}`
+  }
+
+  register <T>(context: TurnContext, handlerContext: T): void {
+    context.turnState.set(this.key(), () => handlerContext)
+  }
+
+  context (context: TurnContext): AuthorizationHandlerContext {
+    const registered = context.turnState.get(this.key())
+    if (!registered) {
+      const msg = `AuthorizationHandler '${this.id}' is not registered in the current route handler.`
+      logger.warn(msg, context.activity)
+      throw new Error(msg)
+    }
+    return registered()
+  }
+}
+
+export class AuthorizationHandlerManager {
+  constructor (private userTokenClient: UserTokenClient, public authhandler: AuthorizationHandler) {
+  }
+
+  async getToken (connectionName: string, channelId: string, userId: string, code?: string): Promise<string> {
+    const { token } = await this.userTokenClient.getUserToken(connectionName, channelId, userId, code)
+    return token ?? ''
+  }
+
+  // private async selector (context: TurnContext) {
+  //   // continue: flow started flag + magic code (retry)
+  //   // begin: no token from service
+  //   // continue: signin/verifyState activity
+  //   // exchange: signing/tokenExchange activity
+  //   return true
+  // }
+
+  async handler (context: TurnContext) {
+    const activity = context.activity
+    const { id, properties } = this.authhandler
+
+    // const selector = this.selector(context)
+    const token = await this.getToken(properties.name!, activity.channelId!, activity.from?.id!)
+
+    const handler = new AuthorizationHandlerContext({
+      id,
+      token
+    })
+
+    this.authhandler.register(context, handler)
+
+    return {
+      authenticated: true,
+      activity,
+    }
+  }
+}
+
+type AutoAuthOptions = Record<string, AuthHandler>
+
+export class AutoAuth {
+  static create <T extends AutoAuthOptions>(options: T): { [K in keyof T]: AuthorizationHandler } {
+    return Object.entries(options).reduce((acc, [key, value]) => {
+      value.name = value.name ?? process.env[key + '_connectionName'] as string
+      value.title = value.title ?? process.env[key + '_connectionTitle'] as string
+      value.text = value.text ?? process.env[key + '_connectionText'] as string
+      value.cnxPrefix = value.cnxPrefix ?? process.env[key + '_cnxPrefix'] as string
+      acc[key] = new AuthorizationHandler(key, value)
+      return acc
+    }, {} as any)
+  }
+}
+
+const authorization = AutoAuth.create({
+  graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In', },
+  github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', },
+})
+
+const app = new AgentApplication({ storage: new MemoryStorage() })
+app.onMessage('/me', (context) => {
+  const s = authorization.graph.context(context)
+  console.log(s.token)
+  return Promise.resolve()
+}, [authorization.graph])
+
+// class App extends AgentApplication<TurnState> {
+//   constructor () {
+//     super({
+//       authorization: { graph: { asd: '' } as any }
+//     })
+//   }
+// }
+
+// const s = new AgentApplication<TurnState>({
+//   authorization: { graph: { asd: '' } as any }
+// })
+
+// s.authorization
+// // // const s = new App().authorization.graph.context(new TurnContext({} as any, {} as any))
+
+// // s.authorization.graph.context(new TurnContext({} as any, {} as any))
+
+// // // const s2 = new App({
+// // // }).authorization.getToken
+
+// interface AOptions {
+//   text?: string
+//   authorization?: AuthorizationHandlers
+// }
+
+// class App<TState extends TurnState, TOptions extends AOptions = AOptions> {
+//   // protected readonly _options: AgentApplicationOptions<TState>
+
+//   constructor (options?: TOptions) {
+//     // this._options = options as any
+//     console.log('A constructor', options)
+//   }
+
+//   get authorization (): AuthMap<TOptions> {
+//     return {} as AuthMap<TOptions>
+//   }
+
+//   get authorization2 (): AuthMap<TState> {
+//     return {} as AuthMap<TState>
+//   }
+
+//   // public get options (): TOptions {
+//   //   return this._options as TOptions
+//   // }
+// }
+
+// const s3 = new App<TurnState>({
+//   authorization: { graph: { asd: '' } as any }
+// })
+
+// s3.authorization.graph.context(new TurnContext({} as any, {} as any))
+
+// // class App extends A {
+// //   constructor () {
+// //     super({
+// //       authorization: { graph: { asd: '' } as any }
+// //     })
+// //   }
+// // }
+
+// // // const s = new A({
+// // //   authorization: { graph: { asd: '' } as any }
+// // // }).authorization.graph.context(new TurnContext({} as any, {} as any))
+// // const s = new App().authorization.graph.context(new TurnContext({} as any, {} as any))
+
+// type AuthMap<T> = T extends { authorization: infer U }
+//   ? {
+//       [K in keyof U]: AuthorizationHandler
+//     }
+//   // : Record<string, AuthorizationHandler>
+//   : never

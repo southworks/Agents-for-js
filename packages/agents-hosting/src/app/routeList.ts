@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { AuthHandlerContext } from './agentApplication'
 import { AppRoute } from './appRoute'
 import { RouteHandler } from './routeHandler'
 import { RouteRank } from './routeRank'
@@ -17,7 +18,7 @@ export class RouteList<TState extends TurnState> {
     handler: RouteHandler<TState>,
     isInvokeRoute: boolean = false,
     rank: number = RouteRank.Unspecified,
-    authHandlers: string[] = []
+    authHandlers: AuthHandlerContext[] = []
   ): this {
     this._routes.push({ selector, handler, isInvokeRoute, rank, authHandlers })
 
