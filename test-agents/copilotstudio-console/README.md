@@ -13,7 +13,7 @@ To setup for this sample, you will need the following:
 
 1. Create a Agent in [Copilot Studio](https://copilotstudio.microsoft.com)
     1. Publish your newly created Agent
-    1. In Copilot Studio, go to Settings > Advanced > Metadata. Copy the following values for later configueration:
+    1. In Copilot Studio, go to Settings > Advanced > Metadata. Copy the following values for later configuration:
         1. Schema name
         1. Environment Id
 
@@ -65,7 +65,7 @@ This step will require permissions to Create application identities in your Azur
 > Current use of this feature requires authorization from Copilot Studio team and will be made generally available in the future.
 
 > [!IMPORTANT]
-> When using Service Principal login, Your Copilot Studio Agent must be configured for User Anonymous authentication. Settings => Security => Authentication => No authentication.
+> When using Service Principal login, Your Copilot Studio Agent must be configured for User Anonymous authentication. Settings > Security > Authentication > No authentication.
 
 This step will require permissions to Create application identities in your Azure tenant. For this sample, you will be creating a Native Client Application Identity.
 
@@ -99,19 +99,19 @@ This step will require permissions to Create application identities in your Azur
 2. Fill in the values you recorded during setup:
     - `environmentId`: The Copilot Studio Environment Id.
     - `schemaName`: The Copilot Studio Schema name.
-    - `directConnectUrl`: The URL used to connect to the Copilot Studio service (use this OR environmentId + schemaName).
+    - `directConnectUrl`: The URL used to connect to the Copilot Studio service. If set, overrides `environmentId` and `schemaName`.
     - `tenantId`: The App Registration Directory (tenant) ID.
     - `appClientId`: The App Registration Application (client) ID.
     - `useS2SConnection`: true.
     - `appClientSecret`: The App Registration secret. Certificates & Secrets => Client secrets.
 
 ### Optional Configuration
-This sample allows to configure the following settings in the .env file:
+This sample lets you configure the following settings in the .env file:
    - `authorityEndpoint`: The login authority to use for the connection. Default: "https://login.microsoftonline.com".
    - `cloud`: The cloud hosting the Power Platform Services. Default: "Prod".
    - `customPowerPlatformCloud`: The Power Platform API endpoint when cloud is set to "Other".
    - `copilotAgentType`: The type of Copilot Studio Agent (Published or Prebuilt). Default: "Published".
-   - `useExperimentalEndpoint`: The flag to use the URL provided via the  "x-ms-d2e-experimental" header for subsequent calls to the Copilot Studio service.
+   - `useExperimentalEndpoint`: The flag to use the URL provided via the "x-ms-d2e-experimental" header for subsequent calls to the Copilot Studio service.
 
 ### Running the Sample
 
