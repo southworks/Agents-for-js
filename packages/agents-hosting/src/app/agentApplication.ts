@@ -12,7 +12,6 @@ import { AdaptiveCardsActions } from './adaptiveCards'
 import { AgentApplicationOptions } from './agentApplicationOptions'
 import { ConversationUpdateEvents } from './conversationUpdateEvents'
 import { AgentExtension } from './extensions'
-import { AuthHandler } from './authorization'
 import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
 import { TurnEvents } from './turnEvents'
@@ -21,8 +20,11 @@ import { RouteRank } from './routeRank'
 import { RouteList } from './routeList'
 import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
-import { UserTokenClient } from '../oauth'
-import { MemoryStorage } from '../storage'
+import { TokenExchangeRequest, TokenOrSinginResourceResponse, TokenResponse } from '../oauth'
+import { Storage, StoreItem } from '../storage'
+import { MessageFactory } from '../messageFactory'
+import { CardFactory } from '../cards'
+import { AppRoute } from './appRoute'
 
 const logger = debug('agents:app')
 
@@ -77,7 +79,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
   protected readonly _afterTurn: ApplicationEventHandler<TState>[] = []
   private readonly _adapter?: CloudAdapter
   // private readonly _authorization: Record<string, Record<string, AuthorizationHandlerContext>> = {}
-  private readonly _authManager: AuthorizationHandlerManager[] = []
+  private readonly _authManager: RouteGuardManager<TState>[] = []
   private _typingTimer: NodeJS.Timeout | undefined
   protected readonly _extensions: AgentExtension<TState>[] = []
   private readonly _adaptiveCards: AdaptiveCardsActions<TState>
@@ -237,7 +239,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
    * @param handler - The handler function that will be called if the selector returns true.
    * @param isInvokeRoute - Whether this route is for invoke activities. Defaults to false.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
-   * @param authHandlers - Array of authentication handler names for this route. Defaults to empty array.
+   * @param guards - Array of authentication handler names for this route. Defaults to empty array.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -258,10 +260,10 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
    * ```
    *
    */
-  public addRoute (selector: RouteSelector, handler: RouteHandler<TState>, isInvokeRoute: boolean = false, rank: number = RouteRank.Unspecified, authHandlers: AuthHandlerContext[] = []): this {
+  public addRoute (selector: RouteSelector, handler: RouteHandler<TState>, isInvokeRoute: boolean = false, rank: number = RouteRank.Unspecified, guards: Guard[] = []): this {
     // const handlers = this._authManager.filter(e => authHandlers.includes(e.id))
     // new AuthorizationHandlerManager(this.adapter.userTokenClient!, handlerId, handler)
-    this._routes.addRoute(selector, handler, isInvokeRoute, rank, authHandlers)
+    this._routes.addRoute(selector, handler, isInvokeRoute, rank, guards)
     return this
   }
 
@@ -270,7 +272,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
    *
    * @param type - The activity type(s) to handle. Can be a string, RegExp, RouteSelector, or array of these types.
    * @param handler - The handler function that will be called when the specified activity type is received.
-   * @param authHandlers - Array of authentication handler names for this activity. Defaults to empty array.
+   * @param guards - Array of authentication handler names for this activity. Defaults to empty array.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    *
@@ -289,12 +291,12 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
   public onActivity (
     type: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: AuthorizationHandler[] = [],
+    guards: Guard[] = [],
     rank: RouteRank = RouteRank.Unspecified
   ): this {
     (Array.isArray(type) ? type : [type]).forEach((t) => {
       const selector = this.createActivitySelector(t)
-      this.addRoute(selector, handler, false, rank, authHandlers)
+      this.addRoute(selector, handler, false, rank, guards)
     })
     return this
   }
@@ -304,7 +306,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
    *
    * @param event - The conversation update event to handle (e.g., 'membersAdded', 'membersRemoved').
    * @param handler - The handler function that will be called when the specified event occurs.
-   * @param authHandlers - Array of authentication handler names for this event. Defaults to empty array.
+   * @param guards - Array of authentication handler names for this event. Defaults to empty array.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    * @throws Error if the handler is not a function.
@@ -328,7 +330,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
   public onConversationUpdate (
     event: ConversationUpdateEvents,
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: AuthorizationHandler[] = [],
+    guards: Guard[] = [],
     rank: RouteRank = RouteRank.Unspecified
   ): this {
     if (typeof handler !== 'function') {
@@ -338,7 +340,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
     }
 
     const selector = this.createConversationUpdateSelector(event)
-    this.addRoute(selector, handler, false, rank, authHandlers)
+    this.addRoute(selector, handler, false, rank, guards)
     return this
   }
 
@@ -381,7 +383,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
    * @param keyword - The keyword, pattern, or selector function to match against message text.
    *                  Can be a string, RegExp, RouteSelector, or array of these types.
    * @param handler - The handler function that will be called when a matching message is received.
-   * @param authHandlers - Array of authentication handler names for this message handler. Defaults to empty array.
+   * @param guards - Array of authentication handler names for this message handler. Defaults to empty array.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @returns The current instance of the application.
    *
@@ -406,12 +408,12 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
   public onMessage (
     keyword: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    authHandlers: AuthHandlerContext[] = [],
+    guards: Guard[] = [],
     rank: RouteRank = RouteRank.Unspecified
   ): this {
     (Array.isArray(keyword) ? keyword : [keyword]).forEach((k) => {
       const selector = this.createMessageSelector(k)
-      this.addRoute(selector, handler, false, rank, authHandlers)
+      this.addRoute(selector, handler, false, rank, guards)
     })
     return this
   }
@@ -568,6 +570,35 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
     await this.runInternal(turnContext)
   }
 
+  // private async registerGuards (context: TurnContext) {
+  //   const activity = context.activity
+  //   const storageKey = `${activity.channelId}/${activity.from?.id!}`
+  //   let selectedRoute
+  //   for (const route of this._routes) {
+  //     if (await route.selector(context)) {
+  //       selectedRoute = route
+  //       break
+  //     }
+  //   }
+
+  //   let authenticated = !selectedRoute?.guards?.length
+  //   for (const guard of selectedRoute?.guards ?? []) {
+  //     if (guard instanceof AuthorizationGuard) {
+  //       const manager = new AuthorizationGuardManager(guard, this.adapter, this.options.storage!, storageKey)
+  //       const handler = await manager.handler(context)
+  //       authenticated = handler.authenticated
+  //       if (!authenticated) {
+  //         break
+  //       }
+  //       if (authenticated && handler.activity) {
+  //         // selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, handler.activity!)))
+  //       }
+  //     }
+  //   }
+
+  //   return selectedRoute
+  // }
+
   /**
    * Executes the application logic for a given turn context.
    *
@@ -603,6 +634,10 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
       try {
+        if (context.activity.type === ActivityTypes.Typing) {
+          return false
+        }
+
         if (this._options.startTypingTimer) {
           this.startTypingTimer(context)
         }
@@ -626,22 +661,19 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
 
         // TODO: this could be a function that returns the cleanup, authenticated, and route.
 
-        let selectedRoute = await [...this._routes].find(route => route.selector(context))
+        // let selectedRoute = null
+        // for (const route of this._routes) {
+        //   if (await route.selector(context)) {
+        //     selectedRoute = route
+        //     break
+        //   }
+        // }
 
-        for (const authHandler of selectedRoute?.authHandlers ?? []) {
-          if (authHandler instanceof AuthorizationHandler) {
-            const manager = new AuthorizationHandlerManager(this.adapter.userTokenClient!, authHandler)
-            const { authenticated, activity } = await manager.handler(context)
-            if (!authenticated) {
-              return false
-            }
-            if (activity) {
-              selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, activity)))
-            }
-          }
+        const manager = new RouteGuardManager(this._routes, this.adapter, this.options.storage!)
+        const route = await manager.register(context)
+        if (!route) {
+          return false
         }
-
-        await selectedRoute?.handler(context, state)
 
         // for (const manager of selectedRoute?.authHandlers ?? []) {
         //   const handler = await manager.handler(context)
@@ -690,7 +722,7 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
         }
 
         // Use await to ensure async handlers are executed correctly.
-        await selectedRoute?.handler.bind(this, context, state)()
+        await route?.handler.bind(this, context, state)()
 
         if (await this.callEventHandlers(context, state, this._afterTurn)) {
           await state.save(context, storage)
@@ -1107,114 +1139,322 @@ export class AgentApplication<TState extends TurnState, TOptions extends Partial
   }
 }
 
-interface AuthorizationHandlerOptions {
-  id: string;
+// TODO: add attempts?
+export interface AuthorizationGuardContext {
   token: string;
 }
 
-export class AuthorizationHandlerContext {
-  constructor (private options: AuthorizationHandlerOptions) {
-  }
-
-  get id (): string {
-    return this.options.id
-  }
-
-  get token (): string {
-    return this.options.token
-  }
-
-  async logout () {
-    console.log('logout')
-  }
+export interface Guard {
+  // the first param could be anything, a specific guard decides what to pass
+  register(context: TurnContext, data: unknown): void | Promise<void>
 }
 
-export interface AuthHandlerContext {
-  register<T>(context: TurnContext, handlerContext: T): void
-}
+export class AuthorizationGuard<TState extends TurnState> implements Guard {
+  private adapter: BaseAdapter
 
-export class AuthorizationHandler implements AuthHandlerContext {
-  constructor (public id: string, public properties: AuthHandler) {
+  constructor (public id: string, public properties: AuthHandler, app: AgentApplication<TState>) {
+    this.adapter = app.adapter
   }
 
-  private key () {
-    return `__AUTHORIZATION__${this.id}`
+  private get key () {
+    return `__${AuthorizationGuard.name}/${this.id}`
   }
 
-  register <T>(context: TurnContext, handlerContext: T): void {
-    context.turnState.set(this.key(), () => handlerContext)
+  register (context: TurnContext, data: AuthorizationGuardContext) {
+    context.turnState.set(this.key, () => data)
   }
 
-  context (context: TurnContext): AuthorizationHandlerContext {
-    const registered = context.turnState.get(this.key())
+  context (context: TurnContext): AuthorizationGuardContext {
+    const registered = context.turnState.get(this.key)
     if (!registered) {
-      const msg = `AuthorizationHandler '${this.id}' is not registered in the current route handler.`
-      logger.warn(msg, context.activity)
+      const msg = `${AuthorizationGuard.name} '${this.id}' is not registered in the current route handler.`
+      logger.error(msg, context.activity)
       throw new Error(msg)
     }
     return registered()
   }
+
+  // TODO: add a reset auth flow
+  logout (context: TurnContext): Promise<void> {
+    return this.adapter.userTokenClient!.signOut(context.activity.from?.id!, this.properties.name!, context.activity.channelId!)
+  }
 }
 
-export class AuthorizationHandlerManager {
-  constructor (private userTokenClient: UserTokenClient, public authhandler: AuthorizationHandler) {
-  }
+interface TokenVerifyState {
+  state: string
+}
 
-  async getToken (connectionName: string, channelId: string, userId: string, code?: string): Promise<string> {
-    const { token } = await this.userTokenClient.getUserToken(connectionName, channelId, userId, code)
-    return token ?? ''
-  }
+interface Ongoing<TState extends TurnState> extends StoreItem {
+  activity: Activity
+  attempts: number
+  guard: AuthorizationGuard<TState>
+}
 
-  // private async selector (context: TurnContext) {
-  //   // continue: flow started flag + magic code (retry)
-  //   // begin: no token from service
-  //   // continue: signin/verifyState activity
-  //   // exchange: signing/tokenExchange activity
-  //   return true
-  // }
+interface AppRouteWithAuthorization<TState extends TurnState> extends AppRoute<TState> {
+  guards: AuthorizationGuard<TState>[] | undefined
+}
 
-  async handler (context: TurnContext) {
+// TODO: maybe this could be inside the AuthorizationGuard class and share a config through the register.
+// continue: flow started flag + magic code (retry)
+// begin: no token from service
+// continue: signin/verifyState activity
+// exchange: signing/tokenExchange activity\
+export class RouteGuardManager<TState extends TurnState> {
+  constructor (private routes: RouteList<TState>, private adapter: BaseAdapter, private storage: Storage) { }
+
+  private async ongoing (context: TurnContext): Promise<any | undefined> {
     const activity = context.activity
-    const { id, properties } = this.authhandler
 
-    // const selector = this.selector(context)
-    const token = await this.getToken(properties.name!, activity.channelId!, activity.from?.id!)
+    // TODO these are invoke only
+    if (activity.name === 'signin/failure') {
+      logger.error('Sign-in failed.', activity.value, activity)
+      await context.sendActivity(MessageFactory.text('Sign-in failed. Please try again.'))
+      await this.storage.delete([`${activity.channelId}/${activity.from?.id!}`])
+      return { status: 'waiting' }
+    }
 
-    const handler = new AuthorizationHandlerContext({
-      id,
-      token
-    })
+    // TODO: see if the storage saves a guard with a type, so it is easier to identify later.
+    let ongoing = await this.storage.read([`${activity.channelId}/${activity.from?.id!}`]) as Ongoing<TState> | undefined
+    ongoing = ongoing?.[`${activity.channelId}/${activity.from?.id!}`]
 
-    this.authhandler.register(context, handler)
+    // TODO: do this after !ongoing because it will always enter here even if outgoing is null
+    if (ongoing?.activity.conversation?.id !== activity.conversation?.id) {
+      // Conversation restarted == new auth flow
+      await this.storage.delete([`${activity.channelId}/${activity.from?.id!}`])
+      ongoing = undefined
+    }
+    if (!ongoing) {
+      return
+    }
 
-    return {
-      authenticated: true,
-      activity,
+    const origin = await this.getRoute(context)
+    if (origin) {
+      const handlerStr = origin.handler.toString()
+      // Matches logout/reset called as a function, with optional property access or chaining
+      const logoutOrResetRegex = /\b(?:\w+\.)?(logout|reset)\??(?:\.\w+)?\s*\(/g
+
+      if (logoutOrResetRegex.test(handlerStr)) {
+        return
+      }
+    }
+
+    const route:AppRouteWithAuthorization<TState> | undefined = await this.getRoute(new TurnContext(this.adapter, Activity.fromObject(ongoing.activity)))
+    const guard = route?.guards?.find(e => e.id === ongoing.guard.id)!
+
+    // Token exchange
+    if (activity.name === 'signin/tokenExchange') {
+      const { token } = await this.adapter.userTokenClient!.exchangeTokenAsync(activity.from?.id!, guard.properties.name!, activity.channelId!, activity.value as TokenExchangeRequest)
+      return { guard, route, token, activity: ongoing.activity }
+    }
+
+    // Magic code verification
+    if (ongoing.attempts <= 0) {
+      // reset
+      await context.sendActivity(MessageFactory.text('Too many invalid attempts. Please sign-in again to continue.'))
+      await this.storage.delete([`${activity.channelId}/${activity.from?.id!}`])
+      return { guard, route, activity: ongoing.activity }
+    }
+
+    let state: string | undefined = activity.text
+    if (activity.name === 'signin/verifyState') {
+      const { state: teamsState } = activity.value as TokenVerifyState
+      state = teamsState
+    }
+
+    if (state === 'CancelledByUser') {
+      logger.warn('Sign-in process was cancelled by the user.')
+      await context.sendActivity(MessageFactory.text('Sign-in process was cancelled.'))
+      await this.storage.delete([`${activity.channelId}/${activity.from?.id!}`])
+      return { status: 'waiting' }
+    }
+
+    if (!state?.match(/^\d{6}$/)) {
+      logger.warn(`Invalid magic code entered. Attempts left: ${ongoing.attempts - 1}`, activity)
+      await context.sendActivity(MessageFactory.text(`Please enter a valid 6-digit code format (_e.g. 123456_).\r\n${ongoing.attempts} attempt(s) left...`))
+      await this.storage.write({ [`${activity.channelId}/${activity.from?.id!}`]: { ...ongoing, attempts: ongoing.attempts - 1 } })
+      return { status: 'waiting' }
+    }
+
+    const { tokenResponse, signInResource } = await this.adapter.userTokenClient!.getTokenOrSignInResource(activity.from?.id!, guard.properties.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, state ?? '')
+
+    if (!tokenResponse) {
+      logger.warn('Invalid magic code entered. Restarting sign-in flow.', activity)
+      await context.sendActivity(MessageFactory.text('The code entered is invalid or has expired. Please sign-in again to continue.'))
+      const oCard = CardFactory.oauthCard(guard.properties.name!, guard.properties.title!, guard.properties.text!, signInResource)
+      await context.sendActivity(MessageFactory.attachment(oCard))
+      await this.storage.write({ [`${activity.channelId}/${activity.from?.id!}`]: { ...ongoing, attempts: 3 } })
+      return { status: 'waiting' }
+    }
+
+    return { guard, route, token: tokenResponse.token, code: state, activity: ongoing.activity }
+  }
+
+  private async getRoute <T extends AppRoute<TState>>(context: TurnContext): Promise<T | undefined> {
+    for (const route of this.routes) {
+      if (await route.selector(context)) {
+        return route as T
+      }
     }
   }
+
+  // THIS class could be GuardManager
+  async register (context: TurnContext): Promise<AppRoute<TState> | undefined> {
+    let activity = context.activity
+    // See where this should go, so it it executed once
+    const accessToken = await this.adapter.authProvider.getAccessToken(this.adapter.authConfig, 'https://api.botframework.com')
+    this.adapter.userTokenClient!.updateAuthToken(accessToken)
+
+    const ongoing = await this.ongoing(context)
+
+    if (ongoing?.status === 'waiting') {
+      return
+    }
+
+    if (ongoing?.activity) {
+      activity = Activity.fromObject(ongoing.activity)
+    }
+
+    const route = ongoing?.route ?? await this.getRoute(context)
+
+    if (!route) {
+      return
+    }
+
+    for (const guard of route.guards ?? []) {
+      if (guard instanceof AuthorizationGuard) {
+        const { signInResource, tokenResponse } = await this.adapter.userTokenClient!.getTokenOrSignInResource(activity.from?.id!, guard.properties.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
+        if (signInResource) {
+          const oCard = CardFactory.oauthCard(guard.properties.name!, guard.properties.title!, guard.properties.text!, signInResource)
+          await context.sendActivity(MessageFactory.attachment(oCard))
+          await this.storage.write({ [`${activity.channelId}/${activity.from?.id!}`]: { guard, activity, attempts: 3 } })
+          return
+        }
+
+        guard.register(context, { token: tokenResponse.token! })
+      }
+    }
+
+    if (route.guards?.length) {
+      await this.storage.delete([`${activity.channelId}/${activity.from?.id!}`])
+    }
+
+    return route
+  }
+}
+// // TODO: maybe this could be inside the AuthorizationGuard class and share a config through the register.
+// export class AuthorizationGuardManager {
+//   constructor (public guard: AuthorizationGuard, private adapter: BaseAdapter, private storage: Storage) { }
+
+//   private async manager (context: TurnContext): Promise<Manager> {
+//     const activity = context.activity
+//     // continue: flow started flag + magic code (retry)
+//     // begin: no token from service
+//     // continue: signin/verifyState activity
+//     // exchange: signing/tokenExchange activity
+
+//     if (activity.name === 'signin/tokenExchange') {
+//       return this.adapter.userTokenClient!.exchangeTokenAsync(activity.from?.id!, this.guard.properties.name!, activity.channelId!, activity.value as TokenExchangeRequest)
+//     }
+
+//     let magiccode = ''
+
+//     if (activity.name === 'signin/verifyState') {
+//       magiccode = (activity.value as TokenVerifyState).state
+//     }
+
+//     if (activity.text?.match(/^\d{6}$/)) {
+//       magiccode = activity.text
+//     }
+
+//     const { activity: storageActivity, attempts } = await this.storage.read([`${activity.channelId}/${activity.from?.id!}/${this.guard.id}`])
+
+//     if (magiccode && !storageActivity) {
+//       magiccode = ''
+//     }
+
+//     if (!magiccode && storageActivity) {
+//       if (attempts > 0) {
+//         await context.sendActivity(MessageFactory.text(`Please enter a valid 6-digit code format (_e.g. 123456_).\n${attempts} attempt(s) left...`))
+//         await this.storage.write({ [`${activity.channelId}/${activity.from?.id!}/${this.guard.id}`]: { activity: storageActivity, attempts: attempts - 1 } })
+//         return { token: undefined }
+//       }
+//       await this.storage.delete([`${activity.channelId}/${activity.from?.id!}/${this.guard.id}`])
+//     }
+
+//     const { signInResource, tokenResponse } = await this.adapter.userTokenClient!.getTokenOrSignInResource(activity.from?.id!, this.guard.properties.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, magiccode)
+
+//     if (tokenResponse) {
+//       return tokenResponse
+//     }
+
+//     const oCard = CardFactory.oauthCard(this.guard.properties.name!, this.guard.properties.title!, this.guard.properties.text!, signInResource)
+//     await context.sendActivity(MessageFactory.attachment(oCard))
+//     await this.storage.write({ [`${activity.channelId}/${activity.from?.id!}/${this.guard.id}`]: { activity: context.activity, attempts: 3 } })
+//     return { token: undefined }
+//   }
+
+//   async handler (context: TurnContext) {
+//     // TODO: see how to improve this
+//     const accessToken = await this.adapter.authProvider.getAccessToken(this.adapter.authConfig, 'https://api.botframework.com')
+//     this.adapter.userTokenClient!.updateAuthToken(accessToken)
+
+//     const { token, activity } = await this.manager(context)
+//     const authenticated = !!token?.trim().length
+//     if (authenticated) {
+//       const data = new AuthorizationGuardContext({ token }, this.guard, context, this.adapter.userTokenClient!)
+//       this.guard.register(context, data)
+//     }
+
+//     return { authenticated, activity }
+//   }
+// }
+
+/**
+ * Interface defining an authorization handler for OAuth flows.
+ * @interface AuthHandler
+ */
+export interface AuthHandler {
+  /** Connection name for the auth provider. */
+  name?: string,
+  /** Title to display on auth cards/UI. */
+  title?: string,
+  /** Text to display on auth cards/UI. */
+  text?: string,
+
+  cnxPrefix?: string
 }
 
-type AutoAuthOptions = Record<string, AuthHandler>
+// TODO improve interface
+export class Authorization<TState extends TurnState, T extends string> {
+  public guards: AuthorizationGuard<TState>[] = []
+  constructor (private app: AgentApplication<TState>) {}
 
-export class AutoAuth {
-  static create <T extends AutoAuthOptions>(options: T): { [K in keyof T]: AuthorizationHandler } {
-    return Object.entries(options).reduce((acc, [key, value]) => {
+  create <T2 extends T>(options: Record<T2, AuthHandler>): Record<T2, AuthorizationGuard<TState>> {
+    const result = {} as Record<string, AuthorizationGuard<TState>>
+    for (const [key, value] of Object.entries<AuthHandler>(options)) {
       value.name = value.name ?? process.env[key + '_connectionName'] as string
       value.title = value.title ?? process.env[key + '_connectionTitle'] as string
       value.text = value.text ?? process.env[key + '_connectionText'] as string
       value.cnxPrefix = value.cnxPrefix ?? process.env[key + '_cnxPrefix'] as string
-      acc[key] = new AuthorizationHandler(key, value)
-      return acc
-    }, {} as any)
+      result[key] = new AuthorizationGuard(key, value, this.app)
+      this.guards.push(result[key])
+    }
+    return result
+  }
+
+  async logout (context: TurnContext) {
+    for (const guard of this.guards) {
+      await guard.logout(context)
+    }
   }
 }
 
-const authorization = AutoAuth.create({
+const app = new AgentApplication()
+const authorization = new Authorization(app).create({
   graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In', },
   github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', },
 })
 
-const app = new AgentApplication({ storage: new MemoryStorage() })
 app.onMessage('/me', (context) => {
   const s = authorization.graph.context(context)
   console.log(s.token)

@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { AuthHandlerContext } from './agentApplication'
+import { Guard } from './agentApplication'
 import { AppRoute } from './appRoute'
 import { RouteHandler } from './routeHandler'
 import { RouteRank } from './routeRank'
@@ -18,9 +18,9 @@ export class RouteList<TState extends TurnState> {
     handler: RouteHandler<TState>,
     isInvokeRoute: boolean = false,
     rank: number = RouteRank.Unspecified,
-    authHandlers: AuthHandlerContext[] = []
+    guards: Guard[] = []
   ): this {
-    this._routes.push({ selector, handler, isInvokeRoute, rank, authHandlers })
+    this._routes.push({ selector, handler, isInvokeRoute, rank, guards })
 
     // Invoke selectors are first, then order by rank ascending
     this._routes.sort((a, b) => {
