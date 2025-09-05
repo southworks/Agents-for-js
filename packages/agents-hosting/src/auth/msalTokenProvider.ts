@@ -6,7 +6,7 @@
 import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
 import { AuthConfiguration } from './authConfiguration'
 import { AuthProvider } from './authProvider'
-import { debug } from '../logger'
+import { debug } from '@microsoft/agents-activity/logger'
 import { v4 } from 'uuid'
 
 import fs from 'fs'
@@ -25,7 +25,7 @@ export class MsalTokenProvider implements AuthProvider {
    * @param scope The scope for the token.
    * @returns A promise that resolves to the access token.
    */
-  async getAccessToken (authConfig: AuthConfiguration, scope: string): Promise<string> {
+  public async getAccessToken (authConfig: AuthConfiguration, scope: string): Promise<string> {
     if (!authConfig.clientId && process.env.NODE_ENV !== 'production') {
       return ''
     }
@@ -53,6 +53,22 @@ export class MsalTokenProvider implements AuthProvider {
     return token
   }
 
+  public async acquireTokenOnBehalfOf (authConfig: AuthConfiguration, scopes: string[], oboAssertion: string): Promise<string> {
+    const cca = new ConfidentialClientApplication({
+      auth: {
+        clientId: authConfig.clientId as string,
+        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
+        clientSecret: authConfig.clientSecret
+      },
+      system: this.sysOptions
+    })
+    const token = await cca.acquireTokenOnBehalfOf({
+      oboAssertion,
+      scopes
+    })
+    return token?.accessToken as string
+  }
+
   private readonly sysOptions: NodeSystemOptions = {
     loggerOptions: {
       logLevel: LogLevel.Trace,
@@ -65,10 +81,12 @@ export class MsalTokenProvider implements AuthProvider {
             logger.error(message)
             return
           case LogLevel.Info:
-            logger.info(message)
+            logger.debug(message)
             return
           case LogLevel.Warning:
-            logger.warn(message)
+            if (!message.includes('Warning - No client info in response')) {
+              logger.warn(message)
+            }
             return
           case LogLevel.Verbose:
             logger.debug(message)
@@ -121,7 +139,7 @@ export class MsalTokenProvider implements AuthProvider {
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId || '',
-        authority: `https://login.microsoftonline.com/${authConfig.tenantId || 'botframework.com'}`,
+        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
         clientCertificate: {
           privateKey: privateKey as string,
           thumbprint: pubKeyObject.fingerprint.replaceAll(':', ''),
@@ -147,7 +165,7 @@ export class MsalTokenProvider implements AuthProvider {
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId as string,
-        authority: `https://login.microsoftonline.com/${authConfig.tenantId || 'botframework.com'}`,
+        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
         clientSecret: authConfig.clientSecret
       },
       system: this.sysOptions
@@ -171,13 +189,13 @@ export class MsalTokenProvider implements AuthProvider {
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId as string,
-        authority: `https://login.microsoftonline.com/${authConfig.tenantId}`,
+        authority: `${authConfig.authority}/${authConfig.tenantId}`,
         clientAssertion
       },
       system: this.sysOptions
     })
     const token = await cca.acquireTokenByClientCredential({ scopes })
-    logger.info('got token using FIC client assertion')
+    logger.debug('got token using FIC client assertion')
     return token?.accessToken as string
   }
 
@@ -220,7 +238,7 @@ export class MsalTokenProvider implements AuthProvider {
       resource: audience,
       forceRefresh: true
     })
-    logger.info('got token for FIC')
+    logger.debug('got token for FIC')
     return response.accessToken
   }
 }

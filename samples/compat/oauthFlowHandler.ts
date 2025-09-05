@@ -2,24 +2,24 @@
 // Licensed under the MIT License.
 
 import { startServer } from '@microsoft/agents-hosting-express'
-import { ActivityHandler, CardFactory, MessageFactory, TurnContext, UserState, OAuthFlow, TokenRequestStatus, MemoryStorage } from '@microsoft/agents-hosting'
+import { ActivityHandler, CardFactory, MessageFactory, TurnContext, OAuthFlow, Storage, FileStorage, UserTokenClient, loadAuthConfigFromEnv } from '@microsoft/agents-hosting'
 import { Template } from 'adaptivecards-templating'
-import { getUserInfo } from './../_shared/userGraphClient'
+import { getUserInfo } from './../_shared/userGraphClient.js'
 
-export class OAuthFlowHanlder extends ActivityHandler {
+const authConfig = loadAuthConfigFromEnv()
+
+export class OAuthFlowHandler extends ActivityHandler {
   oAuthFlow: OAuthFlow
 
-  userState: UserState
-  constructor (userState: UserState) {
+  constructor (private storage: Storage) {
     super()
-    this.userState = userState
-    this.oAuthFlow = new OAuthFlow(userState, process.env.connectionName!)
+    this.oAuthFlow = new OAuthFlow(storage, process.env.connectionName!, new UserTokenClient(authConfig.clientId))
 
     this.onConversationUpdate(async (context, next) => {
       await context.sendActivity('Welcome to the Web Chat SSO sample. Type "signin" to sign in or "signout" to sign out.')
       const tokenResponse = await this.oAuthFlow.beginFlow(context)
-      if (tokenResponse.status === TokenRequestStatus.Success) {
-        await this.sendLoggedUserInfo(context, tokenResponse.token!)
+      if (tokenResponse && tokenResponse.token) {
+        await this.sendLoggedUserInfo(context, tokenResponse.token)
       }
       await next()
     })
@@ -34,8 +34,8 @@ export class OAuthFlowHanlder extends ActivityHandler {
       } else {
         if (/^\d{6}$/.test(context.activity.text!)) {
           const tokenResponse = await this.oAuthFlow.continueFlow(context)
-          if (tokenResponse?.status === TokenRequestStatus.Success) {
-            await this.sendLoggedUserInfo(context, tokenResponse.token!)
+          if (tokenResponse.token) {
+            await this.sendLoggedUserInfo(context, tokenResponse.token)
           } else {
             await context.sendActivity(MessageFactory.text('Invalid code. Please try again.'))
           }
@@ -50,7 +50,7 @@ export class OAuthFlowHanlder extends ActivityHandler {
     this.onSignInInvoke(async (context, next) => {
       console.log('SignInInvoke event triggered')
       const tokenResponse = await this.oAuthFlow.continueFlow(context)
-      if (tokenResponse?.status === TokenRequestStatus.Success) {
+      if (tokenResponse && tokenResponse.token) {
         await this.sendLoggedUserInfo(context, tokenResponse.token!)
       }
       await next()
@@ -59,10 +59,10 @@ export class OAuthFlowHanlder extends ActivityHandler {
 
   async beginOAuthFlow (context: TurnContext): Promise<void> {
     const tokenResponse = await this.oAuthFlow.beginFlow(context)
-    if (tokenResponse.status === TokenRequestStatus.Success) {
-      await this.sendLoggedUserInfo(context, tokenResponse.token!)
+    if (tokenResponse && tokenResponse.token) {
+      await this.sendLoggedUserInfo(context, tokenResponse.token)
     } else {
-      await context.sendActivity(MessageFactory.text('Authentication status ' + tokenResponse.status))
+      await context.sendActivity(MessageFactory.text('Authentication not available '))
     }
   }
 
@@ -78,7 +78,6 @@ export class OAuthFlowHanlder extends ActivityHandler {
 
   async run (context: TurnContext) {
     await super.run(context)
-    await this.userState.saveChanges(context, false)
   }
 }
-startServer(new OAuthFlowHanlder(new UserState(new MemoryStorage())))
+startServer(new OAuthFlowHandler(new FileStorage('../__oauth_state')))

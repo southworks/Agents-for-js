@@ -6,12 +6,12 @@
 import { Storage } from '../storage'
 import { AgentApplication } from './agentApplication'
 import { AgentApplicationOptions } from './agentApplicationOptions'
-import { AuthorizationHandlers } from './oauth/authorization'
+import { AuthorizationHandlers } from './authorization'
 import { TurnState } from './turnState'
 
 /**
  * Builder class for creating and configuring AgentApplication instances.
- * @template TState Type extending TurnState that will be used by the application
+ * @typeParam TState Type extending TurnState that will be used by the application
  */
 export class AgentApplicationBuilder<TState extends TurnState = TurnState> {
   protected _options: Partial<AgentApplicationOptions<TState>> = {}

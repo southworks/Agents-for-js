@@ -1,5 +1,6 @@
 import * as z from 'zod'
 import StreamConsumers from 'stream/consumers'
+import { isTokenCredential, TokenCredential } from '@azure/core-auth'
 import {
   AnonymousCredential,
   ContainerClient,
@@ -9,6 +10,9 @@ import {
 import { Storage, StoreItems } from '@microsoft/agents-hosting'
 import { sanitizeBlobKey } from './blobsTranscriptStore'
 import { ignoreError, isStatusCodeError } from './ignoreError'
+import { debug } from '@microsoft/agents-activity/logger'
+
+const logger = debug('agents:blob-storage')
 
 /**
  * Options for configuring the BlobsStorage.
@@ -32,18 +36,18 @@ export class BlobsStorage implements Storage {
   /**
    * Creates a new instance of the BlobsStorage class.
    *
-   * @param connectionString The Azure Storage connection string
    * @param containerName The name of the Blob container to use
+   * @param connectionString Optional, The Azure Storage connection string
    * @param options Optional configuration settings for the storage provider
    * @param url Optional URL to the blob service (used instead of connectionString if provided)
    * @param credential Optional credential for authentication (used with url if provided)
    */
   constructor (
-    connectionString: string,
     containerName: string,
+    connectionString?: string,
     options?: BlobsStorageOptions,
     url = '',
-    credential?: StorageSharedKeyCredential | AnonymousCredential
+    credential?: StorageSharedKeyCredential | AnonymousCredential | TokenCredential
   ) {
     if (url !== '' && credential != null) {
       z.object({ url: z.string() }).parse({
@@ -62,15 +66,16 @@ export class BlobsStorage implements Storage {
       })
 
       this._containerClient = new ContainerClient(
-        connectionString,
+        connectionString!,
         containerName,
         options?.storagePipelineOptions
       )
 
-      if (connectionString.trim() === 'UseDevelopmentStorage=true;') {
+      if (connectionString!.trim() === 'UseDevelopmentStorage=true;') {
         this._concurrency = 1
       }
     }
+    logger.info(`BlobsStorage initialized with container: ${containerName}, url: ${url}, credential: ${isTokenCredential(credential) ? 'TokenCredential' : 'SharedKey/Anonymous'}`)
   }
 
   private toJSON (): unknown {
@@ -115,7 +120,7 @@ export class BlobsStorage implements Storage {
 
       const parsed = (await StreamConsumers.json(readableStreamBody)) as any
       result.value = { ...parsed, eTag }
-
+      logger.debug(`Read blob: ${key}, eTag: ${eTag}`)
       return result
     }))
 
@@ -139,6 +144,7 @@ export class BlobsStorage implements Storage {
         try {
           const blob = this._containerClient.getBlockBlobClient(sanitizeBlobKey(key))
           const serialized = JSON.stringify(change)
+          logger.debug(`Writing blob: ${key}, eTag: ${eTag}, size: ${serialized.length}`)
           return await blob.upload(serialized, serialized.length, {
             conditions: typeof eTag === 'string' && eTag !== '*' ? { ifMatch: eTag } : {},
             blobHTTPHeaders: { blobContentType: 'application/json' },

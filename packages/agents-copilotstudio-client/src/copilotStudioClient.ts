@@ -5,27 +5,44 @@
 
 import { ConnectionSettings } from './connectionSettings'
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
-import { getCopilotStudioConnectionUrl } from './powerPlatformEnvironment'
+import { getCopilotStudioConnectionUrl, getTokenAudience } from './powerPlatformEnvironment'
 import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-activity'
 import { ExecuteTurnRequest } from './executeTurnRequest'
-import createDebug, { Debugger } from 'debug'
-import pjson from '@microsoft/agents-copilotstudio-client/package.json'
+import { debug } from '@microsoft/agents-activity/logger'
+import { version } from '../package.json'
 import os from 'os'
+
+const logger = debug('copilot-studio:client')
 
 interface streamRead {
   done: boolean,
   value: string
 }
 
+/**
+ * Client for interacting with Microsoft Copilot Studio services.
+ * Provides functionality to start conversations and send messages to Copilot Studio bots.
+ */
 export class CopilotStudioClient {
+  /** Header key for conversation ID. */
+  private static readonly conversationIdHeaderKey: string = 'x-ms-conversationid'
+  /** Island Header key */
+  private static readonly islandExperimentalUrlHeaderKey: string = 'x-ms-d2e-experimental'
+
   /** The ID of the current conversation. */
   private conversationId: string = ''
   /** The connection settings for the client. */
   private readonly settings: ConnectionSettings
   /** The Axios instance used for HTTP requests. */
   private readonly client: AxiosInstance
-  /** The logger for debugging. */
-  private readonly logger: Debugger
+
+  /**
+   * Returns the scope URL needed to connect to Copilot Studio from the connection settings.
+   * This is used for authentication token audience configuration.
+   * @param settings Copilot Studio connection settings.
+   * @returns The scope URL for token audience.
+   */
+  static scopeFromSettings: (settings: ConnectionSettings) => string = getTokenAudience
 
   /**
    * Creates an instance of CopilotStudioClient.
@@ -36,12 +53,34 @@ export class CopilotStudioClient {
     this.settings = settings
     this.client = axios.create()
     this.client.defaults.headers.common.Authorization = `Bearer ${token}`
-    this.logger = createDebug('copilot-studio-client')
+    this.client.defaults.headers.common['User-Agent'] = CopilotStudioClient.getProductInfo()
   }
 
   private async postRequestAsync (axiosConfig: AxiosRequestConfig): Promise<Activity[]> {
     const activities: Activity[] = []
+
+    logger.debug(`>>> SEND TO ${axiosConfig.url}`)
+
     const response = await this.client(axiosConfig)
+
+    if (this.settings.useExperimentalEndpoint && !this.settings.directConnectUrl?.trim()) {
+      const islandExperimentalUrl = response.headers?.[CopilotStudioClient.islandExperimentalUrlHeaderKey]
+      if (islandExperimentalUrl) {
+        this.settings.directConnectUrl = islandExperimentalUrl
+        logger.debug(`Island Experimental URL: ${islandExperimentalUrl}`)
+      }
+    }
+
+    this.conversationId = response.headers?.[CopilotStudioClient.conversationIdHeaderKey] ?? ''
+    if (this.conversationId) {
+      logger.debug(`Conversation ID: ${this.conversationId}`)
+    }
+
+    const sanitizedHeaders = { ...response.headers }
+    delete sanitizedHeaders['Authorization']
+    delete sanitizedHeaders[CopilotStudioClient.conversationIdHeaderKey]
+    logger.debug('Headers received:', sanitizedHeaders)
+
     const stream = response.data
     const reader = stream.pipeThrough(new TextDecoderStream()).getReader()
     let result: string = ''
@@ -49,12 +88,12 @@ export class CopilotStudioClient {
 
     const processEvents = async ({ done, value }: streamRead): Promise<string[]> => {
       if (done) {
-        this.logger('Stream complete')
+        logger.debug('Stream complete')
         result += value
         results.push(result)
         return results
       }
-      this.logger('Agent is typing...')
+      logger.info('Agent is typing ...')
       result += value
 
       return await processEvents(await reader.read())
@@ -70,11 +109,16 @@ export class CopilotStudioClient {
           const act = Activity.fromJson(ve.substring(5, ve.length))
           if (act.type === ActivityTypes.Message) {
             activities.push(act)
+            if (!this.conversationId.trim()) {
+              // Did not get it from the header.
+              this.conversationId = act.conversation?.id ?? ''
+              logger.debug(`Conversation ID: ${this.conversationId}`)
+            }
           } else {
-            this.logger('Activity type: ', act.type)
+            logger.debug(`Activity type: ${act.type}`)
           }
         } catch (e) {
-          this.logger('Error: ', e)
+          logger.error('Error: ', e)
           throw e
         }
       })
@@ -82,8 +126,24 @@ export class CopilotStudioClient {
     return activities
   }
 
+  /**
+   * Appends this package.json version to the User-Agent header.
+   * - For browser environments, it includes the user agent of the browser.
+   * - For Node.js environments, it includes the Node.js version, platform, architecture, and release.
+   * @returns A string containing the product information, including version and user agent.
+   */
   private static getProductInfo (): string {
-    return `CopilotStudioClient.agents-sdk-js/${pjson.version} nodejs/${process.version}  ${os.platform()}-${os.arch()}/${os.release()}`
+    const versionString = `CopilotStudioClient.agents-sdk-js/${version}`
+    let userAgent: string
+
+    if (typeof window !== 'undefined' && window.navigator) {
+      userAgent = `${versionString} ${navigator.userAgent}`
+    } else {
+      userAgent = `${versionString} nodejs/${process.version} ${os.platform()}-${os.arch()}/${os.release()}`
+    }
+
+    logger.debug(`User-Agent: ${userAgent}`)
+    return userAgent
   }
 
   /**
@@ -101,16 +161,16 @@ export class CopilotStudioClient {
       headers: {
         Accept: 'text/event-stream',
         'Content-Type': 'application/json',
-        'User-Agent': CopilotStudioClient.getProductInfo(),
       },
       data: body,
       responseType: 'stream',
       adapter: 'fetch'
     }
 
+    logger.info('Starting conversation ...')
     const values = await this.postRequestAsync(config)
     const act = values[0]
-    this.conversationId = act.conversation?.id!
+    logger.info(`Conversation '${act.conversation?.id}' started. Received ${values.length} activities.`, values)
     return act
   }
 
@@ -131,6 +191,16 @@ export class CopilotStudioClient {
     }
     const activity = Activity.fromObject(activityObj)
 
+    return this.sendActivity(activity)
+  }
+
+  /**
+   * Sends an activity to the Copilot Studio service and retrieves the response activities.
+   * @param activity The activity to send.
+   * @param conversationId The ID of the conversation. Defaults to the current conversation ID.
+   * @returns A promise that resolves to an array of activities containing the responses.
+   */
+  public async sendActivity (activity: Activity, conversationId: string = this.conversationId) {
     const localConversationId = activity.conversation?.id ?? conversationId
     const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)
     const qbody: ExecuteTurnRequest = new ExecuteTurnRequest(activity)
@@ -140,13 +210,15 @@ export class CopilotStudioClient {
       url: uriExecute,
       headers: {
         Accept: 'text/event-stream',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       data: qbody,
       responseType: 'stream',
       adapter: 'fetch'
     }
+    logger.info('Sending activity...', activity)
     const values = await this.postRequestAsync(config)
+    logger.info(`Received ${values.length} activities.`, values)
     return values
   }
 }
