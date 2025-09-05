@@ -3,10 +3,10 @@
  * Licensed under the MIT License.
  */
 
-import { Guard } from './agentApplication'
+import { Guard } from '../guards/types'
 import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
-import { TurnState } from './turnState'
+import { TurnState } from '../turnState'
 
 /**
  * Represents a route configuration for handling bot activities within an application.
@@ -84,7 +84,13 @@ export interface AppRoute<TState extends TurnState> {
    *
    * @example
    * ```typescript
-   * authHandlers: ['oauth', 'admin-only']
+   * const auth = new Authorization(app)
+   * const guards = auth.initialize({
+   *   graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In' },
+   *   github: { text: 'Sign in with GitHub', title: 'GitHub Sign In' },
+   * })
+   *
+   * guards: [guards.graph, guards.github]
    * ```
    *
    */

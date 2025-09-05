@@ -10,36 +10,48 @@ import { BlobsStorage } from '../../packages/agents-hosting-storage-blob/src/blo
 
 const app = new AgentApplication({ storage: new BlobsStorage('test', 'UseDevelopmentStorage=true;') })
 
-const auth = new Authorization(app).create({
-  graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In', },
-  github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', },
+const auth = new Authorization(app)
+const guards = auth.initialize({
+  graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In', cancelKeyword: '/cancel' },
+  github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', cancelKeyword: '/cancel' },
 })
 
-// app.onConversationUpdate('membersAdded', _status, [auth.graph, auth.github])
+app.onConversationUpdate('membersAdded', _status, [guards.graph, guards.github])
 app.onMessage('/logout', _logout)
-app.onMessage('/me', _profileRequest, [auth.graph])
-app.onMessage('/prs', _pullRequests, [auth.github])
-app.onMessage('/status', _status, [auth.graph, auth.github])
+app.onMessage('/me', _profileRequest, [guards.graph])
+app.onMessage('/prs', _pullRequests, [guards.github])
+app.onMessage('/status', _status, [guards.graph, guards.github])
 app.onActivity('invoke', _invoke)
 app.onActivity('message', _message)
 
+auth.onSuccess(async (guard, context) => {
+  await context.sendActivity(MessageFactory.text(`You have successfully logged in with ${guard.id}!`))
+})
+
+auth.onFailure(async (guard, context, reason) => {
+  await context.sendActivity(MessageFactory.text(`Failed to log in with ${guard.id} due to ${reason}`))
+})
+
+auth.onCancelled(async (guard, context) => {
+  await context.sendActivity(MessageFactory.text(`login process canceled for ${guard.id}`))
+})
+
 async function _status (context: TurnContext): Promise<void> {
   await context.sendActivity(MessageFactory.text('Welcome to the App Routes with auth demo!'))
-  const graph = auth.graph.context(context)
-  const github = auth.github.context(context)
+  const graph = guards.graph.context(context)
+  const github = guards.github.context(context)
   const statusGraph = graph.token !== undefined
   const statusGH = github.token !== undefined
-  await context.sendActivity(MessageFactory.text(`Token status: Graph:${statusGraph} GH:${statusGH}`))
+  await context.sendActivity(MessageFactory.text(`Token status: graph:${statusGraph} github:${statusGH}`))
 }
 
 async function _logout (context: TurnContext): Promise<void> {
-  await auth.graph.logout(context)
-  await auth.github.logout(context)
-  await context.sendActivity(MessageFactory.text('user logged out'))
+  const loggedOut = await auth.logout(context)
+  await context.sendActivity(MessageFactory.text(`user logged out for ${loggedOut.map(e => e.id).join(', ')}`))
 }
 
 async function _profileRequest (context: TurnContext): Promise<void> {
-  const graph = auth.graph.context(context)
+  const graph = guards.graph.context(context)
   const userTemplate = (await import('./../_resources/UserProfileCard.json'))
   const template = new Template(userTemplate)
   const userInfo = await getUserInfo(graph.token)
@@ -57,7 +69,7 @@ async function _message (context: TurnContext): Promise<void> {
 }
 
 async function _pullRequests (context: TurnContext): Promise<void> {
-  const github = auth.github.context(context)
+  const github = guards.github.context(context)
   const ghProf = await getCurrentProfile(github.token)
   const userTemplate = (await import('./../_resources/UserProfileCard.json'))
   const template = new Template(userTemplate)
@@ -80,16 +92,5 @@ async function _pullRequests (context: TurnContext): Promise<void> {
     await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard(card)))
   }
 }
-
-// this.authorization.onSignInSuccess(this._singinSuccess)
-// this.authorization.onSignInFailure(this._singinFailure)
-
-// private _singinSuccess = async (context: TurnContext, state: TurnState, authId?: string): Promise<void> => {
-//   await context.sendActivity(MessageFactory.text(`User signed in successfully in ${authId}`))
-// }
-
-// private _singinFailure = async (context: TurnContext, state: TurnState, authId?: string, err?: string): Promise<void> => {
-//   await context.sendActivity(MessageFactory.text(`Signing Failure in auth handler: ${authId} with error: ${err}`))
-// }
 
 startServer(app)

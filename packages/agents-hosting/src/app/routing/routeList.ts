@@ -3,12 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import { Guard } from './agentApplication'
 import { AppRoute } from './appRoute'
+import { Guard } from '../guards/types'
 import { RouteHandler } from './routeHandler'
 import { RouteRank } from './routeRank'
 import { RouteSelector } from './routeSelector'
-import { TurnState } from './turnState'
+import { TurnState } from '../turnState'
 
 export class RouteList<TState extends TurnState> {
   private _routes: Array<AppRoute<TState>> = []
