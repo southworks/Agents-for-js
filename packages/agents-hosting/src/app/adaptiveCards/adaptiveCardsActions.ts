@@ -4,7 +4,8 @@
  */
 
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
-import { AdaptiveCardInvokeResponse, AgentApplication, CardFactory, INVOKE_RESPONSE_KEY, InvokeResponse, MessageFactory, RouteSelector, TurnContext, TurnState } from '../../'
+import { AdaptiveCardInvokeResponse, AgentApplication, CardFactory, InvokeResponse, MessageFactory, RouteSelector, TurnContext, TurnState } from '../../'
+import { INVOKE_RESPONSE_KEY } from '../../activityHandler'
 import { AdaptiveCardActionExecuteResponseType } from './adaptiveCardActionExecuteResponseType'
 import { parseAdaptiveCardInvokeAction, parseValueActionExecuteSelector, parseValueDataset, parseValueSearchQuery } from './activityValueParsers'
 import { AdaptiveCardsSearchParams } from './adaptiveCardsSearchParams'
