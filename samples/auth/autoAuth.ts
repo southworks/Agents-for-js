@@ -6,9 +6,8 @@ import { AgentApplication, Authorization, CardFactory, MemoryStorage, MessageFac
 import { Template } from 'adaptivecards-templating'
 import { getUserInfo } from '../_shared/userGraphClient.js'
 import { getCurrentProfile, getPullRequests } from '../_shared/githubApiClient.js'
-import { BlobsStorage } from '../../packages/agents-hosting-storage-blob/src/blobsStorage.js'
 
-const app = new AgentApplication({ storage: new BlobsStorage('test', 'UseDevelopmentStorage=true;') })
+const app = new AgentApplication({ storage: new MemoryStorage() })
 
 const auth = new Authorization(app)
 const guards = auth.initialize({
@@ -16,7 +15,7 @@ const guards = auth.initialize({
   github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', cancelKeyword: '/cancel' },
 })
 
-app.onConversationUpdate('membersAdded', _status, [guards.graph, guards.github])
+app.onConversationUpdate('membersAdded', _status)
 app.onMessage('/logout', _logout)
 app.onMessage('/me', _profileRequest, [guards.graph])
 app.onMessage('/prs', _pullRequests, [guards.github])
@@ -33,7 +32,7 @@ auth.onFailure(async (guard, context, reason) => {
 })
 
 auth.onCancelled(async (guard, context) => {
-  await context.sendActivity(MessageFactory.text(`login process canceled for ${guard.id}`))
+  await context.sendActivity(MessageFactory.text(`Login process canceled for ${guard.id}`))
 })
 
 async function _status (context: TurnContext): Promise<void> {
@@ -47,7 +46,7 @@ async function _status (context: TurnContext): Promise<void> {
 
 async function _logout (context: TurnContext): Promise<void> {
   const loggedOut = await auth.logout(context)
-  await context.sendActivity(MessageFactory.text(`user logged out for ${loggedOut.map(e => e.id).join(', ')}`))
+  await context.sendActivity(MessageFactory.text(`You have successfully logged out from ${loggedOut.map(e => e.id).join(', ')}`))
 }
 
 async function _profileRequest (context: TurnContext): Promise<void> {

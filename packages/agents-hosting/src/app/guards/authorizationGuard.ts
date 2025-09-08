@@ -90,9 +90,8 @@ export class AuthorizationGuard implements Guard {
   context (context: TurnContext): AuthorizationGuardContext {
     const registered = context.turnState.get(this._key)
     if (!registered) {
-      const msg = `Guard '${this.id}' is not registered in the current route handler.`
-      logger.error(msg, context.activity)
-      throw new Error(msg)
+      logger.warn(`Guard '${this.id}' is not registered in the current route handler.`, context.activity)
+      return { token: '' }
     }
     return registered()
   }
