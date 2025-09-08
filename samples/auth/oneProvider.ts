@@ -45,7 +45,7 @@ class OneProvider extends AgentApplication<TurnState> {
   }
 
   private _message = async (context: TurnContext): Promise<void> => {
-    await context.sendActivity(MessageFactory.text('You said.' + context.activity.text))
+    await context.sendActivity(MessageFactory.text(`You said ${context.activity.text}`))
   }
 }
 

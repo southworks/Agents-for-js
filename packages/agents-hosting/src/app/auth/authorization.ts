@@ -26,7 +26,11 @@ export class Authorization<TState extends TurnState> {
    * Creates an instance of the Authorization class.
    * @param app The agent application instance.
    */
-  constructor (private app: AgentApplication<TState>) {}
+  constructor (private app: AgentApplication<TState>) {
+    if (!app.options.storage) {
+      throw new Error('Storage is required for Authorization. Ensure that a storage provider is configured in the AgentApplication options.')
+    }
+  }
 
   /**
    * Initializes authorization guard settings.
@@ -57,6 +61,10 @@ export class Authorization<TState extends TurnState> {
   initialize<GuardName extends string>(
     options: Record<GuardName, AuthorizationGuardSettings>
   ): Record<GuardName, AuthorizationGuard> {
+    if (!options || Object.keys(options).length === 0) {
+      throw new Error('Cannot initialize Authorization with empty options')
+    }
+
     const result = {} as Record<GuardName, AuthorizationGuard>
     for (const [key, value] of Object.entries(options) as [GuardName, AuthorizationGuardSettings][]) {
       const settings: AuthorizationGuardSettings = {

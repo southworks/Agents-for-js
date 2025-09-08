@@ -20,9 +20,10 @@ class McsAgent extends AgentApplication<TurnState> {
     })
 
     this.onConversationUpdate('membersAdded', this._status)
-    this.auth.onSuccess(this._singinSuccess)
     this.onMessage('/logout', this._signOut)
     this.onActivity('message', this._message, [this.guards.mcs])
+
+    this.auth.onSuccess(this._singinSuccess)
   }
 
   private _signOut = async (context: TurnContext): Promise<void> => {
@@ -30,7 +31,7 @@ class McsAgent extends AgentApplication<TurnState> {
     await context.sendActivity(MessageFactory.text('User signed out'))
   }
 
-  private _status = async (context: TurnContext, state: TurnState): Promise<void> => {
+  private _status = async (context: TurnContext): Promise<void> => {
     await context.sendActivity(MessageFactory.text('Welcome to the MCS Agent demo!, ready to chat with MCS!'))
   }
 
@@ -42,7 +43,7 @@ class McsAgent extends AgentApplication<TurnState> {
     const cid = state.getValue<string>('conversation.conversationId')
     const mcs = this.guards.mcs.context(context)
     if (!mcs.token) {
-      return await this._status(context, state)
+      return await this._status(context)
     }
     const cpsClient = this.createClient(mcs.token!)
 

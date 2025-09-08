@@ -491,17 +491,10 @@ export class AgentApplication<TState extends TurnState> {
    * The method performs the following operations:
    * 1. Starts typing timer if configured
    * 2. Processes mentions if configured
-<<<<<<< HEAD
    * 3. Handles authentication flows
    * 4. Loads turn state
-   * 5. Executes before-turn event handlers
-   * 6. Downloads files if file downloaders are configured
-=======
-   * 3. Loads turn state
-   * 4. Handles authentication flows
    * 5. Downloads files if file downloaders are configured
    * 6. Executes before-turn event handlers
->>>>>>> origin/main
    * 7. Routes to appropriate handlers
    * 8. Executes after-turn event handlers
    * 9. Saves turn state

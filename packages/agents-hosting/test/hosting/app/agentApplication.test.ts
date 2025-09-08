@@ -44,7 +44,6 @@ describe('Application', () => {
     assert.notEqual(app.options, undefined)
     assert.equal(app.options.adapter, undefined)
     assert.equal(app.options.storage, undefined)
-    assert.equal(app.options.authorization, undefined)
     assert.equal(app.options.startTypingTimer, false)
     assert.equal(app.options.transcriptLogger, undefined)
   })
