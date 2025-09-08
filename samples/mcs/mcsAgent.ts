@@ -41,6 +41,9 @@ class McsAgent extends AgentApplication<TurnState> {
   private _message = async (context: TurnContext, state: TurnState): Promise<void> => {
     const cid = state.getValue<string>('conversation.conversationId')
     const mcs = this.guards.mcs.context(context)
+    if (!mcs.token) {
+      return await this._status(context, state)
+    }
     const cpsClient = this.createClient(mcs.token!)
 
     if (cid === undefined || cid === null || cid.length === 0) {

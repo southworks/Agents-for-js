@@ -69,7 +69,7 @@ export class RouteManager {
 
       // reset active for next guard
       active = undefined
-      this._storage?.delete()
+      await this._storage?.delete()
     }
 
     return false
@@ -92,7 +92,7 @@ export class RouteManager {
     }
 
     // Sort guards to ensure the active guard is processed first.
-    const guards = route.guards?.sort((a, b) => {
+    const guards = [...route.guards ?? []].sort((a, b) => {
       if (a.id === active.guard) return -1
       if (b.id === active.guard) return 1
       return 0
