@@ -31,13 +31,6 @@ export class RouteManager {
    * Initializes a route manager for the current context.
    */
   static async initialize (app: AgentApplication<any>, routes: RouteList<any>, context: TurnContext) {
-    if (!app.adapter.userTokenClient) {
-      throw new Error('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.')
-    }
-
-    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    app.adapter.userTokenClient.updateAuthToken(accessToken)
-
     const manager = new RouteManager(app, routes, context)
     manager._route = await manager.getRoute(context)
     return manager

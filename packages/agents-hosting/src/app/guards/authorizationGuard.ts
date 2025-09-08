@@ -67,6 +67,8 @@ export interface AuthorizationGuardSettings {
  */
 export class AuthorizationGuard implements Guard {
   private _userTokenClient: UserTokenClient
+  private accessToken?: string
+
   private _onSuccess?: Parameters<AuthorizationGuard['onSuccess']>[0]
   private _onFailure?: Parameters<AuthorizationGuard['onFailure']>[0]
   private _onCancelled?: Parameters<AuthorizationGuard['onCancelled']>[0]
@@ -181,6 +183,9 @@ export class AuthorizationGuard implements Guard {
     const { context, active } = options
     const { activity } = context
     const storage = new GuardStorage(this.app.options.storage, context)
+
+    this.accessToken ??= await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
+    this._userTokenClient.updateAuthToken(this.accessToken)
 
     if (!active) {
       return this.setToken(options, storage)

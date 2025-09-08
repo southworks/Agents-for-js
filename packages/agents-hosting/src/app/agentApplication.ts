@@ -553,13 +553,14 @@ export class AgentApplication<TState extends TurnState> {
           await manager.route.handler.bind(this, context, state)()
         } else {
           logger.debug('No matching route found for activity:', context.activity)
+          return false
         }
 
         if (await this.callEventHandlers(context, state, this._afterTurn)) {
           await state.save(context, storage)
         }
 
-        return false
+        return true
       } catch (err: any) {
         logger.error(err)
         throw err
