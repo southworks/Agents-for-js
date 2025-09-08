@@ -23,7 +23,7 @@ class OneProvider extends AgentApplication<TurnState> {
 
   private _status = async (context: TurnContext): Promise<void> => {
     await context.sendActivity(MessageFactory.text('Welcome to the Basic App demo!'))
-    const graph = this.guards.graph.context(context)
+    const graph = await this.guards.graph.context(context)
     if (graph.token) {
       await context.sendActivity(MessageFactory.text(`Token received: ${graph.token.length ?? 0}`))
     } else {

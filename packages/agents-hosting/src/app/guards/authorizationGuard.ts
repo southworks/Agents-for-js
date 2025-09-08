@@ -21,7 +21,7 @@ const logger = debug('agents:guards:authorization')
  * Context data for authorization guards.
  */
 export interface AuthorizationGuardContext {
-  token: string
+  token: string | undefined
 }
 
 /**
@@ -67,7 +67,6 @@ export interface AuthorizationGuardSettings {
  */
 export class AuthorizationGuard implements Guard {
   private _userTokenClient: UserTokenClient
-  private accessToken?: string
 
   private _onSuccess?: Parameters<AuthorizationGuard['onSuccess']>[0]
   private _onFailure?: Parameters<AuthorizationGuard['onFailure']>[0]
@@ -96,13 +95,17 @@ export class AuthorizationGuard implements Guard {
    * Gets the authorization context from the turn state.
    * @param context The turn context.
    */
-  context (context: TurnContext): AuthorizationGuardContext {
+  async context (context: TurnContext): Promise<AuthorizationGuardContext> {
     const registered = context.turnState.get(this._key)
-    if (!registered) {
-      logger.warn(`Guard '${this.id}' is not registered in the current route handler.`, context.activity)
-      return { token: '' }
+    if (registered) {
+      return registered()
     }
-    return registered()
+
+    const { activity } = context
+    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
+    this._userTokenClient.updateAuthToken(accessToken)
+    const tokenResponse = await this._userTokenClient.getUserToken(this.settings.name!, activity.channelId!, activity.from?.id!)
+    return { token: tokenResponse.token }
   }
 
   /**
@@ -184,8 +187,8 @@ export class AuthorizationGuard implements Guard {
     const { activity } = context
     const storage = new GuardStorage(this.app.options.storage, context)
 
-    this.accessToken ??= await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    this._userTokenClient.updateAuthToken(this.accessToken)
+    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
+    this._userTokenClient.updateAuthToken(accessToken)
 
     if (!active) {
       return this.setToken(options, storage)
@@ -214,7 +217,7 @@ export class AuthorizationGuard implements Guard {
       }
 
       logger.info('Token exchanged successfully.')
-      this.setContext(context, { token: token! })
+      this.setContext(context, { token })
       return true
     }
 
@@ -234,9 +237,9 @@ export class AuthorizationGuard implements Guard {
 
     const result = await this.setToken(options, storage, code)
 
-    const data = this.context(context)
+    const data = await this.context(context)
     if (this.isExchangeable(data.token)) {
-      return this.handleObo(context, data.token)
+      return this.handleObo(context, data.token!)
     }
 
     return result
@@ -319,7 +322,7 @@ export class AuthorizationGuard implements Guard {
     }
 
     logger.debug('Token acquired successfully.', activity)
-    const guardContext: AuthorizationGuardContext = { token: tokenResponse.token! }
+    const guardContext: AuthorizationGuardContext = { token: tokenResponse.token }
     this.setContext(context, guardContext)
     await storage.delete()
     await this._onSuccess?.(context, guardContext)

@@ -37,8 +37,8 @@ auth.onCancelled(async (guard, context) => {
 
 async function _status (context: TurnContext): Promise<void> {
   await context.sendActivity(MessageFactory.text('Welcome to the App Routes with auth demo!'))
-  const graph = guards.graph.context(context)
-  const github = guards.github.context(context)
+  const graph = await guards.graph.context(context)
+  const github = await guards.github.context(context)
   const statusGraph = graph.token !== undefined
   const statusGH = github.token !== undefined
   await context.sendActivity(MessageFactory.text(`Token status: graph:${statusGraph} github:${statusGH}`))
@@ -50,10 +50,10 @@ async function _logout (context: TurnContext): Promise<void> {
 }
 
 async function _profileRequest (context: TurnContext): Promise<void> {
-  const graph = guards.graph.context(context)
+  const graph = await guards.graph.context(context)
   const userTemplate = (await import('./../_resources/UserProfileCard.json'))
   const template = new Template(userTemplate)
-  const userInfo = await getUserInfo(graph.token)
+  const userInfo = await getUserInfo(graph.token!)
   const card = template.expand(userInfo)
   const activity = MessageFactory.attachment(CardFactory.adaptiveCard(card))
   await context.sendActivity(activity)
@@ -68,15 +68,15 @@ async function _message (context: TurnContext): Promise<void> {
 }
 
 async function _pullRequests (context: TurnContext): Promise<void> {
-  const github = guards.github.context(context)
-  const ghProf = await getCurrentProfile(github.token)
+  const github = await guards.github.context(context)
+  const ghProf = await getCurrentProfile(github.token!)
   const userTemplate = (await import('./../_resources/UserProfileCard.json'))
   const template = new Template(userTemplate)
   const card = template.expand(ghProf)
   const activity = MessageFactory.attachment(CardFactory.adaptiveCard(card))
   await context.sendActivity(activity)
 
-  const prs = await getPullRequests('microsoft', 'agents', github.token)
+  const prs = await getPullRequests('microsoft', 'agents', github.token!)
   for (const pr of prs) {
     const prCard = (await import('./../_resources/PullRequestCard.json'))
     const template = new Template(prCard)
