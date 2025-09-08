@@ -184,7 +184,6 @@ export class AgentApplication<TState extends TurnState> {
     // (undocumented)
     protected readonly _routes: RouteList<TState>;
     run(turnContext: TurnContext): Promise<void>;
-    runInternal(turnContext: TurnContext): Promise<boolean>;
     sendProactiveActivity(context: TurnContext | ConversationReference, activityOrText: string | Activity, speak?: string, inputHint?: string): Promise<ResourceResponse | undefined>;
     protected startLongRunningCall(context: TurnContext, handler: (context: TurnContext) => Promise<boolean>): Promise<boolean>;
     startTypingTimer(context: TurnContext): void;
