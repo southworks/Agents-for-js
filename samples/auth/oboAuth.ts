@@ -21,7 +21,7 @@ class OboApp extends AgentApplication<TurnState> {
 
   private _status = async (context: TurnContext): Promise<void> => {
     await context.sendActivity(MessageFactory.text('Welcome to the Basic App demo!'))
-    const mcs = this.guards.mcs.context(context)
+    const mcs = await this.guards.mcs.context(context)
     if (mcs.token) {
       await context.sendActivity(MessageFactory.text(`OBO Token received: ${mcs.token.length || 0}`))
     } else {
