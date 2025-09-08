@@ -477,35 +477,6 @@ export class AgentApplication<TState extends TurnState> {
     await this.runInternal(turnContext)
   }
 
-  // private async registerGuards (context: TurnContext) {
-  //   const activity = context.activity
-  //   const storageKey = `${activity.channelId}/${activity.from?.id!}`
-  //   let selectedRoute
-  //   for (const route of this._routes) {
-  //     if (await route.selector(context)) {
-  //       selectedRoute = route
-  //       break
-  //     }
-  //   }
-
-  //   let authenticated = !selectedRoute?.guards?.length
-  //   for (const guard of selectedRoute?.guards ?? []) {
-  //     if (guard instanceof AuthorizationGuard) {
-  //       const manager = new AuthorizationGuardManager(guard, this.adapter, this.options.storage!, storageKey)
-  //       const handler = await manager.handler(context)
-  //       authenticated = handler.authenticated
-  //       if (!authenticated) {
-  //         break
-  //       }
-  //       if (authenticated && handler.activity) {
-  //         // selectedRoute = await [...this._routes].find(route => route.selector(new TurnContext(context.adapter, handler.activity!)))
-  //       }
-  //     }
-  //   }
-
-  //   return selectedRoute
-  // }
-
   /**
    * Executes the application logic for a given turn context.
    *
@@ -520,8 +491,8 @@ export class AgentApplication<TState extends TurnState> {
    * The method performs the following operations:
    * 1. Starts typing timer if configured
    * 2. Processes mentions if configured
-   * 3. Loads turn state
-   * 4. Handles authentication flows
+   * 3. Handles authentication flows
+   * 4. Loads turn state
    * 5. Executes before-turn event handlers
    * 6. Downloads files if file downloaders are configured
    * 7. Routes to appropriate handlers
@@ -541,12 +512,12 @@ export class AgentApplication<TState extends TurnState> {
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
       try {
-        if (context.activity.type === ActivityTypes.Typing) {
-          return false
-        }
-
         if (this._options.startTypingTimer) {
           this.startTypingTimer(context)
+        }
+
+        if (context.activity.type === ActivityTypes.Typing) {
+          return false
         }
 
         if (this._options.removeRecipientMention && context.activity.type === ActivityTypes.Message) {
@@ -581,7 +552,11 @@ export class AgentApplication<TState extends TurnState> {
           state.temp.inputFiles = inputFiles
         }
 
-        await manager.route?.handler.bind(this, context, state)()
+        if (manager.route) {
+          await manager.route.handler.bind(this, context, state)()
+        } else {
+          logger.debug('No matching route found for activity:', context.activity)
+        }
 
         if (await this.callEventHandlers(context, state, this._afterTurn)) {
           await state.save(context, storage)

@@ -16,12 +16,13 @@ export class GuardStorage {
   /**
    * Gets the unique key for this guard session.
    */
-  get key () {
-    if (!this.context.activity.channelId?.trim() && !this.context.activity.from?.id?.trim()) {
-      throw new Error(`channelId and from.id properties must be set in the activity in order to generate the ${GuardStorage.name} key`)
+  get key (): string {
+    const channelId = this.context.activity.channelId?.trim()
+    const userId = this.context.activity.from?.id?.trim()
+    if (!channelId || !userId) {
+      throw new Error(`Both 'activity.channelId' and 'activity.from.id' are required to generate the ${GuardStorage.name} key.`)
     }
-
-    return `${this.context.activity.channelId}/${this.context.activity.from?.id!}`
+    return `${channelId}/${userId}`
   }
 
   /**

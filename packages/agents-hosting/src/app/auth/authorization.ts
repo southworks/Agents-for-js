@@ -54,15 +54,19 @@ export class Authorization<TState extends TurnState> {
    * });
    * ```
    */
-  initialize<GuardName extends string>(options: Record<GuardName, AuthorizationGuardSettings>): Record<GuardName, AuthorizationGuard> {
-    const result = {} as Record<string, AuthorizationGuard>
-    for (const [key, value] of Object.entries<AuthorizationGuardSettings>(options)) {
-      value.name = value.name ?? process.env[key + '_connectionName'] as string
-      value.title = value.title ?? process.env[key + '_connectionTitle'] as string
-      value.text = value.text ?? process.env[key + '_connectionText'] as string
-      value.cnxPrefix = value.cnxPrefix ?? process.env[key + '_cnxPrefix'] as string
-      value.scopes = value.scopes ?? this.loadScopes(process.env[key + '_scopes'] as string)
-      result[key] = new AuthorizationGuard(key, value, this.app)
+  initialize<GuardName extends string>(
+    options: Record<GuardName, AuthorizationGuardSettings>
+  ): Record<GuardName, AuthorizationGuard> {
+    const result = {} as Record<GuardName, AuthorizationGuard>
+    for (const [key, value] of Object.entries(options) as [GuardName, AuthorizationGuardSettings][]) {
+      const settings: AuthorizationGuardSettings = {
+        name: value.name ?? (process.env[`${key}_connectionName`]),
+        title: value.title ?? (process.env[`${key}_connectionTitle`]),
+        text: value.text ?? (process.env[`${key}_connectionText`]),
+        cnxPrefix: value.cnxPrefix ?? (process.env[`${key}_cnxPrefix`]),
+        scopes: value.scopes ?? this.loadScopes(process.env[`${key}_scopes`]),
+      }
+      result[key] = new AuthorizationGuard(key, settings, this.app)
       this.guards.push(result[key])
     }
     this._initialized = true
@@ -99,7 +103,14 @@ export class Authorization<TState extends TurnState> {
       throw new Error('Authorization not initialized')
     }
 
-    const statuses = await context.adapter.userTokenClient!.getTokenStatus(context.activity.from?.id!, context.activity.channelId!)
+    const client = context.adapter.userTokenClient
+    const userId = context.activity.from?.id
+    const channelId = context.activity.channelId
+    if (!client || !userId || !channelId) {
+      return []
+    }
+
+    const statuses = await client.getTokenStatus(userId, channelId)
     const result: AuthorizationGuard[] = []
     for (const guard of this.guards) {
       const status = statuses.find(e => e.connectionName === guard.settings.name)
@@ -146,7 +157,7 @@ export class Authorization<TState extends TurnState> {
   /**
    * Loads the OAuth scopes from the environment variables.
    */
-  private loadScopes (value:string): string[] {
+  private loadScopes (value:string | undefined): string[] {
     return value?.split(',').reduce<string[]>((acc, scope) => {
       const trimmed = scope.trim()
       if (trimmed) {

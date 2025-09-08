@@ -19,18 +19,25 @@ const logger = debug('agents:route-manager')
  */
 export class RouteManager {
   private _route: AppRoute<any> | undefined
-  private _storage: GuardStorage
+  private _storage?: GuardStorage
 
   private constructor (app: AgentApplication<any>, private routes: RouteList<any>, private context: TurnContext) {
-    this._storage = new GuardStorage(app.options.storage!, context)
+    if (app.options.storage) {
+      this._storage = new GuardStorage(app.options.storage, context)
+    }
   }
 
   /**
    * Initializes a route manager for the current context.
    */
   static async initialize (app: AgentApplication<any>, routes: RouteList<any>, context: TurnContext) {
+    if (!app.adapter.userTokenClient) {
+      throw new Error('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.')
+    }
+
     const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    context.adapter.userTokenClient!.updateAuthToken(accessToken)
+    app.adapter.userTokenClient.updateAuthToken(accessToken)
+
     const manager = new RouteManager(app, routes, context)
     manager._route = await manager.getRoute(context)
     return manager
@@ -62,8 +69,9 @@ export class RouteManager {
 
       // reset active for next guard
       active = undefined
-      this._storage.delete()
+      this._storage?.delete()
     }
+
     return false
   }
 
@@ -71,7 +79,7 @@ export class RouteManager {
    * Gets the active guard session from the storage.
    */
   private async active (): Promise<ActiveGuard | undefined> {
-    const active = await this._storage.read()
+    const active = await this._storage?.read()
     if (!active) {
       return
     }
@@ -79,13 +87,17 @@ export class RouteManager {
     const context = new TurnContext(this.context.adapter, Activity.fromObject(active.activity))
     const route = await this.getRoute(context)
 
+    if (!route) {
+      return active
+    }
+
     // Sort guards to ensure the active guard is processed first.
-    route!.guards = route!.guards?.sort((a, b) => {
+    const guards = route.guards?.sort((a, b) => {
       if (a.id === active.guard) return -1
       if (b.id === active.guard) return 1
-      return -1
+      return 0
     })
-    this._route = route
+    this._route = { ...route, guards }
     return active
   }
 

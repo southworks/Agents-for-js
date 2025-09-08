@@ -19,7 +19,7 @@ export interface GuardRegisterOptions {
  * Interface for all guard implementations.
  */
 export interface Guard {
-  get id(): string
+  readonly id: string
   register(options: GuardRegisterOptions): boolean | Promise<boolean>
 }
 

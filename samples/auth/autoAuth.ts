@@ -64,7 +64,7 @@ async function _invoke (context: TurnContext): Promise<void> {
 }
 
 async function _message (context: TurnContext): Promise<void> {
-  await context.sendActivity(MessageFactory.text('You said.' + context.activity.text))
+  await context.sendActivity(MessageFactory.text(`You said ${context.activity.text}`))
 }
 
 async function _pullRequests (context: TurnContext): Promise<void> {
