@@ -53,14 +53,19 @@ export class RouteManager {
       logger.debug(`Active guard session found: ${active.guard}`)
     }
 
+    let activity = this.context.activity
     for (const guard of this._route?.guards ?? []) {
-      const registered = await guard.register({ context: this.context, active })
+      const context = new TurnContext(this.context.adapter, activity)
+      const registered = await guard.register({ context, active })
       logger.debug(`Guard ${guard.id} registered: ${registered}`)
       if (!registered) {
         return true
       }
 
-      // reset active for next guard
+      // Reset active for next guard, but keep original activity.
+      if (active) {
+        activity = Activity.fromObject(active.activity)
+      }
       active = undefined
       await this._storage?.delete()
     }
@@ -85,11 +90,8 @@ export class RouteManager {
     }
 
     // Sort guards to ensure the active guard is processed first.
-    const guards = [...route.guards ?? []].sort((a, b) => {
-      if (a.id === active.guard) return -1
-      if (b.id === active.guard) return 1
-      return 0
-    })
+    const index = route.guards?.findIndex(e => e.id === active.guard)
+    const guards = route.guards?.slice(index) ?? []
     this._route = { ...route, guards }
     return active
   }

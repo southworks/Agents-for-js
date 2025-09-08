@@ -118,6 +118,7 @@ export class Authorization<TState extends TurnState> {
       return []
     }
 
+    await this.setAccessToken(context)
     const statuses = await client.getTokenStatus(userId, channelId)
     const result: AuthorizationGuard[] = []
     for (const guard of this.guards) {
@@ -173,5 +174,14 @@ export class Authorization<TState extends TurnState> {
       }
       return acc
     }, []) ?? []
+  }
+
+  /**
+   * Sets the access token in the user token client.
+   * @param context The turn context.
+   */
+  private async setAccessToken (context: TurnContext) {
+    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
+    context.adapter.userTokenClient!.updateAuthToken(accessToken)
   }
 }

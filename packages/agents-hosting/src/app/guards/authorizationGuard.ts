@@ -102,8 +102,7 @@ export class AuthorizationGuard implements Guard {
     }
 
     const { activity } = context
-    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    this._userTokenClient.updateAuthToken(accessToken)
+    await this.setAccessToken(context)
     const tokenResponse = await this._userTokenClient.getUserToken(this.settings.name!, activity.channelId!, activity.from?.id!)
     return { token: tokenResponse.token }
   }
@@ -187,8 +186,7 @@ export class AuthorizationGuard implements Guard {
     const { activity } = context
     const storage = new GuardStorage(this.app.options.storage, context)
 
-    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    this._userTokenClient.updateAuthToken(accessToken)
+    await this.setAccessToken(context)
 
     if (!active) {
       return this.setToken(options, storage)
@@ -375,5 +373,14 @@ export class AuthorizationGuard implements Guard {
    */
   private setContext (context: TurnContext, data: AuthorizationGuardContext) {
     return context.turnState.set(this._key, () => data)
+  }
+
+  /**
+   * Sets the access token in the user token client.
+   * @param context The turn context.
+   */
+  private async setAccessToken (context: TurnContext) {
+    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
+    this._userTokenClient.updateAuthToken(accessToken)
   }
 }
