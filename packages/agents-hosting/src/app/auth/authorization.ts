@@ -124,13 +124,12 @@ export class Authorization<TState extends TurnState> {
     const statuses = (await client.getTokenStatus(userId, channelId)).filter(e => e.hasToken)
     const result: AuthorizationGuard[] = []
     for (const guard of this.guards) {
-      // Logout if there are no service tokens or if the user has a token for this guard.
-      // This ensures that we only log out of guards that are actually in use.
+      // If there are no service tokens, perform a full cleanup; otherwise only log out guards that have a token.
       const noServiceTokens = statuses.length === 0
-      const hasGuardToken = statuses.findIndex(e => e.connectionName === guard.settings.name) >= 0
+      const hasGuardToken = statuses.some(e => e.connectionName === guard.settings.name)
       if (noServiceTokens || hasGuardToken) {
-        result.push(guard)
         await guard.logout(context)
+        result.push(guard)
       }
     }
     return result
