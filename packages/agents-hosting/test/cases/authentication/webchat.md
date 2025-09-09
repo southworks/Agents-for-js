@@ -1,4 +1,4 @@
-# Authentication Guard Test Scenarios for WebChat
+# Authentication Guard Test Scenarios for Web Chat
 
 This document presents a comprehensive suite of test cases for authentication guards. The scenarios cover login, logout, multi-provider flows, and error handling, demonstrating session management and user experience. All tests are compatible with a range of storage providers, including BlobStorage, CosmosDbPartitionedStorage, and FileStorage.
 
@@ -47,7 +47,7 @@ User reloads the web page or restarts the bot and verifies that the authenticati
 **Steps:**
 
 1. 🧑 → Already logged in (see [Basic Login Flow](#1-basic-login-flow))
-2. 🧑 → Reloads web page or restarts bot
+2. 🧑 → Reloads web page or restarts the bot
 3. 🧑 → Sends `/me` message
 4. 🤖 → Shows signed-in user information from the Graph provider
 
@@ -162,7 +162,7 @@ User checks status and logs in to both guards to verify multi-guard support.
 ### 10. Login the First Guard
 
 **Description:**
-User checks status and logs in to both guards to verify multi-guard support.
+User checks status and logs in first guard to verify multi-guard support.
 
 **Steps:**
 
@@ -179,7 +179,7 @@ User checks status and logs in to both guards to verify multi-guard support.
 ### 11. Login the Second Guard
 
 **Description:**
-User checks status and logs in to both guards to verify multi-guard support.
+User checks status and logs in second guard to verify multi-guard support.
 
 **Steps:**
 
@@ -196,7 +196,7 @@ User checks status and logs in to both guards to verify multi-guard support.
 ### 12. Multi-Guard Logout
 
 **Description:**
-User logs out of all guards and logs in again to both, confirming full session reset and re-authentication.
+User logs out of all guards.
 
 **Steps:**
 
@@ -213,18 +213,16 @@ User simulates having multiple server instances by removing the guard from stora
 
 1. 🧑 → Sends `/me` message
 2. 🤖 → Shows `oAuthCard`
-3. 🧑 → Retrieves and sends `magic code`
-4. 🤖 → Shows signed-in user information from the Graph provider
 5. 🧑 → Removes guard from storage (simulates wrong memory flow)
 6. 🧑 → Sends `/me` message
 7. 🤖 → Shows `oAuthCard`
 8. 🧑 → Retrieves and sends `magic code`
 9. 🤖 → Shows signed-in user information from the Graph provider
 
-### 14. Cancel during sign-in
+### 14. Cancel During Sign-In
 
 **Description:**
-User cancels the authentication process during the sign in.
+User cancels the authentication process during sign-in.
 
 **Steps:**
 

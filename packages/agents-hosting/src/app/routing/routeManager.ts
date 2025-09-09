@@ -58,7 +58,7 @@ export class RouteManager {
 
     for (const guard of guards) {
       const context = new TurnContext(this.context.adapter, activity)
-      const status = await this.onGuardError(guard, () => guard.register({ context, active }))
+      const status = await this.onGuardError(guard, async () => guard.register({ context, active }))
       logger.debug(`Guard ${guard.id} registration status: ${status}`)
 
       if (status === GuardRegisterStatus.IGNORED) {
@@ -76,7 +76,7 @@ export class RouteManager {
       }
 
       if (status === GuardRegisterStatus.APPROVED) {
-        this._route = route
+        this._route = route ?? this._route
         await this._storage?.delete()
       }
 
@@ -94,12 +94,12 @@ export class RouteManager {
    * Handles errors that occur during guard registration.
    * @returns The result of the registration or an error.
    */
-  private async onGuardError<T>(guard: Guard, cb: () => T) {
+  private async onGuardError<T>(guard: Guard, cb: () => Promise<T>): Promise<T> {
     try {
       return await cb()
     } catch (cause) {
       await this._storage?.delete()
-      throw new Error(`Error registering guard '${guard.id}`, { cause })
+      throw new Error(`Error registering guard '${guard.id}'`, { cause })
     }
   }
 
