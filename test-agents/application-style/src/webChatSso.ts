@@ -53,7 +53,7 @@ guards.ah1.onSuccess(async (context: TurnContext) => {
 app.onActivity(ActivityTypes.Message, async (context: TurnContext) => {
   const ah1 = await guards.ah1.context(context)
   if (ah1.token) {
-    await context.sendActivity(MessageFactory.text(`Token status: ${ah1.token !== undefined}`))
+    await context.sendActivity(MessageFactory.text('You are signed in'))
   } else {
     await context.sendActivity(MessageFactory.text('Please enter "/signin" to sign in or "/signout" to sign out'))
   }

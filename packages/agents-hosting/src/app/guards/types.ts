@@ -8,10 +8,30 @@ import { StoreItem } from '../../storage'
 import { TurnContext } from '../../turnContext'
 
 /**
+ * Represents the status of a guard registration attempt.
+ */
+export enum GuardRegisterStatus {
+  /** The guard has approved the request - validation passed */
+  APPROVED = 'approved',
+  /** The guard registration is pending further action */
+  PENDING = 'pending',
+  /** The guard has rejected the request - validation failed */
+  REJECTED = 'rejected',
+  /** The guard has ignored the request - no action taken */
+  IGNORED = 'ignored',
+}
+
+/**
  * Options for guard registration.
  */
 export interface GuardRegisterOptions {
+  /**
+   * The current turn context.
+   */
   context: TurnContext
+  /**
+   * The active guard session, if any.
+   */
   active?: ActiveGuard
 }
 
@@ -19,15 +39,31 @@ export interface GuardRegisterOptions {
  * Interface for all guard implementations.
  */
 export interface Guard {
+  /**
+   * Unique identifier for the guard.
+   */
   readonly id: string
-  register(options: GuardRegisterOptions): boolean | Promise<boolean>
+  /**
+   * Registers the guard with the given options.
+   * @param options Registration options.
+   */
+  register(options: GuardRegisterOptions): GuardRegisterStatus | Promise<GuardRegisterStatus>
 }
 
 /**
  * Active guard manager information.
  */
 export interface ActiveGuard extends StoreItem {
+  /**
+   * The current activity associated with the guard.
+   */
   activity: Activity
+  /**
+   * The number of attempts made by the user.
+   */
   attempts: number
+  /**
+   * The identifier of the guard.
+   */
   guard: string
 }

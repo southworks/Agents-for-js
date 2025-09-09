@@ -4,7 +4,7 @@
  */
 
 import { debug } from '@microsoft/agents-activity/logger'
-import { Guard, GuardRegisterOptions } from './types'
+import { Guard, GuardRegisterOptions, GuardRegisterStatus } from './types'
 import { MessageFactory } from '../../messageFactory'
 import { CardFactory } from '../../cards'
 import { TurnContext } from '../../turnContext'
@@ -53,13 +53,13 @@ export interface AuthorizationGuardSettings {
    */
   cnxPrefix?: string
   /**
-   * List of OAuth scopes required by the auth provider.
+   * List of OAuth scopes required by the auth provider. Usually used for on-behalf-of token exchanges.
    */
   scopes?: string[]
   /**
-   * Keyword or phrase to trigger the cancellation of the ongoing auth flow.
+   * Trigger to cancel the ongoing auth flow (string, RegExp, or RouteSelector).
    */
-  cancelKeyword?: string | RegExp | RouteSelector
+  cancelTrigger?: string | RegExp | RouteSelector
 }
 
 /**
@@ -177,9 +177,9 @@ export class AuthorizationGuard implements Guard {
    * Registers this guard for the current context.
    * @param options Registration options including context, and active guard state.
    */
-  async register (options: GuardRegisterOptions): Promise<boolean> {
+  async register (options: GuardRegisterOptions): Promise<GuardRegisterStatus> {
     if (!this.app.options.storage) {
-      return false
+      return GuardRegisterStatus.IGNORED
     }
 
     const { context, active } = options
@@ -194,15 +194,13 @@ export class AuthorizationGuard implements Guard {
 
     if (await this.isCancellable(context)) {
       logger.debug(`Guard ${this.id} was cancelled`)
-      await storage.delete()
       await this._onCancelled?.(context)
-      return false
+      return GuardRegisterStatus.REJECTED
     }
 
     if (active.activity.conversation?.id !== activity.conversation?.id) {
-      logger.debug('Conversation changed. Starting new auth flow.', activity)
-      await storage.delete()
-      return this.setToken({ ...options, active: undefined }, storage)
+      logger.debug('Conversation changed', activity)
+      return GuardRegisterStatus.IGNORED
     }
 
     if (activity.name === 'signin/tokenExchange') {
@@ -211,33 +209,34 @@ export class AuthorizationGuard implements Guard {
         const reason = 'Token exchange failed.'
         logger.error(reason)
         await this._onFailure?.(context, reason)
-        return false
+        return GuardRegisterStatus.REJECTED
       }
 
       logger.info('Token exchanged successfully.')
       this.setContext(context, { token })
-      return true
+      return GuardRegisterStatus.APPROVED
     }
 
     if (activity.name === 'signin/failure') {
       const reason = 'Login failed.'
       logger.error(reason, activity.value, activity)
       await context.sendActivity(MessageFactory.text(`${reason} Please try again.`))
-      await storage.delete()
       await this._onFailure?.(context, reason)
-      return false
+      return GuardRegisterStatus.REJECTED
     }
 
-    const code = await this.codeVerification(options, storage)
-    if (!code) {
-      return false
+    const { status, code } = await this.codeVerification(options, storage)
+    if (status !== GuardRegisterStatus.APPROVED) {
+      return status
     }
 
     const result = await this.setToken(options, storage, code)
 
-    const data = await this.context(context)
-    if (this.isExchangeable(data.token)) {
-      return this.handleObo(context, data.token!)
+    if (result === GuardRegisterStatus.APPROVED) {
+      const data = await this.context(context)
+      if (this.isExchangeable(data.token)) {
+        return this.handleObo(context, data.token!)
+      }
     }
 
     return result
@@ -247,20 +246,20 @@ export class AuthorizationGuard implements Guard {
    * Checks if the sign-in process can be cancelled.
    */
   private async isCancellable (context : TurnContext): Promise<boolean> {
-    const keyword = this.settings.cancelKeyword
-    if (!keyword) {
+    const trigger = this.settings.cancelTrigger
+    if (!trigger) {
       return false
     }
 
-    if (typeof keyword === 'function') {
-      return keyword(context)
+    if (typeof trigger === 'function') {
+      return trigger(context)
     }
 
-    if (keyword instanceof RegExp) {
-      return keyword.test(context.activity.text ?? '')
+    if (trigger instanceof RegExp) {
+      return trigger.test(context.activity.text ?? '')
     }
 
-    return context.activity.text?.toLocaleLowerCase() === keyword.toLocaleLowerCase()
+    return context.activity.text?.toLocaleLowerCase() === trigger.toLocaleLowerCase()
   }
 
   /**
@@ -277,7 +276,7 @@ export class AuthorizationGuard implements Guard {
   /**
    * Handles on-behalf-of token exchange using MSAL.
    */
-  private async handleObo (context: TurnContext, token: string): Promise<boolean> {
+  private async handleObo (context: TurnContext, token: string): Promise<GuardRegisterStatus> {
     const { cnxPrefix, scopes } = this.settings
     if (!scopes) {
       throw new Error(`Cannot perform on-behalf-of token exchange for guard '${this.id}' without defined scopes.`)
@@ -289,26 +288,26 @@ export class AuthorizationGuard implements Guard {
       const newToken = await msalTokenProvider.acquireTokenOnBehalfOf(authConfig, scopes, token)
       this.setContext(context, { token: newToken })
       await this._onSuccess?.(context, { token: newToken })
-      return true
+      return GuardRegisterStatus.APPROVED
     } catch (error) {
       const reason = `On-behalf-of token exchange failed: ${(error as Error).message}`
       logger.error(reason, error)
       await this._onFailure?.(context, reason)
-      return false
+      return GuardRegisterStatus.REJECTED
     }
   }
 
   /**
    * Sets the token from the token response or initiates the sign-in flow.
    */
-  private async setToken ({ context, active }: GuardRegisterOptions, storage: GuardStorage, code?: string): Promise<boolean> {
+  private async setToken ({ context, active }: GuardRegisterOptions, storage: GuardStorage, code?: string): Promise<GuardRegisterStatus> {
     const { activity } = context
 
     const { tokenResponse, signInResource } = await this._userTokenClient.getTokenOrSignInResource(activity.from?.id!, this.settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
 
     if (!tokenResponse && active) {
       logger.warn('Invalid code entered. Restarting sign-in flow.', activity)
-      await context.sendActivity(MessageFactory.text('The code entered is invalid or has expired. Please sign-in again to continue.'))
+      await context.sendActivity(MessageFactory.text('The code entered is invalid. Please sign-in again to continue.'))
     }
 
     if (!tokenResponse) {
@@ -316,32 +315,32 @@ export class AuthorizationGuard implements Guard {
       const oCard = CardFactory.oauthCard(this.settings.name!, this.settings.title!, this.settings.text!, signInResource)
       await context.sendActivity(MessageFactory.attachment(oCard))
       await storage.write({ activity, guard: this.id, ...(active ?? {}), attempts: 3 })
-      return false
+      return GuardRegisterStatus.PENDING
     }
 
     logger.debug('Token acquired successfully.', activity)
     const guardContext: AuthorizationGuardContext = { token: tokenResponse.token }
     this.setContext(context, guardContext)
-    await storage.delete()
     await this._onSuccess?.(context, guardContext)
-    return true
+    return GuardRegisterStatus.APPROVED
   }
 
   /**
    * Verifies the magic code provided by the user.
    */
-  private async codeVerification ({ context, active }: GuardRegisterOptions, storage: GuardStorage): Promise<string | undefined> {
+  private async codeVerification ({ context, active }: GuardRegisterOptions, storage: GuardStorage): Promise<{ status: GuardRegisterStatus, code?: string }> {
     if (!active) {
-      return
+      logger.debug('No active guard session found. Skipping code verification.', context.activity)
+      return { status: GuardRegisterStatus.IGNORED }
     }
 
     const { activity } = context
     let state: string | undefined = activity.text
 
     if (active.attempts <= 0) {
-      await context.sendActivity(MessageFactory.text('Too many invalid attempts. Please sign-in again to continue.'))
-      await storage.delete()
-      return
+      await context.sendActivity(MessageFactory.text('You have exceeded the maximum number of attempts.'))
+      await this._onCancelled?.(context)
+      return { status: GuardRegisterStatus.REJECTED }
     }
 
     if (activity.name === 'signin/verifyState') {
@@ -352,20 +351,19 @@ export class AuthorizationGuard implements Guard {
 
     if (state === 'CancelledByUser') {
       logger.warn('Sign-in process was cancelled by the user.', activity)
-      await storage.delete()
       await this._onCancelled?.(context)
-      return
+      return { status: GuardRegisterStatus.REJECTED }
     }
 
     if (!state?.match(/^\d{6}$/)) {
       logger.warn(`Invalid magic code entered. Attempts left: ${active.attempts}`, activity)
       await context.sendActivity(MessageFactory.text(`Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**${active.attempts} attempt(s) left...**`))
       await storage.write({ ...active, attempts: active.attempts - 1 })
-      return
+      return { status: GuardRegisterStatus.PENDING }
     }
 
     logger.debug('Code verification successful.', activity)
-    return state
+    return { status: GuardRegisterStatus.APPROVED, code: state }
   }
 
   /**

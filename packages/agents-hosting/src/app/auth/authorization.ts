@@ -43,6 +43,7 @@ export class Authorization<TState extends TurnState> {
    * - `{guardName}_connectionTitle`: Display title for the connection
    * - `{guardName}_connectionText`: Text description for the connection
    * - `{guardName}_cnxPrefix`: Connection prefix
+   * - `{guardName}_cancelTrigger`: Trigger to cancel the ongoing auth flow
    * - `{guardName}_scopes`: Comma-separated list of OAuth scopes
    *
    * @example
@@ -72,6 +73,7 @@ export class Authorization<TState extends TurnState> {
         title: value.title ?? (process.env[`${key}_connectionTitle`]),
         text: value.text ?? (process.env[`${key}_connectionText`]),
         cnxPrefix: value.cnxPrefix ?? (process.env[`${key}_cnxPrefix`]),
+        cancelTrigger: value.cancelTrigger ?? process.env[`${key}_cancelTrigger`],
         scopes: value.scopes ?? this.loadScopes(process.env[`${key}_scopes`]),
       }
       result[key] = new AuthorizationGuard(key, settings, this.app)

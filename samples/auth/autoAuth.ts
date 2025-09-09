@@ -6,13 +6,15 @@ import { AgentApplication, Authorization, CardFactory, MemoryStorage, MessageFac
 import { Template } from 'adaptivecards-templating'
 import { getUserInfo } from '../_shared/userGraphClient.js'
 import { getCurrentProfile, getPullRequests } from '../_shared/githubApiClient.js'
+import { BlobsStorage } from '../../packages/agents-hosting-storage-blob/src/blobsStorage.js'
 
-const app = new AgentApplication({ storage: new MemoryStorage() })
+// const app = new AgentApplication({ storage: new MemoryStorage() })
+const app = new AgentApplication({ storage: new BlobsStorage('test', 'UseDevelopmentStorage=true;') })
 
 const auth = new Authorization(app)
 const guards = auth.initialize({
-  graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In', cancelKeyword: '/cancel' },
-  github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', cancelKeyword: '/cancel' },
+  graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In', cancelTrigger: '/cancel' },
+  github: { text: 'Sign in with GitHub', title: 'GitHub Sign In', cancelTrigger: '/cancel' },
 })
 
 app.onConversationUpdate('membersAdded', _status)
