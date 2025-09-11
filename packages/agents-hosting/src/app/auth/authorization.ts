@@ -89,9 +89,7 @@ export class Authorization<TState extends TurnState> {
    * @returns An array of canceled authorization guards.
    */
   async cancel (context: TurnContext): Promise<AuthorizationGuard[]> {
-    if (!this._initialized) {
-      throw new Error('Ensure to \'initialize\' Authorization class before using it.')
-    }
+    this.isInitialized()
 
     const result: AuthorizationGuard[] = []
     for (const guard of this.guards) {
@@ -109,9 +107,7 @@ export class Authorization<TState extends TurnState> {
    * @returns An array of authorization guards that were logged out.
    */
   async logout (context: TurnContext): Promise<AuthorizationGuard[]> {
-    if (!this._initialized) {
-      throw new Error('Ensure to \'initialize\' Authorization class before using it.')
-    }
+    this.isInitialized()
 
     const userTokenClient = await this.getUserTokenClient()
     const userId = context.activity.from?.id
@@ -146,6 +142,8 @@ export class Authorization<TState extends TurnState> {
    * @param callback The callback function to be invoked on successful sign-in.
    */
   onSuccess (callback: (guard: AuthorizationGuard, context: TurnContext, data: AuthorizationGuardContext) => Promise<void> | void): void {
+    this.isInitialized()
+
     for (const guard of this.guards) {
       guard.onSuccess((context, data) => callback(guard, context, data))
     }
@@ -156,6 +154,8 @@ export class Authorization<TState extends TurnState> {
    * @param callback The callback function to be invoked on sign-in failure.
    */
   onFailure (callback: (guard: AuthorizationGuard, context: TurnContext, reason: string) => Promise<void> | void): void {
+    this.isInitialized()
+
     for (const guard of this.guards) {
       guard.onFailure((context, reason) => callback(guard, context, reason))
     }
@@ -166,6 +166,8 @@ export class Authorization<TState extends TurnState> {
    * @param callback The callback function to be invoked on sign-in cancellation.
    */
   onCancelled (callback: (guard: AuthorizationGuard, context: TurnContext) => Promise<void> | void): void {
+    this.isInitialized()
+
     for (const guard of this.guards) {
       guard.onCancelled((context) => callback(guard, context))
     }
@@ -190,9 +192,21 @@ export class Authorization<TState extends TurnState> {
   private async getUserTokenClient () {
     const userTokenClient = this.app.adapter.userTokenClient
     if (!userTokenClient?.client.defaults.headers.common.Authorization) {
-      const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
-      userTokenClient?.updateAuthToken(accessToken)
+      try {
+        const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
+        userTokenClient?.updateAuthToken(accessToken)
+      } catch (error) {
+        // Log the error and return null to indicate failure
+        console.error('Failed to get or update auth token:', error)
+        return null
+      }
     }
     return userTokenClient
+  }
+
+  private isInitialized () {
+    if (!this._initialized) {
+      throw new Error('Ensure to \'initialize\' Authorization class before using it.')
+    }
   }
 }

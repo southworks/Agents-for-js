@@ -95,6 +95,18 @@ export class AuthorizationGuard implements Guard {
     if (!app.adapter.userTokenClient) {
       throw new Error(this.prefix('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.'))
     }
+
+    if (!app.adapter.authProvider) {
+      throw new Error(this.prefix('The \'authProvider\' is not available in the adapter. Ensure that the adapter supports authentication.'))
+    }
+
+    if (!app.adapter.authConfig) {
+      throw new Error(this.prefix('The \'authConfig\' is not available in the adapter. Ensure that the adapter is properly configured.'))
+    }
+
+    if (!app.options.storage) {
+      throw new Error(this.prefix('The \'storage\' option is not available in the app options. Ensure that the app is properly configured.'))
+    }
   }
 
   private _key = `${AuthorizationGuard.name}/${this.id}`
@@ -111,8 +123,9 @@ export class AuthorizationGuard implements Guard {
 
     const { activity } = context
     const userTokenClient = await this.getUserTokenClient()
-    const tokenResponse = await userTokenClient.getUserToken(this.settings.name!, activity.channelId!, activity.from?.id!)
-    return { token: tokenResponse.token }
+    // Using getTokenOrSignInResource instead of getUserToken to avoid HTTP 404 errors.
+    const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this.settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
+    return { token: tokenResponse?.token }
   }
 
   /**
@@ -121,11 +134,7 @@ export class AuthorizationGuard implements Guard {
    * @returns True if the cancellation was successful, false otherwise.
    */
   async cancel (context:TurnContext): Promise<boolean> {
-    if (!this.app.options.storage) {
-      return false
-    }
-
-    const storage = new GuardStorage(this.app.options.storage, context)
+    const storage = new GuardStorage(this.app.options.storage!, context)
     const active = await storage.read()
 
     if (active?.guard !== this.id) {
@@ -187,14 +196,9 @@ export class AuthorizationGuard implements Guard {
    * @param options Registration options including context, and active guard state.
    */
   async register (options: GuardRegisterOptions): Promise<GuardRegisterStatus> {
-    if (!this.app.options.storage) {
-      logger.debug(this.prefix('Discarding guard because no storage provider has been configured in the app options.'))
-      return GuardRegisterStatus.IGNORED
-    }
-
     const { context, active } = options
     const { activity } = context
-    const storage = new GuardStorage(this.app.options.storage, context)
+    const storage = new GuardStorage(this.app.options.storage!, context)
 
     const userTokenClient = await this.getUserTokenClient()
 
@@ -204,6 +208,7 @@ export class AuthorizationGuard implements Guard {
 
     if (await this.isCancellationRequested(context)) {
       logger.debug(this.prefix('User requested to cancel the sign-in process by using the \'cancelTrigger\' setting'), activity)
+      await storage.delete()
       await this._onCancelled?.(context)
       return GuardRegisterStatus.REJECTED
     }
@@ -354,7 +359,7 @@ export class AuthorizationGuard implements Guard {
 
     if (active.attempts <= 0) {
       logger.warn(this.prefix('Maximum sign-in attempts exceeded'), activity)
-      await context.sendActivity(MessageFactory.text('You have exceeded the maximum number sign-in of attempts.'))
+      await context.sendActivity(MessageFactory.text('You have exceeded the maximum number of sign-in attempts.'))
       await this._onCancelled?.(context)
       return { status: GuardRegisterStatus.REJECTED }
     }

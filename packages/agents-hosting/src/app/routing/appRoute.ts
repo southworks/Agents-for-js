@@ -77,9 +77,7 @@ export interface AppRoute<TState extends TurnState> {
    * Optional list of authorization handlers that this route requires.
    *
    * @remarks
-   * If provided, the route will check for these authorization handlers before processing
-   * the activity. Each string in the array should correspond to a registered authorization
-   * handler name. All specified handlers must pass authorization checks before the route
+   * If provided, all specified guards must authorize the activity before the route
    * handler is invoked.
    *
    * @example

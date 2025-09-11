@@ -28,7 +28,10 @@ auth.onSuccess(async (guard, context) => {
 })
 
 auth.onFailure(async (guard, context, reason) => {
-  await context.sendActivity(MessageFactory.text(`Failed to log in with ${guard.id} due to ${reason}`))
+  // Log the detailed error for debugging
+  console.error(`Auth failure for ${guard.id}:`, reason)
+  // Send a generic message to the user
+  await context.sendActivity(MessageFactory.text(`Failed to log in with ${guard.id}. Please try again.`))
 })
 
 auth.onCancelled(async (guard, context) => {
@@ -51,6 +54,10 @@ async function _logout (context: TurnContext): Promise<void> {
 
 async function _profileRequest (context: TurnContext): Promise<void> {
   const graph = await guards.graph.context(context)
+  if (!graph.token) {
+    await context.sendActivity(MessageFactory.text('Microsoft Graph authentication token not found. Please sign in again.'))
+    return
+  }
   const userTemplate = (await import('./../_resources/UserProfileCard.json'))
   const template = new Template(userTemplate)
   const userInfo = await getUserInfo(graph.token!)
@@ -69,6 +76,10 @@ async function _message (context: TurnContext): Promise<void> {
 
 async function _pullRequests (context: TurnContext): Promise<void> {
   const github = await guards.github.context(context)
+  if (!github.token) {
+    await context.sendActivity(MessageFactory.text('GitHub authentication token not found. Please sign in again.'))
+    return
+  }
   const ghProf = await getCurrentProfile(github.token!)
   const userTemplate = (await import('./../_resources/UserProfileCard.json'))
   const template = new Template(userTemplate)

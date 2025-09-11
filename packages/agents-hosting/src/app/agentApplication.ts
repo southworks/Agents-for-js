@@ -491,8 +491,8 @@ export class AgentApplication<TState extends TurnState> {
    * The method performs the following operations:
    * 1. Starts typing timer if configured
    * 2. Processes mentions if configured
-   * 3. Handles authentication flows
-   * 4. Loads turn state
+   * 3. Loads turn state
+   * 4. Handles authentication flows
    * 5. Downloads files if file downloaders are configured
    * 6. Executes before-turn event handlers
    * 7. Routes to appropriate handlers
@@ -528,16 +528,17 @@ export class AgentApplication<TState extends TurnState> {
           context.activity.normalizeMentions()
         }
 
+        const { storage, turnStateFactory } = this._options
+        const state = turnStateFactory()
+        await state.load(context, storage)
+
         const manager = await RouteManager.initialize(this, this._routes, context)
         const newContext = manager.context ?? context
 
         if (await manager.guarded()) {
+          await state.save(newContext, storage)
           return false
         }
-
-        const { storage, turnStateFactory } = this._options
-        const state = turnStateFactory()
-        await state.load(newContext, storage)
 
         if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
           for (let i = 0; i < this._options.fileDownloaders.length; i++) {

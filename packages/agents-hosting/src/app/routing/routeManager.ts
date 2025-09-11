@@ -64,7 +64,7 @@ export class RouteManager {
    */
   public async handler (state: TurnState) : Promise<boolean> {
     if (this._route) {
-      await this._route.handler.bind(this.app, this._context, state)()
+      await this._route.handler.bind(this.app)(this._context, state)
       return true
     } else {
       logger.debug('No matching route found for activity:', this._context.activity)
@@ -124,7 +124,7 @@ export class RouteManager {
    */
   private async registerGuard (guard: Guard, options: GuardRegisterOptions) {
     try {
-      return guard.register(options)
+      return await guard.register(options)
     } catch (cause) {
       await this._storage?.delete()
       throw new Error(this.prefix(guard.id, 'Registration failed'), { cause })

@@ -16,6 +16,7 @@ This document presents a comprehensive suite of test cases for authentication gu
 - 🤖: Bot interaction
 - `magic code`: 6-digit code gathered from the `oAuthCard`
 - `/me`: Login route for `graph` auth guard
+- `/prs`: Lists GitHub pull requests; triggers GitHub sign-in if needed
 - `/status`: Login route for `graph` and `github` auth guards
 - `/logout`: Logout route for `graph` and `github` auth guards
 - `oAuthCard`: <br>
@@ -213,11 +214,11 @@ User simulates having multiple server instances by removing the guard from stora
 
 1. 🧑 → Sends `/me` message
 2. 🤖 → Shows `oAuthCard`
-5. 🧑 → Removes guard from storage (simulates wrong memory flow)
-6. 🧑 → Sends `/me` message
-7. 🤖 → Shows `oAuthCard`
-8. 🧑 → Retrieves and sends `magic code`
-9. 🤖 → Shows signed-in user information from the Graph provider
+3. 🧑 → Removes guard from storage (simulates wrong memory flow)
+4. 🧑 → Sends `/me` message
+5. 🤖 → Shows `oAuthCard`
+6. 🧑 → Retrieves and sends `magic code`
+7. 🤖 → Shows signed-in user information from the Graph provider
 
 ### 14. Cancel During Sign-In
 
