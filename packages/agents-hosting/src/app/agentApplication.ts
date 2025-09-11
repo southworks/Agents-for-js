@@ -551,13 +551,13 @@ export class AgentApplication<TState extends TurnState> {
           return false
         }
 
-        await manager.handler(state)
+        const result = await manager.handler(state)
 
         if (await this.callEventHandlers(newContext, state, this._afterTurn)) {
           await state.save(newContext, storage)
         }
 
-        return true
+        return result
       } catch (err: any) {
         logger.error(err)
         throw err
