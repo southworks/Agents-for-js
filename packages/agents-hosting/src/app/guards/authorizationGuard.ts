@@ -21,14 +21,10 @@ const logger = debug('agents:guards:authorization')
  * Context data for authorization guards.
  */
 export interface AuthorizationGuardContext {
+  /**
+   * The OAuth token acquired after successful authentication.
+   */
   token: string | undefined
-}
-
-/**
- * Interface for token verification state.
- */
-export interface TokenVerifyState {
-  state: string
 }
 
 /**
@@ -63,11 +59,24 @@ export interface AuthorizationGuardSettings {
 }
 
 /**
+ * Interface for token verification state.
+ */
+interface TokenVerifyState {
+  state: string
+}
+
+/**
+ * Interface for sign-in failure value.
+ */
+interface SignInFailureValue {
+  code: string
+  message: string
+}
+
+/**
  * Guard implementation for OAuth authorization flows.
  */
 export class AuthorizationGuard implements Guard {
-  private _userTokenClient: UserTokenClient
-
   private _onSuccess?: Parameters<AuthorizationGuard['onSuccess']>[0]
   private _onFailure?: Parameters<AuthorizationGuard['onFailure']>[0]
   private _onCancelled?: Parameters<AuthorizationGuard['onCancelled']>[0]
@@ -76,17 +85,16 @@ export class AuthorizationGuard implements Guard {
    * Creates an instance of the AuthorizationGuard.
    * @param id The unique identifier for the guard.
    * @param settings The settings for the guard.
+   * @param app The agent application instance.
    */
   constructor (public id: string, public settings: AuthorizationGuardSettings, private app : AgentApplication<any>) {
     if (!settings.name) {
-      throw new Error(`The 'name' property is required to initialize the '${this.id}' authorization guard.`)
+      throw new Error(this.prefix('The \'name\' property is required to initialize the guard.'))
     }
 
     if (!app.adapter.userTokenClient) {
-      throw new Error('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.')
+      throw new Error(this.prefix('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.'))
     }
-
-    this._userTokenClient = app.adapter.userTokenClient
   }
 
   private _key = `${AuthorizationGuard.name}/${this.id}`
@@ -102,8 +110,8 @@ export class AuthorizationGuard implements Guard {
     }
 
     const { activity } = context
-    await this.setAccessToken(context)
-    const tokenResponse = await this._userTokenClient.getUserToken(this.settings.name!, activity.channelId!, activity.from?.id!)
+    const userTokenClient = await this.getUserTokenClient()
+    const tokenResponse = await userTokenClient.getUserToken(this.settings.name!, activity.channelId!, activity.from?.id!)
     return { token: tokenResponse.token }
   }
 
@@ -124,7 +132,7 @@ export class AuthorizationGuard implements Guard {
       return false
     }
 
-    logger.debug(`Cancelling active guard ${this.id}`, context.activity)
+    logger.debug(this.prefix('Cancelling active session'), context.activity)
     await storage.delete()
     await this._onCancelled?.(context)
     return true
@@ -144,8 +152,9 @@ export class AuthorizationGuard implements Guard {
       throw new Error('Both \'activity.channelId\' and \'activity.from.id\' are required to perform logout.')
     }
 
-    logger.debug(`Logging out User '${user}' from => Channel: '${channel}', Guard: '${this.id}', Connection: '${connection}'`, context.activity)
-    await this._userTokenClient.signOut(user, connection, channel)
+    logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
+    const userTokenClient = await this.getUserTokenClient()
+    await userTokenClient.signOut(user, connection, channel)
     return true
   }
 
@@ -179,6 +188,7 @@ export class AuthorizationGuard implements Guard {
    */
   async register (options: GuardRegisterOptions): Promise<GuardRegisterStatus> {
     if (!this.app.options.storage) {
+      logger.debug(this.prefix('Discarding guard because no storage provider has been configured in the app options.'))
       return GuardRegisterStatus.IGNORED
     }
 
@@ -186,42 +196,44 @@ export class AuthorizationGuard implements Guard {
     const { activity } = context
     const storage = new GuardStorage(this.app.options.storage, context)
 
-    await this.setAccessToken(context)
+    const userTokenClient = await this.getUserTokenClient()
 
     if (!active) {
       return this.setToken(options, storage)
     }
 
-    if (await this.isCancellable(context)) {
-      logger.debug(`Guard ${this.id} was cancelled`)
+    if (await this.isCancellationRequested(context)) {
+      logger.debug(this.prefix('User requested to cancel the sign-in process by using the \'cancelTrigger\' setting'), activity)
       await this._onCancelled?.(context)
       return GuardRegisterStatus.REJECTED
     }
 
     if (active.activity.conversation?.id !== activity.conversation?.id) {
-      logger.debug('Conversation changed', activity)
+      logger.debug(this.prefix('Discarding the active session due to the conversation has changed during an active sign-in process'), activity)
       return GuardRegisterStatus.IGNORED
     }
 
     if (activity.name === 'signin/tokenExchange') {
-      const { token } = await this._userTokenClient.exchangeTokenAsync(activity.from?.id!, this.settings.name!, activity.channelId!, activity.value as TokenExchangeRequest)
+      const { token } = await userTokenClient.exchangeTokenAsync(activity.from?.id!, this.settings.name!, activity.channelId!, activity.value as TokenExchangeRequest)
       if (!token) {
-        const reason = 'Token exchange failed.'
-        logger.error(reason)
+        const reason = 'Failed to exchange token.'
+        logger.error(this.prefix(reason))
         await this._onFailure?.(context, reason)
         return GuardRegisterStatus.REJECTED
       }
 
-      logger.info('Token exchanged successfully.')
+      logger.debug(this.prefix('Successfully exchanged token'))
       this.setContext(context, { token })
+      await this._onSuccess?.(context, { token })
       return GuardRegisterStatus.APPROVED
     }
 
     if (activity.name === 'signin/failure') {
-      const reason = 'Login failed.'
-      logger.error(reason, activity.value, activity)
-      await context.sendActivity(MessageFactory.text(`${reason} Please try again.`))
-      await this._onFailure?.(context, reason)
+      const reason = 'Failed to sign-in'
+      const value = activity.value as SignInFailureValue
+      logger.error(this.prefix(reason), value, activity)
+      await context.sendActivity(MessageFactory.text(`${reason}. Please try again.`))
+      await this._onFailure?.(context, value.message || reason)
       return GuardRegisterStatus.REJECTED
     }
 
@@ -231,21 +243,23 @@ export class AuthorizationGuard implements Guard {
     }
 
     const result = await this.setToken(options, storage, code)
-
-    if (result === GuardRegisterStatus.APPROVED) {
-      const data = await this.context(context)
-      if (this.isExchangeable(data.token)) {
-        return this.handleObo(context, data.token!)
-      }
+    if (result !== GuardRegisterStatus.APPROVED) {
+      return result
     }
 
+    const data = await this.context(context)
+    if (this.isExchangeable(data.token)) {
+      return this.handleObo(context, data.token!)
+    }
+
+    await this._onSuccess?.(context, data)
     return result
   }
 
   /**
    * Checks if the sign-in process can be cancelled.
    */
-  private async isCancellable (context : TurnContext): Promise<boolean> {
+  private async isCancellationRequested (context : TurnContext): Promise<boolean> {
     const trigger = this.settings.cancelTrigger
     if (!trigger) {
       return false
@@ -279,19 +293,20 @@ export class AuthorizationGuard implements Guard {
   private async handleObo (context: TurnContext, token: string): Promise<GuardRegisterStatus> {
     const { cnxPrefix, scopes } = this.settings
     if (!scopes) {
-      throw new Error(`Cannot perform on-behalf-of token exchange for guard '${this.id}' without defined scopes.`)
+      throw new Error(this.prefix('Cannot perform on-behalf-of token exchange without scopes setting'))
     }
 
     try {
       const msalTokenProvider = new MsalTokenProvider()
       const authConfig = cnxPrefix ? loadAuthConfigFromEnv(cnxPrefix) : context.adapter.authConfig
       const newToken = await msalTokenProvider.acquireTokenOnBehalfOf(authConfig, scopes, token)
+      logger.debug(this.prefix('Successfully acquired on-behalf-of token'))
       this.setContext(context, { token: newToken })
       await this._onSuccess?.(context, { token: newToken })
       return GuardRegisterStatus.APPROVED
     } catch (error) {
-      const reason = `On-behalf-of token exchange failed: ${(error as Error).message}`
-      logger.error(reason, error)
+      const reason = `Failed to exchange on-behalf-of token: ${(error as Error).message}`
+      logger.error(this.prefix(reason), error)
       await this._onFailure?.(context, reason)
       return GuardRegisterStatus.REJECTED
     }
@@ -303,25 +318,25 @@ export class AuthorizationGuard implements Guard {
   private async setToken ({ context, active }: GuardRegisterOptions, storage: GuardStorage, code?: string): Promise<GuardRegisterStatus> {
     const { activity } = context
 
-    const { tokenResponse, signInResource } = await this._userTokenClient.getTokenOrSignInResource(activity.from?.id!, this.settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
+    const userTokenClient = await this.getUserTokenClient()
+    const { tokenResponse, signInResource } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this.settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
 
     if (!tokenResponse && active) {
-      logger.warn('Invalid code entered. Restarting sign-in flow.', activity)
+      logger.warn(this.prefix('Invalid code entered. Restarting sign-in flow'), activity)
       await context.sendActivity(MessageFactory.text('The code entered is invalid. Please sign-in again to continue.'))
     }
 
     if (!tokenResponse) {
-      logger.debug('No token found. Sending sign-in card.', activity)
+      logger.debug(this.prefix('Cannot find token. Sending sign-in card'), activity)
       const oCard = CardFactory.oauthCard(this.settings.name!, this.settings.title!, this.settings.text!, signInResource)
       await context.sendActivity(MessageFactory.attachment(oCard))
       await storage.write({ activity, guard: this.id, ...(active ?? {}), attempts: 3 })
       return GuardRegisterStatus.PENDING
     }
 
-    logger.debug('Token acquired successfully.', activity)
+    logger.debug(this.prefix('Successfully acquired token'), activity)
     const guardContext: AuthorizationGuardContext = { token: tokenResponse.token }
     this.setContext(context, guardContext)
-    await this._onSuccess?.(context, guardContext)
     return GuardRegisterStatus.APPROVED
   }
 
@@ -330,7 +345,7 @@ export class AuthorizationGuard implements Guard {
    */
   private async codeVerification ({ context, active }: GuardRegisterOptions, storage: GuardStorage): Promise<{ status: GuardRegisterStatus, code?: string }> {
     if (!active) {
-      logger.debug('No active guard session found. Skipping code verification.', context.activity)
+      logger.debug(this.prefix('No active session found. Skipping code verification.'), context.activity)
       return { status: GuardRegisterStatus.IGNORED }
     }
 
@@ -338,31 +353,32 @@ export class AuthorizationGuard implements Guard {
     let state: string | undefined = activity.text
 
     if (active.attempts <= 0) {
-      await context.sendActivity(MessageFactory.text('You have exceeded the maximum number of attempts.'))
+      logger.warn(this.prefix('Maximum sign-in attempts exceeded'), activity)
+      await context.sendActivity(MessageFactory.text('You have exceeded the maximum number sign-in of attempts.'))
       await this._onCancelled?.(context)
       return { status: GuardRegisterStatus.REJECTED }
     }
 
     if (activity.name === 'signin/verifyState') {
-      logger.debug('Getting code from activity.value', activity)
+      logger.debug(this.prefix('Getting code from activity.value'), activity)
       const { state: teamsState } = activity.value as TokenVerifyState
       state = teamsState
     }
 
     if (state === 'CancelledByUser') {
-      logger.warn('Sign-in process was cancelled by the user.', activity)
+      logger.warn(this.prefix('Sign-in process was cancelled by the user'), activity)
       await this._onCancelled?.(context)
       return { status: GuardRegisterStatus.REJECTED }
     }
 
     if (!state?.match(/^\d{6}$/)) {
-      logger.warn(`Invalid magic code entered. Attempts left: ${active.attempts}`, activity)
+      logger.warn(this.prefix(`Invalid magic code entered. Attempts left: ${active.attempts}`), activity)
       await context.sendActivity(MessageFactory.text(`Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**${active.attempts} attempt(s) left...**`))
       await storage.write({ ...active, attempts: active.attempts - 1 })
       return { status: GuardRegisterStatus.PENDING }
     }
 
-    logger.debug('Code verification successful.', activity)
+    logger.debug(this.prefix('Code verification successful'), activity)
     return { status: GuardRegisterStatus.APPROVED, code: state }
   }
 
@@ -374,11 +390,22 @@ export class AuthorizationGuard implements Guard {
   }
 
   /**
-   * Sets the access token in the user token client.
-   * @param context The turn context.
+   * Gets the user token client, ensuring it has a valid auth token.
    */
-  private async setAccessToken (context: TurnContext) {
-    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    this._userTokenClient.updateAuthToken(accessToken)
+  private async getUserTokenClient (): Promise<UserTokenClient> {
+    const userTokenClient = this.app.adapter.userTokenClient
+    if (!userTokenClient?.client.defaults.headers.common.Authorization) {
+      const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
+      userTokenClient?.updateAuthToken(accessToken)
+    }
+
+    return userTokenClient!
+  }
+
+  /**
+   * Prefixes a message with the guard ID.
+   */
+  private prefix (message: string) {
+    return `[guard:${this.id}] ${message}`
   }
 }

@@ -11,6 +11,11 @@ import { Storage } from '../../storage'
  * Storage manager for guard state.
  */
 export class GuardStorage {
+  /**
+   * Creates an instance of the GuardStorage.
+   * @param storage The storage provider.
+   * @param context The turn context.
+   */
   constructor (private storage: Storage, private context: TurnContext) { }
 
   /**

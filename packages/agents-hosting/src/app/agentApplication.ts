@@ -529,6 +529,7 @@ export class AgentApplication<TState extends TurnState> {
         }
 
         const manager = await RouteManager.initialize(this, this._routes, context)
+        const newContext = manager.context ?? context
 
         if (await manager.guarded()) {
           return false
@@ -536,28 +537,23 @@ export class AgentApplication<TState extends TurnState> {
 
         const { storage, turnStateFactory } = this._options
         const state = turnStateFactory()
-        await state.load(context, storage)
+        await state.load(newContext, storage)
 
         if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
           for (let i = 0; i < this._options.fileDownloaders.length; i++) {
-            await this._options.fileDownloaders[i].downloadAndStoreFiles(context, state)
+            await this._options.fileDownloaders[i].downloadAndStoreFiles(newContext, state)
           }
         }
 
-        if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
-          await state.save(context, storage)
+        if (!(await this.callEventHandlers(newContext, state, this._beforeTurn))) {
+          await state.save(newContext, storage)
           return false
         }
 
-        if (manager.route) {
-          await manager.route.handler.bind(this, context, state)()
-        } else {
-          logger.debug('No matching route found for activity:', context.activity)
-          return false
-        }
+        await manager.handler(state)
 
-        if (await this.callEventHandlers(context, state, this._afterTurn)) {
-          await state.save(context, storage)
+        if (await this.callEventHandlers(newContext, state, this._afterTurn)) {
+          await state.save(newContext, storage)
         }
 
         return true

@@ -59,7 +59,7 @@ export interface ActiveGuard extends StoreItem {
    */
   activity: Activity
   /**
-   * The number of attempts made by the user.
+   * The number of sign-in attempts made by the user.
    */
   attempts: number
   /**

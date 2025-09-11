@@ -6,11 +6,12 @@
 import { debug } from '@microsoft/agents-activity/logger'
 import { AgentApplication } from '../agentApplication'
 import { GuardStorage } from '../guards/guardStorage'
-import { ActiveGuard, Guard, GuardRegisterStatus } from '../guards/types'
+import { ActiveGuard, Guard, GuardRegisterOptions, GuardRegisterStatus } from '../guards/types'
 import { AppRoute } from './appRoute'
 import { RouteList } from './routeList'
 import { TurnContext } from '../../turnContext'
 import { Activity } from '@microsoft/agents-activity'
+import { TurnState } from '../turnState'
 
 const logger = debug('agents:route-manager')
 
@@ -18,17 +19,37 @@ const logger = debug('agents:route-manager')
  * Manages route handlers and guard validation.
  */
 export class RouteManager {
+  private _context: TurnContext
   private _route: AppRoute<any> | undefined
   private _storage?: GuardStorage
 
-  private constructor (app: AgentApplication<any>, private routes: RouteList<any>, private context: TurnContext) {
+  /**
+   * Creates an instance of the RouteManager.
+   * @param app The agent application.
+   * @param routes The list of application routes.
+   * @param context The current turn context.
+   */
+  private constructor (private app: AgentApplication<any>, private routes: RouteList<any>, context: TurnContext) {
+    this._context = context
+
     if (app.options.storage) {
-      this._storage = new GuardStorage(app.options.storage, context)
+      this._storage = new GuardStorage(app.options.storage, this._context)
     }
   }
 
   /**
+   * The current turn context.
+   */
+  public get context () {
+    return this._context
+  }
+
+  /**
    * Initializes a route manager for the current context.
+   * @param app The agent application.
+   * @param routes The list of application routes.
+   * @param context The current turn context.
+   * @returns A promise that resolves to the initialized RouteManager.
    */
   static async initialize (app: AgentApplication<any>, routes: RouteList<any>, context: TurnContext) {
     const manager = new RouteManager(app, routes, context)
@@ -37,29 +58,36 @@ export class RouteManager {
   }
 
   /**
-   * Gets the current active route.
+   * Handles the current route, if one is found.
+   * @param state The current turn state.
+   * @returns A promise that resolves to a boolean indicating whether the handler was successful.
    */
-  public get route () {
-    return this._route
+  public async handler (state: TurnState) : Promise<boolean> {
+    if (this._route) {
+      await this._route.handler.bind(this.app, this._context, state)()
+      return true
+    } else {
+      logger.debug('No matching route found for activity:', this._context.activity)
+      return false
+    }
   }
 
   /**
-   * Processes guards for the current route, verifying that each guard is properly registered.
-   * @returns true if the current route is guarded, meaning that at least one guard wasn't registered successfully.
+   * Processes guards for the current route. If any guard requires action, the request is considered "guarded".
+   * @returns A promise that resolves to a boolean indicating whether the request is being guarded.
+   * @remarks If a guard is active, the original activity is restored in the turn context after processing.
    */
   public async guarded (): Promise<boolean> {
     let { route, active } = await this.active()
     if (active) {
-      logger.debug(`Active guard session found: ${active.guard}`)
+      logger.debug(this.prefix(active.guard, `Active session found with ${active.attempts} attempt(s)`), active.activity)
     }
 
-    let activity = this.context.activity
     const guards = (route ?? this._route)?.guards ?? []
 
     for (const guard of guards) {
-      const context = new TurnContext(this.context.adapter, activity)
-      const status = await this.onGuardError(guard, async () => guard.register({ context, active }))
-      logger.debug(`Guard ${guard.id} registration status: ${status}`)
+      const status = await this.registerGuard(guard, { context: this._context, active })
+      logger.debug(this.prefix(guard.id, `Registration status: ${status}`))
 
       if (status === GuardRegisterStatus.IGNORED) {
         await this._storage?.delete()
@@ -76,13 +104,14 @@ export class RouteManager {
       }
 
       if (status === GuardRegisterStatus.APPROVED) {
-        this._route = route ?? this._route
         await this._storage?.delete()
       }
 
       if (active) {
-        // Save originating activity for next guard in the chain.
-        activity = Activity.fromObject(active.activity)
+        // Restore the original activity in the turn context.
+        (this._context as any)._activity = Activity.fromObject(active.activity)
+        // Clear active guard session and re-evaluate route.
+        this._route = route ?? this._route
         active = undefined
       }
     }
@@ -91,15 +120,14 @@ export class RouteManager {
   }
 
   /**
-   * Handles errors that occur during guard registration.
-   * @returns The result of the registration or an error.
+   * Registers a guard and handles any errors that may occur during registration.
    */
-  private async onGuardError<T>(guard: Guard, cb: () => Promise<T>): Promise<T> {
+  private async registerGuard (guard: Guard, options: GuardRegisterOptions) {
     try {
-      return await cb()
+      return guard.register(options)
     } catch (cause) {
       await this._storage?.delete()
-      throw new Error(`Error registering guard '${guard.id}'`, { cause })
+      throw new Error(this.prefix(guard.id, 'Registration failed'), { cause })
     }
   }
 
@@ -112,16 +140,24 @@ export class RouteManager {
       return {}
     }
 
-    const context = new TurnContext(this.context.adapter, Activity.fromObject(active.activity))
+    const activity = Activity.fromObject(active.activity)
+    const context = new TurnContext(this._context.adapter, activity)
     const route = await this.getRoute(context)
 
     if (!route) {
-      return { active }
+      return { active: { ...active, activity } }
     }
 
-    // Sort guards to ensure the active guard is processed first.
-    const index = route.guards?.findIndex(e => e.id === active.guard) ?? -1
-    const guards = index >= 0 ? route.guards?.slice(index) : []
+    // Sort guards to ensure the active guard is processed first, to ensure continuity.
+    const guards = route.guards?.sort((a, b) => {
+      if (a.id === active.guard) {
+        return -1
+      }
+      if (b.id === active.guard) {
+        return 1
+      }
+      return 0
+    }) ?? []
     return { route: { ...route, guards }, active }
   }
 
@@ -134,5 +170,12 @@ export class RouteManager {
         return route
       }
     }
+  }
+
+  /**
+   * Prefixes a message with the guard ID.
+   */
+  private prefix (id: string, message: string) {
+    return `[guard:${id}] ${message}`
   }
 }

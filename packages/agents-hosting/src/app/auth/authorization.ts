@@ -90,7 +90,7 @@ export class Authorization<TState extends TurnState> {
    */
   async cancel (context: TurnContext): Promise<AuthorizationGuard[]> {
     if (!this._initialized) {
-      throw new Error('Authorization not initialized')
+      throw new Error('Ensure to \'initialize\' Authorization class before using it.')
     }
 
     const result: AuthorizationGuard[] = []
@@ -110,28 +110,34 @@ export class Authorization<TState extends TurnState> {
    */
   async logout (context: TurnContext): Promise<AuthorizationGuard[]> {
     if (!this._initialized) {
-      throw new Error('Authorization not initialized')
+      throw new Error('Ensure to \'initialize\' Authorization class before using it.')
     }
 
-    const client = context.adapter.userTokenClient
+    const userTokenClient = await this.getUserTokenClient()
     const userId = context.activity.from?.id
     const channelId = context.activity.channelId
-    if (!client || !userId || !channelId) {
+    if (!userTokenClient || !userId || !channelId) {
       return []
     }
 
-    await this.setAccessToken(context)
-    const statuses = (await client.getTokenStatus(userId, channelId)).filter(e => e.hasToken)
+    const statuses = await userTokenClient.getTokenStatus(userId, channelId)
+
     const result: AuthorizationGuard[] = []
-    for (const guard of this.guards) {
-      // If there are no service tokens, perform a full cleanup; otherwise only log out guards that have a token.
-      const noServiceTokens = statuses.length === 0
-      const hasGuardToken = statuses.some(e => e.connectionName === guard.settings.name)
-      if (noServiceTokens || hasGuardToken) {
+    for (const status of statuses) {
+      if (!status.hasToken) {
+        continue
+      }
+
+      const guard = this.guards.find(e => e.settings.name === status.connectionName)
+      if (guard) {
         await guard.logout(context)
         result.push(guard)
+      } else {
+        // If there is no guard for the connection, sign out directly
+        await userTokenClient.signOut(userId, status.connectionName, channelId)
       }
     }
+
     return result
   }
 
@@ -179,11 +185,14 @@ export class Authorization<TState extends TurnState> {
   }
 
   /**
-   * Sets the access token in the user token client.
-   * @param context The turn context.
+   * Gets the user token client, ensuring it has a valid auth token.
    */
-  private async setAccessToken (context: TurnContext) {
-    const accessToken = await context.adapter.authProvider.getAccessToken(context.adapter.authConfig, 'https://api.botframework.com')
-    context.adapter.userTokenClient!.updateAuthToken(accessToken)
+  private async getUserTokenClient () {
+    const userTokenClient = this.app.adapter.userTokenClient
+    if (!userTokenClient?.client.defaults.headers.common.Authorization) {
+      const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
+      userTokenClient?.updateAuthToken(accessToken)
+    }
+    return userTokenClient
   }
 }
