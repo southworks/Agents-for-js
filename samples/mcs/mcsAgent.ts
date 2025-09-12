@@ -23,7 +23,7 @@ class McsAgent extends AgentApplication<TurnState> {
     this.onMessage('/logout', this._signOut)
     this.onActivity('message', this._message, [this.guards.mcs])
 
-    this.auth.onSuccess(this._singinSuccess)
+    this.auth.onSuccess(this._signinSuccess)
   }
 
   private _signOut = async (context: TurnContext): Promise<void> => {
@@ -35,7 +35,7 @@ class McsAgent extends AgentApplication<TurnState> {
     await context.sendActivity(MessageFactory.text('Welcome to the MCS Agent demo!, ready to chat with MCS!'))
   }
 
-  private _singinSuccess = async (guard: AuthorizationGuard, context: TurnContext): Promise<void> => {
+  private _signinSuccess = async (guard: AuthorizationGuard, context: TurnContext): Promise<void> => {
     await context.sendActivity(MessageFactory.text(`User signed in successfully from ${guard.id}`))
   }
 

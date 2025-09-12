@@ -80,7 +80,7 @@ export class RouteManager {
   public async guarded (): Promise<boolean> {
     let { route, active } = await this.active()
     if (active) {
-      logger.debug(this.prefix(active.guard, `Active session found with ${active.attempts} attempt(s)`), active.activity)
+      logger.debug(this.prefix(active.guard, `Active session found with ${active.attemptsLeft} attempt(s)`), active.activity)
     }
 
     const guards = (route ?? this._route)?.guards ?? []

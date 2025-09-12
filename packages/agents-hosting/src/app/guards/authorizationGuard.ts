@@ -56,6 +56,10 @@ export interface AuthorizationGuardSettings {
    * Trigger to cancel the ongoing auth flow (string, RegExp, or RouteSelector).
    */
   cancelTrigger?: string | RegExp | RouteSelector
+  /**
+   * Maximum number of attempts for entering the magic code.
+   */
+  maxAttempts?: number
 }
 
 /**
@@ -72,6 +76,8 @@ interface SignInFailureValue {
   code: string
   message: string
 }
+
+const SIGN_IN_ATTEMPTS = 3
 
 /**
  * Guard implementation for OAuth authorization flows.
@@ -110,6 +116,15 @@ export class AuthorizationGuard implements Guard {
   }
 
   private _key = `${AuthorizationGuard.name}/${this.id}`
+
+  /**
+   * Maximum number of attempts for magic code entry.
+   */
+  private get maxAttempts (): number {
+    const attempts = this.settings.maxAttempts
+    const result = typeof attempts === 'number' && Number.isFinite(attempts) ? Math.round(attempts) : NaN
+    return result > 0 ? result : SIGN_IN_ATTEMPTS
+  }
 
   /**
    * Gets the authorization context from the turn state.
@@ -335,7 +350,7 @@ export class AuthorizationGuard implements Guard {
       logger.debug(this.prefix('Cannot find token. Sending sign-in card'), activity)
       const oCard = CardFactory.oauthCard(this.settings.name!, this.settings.title!, this.settings.text!, signInResource)
       await context.sendActivity(MessageFactory.attachment(oCard))
-      await storage.write({ activity, guard: this.id, ...(active ?? {}), attempts: 3 })
+      await storage.write({ activity, guard: this.id, ...(active ?? {}), attemptsLeft: this.maxAttempts })
       return GuardRegisterStatus.PENDING
     }
 
@@ -357,7 +372,7 @@ export class AuthorizationGuard implements Guard {
     const { activity } = context
     let state: string | undefined = activity.text
 
-    if (active.attempts <= 0) {
+    if (active.attemptsLeft <= 0) {
       logger.warn(this.prefix('Maximum sign-in attempts exceeded'), activity)
       await context.sendActivity(MessageFactory.text('You have exceeded the maximum number of sign-in attempts.'))
       await this._onCancelled?.(context)
@@ -377,9 +392,9 @@ export class AuthorizationGuard implements Guard {
     }
 
     if (!state?.match(/^\d{6}$/)) {
-      logger.warn(this.prefix(`Invalid magic code entered. Attempts left: ${active.attempts}`), activity)
-      await context.sendActivity(MessageFactory.text(`Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**${active.attempts} attempt(s) left...**`))
-      await storage.write({ ...active, attempts: active.attempts - 1 })
+      logger.warn(this.prefix(`Invalid magic code entered. Attempts left: ${active.attemptsLeft}`), activity)
+      await context.sendActivity(MessageFactory.text(`Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**${active.attemptsLeft} attempt(s) left...**`))
+      await storage.write({ ...active, attemptsLeft: active.attemptsLeft - 1 })
       return { status: GuardRegisterStatus.PENDING }
     }
 

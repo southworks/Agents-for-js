@@ -74,6 +74,7 @@ export class Authorization<TState extends TurnState> {
         text: value.text ?? (process.env[`${key}_connectionText`]),
         cnxPrefix: value.cnxPrefix ?? (process.env[`${key}_cnxPrefix`]),
         cancelTrigger: value.cancelTrigger ?? process.env[`${key}_cancelTrigger`],
+        maxAttempts: value.maxAttempts ?? parseInt(process.env[`${key}_maxAttempts`]!),
         scopes: value.scopes ?? this.loadScopes(process.env[`${key}_scopes`]),
       }
       result[key] = new AuthorizationGuard(key, settings, this.app)

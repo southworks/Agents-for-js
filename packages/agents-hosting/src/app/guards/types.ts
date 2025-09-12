@@ -55,15 +55,15 @@ export interface Guard {
  */
 export interface ActiveGuard extends StoreItem {
   /**
+   * The identifier of the guard.
+  */
+  guard: string
+  /**
    * The current activity associated with the guard.
    */
   activity: Activity
   /**
-   * The number of sign-in attempts made by the user.
-   */
-  attempts: number
-  /**
-   * The identifier of the guard.
-   */
-  guard: string
+  * The number of attempts left for the guard.
+  */
+  attemptsLeft: number
 }

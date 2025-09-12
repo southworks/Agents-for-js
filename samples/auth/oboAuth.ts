@@ -16,7 +16,7 @@ class OboApp extends AgentApplication<TurnState> {
     this.onConversationUpdate('membersAdded', this._status)
     this.onActivity('message', this._message, [this.guards.mcs])
 
-    this.auth.onSuccess(this._singinSuccess)
+    this.auth.onSuccess(this._signinSuccess)
   }
 
   private _status = async (context: TurnContext): Promise<void> => {
@@ -29,7 +29,7 @@ class OboApp extends AgentApplication<TurnState> {
     }
   }
 
-  private _singinSuccess = async (guard: AuthorizationGuard, context: TurnContext): Promise<void> => {
+  private _signinSuccess = async (guard: AuthorizationGuard, context: TurnContext): Promise<void> => {
     await context.sendActivity(MessageFactory.text(`User signed in successfully from ${guard.id}`))
   }
 

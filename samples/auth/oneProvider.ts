@@ -18,7 +18,7 @@ class OneProvider extends AgentApplication<TurnState> {
     this.onActivity('invoke', this._invoke)
     this.onActivity('message', this._message, [this.guards.graph])
 
-    this.guards.graph.onSuccess(this._singinSuccess)
+    this.guards.graph.onSuccess(this._singninSuccess)
   }
 
   private _status = async (context: TurnContext): Promise<void> => {
@@ -40,7 +40,7 @@ class OneProvider extends AgentApplication<TurnState> {
     await context.sendActivity(MessageFactory.text('Invoke received.'))
   }
 
-  private _singinSuccess = async (context: TurnContext): Promise<void> => {
+  private _singninSuccess = async (context: TurnContext): Promise<void> => {
     await context.sendActivity(MessageFactory.text(`User signed in successfully from ${this.guards.graph.id}`))
   }
 
