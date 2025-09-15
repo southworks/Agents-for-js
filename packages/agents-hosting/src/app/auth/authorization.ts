@@ -121,18 +121,21 @@ export class Authorization<TState extends TurnState> {
 
     const result: AuthorizationGuard[] = []
     for (const status of statuses) {
+      // Sign out the user from all connections even if they are not listed as connected.
+      await userTokenClient.signOut(userId, status.connectionName, channelId)
+
       if (!status.hasToken) {
         continue
       }
 
       const guard = this.guards.find(e => e.settings.name === status.connectionName)
       if (guard) {
-        await guard.logout(context)
         result.push(guard)
-      } else {
-        // If there is no guard for the connection, sign out directly
-        await userTokenClient.signOut(userId, status.connectionName, channelId)
       }
+    }
+
+    if (result.length === 0) {
+      return this.guards
     }
 
     return result
