@@ -305,9 +305,9 @@ export class CopilotStudioWebChat {
 }
 
 /**
- * Processes activity attachments to convert any blob: URLs to data URLs.
+ * Processes activity attachments.
  * @param activity The activity to process for attachments.
- * @returns A promise that resolves to the activity with all attachments converted to data URLs.
+ * @returns A promise that resolves to the activity with all attachments converted.
  */
 async function processAttachments (activity: Activity): Promise<Attachment[]> {
   if (activity.type !== 'message' || !activity.attachments?.length) {
@@ -316,18 +316,40 @@ async function processAttachments (activity: Activity): Promise<Attachment[]> {
 
   const attachments: Attachment[] = []
   for (const attachment of activity.attachments) {
-    let contentUrl = attachment.contentUrl
-    if (contentUrl && new URL(contentUrl).protocol === 'blob:') {
-      const response = await fetch(contentUrl)
-      const blob = await response.blob()
-      const arrayBuffer = await blob.arrayBuffer()
-      const base64 = arrayBufferToBase64(arrayBuffer)
-      contentUrl = `data:${blob.type};base64,${base64}`
-    }
-    attachments.push({ ...attachment, contentUrl })
+    const processed = await processBlobAttachment(attachment)
+    attachments.push(processed)
   }
 
   return attachments
+}
+
+/**
+ * Processes a blob attachment to convert its content URL to a data URL.
+ * @param attachment The attachment to process.
+ * @returns A promise that resolves to the processed attachment.
+ */
+async function processBlobAttachment (attachment: Attachment): Promise<Attachment> {
+  let newContentUrl = attachment.contentUrl
+  if (!newContentUrl?.startsWith('blob:')) {
+    return attachment
+  }
+
+  try {
+    const response = await fetch(newContentUrl)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch blob URL: ${response.status} ${response.statusText}`)
+    }
+
+    const blob = await response.blob()
+    const arrayBuffer = await blob.arrayBuffer()
+    const base64 = arrayBufferToBase64(arrayBuffer)
+    newContentUrl = `data:${blob.type};base64,${base64}`
+  } catch (error) {
+    newContentUrl = attachment.contentUrl
+    logger.error('Error processing blob attachment:', newContentUrl, error)
+  }
+
+  return { ...attachment, contentUrl: newContentUrl }
 }
 
 /**
@@ -337,9 +359,9 @@ async function processAttachments (activity: Activity): Promise<Attachment[]> {
  */
 function arrayBufferToBase64 (buffer: ArrayBuffer): string {
   // Node.js environment
-  const B = (globalThis as any).Buffer
-  if (B && typeof B.from === 'function') {
-    return B.from(buffer).toString('base64')
+  const BufferClass = typeof globalThis.Buffer === 'function' ? globalThis.Buffer : undefined
+  if (BufferClass && typeof BufferClass.from === 'function') {
+    return BufferClass.from(buffer).toString('base64')
   }
 
   // Browser environment
