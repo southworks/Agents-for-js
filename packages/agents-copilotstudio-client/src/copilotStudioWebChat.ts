@@ -5,7 +5,7 @@
 
 import { v4 as uuid } from 'uuid'
 
-import { Activity, ConversationAccount } from '@microsoft/agents-activity'
+import { Activity, Attachment, ConversationAccount } from '@microsoft/agents-activity'
 import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
@@ -219,6 +219,8 @@ export class CopilotStudioWebChat {
       logger.debug('--> Connection established.')
       notifyTyping()
       const activity = await client.startConversationAsync()
+      // Remove replyToId to avoid timeout issues with WebChat on first activity.
+      delete activity.replyToId
       conversation = activity.conversation
       sequence = 0
       notifyActivity(activity)
@@ -264,22 +266,25 @@ export class CopilotStudioWebChat {
 
         return createObservable<string>(async (subscriber) => {
           try {
-            const id = uuid()
-
             logger.info('--> Sending activity to Copilot Studio ...')
+            const newActivity = Activity.fromObject({
+              ...activity,
+              id: uuid(),
+              attachments: await processAttachments(activity)
+            })
 
-            notifyActivity({ ...activity, id })
+            notifyActivity(newActivity)
             notifyTyping()
 
-            const activities = await client.sendActivity(activity)
+            const activities = await client.sendActivity(newActivity)
 
             for (const responseActivity of activities) {
               notifyActivity(responseActivity)
             }
 
-            subscriber.next(id)
+            subscriber.next(newActivity.id!)
             subscriber.complete()
-            logger.info('--> Activity received correctly from Copilot Studio.')
+            logger.info('<-- Activity received correctly from Copilot Studio.')
           } catch (error) {
             logger.error('Error sending Activity to Copilot Studio:', error)
             subscriber.error(error)
@@ -297,6 +302,52 @@ export class CopilotStudioWebChat {
       },
     }
   }
+}
+
+/**
+ * Processes activity attachments to convert any blob: URLs to data URLs.
+ * @param activity The activity to process for attachments.
+ * @returns A promise that resolves to the activity with all attachments converted to data URLs.
+ */
+async function processAttachments (activity: Activity): Promise<Attachment[]> {
+  if (activity.type !== 'message' || !activity.attachments?.length) {
+    return activity.attachments || []
+  }
+
+  const attachments: Attachment[] = []
+  for (const attachment of activity.attachments) {
+    let contentUrl = attachment.contentUrl
+    if (contentUrl && new URL(contentUrl).protocol === 'blob:') {
+      const response = await fetch(contentUrl)
+      const blob = await response.blob()
+      const arrayBuffer = await blob.arrayBuffer()
+      const base64 = arrayBufferToBase64(arrayBuffer)
+      contentUrl = `data:${blob.type};base64,${base64}`
+    }
+    attachments.push({ ...attachment, contentUrl })
+  }
+
+  return attachments
+}
+
+/**
+ * Converts an ArrayBuffer to a base64 string.
+ * @param buffer The ArrayBuffer to convert.
+ * @returns The base64 encoded string.
+ */
+function arrayBufferToBase64 (buffer: ArrayBuffer): string {
+  // Node.js environment
+  const B = (globalThis as any).Buffer
+  if (B && typeof B.from === 'function') {
+    return B.from(buffer).toString('base64')
+  }
+
+  // Browser environment
+  let binary = ''
+  for (const byte of new Uint8Array(buffer)) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary)
 }
 
 /**
