@@ -4,7 +4,7 @@
  */
 
 import * as msal from '@azure/msal-node'
-import { Activity, ActivityTypes, CardAction } from '@microsoft/agents-activity'
+import { ActivityTypes, CardAction } from '@microsoft/agents-activity'
 import { ConnectionSettings, CopilotStudioClient, loadCopilotStudioConnectionSettingsFromEnv } from '@microsoft/agents-copilotstudio-client'
 import pkg from '@microsoft/agents-copilotstudio-client/package.json' with { type: 'json' }
 import readline from 'readline'
@@ -43,7 +43,6 @@ async function acquireS2SToken (baseConfig: msal.Configuration, settings: S2SCon
 async function acquireToken (baseConfig: msal.Configuration, settings: ConnectionSettings): Promise<string> {
   const tokenRequest = {
     scopes: [CopilotStudioClient.scopeFromSettings(settings)],
-    redirectUri: 'http://localhost',
     openBrowser: async (url: string) => {
       await open(url)
     }
@@ -113,16 +112,15 @@ const askQuestion = async (copilotClient: CopilotStudioClient, conversationId: s
       rl.close()
       return
     } else if (answer.length > 0) {
-      const replies = await copilotClient.askQuestionAsync(answer, conversationId)
-      replies.forEach((act: Activity) => {
-        if (act.type === ActivityTypes.Message) {
-          console.log(`\n${act.text}`)
-          act.suggestedActions?.actions.forEach((action: CardAction) => console.log(action.value))
-        } else if (act.type === ActivityTypes.EndOfConversation) {
-          console.log(`\n${act.text}`)
+      for await (const replyActivity of await copilotClient.askQuestionAsync(answer, conversationId)) {
+        if (replyActivity.type === ActivityTypes.Message) {
+          console.log(`\n${replyActivity.text}`)
+          replyActivity.suggestedActions?.actions.forEach((action: CardAction) => console.log(action.value))
+        } else if (replyActivity.type === ActivityTypes.EndOfConversation) {
+          console.log(`\n${replyActivity.text}`)
           rl.close()
         }
-      })
+      }
     }
     await askQuestion(copilotClient, conversationId)
   })
@@ -130,9 +128,14 @@ const askQuestion = async (copilotClient: CopilotStudioClient, conversationId: s
 
 const main = async () => {
   const copilotClient = await createClient()
-  const act: Activity = await copilotClient.startConversationAsync(true)
-  act.suggestedActions?.actions.forEach((action: CardAction) => console.log(action.value))
-  await askQuestion(copilotClient, act.conversation?.id!)
+  let conversationId = ''
+
+  for await (const activity of copilotClient.startConversationAsync(true)) {
+    console.log(`\n${activity.text}`)
+    activity.suggestedActions?.actions.forEach((action: CardAction) => console.log(action.value))
+    conversationId = activity.conversation?.id ?? ''
+  }
+  await askQuestion(copilotClient, conversationId!)
 }
 
 main().catch(e => console.log(e))

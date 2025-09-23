@@ -218,12 +218,13 @@ export class CopilotStudioWebChat {
 
       logger.debug('--> Connection established.')
       notifyTyping()
-      const activity = await client.startConversationAsync()
-      // Remove replyToId to avoid timeout issues with WebChat on first activity.
-      delete activity.replyToId
-      conversation = activity.conversation
-      sequence = 0
-      notifyActivity(activity)
+
+      for await (const activity of client.startConversationAsync()) {
+        delete activity.replyToId
+        conversation = activity.conversation
+        sequence = 0
+        notifyActivity(activity)
+      }
     })
 
     const notifyActivity = (activity: Partial<Activity>) => {
@@ -276,9 +277,7 @@ export class CopilotStudioWebChat {
             notifyActivity(newActivity)
             notifyTyping()
 
-            const activities = await client.sendActivity(newActivity)
-
-            for (const responseActivity of activities) {
+            for await (const responseActivity of client.sendActivity(newActivity)) {
               notifyActivity(responseActivity)
             }
 

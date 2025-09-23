@@ -14,11 +14,6 @@ import os from 'os'
 
 const logger = debug('copilot-studio:client')
 
-interface streamRead {
-  done: boolean,
-  value: string
-}
-
 /**
  * Client for interacting with Microsoft Copilot Studio services.
  * Provides functionality to start conversations and send messages to Copilot Studio bots.
@@ -56,9 +51,7 @@ export class CopilotStudioClient {
     this.client.defaults.headers.common['User-Agent'] = CopilotStudioClient.getProductInfo()
   }
 
-  private async postRequestAsync (axiosConfig: AxiosRequestConfig): Promise<Activity[]> {
-    const activities: Activity[] = []
-
+  private async * postRequestAsync (axiosConfig: AxiosRequestConfig): AsyncGenerator<Activity> {
     logger.debug(`>>> SEND TO ${axiosConfig.url}`)
 
     const response = await this.client(axiosConfig)
@@ -84,46 +77,38 @@ export class CopilotStudioClient {
     const stream = response.data
     const reader = stream.pipeThrough(new TextDecoderStream()).getReader()
     let result: string = ''
-    const results: string[] = []
 
-    const processEvents = async ({ done, value }: streamRead): Promise<string[]> => {
+    while (true) {
+      const { done, value } = await reader.read()
       if (done) {
         logger.debug('Stream complete')
-        result += value
-        results.push(result)
-        return results
+        break
       }
-      logger.info('Agent is typing ...')
       result += value
-
-      return await processEvents(await reader.read())
-    }
-
-    const events: string[] = await reader.read().then(processEvents)
-
-    events.forEach(event => {
-      const values: string[] = event.toString().split('\n')
-      const validEvents = values.filter(e => e.substring(0, 4) === 'data' && e !== 'data: end\r')
-      validEvents.forEach(ve => {
-        try {
-          const act = Activity.fromJson(ve.substring(5, ve.length))
-          if (act.type === ActivityTypes.Message) {
-            activities.push(act)
-            if (!this.conversationId.trim()) {
-              // Did not get it from the header.
-              this.conversationId = act.conversation?.id ?? ''
-              logger.debug(`Conversation ID: ${this.conversationId}`)
+      const values: string[] = result.split('\n')
+      // Keep the last partial line for the next chunk
+      result = values.pop() ?? ''
+      for (const line of values) {
+        if (line.startsWith('data') && line !== 'data: end\r') { // valid events
+          try {
+            const act = Activity.fromJson(line.substring(5))
+            if (act.type === ActivityTypes.Message) {
+              if (!this.conversationId.trim()) { // Did not get it from the header.
+                this.conversationId = act.conversation?.id ?? ''
+              }
+              logger.debug('Received activity: ', act)
+              yield act
+            } else {
+              logger.debug(`Activity type: ${act.type}`)
+              yield act
             }
-          } else {
-            logger.debug(`Activity type: ${act.type}`)
+          } catch (e) {
+            logger.error('Error: ', e)
+            throw e
           }
-        } catch (e) {
-          logger.error('Error: ', e)
-          throw e
         }
-      })
-    })
-    return activities
+      }
+    }
   }
 
   /**
@@ -151,7 +136,7 @@ export class CopilotStudioClient {
    * @param emitStartConversationEvent Whether to emit a start conversation event. Defaults to true.
    * @returns A promise that resolves to the initial activity of the conversation.
    */
-  public async startConversationAsync (emitStartConversationEvent: boolean = true): Promise<Activity> {
+  public async * startConversationAsync (emitStartConversationEvent: boolean = true): AsyncGenerator<Activity> {
     const uriStart: string = getCopilotStudioConnectionUrl(this.settings)
     const body = { emitStartConversationEvent }
 
@@ -168,10 +153,8 @@ export class CopilotStudioClient {
     }
 
     logger.info('Starting conversation ...')
-    const values = await this.postRequestAsync(config)
-    const act = values[0]
-    logger.info(`Conversation '${act.conversation?.id}' started. Received ${values.length} activities.`, values)
-    return act
+
+    yield * this.postRequestAsync(config)
   }
 
   /**
@@ -180,7 +163,7 @@ export class CopilotStudioClient {
    * @param conversationId The ID of the conversation. Defaults to the current conversation ID.
    * @returns A promise that resolves to an array of activities containing the responses.
    */
-  public async askQuestionAsync (question: string, conversationId: string = this.conversationId) {
+  public async * askQuestionAsync (question: string, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
     const conversationAccount: ConversationAccount = {
       id: conversationId
     }
@@ -191,7 +174,7 @@ export class CopilotStudioClient {
     }
     const activity = Activity.fromObject(activityObj)
 
-    return this.sendActivity(activity)
+    yield * this.sendActivity(activity)
   }
 
   /**
@@ -200,7 +183,7 @@ export class CopilotStudioClient {
    * @param conversationId The ID of the conversation. Defaults to the current conversation ID.
    * @returns A promise that resolves to an array of activities containing the responses.
    */
-  public async sendActivity (activity: Activity, conversationId: string = this.conversationId) {
+  public async * sendActivity (activity: Activity, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
     const localConversationId = activity.conversation?.id ?? conversationId
     const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)
     const qbody: ExecuteTurnRequest = new ExecuteTurnRequest(activity)
@@ -217,8 +200,7 @@ export class CopilotStudioClient {
       adapter: 'fetch'
     }
     logger.info('Sending activity...', activity)
-    const values = await this.postRequestAsync(config)
-    logger.info(`Received ${values.length} activities.`, values)
-    return values
+
+    yield * this.postRequestAsync(config)
   }
 }
