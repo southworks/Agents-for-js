@@ -112,7 +112,7 @@ const askQuestion = async (copilotClient: CopilotStudioClient, conversationId: s
       rl.close()
       return
     } else if (answer.length > 0) {
-      for await (const replyActivity of await copilotClient.askQuestionAsync(answer, conversationId)) {
+      for await (const replyActivity of copilotClient.askQuestionAsync(answer, conversationId)) {
         if (replyActivity.type === ActivityTypes.Message) {
           console.log(`\n${replyActivity.text}`)
           replyActivity.suggestedActions?.actions.forEach((action: CardAction) => console.log(action.value))
