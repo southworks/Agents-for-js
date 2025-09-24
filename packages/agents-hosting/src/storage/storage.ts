@@ -103,14 +103,6 @@ export interface Storage {
    *
    * @param changes The items to write to storage, indexed by key
    * @param options Optional settings for the write operation
-   * @returns A promise that resolves when the write operation is complete
-   * @throws If the changes object is empty or undefined, or if an eTag conflict occurs and optimistic concurrency is enabled
-   */
-  /**
-   * Writes store items to storage.
-   *
-   * @param changes The items to write to storage, indexed by key
-   * @param options Optional settings for the write operation
    * @returns A promise that resolves to the written store items
    * @throws If the changes object is empty or undefined, or if an eTag conflict occurs and optimistic concurrency is enabled
    */

@@ -281,11 +281,11 @@ export class Authorization {
    *
    * @public
    */
-  public async beginOrContinueFlow (context: TurnContext, state: TurnState, authHandlerId: string, secRoute: boolean = true) : Promise<TokenResponse> {
+  public async beginOrContinueFlow (context: TurnContext, state: TurnState, authHandlerId: string, secRoute: boolean = true) : Promise<TokenResponse | undefined> {
     if (context.activity.type === ActivityTypes.Invoke && context.activity.name === 'signin/tokenExchange') {
       if (await this.isTokenExchangeDuplicated(context)) {
         logger.debug('Skipping duplicated signin/tokenExchange invoke activity.')
-        return undefined!
+        return undefined
       }
     }
 
@@ -459,9 +459,9 @@ export class Authorization {
    * @param context The turn context.
    * @returns True if the token exchange request is duplicated, false otherwise.
    */
-  private async isTokenExchangeDuplicated (context:TurnContext) {
+  private async isTokenExchangeDuplicated (context: TurnContext) {
+    const key = this.getTokenExchangeKey(context)
     try {
-      const key = this.getTokenExchangeKey(context)
       await this.storage.write({ [key]: {} }, { ifNotExists: true })
       return false
     } catch (error) {
@@ -474,7 +474,7 @@ export class Authorization {
    * @param context The turn context.
    * @returns A promise that resolves when the state is deleted.
    */
-  private async deleteTokenExchange (context:TurnContext) {
+  private async deleteTokenExchange (context: TurnContext) {
     try {
       await this.storage.delete([this.getTokenExchangeKey(context)])
     } catch (error) {
