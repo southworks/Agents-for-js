@@ -5,7 +5,6 @@ import { AgentApplication, TurnState } from './../../../src/app'
 import { MemoryStorage } from '../../../src/storage'
 import { TurnContext } from '../../../src'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
-import { channel } from 'diagnostics_channel'
 
 describe('AgentApplication', () => {
   it('should intitalize with underfined authorization', () => {
