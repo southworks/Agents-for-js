@@ -222,7 +222,6 @@ export class CopilotStudioWebChat {
       for await (const activity of client.startConversationAsync()) {
         delete activity.replyToId
         conversation = activity.conversation
-        sequence = 0
         notifyActivity(activity)
       }
     })
