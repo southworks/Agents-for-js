@@ -279,13 +279,14 @@ export class CopilotStudioWebChat {
 
             // Notify WebChat immediately that the message was sent
             subscriber.next(newActivity.id!)
-            subscriber.complete()
 
-            // Now stream the agent's response, but don't block the UI
+            // Stream the agent's response, but don't block the UI
             for await (const responseActivity of client.sendActivity(newActivity)) {
               notifyActivity(responseActivity)
               logger.info('<-- Activity received correctly from Copilot Studio.')
             }
+
+            subscriber.complete()
           } catch (error) {
             logger.error('Error sending Activity to Copilot Studio:', error)
             subscriber.error(error)

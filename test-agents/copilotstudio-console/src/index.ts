@@ -116,6 +116,7 @@ const askQuestion = async (copilotClient: CopilotStudioClient, conversationId: s
         if (replyActivity.type === ActivityTypes.EndOfConversation) {
           console.log(`\n${replyActivity.text}`)
           rl.close()
+          return
         } else {
           printActivity(replyActivity)
         }
@@ -135,7 +136,7 @@ function printActivity (act: Activity): void {
     case ActivityTypes.Message: {
       if (act.textFormat === 'markdown') {
         console.log(`\n${act.text}`)
-        act.suggestedActions?.actions.forEach((action: CardAction) => console.log(`\t${action.value}`))
+        act.suggestedActions?.actions?.forEach((action: CardAction) => console.log(`\t${action.value}`))
       } else {
         console.log(`\n${act.text}`)
       }

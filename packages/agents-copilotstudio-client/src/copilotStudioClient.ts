@@ -77,37 +77,39 @@ export class CopilotStudioClient {
       }
     })
 
-    for await (const { data, event } of eventSource) {
-      if (data && event === 'activity') {
-        try {
-          const activity = Activity.fromJson(data)
-          switch (activity.type) {
-            case ActivityTypes.Message:
-              if (!this.conversationId.trim()) { // Did not get it from the header.
-                this.conversationId = activity.conversation?.id ?? ''
-                logger.debug(`Conversation ID: ${this.conversationId}`)
-              }
-              yield activity
-              break
-            default:
-              logger.debug(`Activity type: ${activity.type}`)
-              yield activity
-              break
+    try {
+      for await (const { data, event } of eventSource) {
+        if (data && event === 'activity') {
+          try {
+            const activity = Activity.fromJson(data)
+            switch (activity.type) {
+              case ActivityTypes.Message:
+                if (!this.conversationId.trim()) { // Did not get it from the header.
+                  this.conversationId = activity.conversation?.id ?? ''
+                  logger.debug(`Conversation ID: ${this.conversationId}`)
+                }
+                yield activity
+                break
+              default:
+                logger.debug(`Activity type: ${activity.type}`)
+                yield activity
+                break
+            }
+          } catch (error) {
+            logger.error('Failed to parse activity:', error)
           }
-        } catch (error) {
-          logger.error('Failed to parse activity:', error)
+        } else if (event === 'end') {
+          logger.debug('Stream complete')
+          break
         }
-      } else if (event === 'end') {
-        logger.debug('Stream complete')
-        eventSource.close()
-        break
-      }
 
-      if (eventSource.readyState === 'closed') {
-        logger.debug('Connection closed')
-        eventSource.close()
-        break
+        if (eventSource.readyState === 'closed') {
+          logger.debug('Connection closed')
+          break
+        }
       }
+    } finally {
+      eventSource.close()
     }
   }
 

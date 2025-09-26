@@ -53,7 +53,7 @@ class McsAgent extends AgentApplication<TurnState> {
     if (cid === undefined || cid === null || cid.length === 0) {
       for await (const newAct of cpsClient.startConversationAsync()) {
         if (newAct.type === ActivityTypes.Message) {
-          await context.sendActivity(newAct.text!)
+          await context.sendActivity(newAct)
           state.setValue('conversation.conversationId', newAct.conversation!.id)
         }
       }
