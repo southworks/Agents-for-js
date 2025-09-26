@@ -58,7 +58,6 @@ export class CopilotStudioClient {
    */
   private async * postRequestAsync (url: string, body?: any, method: string = 'POST'): AsyncGenerator<Activity> {
     logger.debug(`>>> SEND TO ${url}`)
-    let responseHeaders: Headers | undefined
 
     const eventSource: EventSourceClient = createEventSource({
       url,
