@@ -47,7 +47,7 @@ export interface StoreItems {
    * If a requested key is not found during a read operation, it will not appear in this collection.
    *
    */
-  [key: string]: StoreItem;
+  [key: string]: any;
 }
 
 /**

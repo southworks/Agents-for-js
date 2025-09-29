@@ -451,7 +451,7 @@ export class Authorization {
     if (!channelId || !userId) {
       throw new Error('ChannelId and userId must be set in the activity')
     }
-    return `auth/${channelId}/${userId}/exchange`
+    return `oauth/${channelId}/${userId}/flowState/exchange`
   }
 
   /**
@@ -462,7 +462,7 @@ export class Authorization {
   private async isTokenExchangeDuplicated (context: TurnContext) {
     const key = this.getTokenExchangeKey(context)
     try {
-      await this.storage.write({ [key]: {} }, { ifNotExists: true })
+      await this.storage.write({ [key]: { exchanged: true, timestamp: Date.now() } }, { ifNotExists: true })
       return false
     } catch (error) {
       return true

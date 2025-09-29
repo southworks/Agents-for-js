@@ -50,7 +50,7 @@ import { Storage, StorageWriteOptions, StoreItem, StoreItems } from './storage'
  */
 export class FileStorage implements Storage {
   private _folder: string
-  private _stateFile: StoreItems
+  private _stateFile: Record<string, any>
 
   /**
    * Creates a new FileStorage instance that stores data in the specified folder.
