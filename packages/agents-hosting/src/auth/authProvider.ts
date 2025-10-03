@@ -16,4 +16,10 @@ export interface AuthProvider {
    * @returns A promise that resolves to the access token.
    */
   getAccessToken: (authConfig: AuthConfiguration, scope: string) => Promise<string>
+
+  GetAgenticApplicationToken: (authConfig: AuthConfiguration, agentAppInstanceId: string) => Promise<string>
+
+  GetAgenticInstanceToken: (authConfig: AuthConfiguration, agentAppInstanceId: string) => Promise<string>
+
+  GetAgenticUserToken: (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]) => Promise<string>
 }

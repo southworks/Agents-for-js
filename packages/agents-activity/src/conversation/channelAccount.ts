@@ -26,6 +26,13 @@ export interface ChannelAccount {
    */
   aadObjectId?: string
 
+  // benbro: need descriptions
+  agenticUserId?: string
+
+  agenticAppId?: string
+
+  agenticAppBlueprintId?: string
+
   /**
    * The role of the channel account.
    */
@@ -49,6 +56,9 @@ export const channelAccountZodSchema = z.object({
   id: z.string().min(1).optional(),
   name: z.string().optional(),
   aadObjectId: z.string().min(1).optional(),
+  agenticUserId: z.string().min(1).optional(),
+  agenticAppId: z.string().min(1).optional(),
+  agenticAppBlueprintId: z.string().min(1).optional(),
   role: z.union([roleTypeZodSchema, z.string().min(1)]).optional(),
   properties: z.unknown().optional()
 })

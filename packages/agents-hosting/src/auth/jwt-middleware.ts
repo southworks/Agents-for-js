@@ -20,6 +20,7 @@ const logger = debug('agents:jwt-middleware')
  */
 const verifyToken = async (raw: string, config: AuthConfiguration): Promise<JwtPayload> => {
   const getKey: GetPublicKeyOrSecret = (header: JwtHeader, callback: SignCallback) => {
+
     const payload = jwt.decode(raw) as JwtPayload
     logger.debug('jwt.decode ', JSON.stringify(payload))
     const jwksUri: string = payload.iss === 'https://api.botframework.com'
