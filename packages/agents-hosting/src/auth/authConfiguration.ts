@@ -3,6 +3,8 @@
  * Licensed under the MIT License.
  */
 
+import { ConnectionMapItem } from './msalConnectionManager'
+
 /**
  * Represents the authentication configuration.
  */
@@ -35,7 +37,7 @@ export interface AuthConfiguration {
   /**
    * A list of valid issuers for the authentication configuration.
    */
-  issuers: string[]
+  issuers?: string[]
 
   /**
    * The connection name for the authentication configuration.
@@ -56,8 +58,17 @@ export interface AuthConfiguration {
    * see also https://learn.microsoft.com/entra/identity-platform/authentication-national-cloud
    */
   authority?: string
-}
 
+  /**
+   * A map of connection names to their respective authentication configurations.
+   */
+  connections?: Map<string, AuthConfiguration>
+
+  /**
+   * A list of connection map items to map service URLs to connection names.
+   */
+  connectionsMap?: ConnectionMapItem[]
+}
 /**
  * Loads the authentication configuration from environment variables.
  *
@@ -89,6 +100,15 @@ export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (c
     if (process.env.clientId === undefined && process.env.NODE_ENV === 'production') {
       throw new Error('ClientId required in production')
     }
+    const envConnections = loadConnectionsMapFromEnv()
+
+    if (envConnections.connections.size > 0) {
+      envConnections.connections.set('default', {
+        clientId: process.env.clientId!,
+        authority,
+      })
+    }
+
     return {
       tenantId: process.env.tenantId,
       clientId: process.env.clientId!,
@@ -98,11 +118,9 @@ export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (c
       connectionName: process.env.connectionName,
       FICClientId: process.env.FICClientId,
       authority,
-      issuers: [
-        'https://api.botframework.com',
-        `https://sts.windows.net/${process.env.tenantId}/`,
-        `${authority}/${process.env.tenantId}/v2.0`
-      ],
+      issuers: getDefaultIssuers(process.env.tenantId ?? '', authority),
+      connections: envConnections.connections,
+      connectionsMap: envConnections.connectionsMap,
     }
   } else {
     const authority = process.env[`${cnxName}_authorityEndpoint`] ?? 'https://login.microsoftonline.com'
@@ -115,11 +133,7 @@ export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (c
       connectionName: process.env[`${cnxName}_connectionName`],
       FICClientId: process.env[`${cnxName}_FICClientId`],
       authority,
-      issuers: [
-        'https://api.botframework.com',
-        `https://sts.windows.net/${process.env[`${cnxName}_tenantId`]}/`,
-        `${authority}/${process.env[`${cnxName}_tenantId`]}/v2.0`
-      ]
+      issuers: getDefaultIssuers(process.env[`${cnxName}_tenantId`] ?? '', authority)
     }
   }
 }
@@ -152,11 +166,7 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
     connectionName: process.env.connectionName,
     FICClientId: process.env.MicrosoftAppClientId,
     authority,
-    issuers: [
-      'https://api.botframework.com',
-      `https://sts.windows.net/${process.env.MicrosoftAppTenantId}/`,
-      `${authority}/${process.env.MicrosoftAppTenantId}/v2.0`
-    ]
+    issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority)
   }
 }
 
@@ -186,9 +196,22 @@ function loadConnectionsMapFromEnv () {
     result.CONNECTIONSMAP = Object.values(result.CONNECTIONSMAP)
   }
 
-  return {
-    AGENTAPPLICATION: result.AGENTAPPLICATION || {},
-    CONNECTIONS: result.CONNECTIONS || {},
-    CONNECTIONSMAP: result.CONNECTIONSMAP || [],
+  const connections = new Map<string, AuthConfiguration>()
+  for (const [key, value] of Object.entries(result.CONNECTIONS)) {
+    connections.set(key, value as AuthConfiguration)
   }
+  const connectionsMap = result.CONNECTIONSMAP as ConnectionMapItem[]
+
+  return {
+    connections: connections || new Map<string, AuthConfiguration>(),
+    connectionsMap: connectionsMap || [],
+  }
+}
+
+function getDefaultIssuers (tenantId: string, authority: string) : string[] {
+  return [
+    'https://api.botframework.com',
+      `https://sts.windows.net/${tenantId}/`,
+      `${authority}/${tenantId}/v2.0`
+  ]
 }

@@ -11,6 +11,7 @@ import { InputFileDownloader } from './inputFileDownloader'
 import { AuthorizationHandlers } from './authorization'
 import { TurnState } from './turnState'
 import { HeaderPropagationDefinition } from '../headerPropagation'
+import { Connections } from '../auth/connections'
 
 /**
  * Configuration options for creating and initializing an Agent Application.
@@ -139,4 +140,9 @@ export interface AgentApplicationOptions<TState extends TurnState> {
    * @default undefined
    */
   headerPropagation?: HeaderPropagationDefinition
+
+  /**
+   * Optional. The Connections for this AgentApplication.
+   */
+  connections?: Connections
 }

@@ -4,6 +4,7 @@
  */
 
 import { AuthConfiguration } from './authConfiguration'
+import { Connections } from './connections'
 import { MsalTokenProvider } from './msalTokenProvider'
 
 interface MsalConnectionManagerOptions {
@@ -12,17 +13,17 @@ interface MsalConnectionManagerOptions {
   [key: string]: any; // Allow arbitrary properties
 }
 
-interface ConnectionMapItem {
+export interface ConnectionMapItem {
   audience: string
   serviceUrl: string
   connection: string
 }
 
-export class MsalConnectionManager {
+export class MsalConnectionManager implements Connections {
   private _connections: Map<string, MsalTokenProvider>
   private _connectionsMap: ConnectionMapItem[]
   private _serviceConnectionConfiguration: AuthConfiguration
-  private static readonly DEFAULT_CONNECTION = 'SERVICE_CONNECTION'
+  private static readonly DEFAULT_CONNECTION = 'SERVICECONNECTION'
 
   constructor (
     connectionsConfigurations: Map<string, AuthConfiguration> = new Map(),
@@ -35,7 +36,7 @@ export class MsalConnectionManager {
     if (connectionsConfigurations.size > 0) {
       for (const [name, config] of connectionsConfigurations) {
         // Instantiate MsalTokenProvider for each connection
-        this._connections.set(name, new MsalTokenProvider())
+        this._connections.set(name, new MsalTokenProvider(config))
       }
     } else {
       const rawConfigurations: Map<string, Map<string, string>> = options.CONNECTIONS || new Map()
@@ -45,7 +46,7 @@ export class MsalConnectionManager {
           authority: rawConfig.get('authority') || '',
           issuers: rawConfig.get('issuers') ? rawConfig.get('issuers')!.split(',').map(s => s.trim()) : [],
         }
-        this._connections.set(name, new MsalTokenProvider())
+        this._connections.set(name, new MsalTokenProvider(parsedConfig))
         if (name === 'SERVICE_CONNECTION') {
           this._serviceConnectionConfiguration = parsedConfig
         }
