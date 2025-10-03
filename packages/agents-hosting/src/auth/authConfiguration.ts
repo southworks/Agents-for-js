@@ -159,3 +159,36 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
     ]
   }
 }
+
+function loadConnectionsMapFromEnv () {
+  const envVars = process.env
+  const result: Record<string, any> = {}
+
+  for (const [key, value] of Object.entries(envVars)) {
+    if (!key.includes('__')) continue // Only parse keys with double underscores
+    const levels = key.split('__')
+    let currentLevel = result
+    let lastLevel: Record<string, any> | null = null
+
+    for (const nextLevel of levels) {
+      if (!(nextLevel in currentLevel)) {
+        currentLevel[nextLevel] = {}
+      }
+      lastLevel = currentLevel
+      currentLevel = currentLevel[nextLevel]
+    }
+    if (lastLevel) {
+      lastLevel[levels[levels.length - 1]] = value
+    }
+  }
+
+  if (result.CONNECTIONSMAP && typeof result.CONNECTIONSMAP === 'object' && !Array.isArray(result.CONNECTIONSMAP)) {
+    result.CONNECTIONSMAP = Object.values(result.CONNECTIONSMAP)
+  }
+
+  return {
+    AGENTAPPLICATION: result.AGENTAPPLICATION || {},
+    CONNECTIONS: result.CONNECTIONS || {},
+    CONNECTIONSMAP: result.CONNECTIONSMAP || [],
+  }
+}
