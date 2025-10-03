@@ -3,7 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
+import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions, AuthenticationResult} from '@azure/msal-node'
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { AuthConfiguration } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug } from '@microsoft/agents-activity/logger'
@@ -70,14 +71,8 @@ export class MsalTokenProvider implements AuthProvider {
 
   public async GetAgenticInstanceToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
     const appToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId);
-
-            // dotnet version
-            // var instanceApp = ConfidentialClientApplicationBuilder
-            //     .Create(agentAppInstanceId)
-            //     .WithClientAssertion((AssertionRequestOptions options) => Task.FromResult(agentTokenResult))
-            //     .WithAuthority(new Uri(_connectionSettings.Authority ?? $"https://login.microsoftonline.com/{_connectionSettings.TenantId}"))
-            //     .Build();
-
+    
+    logger.debug('Getting agentic instance token');
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: agentAppInstanceId,
@@ -99,72 +94,68 @@ export class MsalTokenProvider implements AuthProvider {
     return token.accessToken
   }
 
+    // To overcome a gap in the MSAL library where acquireTokenByClientCredential does not properly apply the tokenBodyParameters, 
+    // we will do a direct HTTP call here ourselves.
+  private async acquireTokenByClientCredential(authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
+
+    const url =  `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}/oauth2/v2.0/token`;
+
+    let data: { [key: string]: any } = {
+        client_id: clientId,
+        scope: scopes.join(" "),
+        ...tokenBodyParameters
+      };
+
+      if (clientAssertion) {
+        data.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+        data.client_assertion = clientAssertion;
+      } else {  
+        data.client_secret = authConfig.clientSecret;
+      }
+
+    const token = await axios.post(
+      url,
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+        }
+      }
+    )
+
+    return token.data.access_token;
+  }
+
   public async GetAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
 
-
-    logger.debug('Getting agentic user token', authConfig, agentAppInstanceId, upn, scopes);
     const agentToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId);
     const instanceToken = await this.GetAgenticInstanceToken(authConfig, agentAppInstanceId);
 
-    logger.debug(`Acquired agent token for instance ${agentAppInstanceId}`, agentToken);
-    logger.debug('Acquired instance token',  instanceToken);
-
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId: agentAppInstanceId,
-        clientAssertion: agentToken,
-        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
-      },
-      system: this.sysOptions
+    const token = await this.acquireTokenByClientCredential(authConfig, agentAppInstanceId, agentToken, scopes, {
+      username: upn,
+      user_federated_identity_credential: instanceToken,
+      grant_type : "user_fic",  
     });
 
-    const token = await cca.acquireTokenByClientCredential({
-      scopes: scopes,
-      correlationId: v4(),
-      clientAssertion: agentToken,
-      tokenBodyParameters: {
-        username: upn,
-        user_federated_identity_credential: instanceToken,
-        grant_type : "user_fic",  
-      }
-    });
 
-    if (!token?.accessToken) {
+    if (!token) {
       throw new Error(`Failed to acquire instance token for user token: ${agentAppInstanceId}`)
     }
 
-    return token.accessToken  }
+    return token  
+}
 
   public async GetAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId: authConfig.clientId as string,
-        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
-        clientSecret: authConfig.clientSecret
-      },
-      system: this.sysOptions
+    const token = await this.acquireTokenByClientCredential(authConfig, authConfig.clientId, undefined, ["api://AzureAdTokenExchange/.default"], {
+      grant_type: "client_credentials",
+      fmi_path: agentAppInstanceId,
     });
-
-    const tokenRequest = {
-      scopes: ["api://AzureAdTokenExchange/.default"],
-      correlationId: v4(),
-      tokenBodyParameters: {
-        "fmi_path": agentAppInstanceId
-      }
-    }
-
-    // BENBRO: this currently only works if we monkey patch the msal-node library to allow
-    // extra token body parameters
-    // we probably need to do a direct HTTP for this?
-
-    // see changes in node_modules/@azure/msal-node/lib/msal-node.cjs
-    const token = await cca.acquireTokenByClientCredential(tokenRequest);
-
-    if (!token?.accessToken) {
+    
+    if (!token) {
       throw new Error(`Failed to acquire token for agent instance: ${agentAppInstanceId}`)
     }
 
-    return token.accessToken
+    return token;
   }
 
 
