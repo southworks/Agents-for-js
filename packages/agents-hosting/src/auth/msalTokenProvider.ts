@@ -19,28 +19,58 @@ const logger = debug('agents:msal')
  * Provides tokens using MSAL.
  */
 export class MsalTokenProvider implements AuthProvider {
+  private _connectionSettings?: AuthConfiguration
+
+  constructor (connectionSettings?: AuthConfiguration) {
+    this._connectionSettings = connectionSettings
+  }
+
+  /**
+   * Gets an access token using the auth configuration from the MsalTokenProvider instance.
+   * @param scope The scope for the token.
+   * @returns A promise that resolves to the access token.
+   */
+  public async getAccessToken (scope: string): Promise<string>
   /**
    * Gets an access token.
    * @param authConfig The authentication configuration.
    * @param scope The scope for the token.
    * @returns A promise that resolves to the access token.
    */
-  public async getAccessToken (authConfig: AuthConfiguration, scope: string): Promise<string> {
+  public async getAccessToken (authConfig: AuthConfiguration, scope: string): Promise<string>
+
+  public async getAccessToken (authConfigOrScope: AuthConfiguration | string, scope?: string): Promise<string> {
+    let authConfig: AuthConfiguration
+    let actualScope: string
+
+    if (typeof authConfigOrScope === 'string') {
+    // Called as getAccessToken(scope)
+      if (!this._connectionSettings) {
+        throw new Error('Connection settings must be provided to constructor when calling getAccessToken(scope)')
+      }
+      authConfig = this._connectionSettings
+      actualScope = authConfigOrScope
+    } else {
+    // Called as getAccessToken(authConfig, scope)
+      authConfig = authConfigOrScope
+      actualScope = scope as string
+    }
+
     if (!authConfig.clientId && process.env.NODE_ENV !== 'production') {
       return ''
     }
     let token
     if (authConfig.FICClientId !== undefined) {
-      token = await this.acquireAccessTokenViaFIC(authConfig, scope)
+      token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
     } else if (authConfig.clientSecret !== undefined) {
-      token = await this.acquireAccessTokenViaSecret(authConfig, scope)
+      token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
     } else if (authConfig.certPemFile !== undefined &&
       authConfig.certKeyFile !== undefined) {
-      token = await this.acquireTokenWithCertificate(authConfig, scope)
+      token = await this.acquireTokenWithCertificate(authConfig, actualScope)
     } else if (authConfig.clientSecret === undefined &&
       authConfig.certPemFile === undefined &&
       authConfig.certKeyFile === undefined) {
-      token = await this.acquireTokenWithUserAssignedIdentity(authConfig, scope)
+      token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
     } else {
       throw new Error('Invalid authConfig. ')
     }
@@ -51,7 +81,33 @@ export class MsalTokenProvider implements AuthProvider {
     return token
   }
 
-  public async acquireTokenOnBehalfOf (authConfig: AuthConfiguration, scopes: string[], oboAssertion: string): Promise<string> {
+  public async acquireTokenOnBehalfOf (scopes: string[], oboAssertion: string): Promise<string>
+  public async acquireTokenOnBehalfOf (authConfig: AuthConfiguration, scopes: string[], oboAssertion: string): Promise<string>
+
+  public async acquireTokenOnBehalfOf (
+    authConfigOrScopes: AuthConfiguration | string[],
+    scopesOrOboAssertion?: string[] | string,
+    oboAssertion?: string
+  ): Promise<string> {
+    let authConfig: AuthConfiguration
+    let actualScopes: string[]
+    let actualOboAssertion: string
+
+    if (Array.isArray(authConfigOrScopes)) {
+    // Called as acquireTokenOnBehalfOf(scopes, oboAssertion)
+      if (!this._connectionSettings) {
+        throw new Error('Connection settings must be provided to constructor when calling acquireTokenOnBehalfOf(scopes, oboAssertion)')
+      }
+      authConfig = this._connectionSettings
+      actualScopes = authConfigOrScopes
+      actualOboAssertion = scopesOrOboAssertion as string
+    } else {
+    // Called as acquireTokenOnBehalfOf(authConfig, scopes, oboAssertion)
+      authConfig = authConfigOrScopes
+      actualScopes = scopesOrOboAssertion as string[]
+      actualOboAssertion = oboAssertion!
+    }
+
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId as string,
@@ -61,8 +117,8 @@ export class MsalTokenProvider implements AuthProvider {
       system: this.sysOptions
     })
     const token = await cca.acquireTokenOnBehalfOf({
-      oboAssertion,
-      scopes
+      oboAssertion: actualOboAssertion,
+      scopes: actualScopes
     })
     return token?.accessToken as string
   }
