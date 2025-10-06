@@ -5,6 +5,7 @@
 
 import { debug } from '@microsoft/agents-activity/logger'
 import { ConnectionMapItem } from './msalConnectionManager'
+import objectPath from 'object-path'
 
 const logger = debug('agents:authConfiguration')
 
@@ -216,7 +217,7 @@ function loadConnectionsMapFromEnv () {
       const parts = key.split('__')
       if (parts.length >= 4 && parts[2] === 'settings') {
         const connectionName = parts[1]
-        const propertyPath = parts.slice(3) // e.g., ['issuers', '0'] or ['clientId']
+        const propertyPath = parts.slice(3).join('.') // e.g., 'issuers.0' or 'clientId'
 
         let config = connections.get(connectionName)
         if (!config) {
@@ -224,28 +225,7 @@ function loadConnectionsMapFromEnv () {
           connections.set(connectionName, config)
         }
 
-        let currentLevel: any = config
-        for (let i = 0; i < propertyPath.length - 1; i++) {
-          const level = propertyPath[i]
-
-          // Detect array index
-          const nextLevel = propertyPath[i + 1]
-          const isArrayIndex = /^\d+$/.test(nextLevel)
-
-          if (!(level in currentLevel)) {
-            currentLevel[level] = isArrayIndex ? [] : {}
-          }
-
-          currentLevel = currentLevel[level]
-        }
-
-        const finalKey = propertyPath[propertyPath.length - 1]
-
-        if (Array.isArray(currentLevel)) {
-          currentLevel[parseInt(finalKey, 10)] = value
-        } else {
-          currentLevel[finalKey] = value
-        }
+        objectPath.set(config, propertyPath, value)
       }
     } else if (key.startsWith('connectionsMap__')) {
       const parts = key.split('__')
@@ -283,8 +263,8 @@ function loadConnectionsMapFromEnv () {
   }
 
   return {
-    connections: connections || new Map<string, AuthConfiguration>(),
-    connectionsMap: connectionsMap || [],
+    connections,
+    connectionsMap,
   }
 }
 
