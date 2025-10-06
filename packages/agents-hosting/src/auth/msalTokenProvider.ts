@@ -4,11 +4,12 @@
  */
 
 import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions, AuthenticationResult} from '@azure/msal-node'
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
 import { AuthConfiguration } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug } from '@microsoft/agents-activity/logger'
 import { v4 } from 'uuid'
+import { MemoryCache } from './MemoryCache';
 
 import fs from 'fs'
 import crypto from 'crypto'
@@ -20,6 +21,13 @@ const logger = debug('agents:msal')
  * Provides tokens using MSAL.
  */
 export class MsalTokenProvider implements AuthProvider {
+  
+  private _agenticTokenCache: MemoryCache<string>;
+
+  constructor() {
+    this._agenticTokenCache = new MemoryCache<string>();
+  }
+
   /**
    * Gets an access token.
    * @param authConfig The authentication configuration.
@@ -98,6 +106,13 @@ export class MsalTokenProvider implements AuthProvider {
     // we will do a direct HTTP call here ourselves.
   private async acquireTokenByClientCredential(authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
 
+
+    // Check cache first
+    const cacheKey = `${ clientId }/${ Object.keys(tokenBodyParameters).map(key =>key!=='user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&') }/${ scopes.join(";") }`;
+    if (this._agenticTokenCache.get(cacheKey)) {
+      return this._agenticTokenCache.get(cacheKey) as string;
+    } 
+
     const url =  `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}/oauth2/v2.0/token`;
 
     let data: { [key: string]: any } = {
@@ -122,6 +137,9 @@ export class MsalTokenProvider implements AuthProvider {
         }
       }
     )
+
+    // capture token, expire local cache 5 minutes early
+    this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300);
 
     return token.data.access_token;
   }

@@ -258,18 +258,12 @@ export class CloudAdapter extends BaseAdapter {
         if (activity.recipient?.role === 'agenticUser' && activity.recipient?.agenticAppId && activity.recipient?.id) {
           const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.recipient?.agenticAppId, activity.recipient?.id, ['5a807f24-c9de-44ee-a3a7-329e88a00ffc/.default']);
 
-
-          console.log('SUCCESSFULLY GOT AGENTIC USER TOKEN:', token);
-
           this.connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
             token,
             scope,
             headers
           );
-
-          console.log('------- PROCEEDING WITH PROCESSSING -------')
-
         }
 
 
@@ -280,10 +274,6 @@ export class CloudAdapter extends BaseAdapter {
 
       this.setConnectorClient(context)
     }
-
-
-    console.log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
-
 
     if (
       activity?.type === ActivityTypes.InvokeResponse ||
