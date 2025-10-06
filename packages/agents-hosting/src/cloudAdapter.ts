@@ -245,29 +245,32 @@ export class CloudAdapter extends BaseAdapter {
       logger.debug('Creating connector client with scope: ', scope)
 
       if (activity.recipient?.role === 'agenticUser' || activity.recipient?.role === 'agenticAppInstance') {
-        logger.debug('Activity is from an agentic source, using special scope', activity.recipient);
+        logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
-        const authConfig = loadAuthConfigFromEnv('test');
+        const authConfig = loadAuthConfigFromEnv('test')
 
-        const tokenProvider = this.authProvider;
+        const tokenProvider = this.authProvider
 
         if (activity.recipient?.role === 'agenticAppInstance' && activity.recipient?.agenticAppId) {
           // get agentic instance token
-          const token = await tokenProvider.GetAgenticInstanceToken(authConfig, activity.recipient?.agenticAppId);
+          const token = await tokenProvider.GetAgenticInstanceToken(authConfig, activity.recipient?.agenticAppId)
+          this.connectorClient = await ConnectorClient.createClientWithToken(
+            activity.serviceUrl!,
+            token,
+            scope,
+            headers
+          )
         }
         if (activity.recipient?.role === 'agenticUser' && activity.recipient?.agenticAppId && activity.recipient?.id) {
-          const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.recipient?.agenticAppId, activity.recipient?.id, ['5a807f24-c9de-44ee-a3a7-329e88a00ffc/.default']);
+          const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.recipient?.agenticAppId, activity.recipient?.id, ['5a807f24-c9de-44ee-a3a7-329e88a00ffc/.default'])
 
           this.connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
             token,
             scope,
             headers
-          );
+          )
         }
-
-
-
       } else {
         this.connectorClient = await this.createConnectorClient(activity.serviceUrl!, scope, headers)
       }

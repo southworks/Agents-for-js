@@ -111,7 +111,7 @@ export class ConnectorClient {
     return new ConnectorClient(axiosInstance)
   }
 
-/**
+  /**
    * Creates a new instance of ConnectorClient with token.
    * @param baseURL - The base URL for the API.
    * @param token - The authentication token.
@@ -142,7 +142,6 @@ export class ConnectorClient {
 
     return new ConnectorClient(axiosInstance)
   }
-
 
   /**
    * Retrieves a list of conversations.

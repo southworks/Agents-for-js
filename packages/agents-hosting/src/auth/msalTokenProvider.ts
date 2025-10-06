@@ -3,13 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions, AuthenticationResult} from '@azure/msal-node'
+import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
 import axios from 'axios'
 import { AuthConfiguration } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug } from '@microsoft/agents-activity/logger'
 import { v4 } from 'uuid'
-import { MemoryCache } from './MemoryCache';
+import { MemoryCache } from './MemoryCache'
 
 import fs from 'fs'
 import crypto from 'crypto'
@@ -21,11 +21,10 @@ const logger = debug('agents:msal')
  * Provides tokens using MSAL.
  */
 export class MsalTokenProvider implements AuthProvider {
-  
-  private _agenticTokenCache: MemoryCache<string>;
+  private _agenticTokenCache: MemoryCache<string>
 
-  constructor() {
-    this._agenticTokenCache = new MemoryCache<string>();
+  constructor () {
+    this._agenticTokenCache = new MemoryCache<string>()
   }
 
   /**
@@ -76,11 +75,10 @@ export class MsalTokenProvider implements AuthProvider {
     return token?.accessToken as string
   }
 
-
   public async GetAgenticInstanceToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    const appToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId);
-    
-    logger.debug('Getting agentic instance token');
+    const appToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId)
+
+    logger.debug('Getting agentic instance token')
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: agentAppInstanceId,
@@ -88,12 +86,12 @@ export class MsalTokenProvider implements AuthProvider {
         authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
       },
       system: this.sysOptions
-    });
+    })
 
     const token = await cca.acquireTokenByClientCredential({
-      scopes: ["api://AzureAdTokenExchange/.default"],
+      scopes: ['api://AzureAdTokenExchange/.default'],
       correlationId: v4()
-    });
+    })
 
     if (!token?.accessToken) {
       throw new Error(`Failed to acquire instance token for agent instance: ${agentAppInstanceId}`)
@@ -102,31 +100,29 @@ export class MsalTokenProvider implements AuthProvider {
     return token.accessToken
   }
 
-    // To overcome a gap in the MSAL library where acquireTokenByClientCredential does not properly apply the tokenBodyParameters, 
-    // we will do a direct HTTP call here ourselves.
-  private async acquireTokenByClientCredential(authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
-
-
+  // To overcome a gap in the MSAL library where acquireTokenByClientCredential does not properly apply the tokenBodyParameters,
+  // we will do a direct HTTP call here ourselves.
+  private async acquireTokenByClientCredential (authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
     // Check cache first
-    const cacheKey = `${ clientId }/${ Object.keys(tokenBodyParameters).map(key =>key!=='user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&') }/${ scopes.join(";") }`;
+    const cacheKey = `${clientId}/${Object.keys(tokenBodyParameters).map(key => key !== 'user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&')}/${scopes.join(';')}`
     if (this._agenticTokenCache.get(cacheKey)) {
-      return this._agenticTokenCache.get(cacheKey) as string;
-    } 
+      return this._agenticTokenCache.get(cacheKey) as string
+    }
 
-    const url =  `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}/oauth2/v2.0/token`;
+    const url = `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}/oauth2/v2.0/token`
 
-    let data: { [key: string]: any } = {
-        client_id: clientId,
-        scope: scopes.join(" "),
-        ...tokenBodyParameters
-      };
+    const data: { [key: string]: any } = {
+      client_id: clientId,
+      scope: scopes.join(' '),
+      ...tokenBodyParameters
+    }
 
-      if (clientAssertion) {
-        data.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-        data.client_assertion = clientAssertion;
-      } else {  
-        data.client_secret = authConfig.clientSecret;
-      }
+    if (clientAssertion) {
+      data.client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+      data.client_assertion = clientAssertion
+    } else {
+      data.client_secret = authConfig.clientSecret
+    }
 
     const token = await axios.post(
       url,
@@ -139,43 +135,40 @@ export class MsalTokenProvider implements AuthProvider {
     )
 
     // capture token, expire local cache 5 minutes early
-    this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300);
+    this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
 
-    return token.data.access_token;
+    return token.data.access_token
   }
 
   public async GetAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
-
-    const agentToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId);
-    const instanceToken = await this.GetAgenticInstanceToken(authConfig, agentAppInstanceId);
+    const agentToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId)
+    const instanceToken = await this.GetAgenticInstanceToken(authConfig, agentAppInstanceId)
 
     const token = await this.acquireTokenByClientCredential(authConfig, agentAppInstanceId, agentToken, scopes, {
       username: upn,
       user_federated_identity_credential: instanceToken,
-      grant_type : "user_fic",  
-    });
-
+      grant_type: 'user_fic',
+    })
 
     if (!token) {
       throw new Error(`Failed to acquire instance token for user token: ${agentAppInstanceId}`)
     }
 
-    return token  
-}
+    return token
+  }
 
   public async GetAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    const token = await this.acquireTokenByClientCredential(authConfig, authConfig.clientId, undefined, ["api://AzureAdTokenExchange/.default"], {
-      grant_type: "client_credentials",
+    const token = await this.acquireTokenByClientCredential(authConfig, authConfig.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
+      grant_type: 'client_credentials',
       fmi_path: agentAppInstanceId,
-    });
-    
+    })
+
     if (!token) {
       throw new Error(`Failed to acquire token for agent instance: ${agentAppInstanceId}`)
     }
 
-    return token;
+    return token
   }
-
 
   private readonly sysOptions: NodeSystemOptions = {
     loggerOptions: {
