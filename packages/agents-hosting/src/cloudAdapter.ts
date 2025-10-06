@@ -244,25 +244,24 @@ export class CloudAdapter extends BaseAdapter {
     if (this.resolveIfConnectorClientIsNeeded(activity)) {
       logger.debug('Creating connector client with scope: ', scope)
 
-      if (activity.recipient?.role === RoleTypes.AgenticUser || activity.recipient?.role === RoleTypes.AgenticIdentity) {
+      if (activity.isAgenticRequest()) {
         logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
         const authConfig = loadAuthConfigFromEnv('test')
 
         const tokenProvider = this.authProvider
 
-        if (activity.recipient?.role === 'agenticAppInstance' && activity.recipient?.agenticAppId) {
+        if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
           // get agentic instance token
-          const token = await tokenProvider.GetAgenticInstanceToken(authConfig, activity.recipient?.agenticAppId)
+          const token = await tokenProvider.GetAgenticInstanceToken(authConfig, activity.getAgenticInstanceId() ?? '')
           this.connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
             token,
             scope,
             headers
           )
-        }
-        if (activity.recipient?.role === 'agenticUser' && activity.recipient?.agenticAppId && activity.recipient?.id) {
-          const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.recipient?.agenticAppId, activity.recipient?.id, ['5a807f24-c9de-44ee-a3a7-329e88a00ffc/.default'])
+        } else if (activity.recipient?.role === RoleTypes.AgenticUser && activity.getAgenticInstanceId() && activity.getAgenticUser()) {
+          const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', ['5a807f24-c9de-44ee-a3a7-329e88a00ffc/.default'])
 
           this.connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
@@ -270,6 +269,8 @@ export class CloudAdapter extends BaseAdapter {
             scope,
             headers
           )
+        } else {
+          throw new Error('Could not create connector client for agentic user')
         }
       } else {
         this.connectorClient = await this.createConnectorClient(activity.serviceUrl!, scope, headers)
