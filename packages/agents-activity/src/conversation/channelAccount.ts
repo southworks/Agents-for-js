@@ -26,11 +26,19 @@ export interface ChannelAccount {
    */
   aadObjectId?: string
 
-  // benbro: need descriptions
+  /**
+   * The UPN of an agentic user 
+   */
   agenticUserId?: string
 
+  /**
+   * The client ID of an agentic app
+   */
   agenticAppId?: string
 
+  /**
+   * The parent blueprint ID of an agentic instance
+   */
   agenticAppBlueprintId?: string
 
   /**
