@@ -8,6 +8,7 @@ import { ConnectionMapItem } from './msalConnectionManager'
 import objectPath from 'object-path'
 
 const logger = debug('agents:authConfiguration')
+const DEFAULT_CONNECTION = 'serviceConnection'
 
 /**
  * Represents the authentication configuration.
@@ -103,53 +104,42 @@ export interface AuthConfiguration {
  * ```
  *
  */
-export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (cnxName?: string) => {
-  if (cnxName === undefined) {
-    const envConnections = loadConnectionsMapFromEnv()
-    let authConfig: AuthConfiguration = {}
+export const loadAuthConfigFromEnv = (cnxName?: string): AuthConfiguration => {
+  const envConnections = loadConnectionsMapFromEnv()
+  let authConfig: AuthConfiguration
 
-    if (envConnections.connectionsMap.length === 0) {
-      // No connections provided, we need to populate the connection map with the old config settings
-      authConfig = buildLegacyAuthConfig()
-      envConnections.connections.set('serviceConnection', authConfig)
-      envConnections.connectionsMap.push({
-        serviceUrl: '*',
-        connection: 'serviceConnection',
-      })
-    } else {
-      // There are connections provided, use the default
-      const firstEntry = envConnections.connections.get('serviceConnection')
-      if (firstEntry) {
-        authConfig = firstEntry
-      }
-      authConfig.authority ??= 'https://login.microsoftonline.com'
-      authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
-    }
-
-    return { ...authConfig, ...envConnections }
+  if (envConnections.connectionsMap.length === 0) {
+    // No connections provided, we need to populate the connections map with the old config settings
+    authConfig = buildLegacyAuthConfig(cnxName)
+    envConnections.connections.set(DEFAULT_CONNECTION, authConfig)
+    envConnections.connectionsMap.push({
+      serviceUrl: '*',
+      connection: DEFAULT_CONNECTION,
+    })
   } else {
-    const envConnections = loadConnectionsMapFromEnv()
-    let authConfig: AuthConfiguration = {}
-
-    if (envConnections.connectionsMap.length === 0) {
-      // No connections provided, we need to populate the connection map with the old config settings
-      authConfig = buildLegacyAuthConfig(cnxName)
-      envConnections.connections.set('serviceConnection', authConfig)
-      envConnections.connectionsMap.push({
-        serviceUrl: '*',
-        connection: 'serviceConnection',
-      })
-    } else {
-      // There are connections provided, use the first one as default
-      const firstEntry = envConnections.connections.entries().next().value
-      if (firstEntry) {
-        const [, firstValue] = firstEntry
-        authConfig = firstValue
+    // There are connections provided, use the default or specified connection
+    if (cnxName) {
+      const entry = envConnections.connections.get(cnxName)
+      if (entry) {
+        authConfig = entry
+      } else {
+        throw new Error(`Connection "${cnxName}" not found in environment.`)
       }
-      authConfig.authority ??= 'https://login.microsoftonline.com'
-      authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
+    } else {
+      const entry = envConnections.connections.get(DEFAULT_CONNECTION)
+      if (!entry) {
+        throw new Error('No default connection found in environment connections.')
+      }
+      authConfig = entry
     }
-    return { ...authConfig, ...envConnections }
+
+    authConfig.authority ??= 'https://login.microsoftonline.com'
+    authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
+  }
+
+  return {
+    ...authConfig,
+    ...envConnections,
   }
 }
 
@@ -179,7 +169,7 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
     const authority = process.env.authorityEndpoint ?? 'https://login.microsoftonline.com'
     authConfig = {
       tenantId: process.env.MicrosoftAppTenantId,
-      clientId: process.env.MicrosoftAppId!,
+      clientId: process.env.MicrosoftAppId,
       clientSecret: process.env.MicrosoftAppPassword,
       certPemFile: process.env.certPemFile,
       certKeyFile: process.env.certKeyFile,
@@ -189,10 +179,10 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
       issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority),
       altBlueprintConnectionName: process.env.altBlueprintConnectionName,
     }
-    envConnections.connections.set('serviceConnection', authConfig)
+    envConnections.connections.set(DEFAULT_CONNECTION, authConfig)
     envConnections.connectionsMap.push({
       serviceUrl: '*',
-      connection: 'serviceConnection',
+      connection: DEFAULT_CONNECTION,
     })
   } else {
     // There are connections provided, use the first one as default

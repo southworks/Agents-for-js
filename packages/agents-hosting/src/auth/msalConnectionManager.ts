@@ -120,7 +120,8 @@ export class MsalConnectionManager implements Connections {
     if (connection &&
       (activity.recipient?.role === RoleTypes.AgenticIdentity ||
         activity.recipient?.role === RoleTypes.AgenticUser)) {
-      if (connection.connectionSettings?.altBlueprintConnectionName?.trim() !== '') {
+      if (connection.connectionSettings?.altBlueprintConnectionName &&
+          connection.connectionSettings.altBlueprintConnectionName.trim() !== '') {
         connection = this.getConnection(connection.connectionSettings?.altBlueprintConnectionName as string)
       }
     }
