@@ -70,7 +70,12 @@ export interface AuthConfiguration {
   /**
    * A list of connection map items to map service URLs to connection names.
    */
-  connectionsMap?: ConnectionMapItem[]
+  connectionsMap?: ConnectionMapItem[],
+
+  /**
+   * An optional alternative blueprint Connection name used when constructing a connector client.
+   */
+  altBlueprintConnectionName?: string
 }
 /**
  * Loads the authentication configuration from environment variables.
@@ -111,14 +116,13 @@ export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (c
         connection: 'serviceConnection',
       })
     } else {
-      // There are connections provided, ensure there is a clientId at least
-      const firstEntry = envConnections.connections.entries().next().value
+      // There are connections provided, use the default
+      const firstEntry = envConnections.connections.get('serviceConnection')
       if (firstEntry) {
-        const [, firstValue] = firstEntry
-        authConfig = {
-          clientId: firstValue.clientId
-        }
+        authConfig = firstEntry
       }
+      authConfig.authority ??= 'https://login.microsoftonline.com'
+      authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
     }
 
     return { ...authConfig, ...envConnections }
@@ -135,14 +139,14 @@ export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (c
         connection: 'serviceConnection',
       })
     } else {
-      // There are connections provided, find the requested one
+      // There are connections provided, use the first one as default
       const firstEntry = envConnections.connections.entries().next().value
       if (firstEntry) {
         const [, firstValue] = firstEntry
-        authConfig = {
-          clientId: firstValue.clientId
-        }
+        authConfig = firstValue
       }
+      authConfig.authority ??= 'https://login.microsoftonline.com'
+      authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
     }
     return { ...authConfig, ...envConnections }
   }
@@ -163,21 +167,43 @@ export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration = (c
  *
  */
 export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
-  if (process.env.MicrosoftAppId === undefined && process.env.NODE_ENV === 'production') {
-    throw new Error('ClientId required in production')
+  const envConnections = loadConnectionsMapFromEnv()
+  let authConfig: AuthConfiguration = {}
+
+  if (envConnections.connectionsMap.length === 0) {
+    // No connections provided, we need to populate the connection map with the old config settings
+    if (process.env.MicrosoftAppId === undefined && process.env.NODE_ENV === 'production') {
+      throw new Error('ClientId required in production')
+    }
+    const authority = process.env.authorityEndpoint ?? 'https://login.microsoftonline.com'
+    authConfig = {
+      tenantId: process.env.MicrosoftAppTenantId,
+      clientId: process.env.MicrosoftAppId!,
+      clientSecret: process.env.MicrosoftAppPassword,
+      certPemFile: process.env.certPemFile,
+      certKeyFile: process.env.certKeyFile,
+      connectionName: process.env.connectionName,
+      FICClientId: process.env.MicrosoftAppClientId,
+      authority,
+      issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority),
+      altBlueprintConnectionName: process.env.altBlueprintConnectionName,
+    }
+    envConnections.connections.set('serviceConnection', authConfig)
+    envConnections.connectionsMap.push({
+      serviceUrl: '*',
+      connection: 'serviceConnection',
+    })
+  } else {
+    // There are connections provided, use the first one as default
+    const firstEntry = envConnections.connections.entries().next().value
+    if (firstEntry) {
+      const [, firstValue] = firstEntry
+      authConfig = firstValue
+    }
+    authConfig.authority ??= 'https://login.microsoftonline.com'
+    authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
   }
-  const authority = process.env.authorityEndpoint ?? 'https://login.microsoftonline.com'
-  return {
-    tenantId: process.env.MicrosoftAppTenantId,
-    clientId: process.env.MicrosoftAppId!,
-    clientSecret: process.env.MicrosoftAppPassword,
-    certPemFile: process.env.certPemFile,
-    certKeyFile: process.env.certKeyFile,
-    connectionName: process.env.connectionName,
-    FICClientId: process.env.MicrosoftAppClientId,
-    authority,
-    issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority)
-  }
+  return { ...authConfig, ...envConnections }
 }
 
 function loadConnectionsMapFromEnv () {
@@ -283,7 +309,8 @@ function buildLegacyAuthConfig (envPrefix: string = ''): AuthConfiguration {
     connectionName: process.env[`${prefix}connectionName`],
     FICClientId: process.env[`${prefix}FICClientId`],
     authority,
-    issuers: getDefaultIssuers(process.env[`${prefix}tenantId`] ?? '', authority)
+    issuers: getDefaultIssuers(process.env[`${prefix}tenantId`] ?? '', authority),
+    altBlueprintConnectionName: process.env[`${prefix}altBlueprintConnectionName`],
   }
 }
 
