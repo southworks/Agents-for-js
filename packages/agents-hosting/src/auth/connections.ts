@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { Activity } from '@microsoft/agents-activity'
 import { AuthConfiguration } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 
@@ -28,6 +29,14 @@ export interface Connections {
    * @returns An AuthProvider instance.
    */
   getTokenProvider: (audience: string, serviceUrl: string) => AuthProvider
+
+  /**
+   * Get the OAuth token provider for the agent.
+   * @param audience - The audience.
+   * @param activity - The activity.
+   * @returns An AuthProvider instance.
+   */
+  getTokenProviderFromActivity: (audience: string, activity: Activity) => AuthProvider
 
   /**
    * Get the default connection configuration for the agent.

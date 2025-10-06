@@ -3,7 +3,9 @@
  * Licensed under the MIT License.
  */
 
+import { Activity, RoleTypes } from '@microsoft/agents-activity'
 import { AuthConfiguration } from './authConfiguration'
+import { AuthProvider } from './authProvider'
 import { Connections } from './connections'
 import { MsalTokenProvider } from './msalTokenProvider'
 
@@ -68,9 +70,9 @@ export class MsalConnectionManager implements Connections {
   /**
    * Finds a connection based on a map.
    *
-   * @param audience.
-   * @param serviceUrl
-   * @returns
+   * @param audience The audience.
+   * @param serviceUrl The service URL.
+   * @returns The TokenProvider for the connection.
    *
    * @remarks
    * Example environment variables:
@@ -103,6 +105,26 @@ export class MsalConnectionManager implements Connections {
       }
     }
     throw new Error(`No connection found for audience: ${audience} and serviceUrl: ${serviceUrl}`)
+  }
+
+  /**
+   * Finds a connection based on an activity's blueprint.
+   * @param audience The audience.
+   * @param activity The activity.
+   * @returns The TokenProvider for the connection.
+   */
+  getTokenProviderFromActivity (audience: string, activity: Activity): AuthProvider {
+    let connection = this.getTokenProvider(audience, activity.serviceUrl || '')
+
+    // This is for the case where the Agentic BlueprintId is not the same as the AppId
+    if (connection &&
+      (activity.recipient?.role === RoleTypes.AgenticIdentity ||
+        activity.recipient?.role === RoleTypes.AgenticUser)) {
+      if (connection.connectionSettings?.altBlueprintConnectionName?.trim() !== '') {
+        connection = this.getConnection(connection.connectionSettings?.altBlueprintConnectionName as string)
+      }
+    }
+    return connection
   }
 
   /**

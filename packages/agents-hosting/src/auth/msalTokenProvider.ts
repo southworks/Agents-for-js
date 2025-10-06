@@ -19,10 +19,10 @@ const logger = debug('agents:msal')
  * Provides tokens using MSAL.
  */
 export class MsalTokenProvider implements AuthProvider {
-  private _connectionSettings?: AuthConfiguration
+  public readonly connectionSettings?: AuthConfiguration
 
   constructor (connectionSettings?: AuthConfiguration) {
-    this._connectionSettings = connectionSettings
+    this.connectionSettings = connectionSettings
   }
 
   /**
@@ -45,10 +45,10 @@ export class MsalTokenProvider implements AuthProvider {
 
     if (typeof authConfigOrScope === 'string') {
     // Called as getAccessToken(scope)
-      if (!this._connectionSettings) {
+      if (!this.connectionSettings) {
         throw new Error('Connection settings must be provided to constructor when calling getAccessToken(scope)')
       }
-      authConfig = this._connectionSettings
+      authConfig = this.connectionSettings
       actualScope = authConfigOrScope
     } else {
     // Called as getAccessToken(authConfig, scope)
@@ -95,10 +95,10 @@ export class MsalTokenProvider implements AuthProvider {
 
     if (Array.isArray(authConfigOrScopes)) {
     // Called as acquireTokenOnBehalfOf(scopes, oboAssertion)
-      if (!this._connectionSettings) {
+      if (!this.connectionSettings) {
         throw new Error('Connection settings must be provided to constructor when calling acquireTokenOnBehalfOf(scopes, oboAssertion)')
       }
-      authConfig = this._connectionSettings
+      authConfig = this.connectionSettings
       actualScopes = authConfigOrScopes
       actualOboAssertion = scopesOrOboAssertion as string
     } else {
