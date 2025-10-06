@@ -11,7 +11,7 @@ import { Request } from './auth/request'
 import { ConnectorClient } from './connector-client/connectorClient'
 import { AuthConfiguration, loadAuthConfigFromEnv } from './auth/authConfiguration'
 import { AuthProvider } from './auth/authProvider'
-import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationReference, DeliveryModes, ConversationParameters } from '@microsoft/agents-activity'
+import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationReference, DeliveryModes, ConversationParameters, RoleTypes } from '@microsoft/agents-activity'
 import { ResourceResponse } from './connector-client/resourceResponse'
 import { MsalTokenProvider } from './auth/msalTokenProvider'
 import * as uuid from 'uuid'
@@ -244,7 +244,7 @@ export class CloudAdapter extends BaseAdapter {
     if (this.resolveIfConnectorClientIsNeeded(activity)) {
       logger.debug('Creating connector client with scope: ', scope)
 
-      if (activity.recipient?.role === 'agenticUser' || activity.recipient?.role === 'agenticAppInstance') {
+      if (activity.recipient?.role === RoleTypes.AgenticUser || activity.recipient?.role === RoleTypes.AgenticIdentity) {
         logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
         const authConfig = loadAuthConfigFromEnv('test')
