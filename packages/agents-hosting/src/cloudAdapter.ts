@@ -12,6 +12,7 @@ import { ConnectorClient } from './connector-client/connectorClient'
 import { AuthConfiguration, loadAuthConfigFromEnv } from './auth/authConfiguration'
 import { AuthProvider } from './auth/authProvider'
 import { ApxProductionScope } from './auth/authConstants'
+import { MsalConnectionManager } from './auth/msalConnectionManager'
 import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationReference, DeliveryModes, ConversationParameters, RoleTypes } from '@microsoft/agents-activity'
 import { ResourceResponse } from './connector-client/resourceResponse'
 import { MsalTokenProvider } from './auth/msalTokenProvider'
@@ -42,6 +43,7 @@ export class CloudAdapter extends BaseAdapter {
    */
   public connectorClient!: ConnectorClient
   authConfig: AuthConfiguration
+  connectionManager: MsalConnectionManager
   /**
    * Creates an instance of CloudAdapter.
    * @param authConfig - The authentication configuration for securing communications
@@ -52,6 +54,8 @@ export class CloudAdapter extends BaseAdapter {
     this.authConfig = authConfig ?? loadAuthConfigFromEnv()
     this.authProvider = authProvider ?? new MsalTokenProvider()
     this.userTokenClient = userTokenClient ?? new UserTokenClient(this.authConfig.clientId!)
+    this.connectionManager = new MsalConnectionManager();
+
   }
 
   /**
@@ -248,9 +252,9 @@ export class CloudAdapter extends BaseAdapter {
       if (activity.isAgenticRequest()) {
         logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
-        const authConfig = loadAuthConfigFromEnv('test')
+        const authConfig = loadAuthConfigFromEnv('serviceConnection')
 
-        const tokenProvider = this.authProvider
+        const tokenProvider = this.connectionManager.getTokenProvider(authConfig.clientId, activity.serviceUrl ?? '');
 
         if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
           // get agentic instance token

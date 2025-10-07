@@ -224,6 +224,9 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   public async getAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
+    if (authConfig.clientId === undefined) {
+      throw new Error('clientId is required in authConfig');
+    }
     const token = await this.acquireTokenByForAgenticScenarios(authConfig, authConfig.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
       grant_type: 'client_credentials',
       fmi_path: agentAppInstanceId,
