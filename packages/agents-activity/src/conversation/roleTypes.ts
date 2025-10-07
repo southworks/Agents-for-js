@@ -25,12 +25,12 @@ export enum RoleTypes {
   Skill = 'skill',
 
   /**
-   * Represents an Agentic App
+   * Agentic AI - AAI role
    */
   AgenticIdentity = 'agenticAppInstance',
 
   /**
-   * Represents an agentic user instance
+   * Agentic AI - AAI role.
    */
   AgenticUser = 'agenticUser'
 }
