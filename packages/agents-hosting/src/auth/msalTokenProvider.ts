@@ -100,9 +100,18 @@ export class MsalTokenProvider implements AuthProvider {
     return token.accessToken
   }
 
-  // To overcome a gap in the MSAL library where acquireTokenByClientCredential does not properly apply the tokenBodyParameters,
-  // we will do a direct HTTP call here ourselves.
-  private async acquireTokenByClientCredential (authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
+  /**
+   * Does a direct HTTP call to acquire a token for agentic scenarios - do not use this directly!
+   * This method will be removed once MSAL is updated with the necessary features.
+   * (This is required in order to pass additional parameters into the auth call)
+   * @param authConfig 
+   * @param clientId 
+   * @param clientAssertion 
+   * @param scopes 
+   * @param tokenBodyParameters 
+   * @returns 
+   */
+  private async acquireTokenByForAgenticScenarios (authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
     // Check cache first
     const cacheKey = `${clientId}/${Object.keys(tokenBodyParameters).map(key => key !== 'user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&')}/${scopes.join(';')}`
     if (this._agenticTokenCache.get(cacheKey)) {
@@ -124,27 +133,34 @@ export class MsalTokenProvider implements AuthProvider {
       data.client_secret = authConfig.clientSecret
     }
 
-    const token = await axios.post(
-      url,
-      data,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+    try {
+      const token = await axios.post(
+        url,
+        data,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+          }
         }
-      }
-    )
+      )
 
-    // capture token, expire local cache 5 minutes early
-    this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
+      // capture token, expire local cache 5 minutes early
+      this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
 
-    return token.data.access_token
+      return token.data.access_token
+
+    } catch (error) {
+      logger.error(`Error acquiring token: ${error}`)
+      return null
+    }
+
   }
 
   public async getAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
     const agentToken = await this.getAgenticApplicationToken(authConfig, agentAppInstanceId)
     const instanceToken = await this.getAgenticInstanceToken(authConfig, agentAppInstanceId)
 
-    const token = await this.acquireTokenByClientCredential(authConfig, agentAppInstanceId, agentToken, scopes, {
+    const token = await this.acquireTokenByForAgenticScenarios(authConfig, agentAppInstanceId, agentToken, scopes, {
       username: upn,
       user_federated_identity_credential: instanceToken,
       grant_type: 'user_fic',
@@ -158,7 +174,7 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   public async getAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    const token = await this.acquireTokenByClientCredential(authConfig, authConfig.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
+    const token = await this.acquireTokenByForAgenticScenarios(authConfig, authConfig.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
       grant_type: 'client_credentials',
       fmi_path: agentAppInstanceId,
     })
