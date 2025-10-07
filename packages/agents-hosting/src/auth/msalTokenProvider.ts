@@ -104,12 +104,12 @@ export class MsalTokenProvider implements AuthProvider {
    * Does a direct HTTP call to acquire a token for agentic scenarios - do not use this directly!
    * This method will be removed once MSAL is updated with the necessary features.
    * (This is required in order to pass additional parameters into the auth call)
-   * @param authConfig 
-   * @param clientId 
-   * @param clientAssertion 
-   * @param scopes 
-   * @param tokenBodyParameters 
-   * @returns 
+   * @param authConfig
+   * @param clientId
+   * @param clientAssertion
+   * @param scopes
+   * @param tokenBodyParameters
+   * @returns
    */
   private async acquireTokenByForAgenticScenarios (authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
     // Check cache first
@@ -148,12 +148,10 @@ export class MsalTokenProvider implements AuthProvider {
       this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
 
       return token.data.access_token
-
     } catch (error) {
       logger.error(`Error acquiring token: ${error}`)
       return null
     }
-
   }
 
   public async getAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
