@@ -126,11 +126,12 @@ export const loadAuthConfigFromEnv = (cnxName?: string): AuthConfiguration => {
         throw new Error(`Connection "${cnxName}" not found in environment.`)
       }
     } else {
-      const entry = envConnections.connections.get(DEFAULT_CONNECTION)
-      if (!entry) {
+      const defaultItem = envConnections.connectionsMap.find((item) => item.serviceUrl === '*')
+      const defaultConn = defaultItem ? envConnections.connections.get(defaultItem.connection) : undefined
+      if (!defaultConn) {
         throw new Error('No default connection found in environment connections.')
       }
-      authConfig = entry
+      authConfig = defaultConn
     }
 
     authConfig.authority ??= 'https://login.microsoftonline.com'
@@ -185,15 +186,18 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
       connection: DEFAULT_CONNECTION,
     })
   } else {
-    // There are connections provided, use the first one as default
-    const firstEntry = envConnections.connections.entries().next().value
-    if (firstEntry) {
-      const [, firstValue] = firstEntry
-      authConfig = firstValue
+    // There are connections provided, use the default one.
+    const defaultItem = envConnections.connectionsMap.find((item) => item.serviceUrl === '*')
+    const defaultConn = defaultItem ? envConnections.connections.get(defaultItem.connection) : undefined
+    if (!defaultConn) {
+      throw new Error('No default connection found in environment connections.')
     }
-    authConfig.authority ??= 'https://login.microsoftonline.com'
-    authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
+    authConfig = defaultConn
   }
+
+  authConfig.authority ??= 'https://login.microsoftonline.com'
+  authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
+
   return { ...authConfig, ...envConnections }
 }
 

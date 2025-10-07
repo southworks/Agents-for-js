@@ -38,12 +38,6 @@ export class MsalConnectionManager implements Connections {
         this._serviceConnectionConfiguration = config
       }
     }
-
-    if (!this._connections.has(MsalConnectionManager.DEFAULT_CONNECTION)) {
-      throw new Error(
-                `Missing default connection: ${MsalConnectionManager.DEFAULT_CONNECTION}`
-      )
-    }
   }
 
   /**
@@ -64,7 +58,18 @@ export class MsalConnectionManager implements Connections {
    * @returns The default OAuth connection for the agent.
    */
   getDefaultConnection (): MsalTokenProvider {
-    return this.getConnection(MsalConnectionManager.DEFAULT_CONNECTION)
+    if (this._connections.size === 0) {
+      throw new Error('No connections found for this Agent in the Connections Configuration.')
+    }
+
+    // Return the wildcard map item instance.
+    for (const item of this._connectionsMap) {
+      if (item.serviceUrl === '*' && !item.audience) {
+        return this.getConnection(item.connection)
+      }
+    }
+
+    return this._connections.values().next().value as MsalTokenProvider
   }
 
   /**
@@ -93,7 +98,13 @@ export class MsalConnectionManager implements Connections {
     }
 
     for (const item of this._connectionsMap) {
-      if (item.audience === audience) {
+      let audienceMatch = true
+
+      if (audience) {
+        audienceMatch = item.audience === audience
+      }
+
+      if (audienceMatch) {
         if (item.serviceUrl === '*' || !item.serviceUrl) {
           return this.getConnection(item.connection)
         }
