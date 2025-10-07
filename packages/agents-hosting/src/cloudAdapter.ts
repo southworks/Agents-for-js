@@ -11,6 +11,7 @@ import { Request } from './auth/request'
 import { ConnectorClient } from './connector-client/connectorClient'
 import { AuthConfiguration, loadAuthConfigFromEnv } from './auth/authConfiguration'
 import { AuthProvider } from './auth/authProvider'
+import { ApxProductionScope } from './auth/authConstants'
 import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationReference, DeliveryModes, ConversationParameters, RoleTypes } from '@microsoft/agents-activity'
 import { ResourceResponse } from './connector-client/resourceResponse'
 import { MsalTokenProvider } from './auth/msalTokenProvider'
@@ -261,7 +262,7 @@ export class CloudAdapter extends BaseAdapter {
             headers
           )
         } else if (activity.recipient?.role === RoleTypes.AgenticUser && activity.getAgenticInstanceId() && activity.getAgenticUser()) {
-          const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', ['5a807f24-c9de-44ee-a3a7-329e88a00ffc/.default'])
+          const token = await tokenProvider.GetAgenticUserToken(authConfig, activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', [ApxProductionScope])
 
           this.connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,

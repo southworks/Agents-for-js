@@ -32,7 +32,7 @@ export interface ChannelAccount {
   tenantId?: string
 
   /**
-   * The UPN of an agentic user 
+   * The UPN of an agentic user
    */
   agenticUserId?: string
 
