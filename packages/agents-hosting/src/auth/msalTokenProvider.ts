@@ -75,8 +75,8 @@ export class MsalTokenProvider implements AuthProvider {
     return token?.accessToken as string
   }
 
-  public async GetAgenticInstanceToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    const appToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId)
+  public async getAgenticInstanceToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
+    const appToken = await this.getAgenticApplicationToken(authConfig, agentAppInstanceId)
 
     logger.debug('Getting agentic instance token')
     const cca = new ConfidentialClientApplication({
@@ -140,9 +140,9 @@ export class MsalTokenProvider implements AuthProvider {
     return token.data.access_token
   }
 
-  public async GetAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
-    const agentToken = await this.GetAgenticApplicationToken(authConfig, agentAppInstanceId)
-    const instanceToken = await this.GetAgenticInstanceToken(authConfig, agentAppInstanceId)
+  public async getAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
+    const agentToken = await this.getAgenticApplicationToken(authConfig, agentAppInstanceId)
+    const instanceToken = await this.getAgenticInstanceToken(authConfig, agentAppInstanceId)
 
     const token = await this.acquireTokenByClientCredential(authConfig, agentAppInstanceId, agentToken, scopes, {
       username: upn,
@@ -157,7 +157,7 @@ export class MsalTokenProvider implements AuthProvider {
     return token
   }
 
-  public async GetAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
+  public async getAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
     const token = await this.acquireTokenByClientCredential(authConfig, authConfig.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
       grant_type: 'client_credentials',
       fmi_path: agentAppInstanceId,
