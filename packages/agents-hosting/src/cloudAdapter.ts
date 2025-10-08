@@ -140,7 +140,7 @@ export class CloudAdapter extends BaseAdapter {
   async createTurnContextWithScope (activity: Activity, logic: AgentHandler, scope: string): Promise<TurnContext> {
 
     // BENBRO staging this change butn ot 100% sure ... 
-    const tokenProvider = this.connectionManager.getTokenProviderFromActivity(undefined, activity);
+    const tokenProvider = this.connectionManager.getTokenProviderFromActivity('undefined benbro temp value', activity);
 
     const connectorClient = await ConnectorClient.createClientWithAuth(activity.serviceUrl!, this.authConfig!, this.authProvider, scope)
     const context = new TurnContext(this, activity);
@@ -274,12 +274,11 @@ export class CloudAdapter extends BaseAdapter {
       if (activity.isAgenticRequest()) {
         logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
-        const authConfig = loadAuthConfigFromEnv('serviceConnection')
         const tokenProvider = this.connectionManager.getTokenProvider(request.user?.aud, activity.serviceUrl ?? '');
 
         if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
           // get agentic instance token
-          const token = await tokenProvider.getAgenticInstanceToken(authConfig, activity.getAgenticInstanceId() ?? '')
+          const token = await tokenProvider.getAgenticInstanceToken(activity.getAgenticInstanceId() ?? '')
           connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
             token,
@@ -287,7 +286,7 @@ export class CloudAdapter extends BaseAdapter {
             headers
           )
         } else if (activity.recipient?.role === RoleTypes.AgenticUser && activity.getAgenticInstanceId() && activity.getAgenticUser()) {
-          const token = await tokenProvider.getAgenticUserToken(authConfig, activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', [ApxProductionScope])
+          const token = await tokenProvider.getAgenticUserToken(activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', [ApxProductionScope])
 
           connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,

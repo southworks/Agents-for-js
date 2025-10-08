@@ -127,15 +127,17 @@ export class MsalTokenProvider implements AuthProvider {
     return token?.accessToken as string
   }
 
-  public async getAgenticInstanceToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    const appToken = await this.getAgenticApplicationToken(authConfig, agentAppInstanceId)
-
+  public async getAgenticInstanceToken (agentAppInstanceId: string): Promise<string> {
     logger.debug('Getting agentic instance token')
+    if (!this.connectionSettings) {
+      throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
+    }
+    const appToken = await this.getAgenticApplicationToken(agentAppInstanceId)
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: agentAppInstanceId,
         clientAssertion: appToken,
-        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
+        authority: `${this.connectionSettings.authority}/${this.connectionSettings.tenantId || 'botframework.com'}`,
       },
       system: this.sysOptions
     })
@@ -156,21 +158,24 @@ export class MsalTokenProvider implements AuthProvider {
    * Does a direct HTTP call to acquire a token for agentic scenarios - do not use this directly!
    * This method will be removed once MSAL is updated with the necessary features.
    * (This is required in order to pass additional parameters into the auth call)
-   * @param authConfig
    * @param clientId
    * @param clientAssertion
    * @param scopes
    * @param tokenBodyParameters
    * @returns
    */
-  private async acquireTokenByForAgenticScenarios (authConfig: AuthConfiguration, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
+  private async acquireTokenByForAgenticScenarios (clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
+    if (!this.connectionSettings) {
+      throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
+    }
+
     // Check cache first
     const cacheKey = `${clientId}/${Object.keys(tokenBodyParameters).map(key => key !== 'user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&')}/${scopes.join(';')}`
     if (this._agenticTokenCache.get(cacheKey)) {
       return this._agenticTokenCache.get(cacheKey) as string
     }
 
-    const url = `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}/oauth2/v2.0/token`
+    const url = `${this.connectionSettings.authority}/${this.connectionSettings.tenantId || 'botframework.com'}/oauth2/v2.0/token`
 
     const data: { [key: string]: any } = {
       client_id: clientId,
@@ -182,35 +187,33 @@ export class MsalTokenProvider implements AuthProvider {
       data.client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
       data.client_assertion = clientAssertion
     } else {
-      data.client_secret = authConfig.clientSecret
+      data.client_secret = this.connectionSettings.clientSecret
     }
 
-    try {
-      const token = await axios.post(
-        url,
-        data,
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
-          }
+    const token = await axios.post(
+      url,
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
         }
-      )
+      }
+    ).catch((error) => {
+      logger.error('Error acquiring token: ', error.toJSON());
+      throw error;
+    });
 
-      // capture token, expire local cache 5 minutes early
-      this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
-
-      return token.data.access_token
-    } catch (error) {
-      logger.error(`Error acquiring token: ${error}`)
-      return null
-    }
+    // capture token, expire local cache 5 minutes early
+    this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
+    return token.data.access_token
   }
 
-  public async getAgenticUserToken (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
-    const agentToken = await this.getAgenticApplicationToken(authConfig, agentAppInstanceId)
-    const instanceToken = await this.getAgenticInstanceToken(authConfig, agentAppInstanceId)
+  public async getAgenticUserToken (agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
+    logger.debug('Getting agentic user token');
+    const agentToken = await this.getAgenticApplicationToken(agentAppInstanceId)
+    const instanceToken = await this.getAgenticInstanceToken(agentAppInstanceId)
 
-    const token = await this.acquireTokenByForAgenticScenarios(authConfig, agentAppInstanceId, agentToken, scopes, {
+    const token = await this.acquireTokenByForAgenticScenarios(agentAppInstanceId, agentToken, scopes, {
       username: upn,
       user_federated_identity_credential: instanceToken,
       grant_type: 'user_fic',
@@ -223,11 +226,12 @@ export class MsalTokenProvider implements AuthProvider {
     return token
   }
 
-  public async getAgenticApplicationToken (authConfig: AuthConfiguration, agentAppInstanceId: string): Promise<string> {
-    if (authConfig.clientId === undefined) {
-      throw new Error('clientId is required in authConfig');
+  public async getAgenticApplicationToken (agentAppInstanceId: string): Promise<string> {
+    if (!this.connectionSettings?.clientId) {
+      throw new Error('Connection settings must be provided when calling getAgenticApplicationToken')
     }
-    const token = await this.acquireTokenByForAgenticScenarios(authConfig, authConfig.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
+    logger.debug('Getting agentic application token');
+    const token = await this.acquireTokenByForAgenticScenarios(this.connectionSettings.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
       grant_type: 'client_credentials',
       fmi_path: agentAppInstanceId,
     })

@@ -19,27 +19,24 @@ export interface AuthProvider {
 
   /**
    * Get an access token for the agentic application
-   * @param authConfig
    * @param agentAppInstanceId
    * @returns a promise that resolves to the access token.
    */
-  getAgenticApplicationToken: (authConfig: AuthConfiguration, agentAppInstanceId: string) => Promise<string>
+  getAgenticApplicationToken: (agentAppInstanceId: string) => Promise<string>
 
   /**
    * Get an access token for the agentic instance
-   * @param authConfig
    * @param agentAppInstanceId
    * @returns a promise that resolves to the access token.
    */
-  getAgenticInstanceToken: (authConfig: AuthConfiguration, agentAppInstanceId: string) => Promise<string>
+  getAgenticInstanceToken: (agentAppInstanceId: string) => Promise<string>
 
   /**
    * Get an access token for the agentic user
-   * @param authConfig
    * @param agentAppInstanceId
    * @param upn
    * @param scopes
    * @returns a promise that resolves to the access token.
    */
-  getAgenticUserToken: (authConfig: AuthConfiguration, agentAppInstanceId: string, upn: string, scopes: string[]) => Promise<string>
+  getAgenticUserToken: (agentAppInstanceId: string, upn: string, scopes: string[]) => Promise<string>
 }
