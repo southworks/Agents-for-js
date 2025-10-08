@@ -192,9 +192,9 @@ export class CloudAdapter extends BaseAdapter {
 
 
         if (activity.replyToId) {
-          response = await context.turnState.get('connectorClient').replyToActivity(activity.conversation.id, activity.replyToId, activity)
+          response = await context.turnState.get(this.ConnectorClientKey).replyToActivity(activity.conversation.id, activity.replyToId, activity)
         } else {
-          response = await context.turnState.get('connectorClient').sendToConversation(activity.conversation.id, activity)
+          response = await context.turnState.get(this.ConnectorClientKey).sendToConversation(activity.conversation.id, activity)
         }
       }
 
@@ -348,7 +348,7 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('Invalid activity object')
     }
 
-    const response = await context.turnState.get('connectorClient').updateActivity(
+    const response = await context.turnState.get(this.ConnectorClientKey).updateActivity(
       activity.conversation.id,
       activity.id,
       activity
@@ -372,7 +372,7 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('Invalid conversation reference object')
     }
 
-    await context.turnState.get('connectorClient').deleteActivity(reference.conversation.id, reference.activityId)
+    await context.turnState.get(this.ConnectorClientKey).deleteActivity(reference.conversation.id, reference.activityId)
   }
 
   /**
