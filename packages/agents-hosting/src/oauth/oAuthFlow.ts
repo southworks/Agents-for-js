@@ -91,7 +91,6 @@ export class OAuthFlow {
   constructor (private storage: Storage, absOauthConnectionName: string, tokenClient?: UserTokenClient, cardTitle?: string, cardText?: string) {
     this.state = { flowStarted: undefined, flowExpires: undefined, absOauthConnectionName }
     this.absOauthConnectionName = absOauthConnectionName
-    // this.userTokenClient = tokenClient
     this.cardTitle = cardTitle ?? this.cardTitle
     this.cardText = cardText ?? this.cardText
   }
@@ -120,7 +119,6 @@ export class OAuthFlow {
     logger.info('Get token from user token service')
     await this.refreshToken(context)
     const userTokenClient = context.turnState.get('userTokenClient')
-    // const tokenResponse = await this.userTokenClient.getUserToken(this.absOauthConnectionName, activity.channelId, activity.from.id)
     const tokenResponse = await userTokenClient.getUserToken(this.absOauthConnectionName, activity.channelId, activity.from.id)
 
     // Cache the token if it's valid (has a token value)
@@ -162,7 +160,6 @@ export class OAuthFlow {
     }
 
     const userTokenClient = context.turnState.get('userTokenClient')
-    // const output = await this.userTokenClient.getTokenOrSignInResource(act.from?.id!, this.absOauthConnectionName, act.channelId!, act.getConversationReference(), act.relatesTo!, undefined!)
     const output = await userTokenClient.getTokenOrSignInResource(act.from?.id!, this.absOauthConnectionName, act.channelId!, act.getConversationReference(), act.relatesTo!, undefined!)
     if (output && output.tokenResponse) {
       // Cache the token if it's valid
@@ -206,7 +203,6 @@ export class OAuthFlow {
       const magicCode = contFlowActivity.text as string
       if (magicCode.match(/^\d{6}$/)) {
         const userTokenClient = context.turnState.get('userTokenClient')
-        // const result = await this.userTokenClient?.getUserToken(this.absOauthConnectionName, contFlowActivity.channelId!, contFlowActivity.from?.id!, magicCode)!
         const result = await userTokenClient?.getUserToken(this.absOauthConnectionName, contFlowActivity.channelId!, contFlowActivity.from?.id!, magicCode)!
         if (result && result.token) {
           // Cache the token if it's valid
@@ -242,7 +238,6 @@ export class OAuthFlow {
       const tokenVerifyState = contFlowActivity.value as TokenVerifyState
       const magicCode = tokenVerifyState.state
       const userTokenClient = context.turnState.get('userTokenClient')
-      // const result = await this.userTokenClient?.getUserToken(this.absOauthConnectionName, contFlowActivity.channelId!, contFlowActivity.from?.id!, magicCode)!
       const result = await userTokenClient?.getUserToken(this.absOauthConnectionName, contFlowActivity.channelId!, contFlowActivity.from?.id!, magicCode)!
       // Cache the token if it's valid
       if (result && result.token && contFlowActivity.channelId && contFlowActivity.from && contFlowActivity.from.id) {
@@ -266,7 +261,6 @@ export class OAuthFlow {
       }
       this.tokenExchangeId = tokenExchangeRequest.id!
       const userTokenClient = context.turnState.get('userTokenClient')
-      // const userTokenResp = await this.userTokenClient?.exchangeTokenAsync(contFlowActivity.from?.id!, this.absOauthConnectionName, contFlowActivity.channelId!, tokenExchangeRequest)
       const userTokenResp = await userTokenClient?.exchangeTokenAsync(contFlowActivity.from?.id!, this.absOauthConnectionName, contFlowActivity.channelId!, tokenExchangeRequest)
       if (userTokenResp && userTokenResp.token) {
         // Cache the token if it's valid
@@ -310,7 +304,6 @@ export class OAuthFlow {
     }
 
     const userTokenClient = context.turnState.get('userTokenClient')
-    // await this.userTokenClient?.signOut(context.activity.from?.id as string, this.absOauthConnectionName, context.activity.channelId as string)
     await userTokenClient?.signOut(context.activity.from?.id as string, this.absOauthConnectionName, context.activity.channelId as string)
     this.state = { flowStarted: false, flowExpires: 0, absOauthConnectionName: this.absOauthConnectionName }
     await this.storage.delete([this.getFlowStateKey(context)])
@@ -356,7 +349,6 @@ export class OAuthFlow {
         expiresAt: decodedToken?.exp ? decodedToken.exp * 1000 - 1000 : Date.now() + 10 * 60 * 1000
       })
       const userTokenClient = context.turnState.get('userTokenClient')
-      // this.userTokenClient.updateAuthToken(accessToken)
       userTokenClient.updateAuthToken(accessToken)
     }
   }
