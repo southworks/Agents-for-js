@@ -41,6 +41,7 @@ export class CloudAdapter extends BaseAdapter {
   /**
    * Client for connecting to the Bot Framework Connector service
    */
+  // BENBRO: we want to remove this top level connectorClient
   public connectorClient!: ConnectorClient
   authConfig: AuthConfiguration
   connectionManager: MsalConnectionManager
@@ -52,9 +53,9 @@ export class CloudAdapter extends BaseAdapter {
   constructor (authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient) {
     super()
     this.authConfig = authConfig ?? loadAuthConfigFromEnv()
-    this.authProvider = authProvider ?? new MsalTokenProvider()
+    // this.authProvider = authProvider ?? new MsalTokenProvider()
     this.userTokenClient = userTokenClient ?? new UserTokenClient(this.authConfig.clientId!)
-    this.connectionManager = new MsalConnectionManager();
+    this.connectionManager = new MsalConnectionManager(undefined, undefined, this.authConfig);
 
   }
 
@@ -97,12 +98,17 @@ export class CloudAdapter extends BaseAdapter {
   protected async createConnectorClient (
     serviceUrl: string,
     scope: string,
-    headers?: HeaderPropagationCollection
+    audience: string | string[],
+    headers?: HeaderPropagationCollection,
   ): Promise<ConnectorClient> {
+
+    // get the correct token provider
+    const tokenProvider = this.connectionManager.getTokenProvider(audience, serviceUrl);
+
     return ConnectorClient.createClientWithAuth(
       serviceUrl,
       this.authConfig,
-      this.authProvider,
+      tokenProvider,
       scope,
       headers
     )
@@ -115,9 +121,10 @@ export class CloudAdapter extends BaseAdapter {
    * @protected
    */
   protected setConnectorClient (
-    context: TurnContext
+    context: TurnContext,
+    connectorClient?: ConnectorClient
   ) {
-    context.turnState.set('connectorClient', this.connectorClient)
+    context.turnState.set('connectorClient', connectorClient)
   }
 
   /**
@@ -131,7 +138,15 @@ export class CloudAdapter extends BaseAdapter {
   }
 
   async createTurnContextWithScope (activity: Activity, logic: AgentHandler, scope: string): Promise<TurnContext> {
-    this.connectorClient = await ConnectorClient.createClientWithAuth(activity.serviceUrl!, this.authConfig!, this.authProvider, scope)
+
+    // BENBRO staging this change butn ot 100% sure ... 
+    const tokenProvider = this.connectionManager.getTokenProviderFromActivity(undefined, activity);
+
+    const connectorClient = await ConnectorClient.createClientWithAuth(activity.serviceUrl!, this.authConfig!, this.authProvider, scope)
+    const context = new TurnContext(this, activity);
+    this.setConnectorClient(context, connectorClient);
+
+
     return new TurnContext(this, activity)
   }
 
@@ -171,12 +186,13 @@ export class CloudAdapter extends BaseAdapter {
         }
 
         // BENBRO: removed this as it happens in the process method.
-        // this.connectorClient = await this.createConnectorClient(activity.serviceUrl, 'https://api.botframework.com')
+        // this.connectorClient = await this.createConnectorClient(activity.serviceUrl, 'https://api.botframework.com', )
+
 
         if (activity.replyToId) {
-          response = await this.connectorClient.replyToActivity(activity.conversation.id, activity.replyToId, activity)
+          response = await context.turnState.get('connectorClient').replyToActivity(activity.conversation.id, activity.replyToId, activity)
         } else {
-          response = await this.connectorClient.sendToConversation(activity.conversation.id, activity)
+          response = await context.turnState.get('connectorClient').sendToConversation(activity.conversation.id, activity)
         }
       }
 
@@ -199,6 +215,8 @@ export class CloudAdapter extends BaseAdapter {
     if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id || !activity.id) {
       throw new Error('Invalid activity object')
     }
+    // BENBRO: this will require a breaking change to fix
+    // as connectorClient will now bein turnContext
     return await this.connectorClient.replyToActivity(activity.conversation.id, activity.id, activity)
   }
 
@@ -249,17 +267,20 @@ export class CloudAdapter extends BaseAdapter {
     if (this.resolveIfConnectorClientIsNeeded(activity)) {
       logger.debug('Creating connector client with scope: ', scope)
 
+      let connectorClient;
+
+      console.log('GOT USER DETAILS FROM TOKEN', request.user);
+
       if (activity.isAgenticRequest()) {
         logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
         const authConfig = loadAuthConfigFromEnv('serviceConnection')
-
-        const tokenProvider = this.connectionManager.getTokenProvider(authConfig.clientId, activity.serviceUrl ?? '');
+        const tokenProvider = this.connectionManager.getTokenProvider(request.user?.aud, activity.serviceUrl ?? '');
 
         if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
           // get agentic instance token
           const token = await tokenProvider.getAgenticInstanceToken(authConfig, activity.getAgenticInstanceId() ?? '')
-          this.connectorClient = await ConnectorClient.createClientWithToken(
+          connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
             token,
             scope,
@@ -268,7 +289,7 @@ export class CloudAdapter extends BaseAdapter {
         } else if (activity.recipient?.role === RoleTypes.AgenticUser && activity.getAgenticInstanceId() && activity.getAgenticUser()) {
           const token = await tokenProvider.getAgenticUserToken(authConfig, activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', [ApxProductionScope])
 
-          this.connectorClient = await ConnectorClient.createClientWithToken(
+          connectorClient = await ConnectorClient.createClientWithToken(
             activity.serviceUrl!,
             token,
             scope,
@@ -278,10 +299,11 @@ export class CloudAdapter extends BaseAdapter {
           throw new Error('Could not create connector client for agentic user')
         }
       } else {
-        this.connectorClient = await this.createConnectorClient(activity.serviceUrl!, scope, headers)
+        connectorClient = await this.createConnectorClient(activity.serviceUrl!, scope, request.user?.aud ?? '',  headers, )
       }
 
-      this.setConnectorClient(context)
+      // Add connector client to turn state
+      this.setConnectorClient(context, connectorClient)
     }
 
     if (
@@ -339,7 +361,7 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('Invalid activity object')
     }
 
-    const response = await this.connectorClient.updateActivity(
+    const response = await context.turnState.get('connectorClient').updateActivity(
       activity.conversation.id,
       activity.id,
       activity
@@ -363,7 +385,7 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('Invalid conversation reference object')
     }
 
-    await this.connectorClient.deleteActivity(reference.conversation.id, reference.activityId)
+    await context.turnState.get('connectorClient').deleteActivity(reference.conversation.id, reference.activityId)
   }
 
   /**
@@ -475,7 +497,10 @@ export class CloudAdapter extends BaseAdapter {
     if (!conversationParameters) throw new TypeError('`conversationParameters` must be defined')
     if (!logic) throw new TypeError('`logic` must be defined')
 
-    const restClient = await this.createConnectorClient(serviceUrl, audience)
+    // BENBRO - is this correct?  I know that audience and scope are diferent,
+    //     const restClient = await this.createConnectorClient(serviceUrl, audience)
+    // previously ^ we were passing in audience to the _scope_ parameter??
+    const restClient = await this.createConnectorClient(serviceUrl, audience, audience)
     const createConversationResult = await restClient.createConversation(conversationParameters)
     const createActivity = this.createCreateActivity(
       createConversationResult.id,
@@ -484,6 +509,7 @@ export class CloudAdapter extends BaseAdapter {
       conversationParameters
     )
     const context = new TurnContext(this, createActivity)
+    this.setConnectorClient(context, restClient)
     await this.runMiddleware(context, logic)
   }
 
@@ -502,6 +528,8 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('attachmentData is required')
     }
 
+    // BENBRO: this will require a breaking change to fix
+    // as connectorClient will now bein turnContext
     return await this.connectorClient.uploadAttachment(conversationId, attachmentData)
   }
 
@@ -515,6 +543,8 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('attachmentId is required')
     }
 
+    // BENBRO: this will require a breaking change to fix
+    // as connectorClient will now bein turnContext
     return await this.connectorClient.getAttachmentInfo(attachmentId)
   }
 
@@ -533,6 +563,8 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('viewId is required')
     }
 
+    // BENBRO: this will require a breaking change to fix
+    // as connectorClient will now bein turnContext
     return await this.connectorClient.getAttachment(attachmentId, viewId)
   }
 }

@@ -100,7 +100,8 @@ export class MsalConnectionManager implements Connections {
     for (const item of this._connectionsMap) {
       let audienceMatch = true
 
-      if (audience) {
+      // if we have an audience to match against, match it.
+      if (item.audience && audience) {
         audienceMatch = item.audience === audience
       }
 
