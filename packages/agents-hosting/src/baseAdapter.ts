@@ -120,27 +120,30 @@ export abstract class BaseAdapter {
   ): Promise<void>
 
   /**
+   * @deprecated This function will not be supported in future versions.  Use TurnContext.turnState.get<ConnectorClient>(CloudAdapter.ConnectorClientKey).
    * Uploads an attachment.
    * @param conversationId - The conversation ID.
    * @param attachmentData - The attachment data.
    * @returns A promise representing the ResourceResponse for the uploaded attachment.
    */
-  abstract uploadAttachment (conversationId: string, attachmentData: AttachmentData): Promise<ResourceResponse>
+  abstract uploadAttachment (context: TurnContext, conversationId: string, attachmentData: AttachmentData): Promise<ResourceResponse>
 
   /**
+   * @deprecated This function will not be supported in future versions.  Use TurnContext.turnState.get<ConnectorClient>(CloudAdapter.ConnectorClientKey).
    * Gets attachment information.
    * @param attachmentId - The attachment ID.
    * @returns A promise representing the AttachmentInfo for the requested attachment.
    */
-  abstract getAttachmentInfo (attachmentId: string): Promise<AttachmentInfo>
+  abstract getAttachmentInfo (context: TurnContext, attachmentId: string): Promise<AttachmentInfo>
 
   /**
+   * @deprecated This function will not be supported in future versions.  Use TurnContext.turnState.get<ConnectorClient>(CloudAdapter.ConnectorClientKey).
    * Gets an attachment.
    * @param attachmentId - The attachment ID.
    * @param viewId - The view ID.
    * @returns A promise representing the NodeJS.ReadableStream for the requested attachment.
    */
-  abstract getAttachment (attachmentId: string, viewId: string): Promise<NodeJS.ReadableStream>
+  abstract getAttachment (context: TurnContext, attachmentId: string, viewId: string): Promise<NodeJS.ReadableStream>
 
   /**
    * Gets the error handler for the adapter.
