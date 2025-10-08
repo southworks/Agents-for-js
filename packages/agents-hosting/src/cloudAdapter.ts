@@ -38,7 +38,8 @@ const logger = debug('agents:cloud-adapter')
  * and conversation continuations.
  */
 export class CloudAdapter extends BaseAdapter {
-  readonly ConnectorClientKey = Symbol('ConnectorClient');
+  readonly ConnectorClientKey = Symbol('ConnectorClient')
+  readonly UserTokenClientKey = Symbol('UserTokenClient')
 
   /**
    * Client for connecting to the Bot Framework Connector service
@@ -56,9 +57,8 @@ export class CloudAdapter extends BaseAdapter {
     super()
     this.authConfig = authConfig ?? loadAuthConfigFromEnv()
     // this.authProvider = authProvider ?? new MsalTokenProvider()
-    this.userTokenClient = userTokenClient ?? new UserTokenClient(this.authConfig.clientId!)
-    this.connectionManager = new MsalConnectionManager(undefined, undefined, this.authConfig);
-
+    // this.userTokenClient = userTokenClient ?? new UserTokenClient(this.authConfig.clientId!)
+    this.connectionManager = new MsalConnectionManager(undefined, undefined, this.authConfig)
   }
 
   /**
@@ -101,11 +101,10 @@ export class CloudAdapter extends BaseAdapter {
     serviceUrl: string,
     scope: string,
     audience: string | string[],
-    headers?: HeaderPropagationCollection,
+    headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
-
     // get the correct token provider
-    const tokenProvider = this.connectionManager.getTokenProvider(audience, serviceUrl);
+    const tokenProvider = this.connectionManager.getTokenProvider(audience, serviceUrl)
 
     return ConnectorClient.createClientWithAuth(
       serviceUrl,
@@ -126,7 +125,47 @@ export class CloudAdapter extends BaseAdapter {
     context: TurnContext,
     connectorClient?: ConnectorClient
   ) {
-    context.turnState.set(this.ConnectorClientKey, connectorClient);
+    context.turnState.set(this.ConnectorClientKey, connectorClient)
+  }
+
+  /**
+   * Creates a user token client for a specific service URL and scope.
+   *
+   * @param serviceUrl - The URL of the service to connect to
+   * @param scope - The authentication scope to use
+   * @param headers - Optional headers to propagate in the request
+   * @returns A promise that resolves to a ConnectorClient instance
+   * @protected
+   */
+  protected async createUserTokenClient (
+    serviceUrl: string,
+    scope: string,
+    audience: string | string[],
+    headers?: HeaderPropagationCollection
+  ): Promise<UserTokenClient> {
+    // get the correct token provider
+    const tokenProvider = this.connectionManager.getTokenProvider(audience, serviceUrl)
+
+    return UserTokenClient.createClientWithAuth(
+      serviceUrl,
+      this.authConfig,
+      tokenProvider,
+      scope,
+      headers
+    )
+  }
+
+  /**
+   * Sets the user token client on the turn context.
+   *
+   * @param context - The current turn context
+   * @protected
+   */
+  protected setUserTokenClient (
+    context: TurnContext,
+    userTokenClient?: UserTokenClient
+  ) {
+    context.turnState.set(this.UserTokenClientKey, userTokenClient)
   }
 
   /**
@@ -140,14 +179,12 @@ export class CloudAdapter extends BaseAdapter {
   }
 
   async createTurnContextWithScope (activity: Activity, logic: AgentHandler, scope: string): Promise<TurnContext> {
-
-    // BENBRO staging this change butn ot 100% sure ... 
-    const tokenProvider = this.connectionManager.getTokenProviderFromActivity(undefined, activity);
+    // BENBRO staging this change butn ot 100% sure ...
+    const tokenProvider = this.connectionManager.getTokenProviderFromActivity(undefined, activity)
 
     const connectorClient = await ConnectorClient.createClientWithAuth(activity.serviceUrl!, this.authConfig!, this.authProvider, scope)
-    const context = new TurnContext(this, activity);
-    this.setConnectorClient(context, connectorClient);
-
+    const context = new TurnContext(this, activity)
+    this.setConnectorClient(context, connectorClient)
 
     return new TurnContext(this, activity)
   }
@@ -189,7 +226,6 @@ export class CloudAdapter extends BaseAdapter {
 
         // BENBRO: removed this as it happens in the process method.
         // this.connectorClient = await this.createConnectorClient(activity.serviceUrl, 'https://api.botframework.com', )
-
 
         if (activity.replyToId) {
           response = await context.turnState.get('connectorClient').replyToActivity(activity.conversation.id, activity.replyToId, activity)
@@ -255,15 +291,15 @@ export class CloudAdapter extends BaseAdapter {
     if (this.resolveIfConnectorClientIsNeeded(activity)) {
       logger.debug('Creating connector client with scope: ', scope)
 
-      let connectorClient;
+      let connectorClient
 
-      console.log('GOT USER DETAILS FROM TOKEN', request.user);
+      console.log('GOT USER DETAILS FROM TOKEN', request.user)
 
       if (activity.isAgenticRequest()) {
         logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
         const authConfig = loadAuthConfigFromEnv('serviceConnection')
-        const tokenProvider = this.connectionManager.getTokenProvider(request.user?.aud, activity.serviceUrl ?? '');
+        const tokenProvider = this.connectionManager.getTokenProvider(request.user?.aud, activity.serviceUrl ?? '')
 
         if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
           // get agentic instance token
@@ -287,11 +323,14 @@ export class CloudAdapter extends BaseAdapter {
           throw new Error('Could not create connector client for agentic user')
         }
       } else {
-        connectorClient = await this.createConnectorClient(activity.serviceUrl!, scope, request.user?.aud ?? '',  headers, )
+        connectorClient = await this.createConnectorClient(activity.serviceUrl!, scope, request.user?.aud ?? '', headers)
       }
 
-      // Add connector client to turn state
+      const userTokenClient = await this.createUserTokenClient(activity.serviceUrl!, scope, request.user?.aud ?? '', headers)
+
+      // Add connector client and user token client to turn state
       this.setConnectorClient(context, connectorClient)
+      this.setUserTokenClient(context, userTokenClient)
     }
 
     if (
@@ -489,6 +528,7 @@ export class CloudAdapter extends BaseAdapter {
     //     const restClient = await this.createConnectorClient(serviceUrl, audience)
     // previously ^ we were passing in audience to the _scope_ parameter??
     const restClient = await this.createConnectorClient(serviceUrl, audience, audience)
+    const userTokenClient = await this.createUserTokenClient(serviceUrl, audience, audience)
     const createConversationResult = await restClient.createConversation(conversationParameters)
     const createActivity = this.createCreateActivity(
       createConversationResult.id,
@@ -498,6 +538,7 @@ export class CloudAdapter extends BaseAdapter {
     )
     const context = new TurnContext(this, createActivity)
     this.setConnectorClient(context, restClient)
+    this.setUserTokenClient(context, userTokenClient)
     await this.runMiddleware(context, logic)
   }
 
