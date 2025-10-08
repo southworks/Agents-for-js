@@ -38,6 +38,8 @@ const logger = debug('agents:cloud-adapter')
  * and conversation continuations.
  */
 export class CloudAdapter extends BaseAdapter {
+  readonly ConnectorClientKey = Symbol('ConnectorClient');
+
   /**
    * Client for connecting to the Bot Framework Connector service
    */
@@ -124,7 +126,7 @@ export class CloudAdapter extends BaseAdapter {
     context: TurnContext,
     connectorClient?: ConnectorClient
   ) {
-    context.turnState.set('connectorClient', connectorClient)
+    context.turnState.set(this.ConnectorClientKey, connectorClient);
   }
 
   /**
@@ -204,20 +206,6 @@ export class CloudAdapter extends BaseAdapter {
     }
 
     return responses
-  }
-
-  /**
-   * Replies to an activity.
-   * @param activity - The activity to reply to.
-   * @returns A promise representing the ResourceResponse for the sent activity.
-   */
-  async replyToActivity (activity: Activity): Promise<ResourceResponse> {
-    if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id || !activity.id) {
-      throw new Error('Invalid activity object')
-    }
-    // BENBRO: this will require a breaking change to fix
-    // as connectorClient will now bein turnContext
-    return await this.connectorClient.replyToActivity(activity.conversation.id, activity.id, activity)
   }
 
   /**
@@ -514,12 +502,17 @@ export class CloudAdapter extends BaseAdapter {
   }
 
   /**
+   * @deprecated This function will not be supported in future versions.  Use TurnContext.turnState.get<ConnectorClient>(CloudAdapter.ConnectorClientKey).
    * Uploads an attachment.
    * @param conversationId - The conversation ID.
    * @param attachmentData - The attachment data.
    * @returns A promise representing the ResourceResponse for the uploaded attachment.
    */
-  async uploadAttachment (conversationId: string, attachmentData: AttachmentData): Promise<ResourceResponse> {
+  async uploadAttachment (context: TurnContext, conversationId: string, attachmentData: AttachmentData): Promise<ResourceResponse> {
+    if (context === undefined) {
+      throw new Error('context is required')
+    }
+
     if (conversationId === undefined) {
       throw new Error('conversationId is required')
     }
@@ -530,31 +523,41 @@ export class CloudAdapter extends BaseAdapter {
 
     // BENBRO: this will require a breaking change to fix
     // as connectorClient will now bein turnContext
-    return await this.connectorClient.uploadAttachment(conversationId, attachmentData)
+    return await context.turnState.get<ConnectorClient>(this.ConnectorClientKey).uploadAttachment(conversationId, attachmentData)
   }
 
   /**
+   * @deprecated This function will not be supported in future versions.  Use TurnContext.turnState.get<ConnectorClient>(CloudAdapter.ConnectorClientKey).
    * Gets attachment information.
    * @param attachmentId - The attachment ID.
    * @returns A promise representing the AttachmentInfo for the requested attachment.
    */
-  async getAttachmentInfo (attachmentId: string): Promise<AttachmentInfo> {
+  async getAttachmentInfo (context: TurnContext, attachmentId: string): Promise<AttachmentInfo> {
+    if (context === undefined) {
+      throw new Error('context is required')
+    }
+
     if (attachmentId === undefined) {
       throw new Error('attachmentId is required')
     }
 
     // BENBRO: this will require a breaking change to fix
     // as connectorClient will now bein turnContext
-    return await this.connectorClient.getAttachmentInfo(attachmentId)
+    return await context.turnState.get<ConnectorClient>(this.ConnectorClientKey).getAttachmentInfo(attachmentId)
   }
 
   /**
+   * @deprecated This function will not be supported in future versions.  Use TurnContext.turnState.get<ConnectorClient>(CloudAdapter.ConnectorClientKey).
    * Gets an attachment.
    * @param attachmentId - The attachment ID.
    * @param viewId - The view ID.
    * @returns A promise representing the NodeJS.ReadableStream for the requested attachment.
    */
-  async getAttachment (attachmentId: string, viewId: string): Promise<NodeJS.ReadableStream> {
+  async getAttachment (context: TurnContext, attachmentId: string, viewId: string): Promise<NodeJS.ReadableStream> {
+    if (context === undefined) {
+      throw new Error('context is required')
+    }
+
     if (attachmentId === undefined) {
       throw new Error('attachmentId is required')
     }
@@ -565,6 +568,6 @@ export class CloudAdapter extends BaseAdapter {
 
     // BENBRO: this will require a breaking change to fix
     // as connectorClient will now bein turnContext
-    return await this.connectorClient.getAttachment(attachmentId, viewId)
+    return await context.turnState.get<ConnectorClient>(this.ConnectorClientKey).getAttachment(attachmentId, viewId)
   }
 }
