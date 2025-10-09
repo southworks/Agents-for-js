@@ -15,7 +15,6 @@ import { ApxProductionScope } from './auth/authConstants'
 import { MsalConnectionManager } from './auth/msalConnectionManager'
 import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationReference, DeliveryModes, ConversationParameters, RoleTypes } from '@microsoft/agents-activity'
 import { ResourceResponse } from './connector-client/resourceResponse'
-import { MsalTokenProvider } from './auth/msalTokenProvider'
 import * as uuid from 'uuid'
 import { debug } from '@microsoft/agents-activity/logger'
 import { StatusCodes } from './statusCodes'
@@ -179,7 +178,7 @@ export class CloudAdapter extends BaseAdapter {
 
   async createTurnContextWithScope (activity: Activity, logic: AgentHandler, scope: string): Promise<TurnContext> {
     // BENBRO staging this change butn ot 100% sure ...
-    const tokenProvider = this.connectionManager.getTokenProviderFromActivity('undefined benbro temp value', activity);
+    // const tokenProvider = this.connectionManager.getTokenProviderFromActivity('undefined benbro temp value', activity)
 
     const connectorClient = await ConnectorClient.createClientWithAuth(activity.serviceUrl!, this.authConfig!, this.authProvider, scope)
     const context = new TurnContext(this, activity)

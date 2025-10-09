@@ -7,7 +7,7 @@ import { debug } from '@microsoft/agents-activity/logger'
 import { normalizeOutgoingActivity, normalizeTokenExchangeState } from '../activityWireCompat'
 import { AadResourceUrls, SignInResource, TokenExchangeRequest, TokenOrSinginResourceResponse, TokenResponse, TokenStatus } from './userTokenClient.types'
 import { getProductInfo } from '../getProductInfo'
-import { AuthConfiguration, AuthProvider, MsalTokenProvider } from '../auth'
+import { AuthProvider, MsalTokenProvider } from '../auth'
 import { HeaderPropagationCollection } from '../headerPropagation'
 
 const logger = debug('agents:user-token-client')

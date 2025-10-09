@@ -199,9 +199,9 @@ export class MsalTokenProvider implements AuthProvider {
         }
       }
     ).catch((error) => {
-      logger.error('Error acquiring token: ', error.toJSON());
-      throw error;
-    });
+      logger.error('Error acquiring token: ', error.toJSON())
+      throw error
+    })
 
     // capture token, expire local cache 5 minutes early
     this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
@@ -209,7 +209,7 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   public async getAgenticUserToken (agentAppInstanceId: string, upn: string, scopes: string[]): Promise<string> {
-    logger.debug('Getting agentic user token');
+    logger.debug('Getting agentic user token')
     const agentToken = await this.getAgenticApplicationToken(agentAppInstanceId)
     const instanceToken = await this.getAgenticInstanceToken(agentAppInstanceId)
 
@@ -230,7 +230,7 @@ export class MsalTokenProvider implements AuthProvider {
     if (!this.connectionSettings?.clientId) {
       throw new Error('Connection settings must be provided when calling getAgenticApplicationToken')
     }
-    logger.debug('Getting agentic application token');
+    logger.debug('Getting agentic application token')
     const token = await this.acquireTokenByForAgenticScenarios(this.connectionSettings.clientId, undefined, ['api://AzureAdTokenExchange/.default'], {
       grant_type: 'client_credentials',
       fmi_path: agentAppInstanceId,
