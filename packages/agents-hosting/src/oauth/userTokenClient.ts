@@ -7,7 +7,7 @@ import { debug } from '@microsoft/agents-activity/logger'
 import { normalizeOutgoingActivity, normalizeTokenExchangeState } from '../activityWireCompat'
 import { AadResourceUrls, SignInResource, TokenExchangeRequest, TokenOrSinginResourceResponse, TokenResponse, TokenStatus } from './userTokenClient.types'
 import { getProductInfo } from '../getProductInfo'
-import { AuthConfiguration, AuthProvider } from '../auth'
+import { AuthConfiguration, AuthProvider, MsalTokenProvider } from '../auth'
 import { HeaderPropagationCollection } from '../headerPropagation'
 
 const logger = debug('agents:user-token-client')
@@ -102,9 +102,8 @@ export class UserTokenClient {
    * @param headers - Optional headers to propagate in the request.
    * @returns A new instance of ConnectorClient.
    */
-  static async createClientWithAuth (
+  static async createClientWithScope (
     baseURL: string,
-    authConfig: AuthConfiguration,
     authProvider: AuthProvider,
     scope: string,
     headers?: HeaderPropagationCollection
@@ -121,7 +120,7 @@ export class UserTokenClient {
           return JSON.stringify(normalizeOutgoingActivity(data))
         }]
     })
-    const token = await authProvider.getAccessToken(authConfig, scope)
+    const token = await (authProvider as MsalTokenProvider).getAccessToken(scope)
     if (token.length > 1) {
       axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`
     }

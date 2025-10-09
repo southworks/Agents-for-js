@@ -146,9 +146,8 @@ export class CloudAdapter extends BaseAdapter {
     // get the correct token provider
     const tokenProvider = this.connectionManager.getTokenProvider(audience, serviceUrl)
 
-    return UserTokenClient.createClientWithAuth(
+    return UserTokenClient.createClientWithScope(
       serviceUrl,
-      this.authConfig,
       tokenProvider,
       scope,
       headers

@@ -30,7 +30,7 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   /**
-   * Gets an access token using the auth configuration from the MsalTokenProvider instance.
+   * Gets an access token using the auth configuration from the MsalTokenProvider instance and the provided scope.
    * @param scope The scope for the token.
    * @returns A promise that resolves to the access token.
    */
