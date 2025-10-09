@@ -32,7 +32,7 @@ const logger = debug('agents:cloud-adapter')
  * Adapter for handling agent interactions with various channels through cloud-based services.
  *
  * @remarks
- * CloudAdapter processes incoming HTTP requests from Microsoft Bot Framework channels,
+ * CloudAdapter processes incoming HTTP requests from Azure Bot Service channels,
  * authenticates them, and generates outgoing responses. It manages the communication
  * flow between agents and users across different channels, handling activities, attachments,
  * and conversation continuations.
@@ -42,23 +42,19 @@ export class CloudAdapter extends BaseAdapter {
   readonly UserTokenClientKey = Symbol('UserTokenClient')
 
   /**
-   * Client for connecting to the Bot Framework Connector service
+   * Client for connecting to the Azure Bot Service
    */
   connectionManager: MsalConnectionManager
 
   /**
    * Creates an instance of CloudAdapter.
    * @param authConfig - The authentication configuration for securing communications
-   * @param authProvider - Optional custom authentication provider. If not specified, a default MsalTokenProvider will be used
+   * @param authProvider - No longer used
    */
   constructor (authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient) {
     super()
     authConfig = authConfig ?? loadAuthConfigFromEnv()
-    this.connectionManager = new MsalConnectionManager(undefined, undefined, authConfig)
-    authConfig = authConfig ?? loadAuthConfigFromEnv()
-    this.userTokenClient = userTokenClient ?? new UserTokenClient(authConfig.clientId!)
     this.connectionManager = new MsalConnectionManager(undefined, undefined, authConfig);
-
   }
 
   /**
@@ -437,10 +433,10 @@ export class CloudAdapter extends BaseAdapter {
   }
 
   /**
- * Processes the turn results and returns an InvokeResponse if applicable.
- * @param context - The TurnContext for the current turn.
- * @returns The InvokeResponse if applicable, otherwise undefined.
- */
+  * Processes the turn results and returns an InvokeResponse if applicable.
+  * @param context - The TurnContext for the current turn.
+  * @returns The InvokeResponse if applicable, otherwise undefined.
+  */
   protected processTurnResults (context: TurnContext): InvokeResponse | undefined {
     logger.info('<--Sending back turn results')
     // Handle ExpectedReplies scenarios where all activities have been buffered and sent back at once in an invoke response.
@@ -560,8 +556,6 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('attachmentData is required')
     }
 
-    // BENBRO: this will require a breaking change to fix
-    // as connectorClient will now bein turnContext
     return await context.turnState.get<ConnectorClient>(this.ConnectorClientKey).uploadAttachment(conversationId, attachmentData)
   }
 
@@ -580,8 +574,6 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('attachmentId is required')
     }
 
-    // BENBRO: this will require a breaking change to fix
-    // as connectorClient will now bein turnContext
     return await context.turnState.get<ConnectorClient>(this.ConnectorClientKey).getAttachmentInfo(attachmentId)
   }
 
@@ -605,8 +597,6 @@ export class CloudAdapter extends BaseAdapter {
       throw new Error('viewId is required')
     }
 
-    // BENBRO: this will require a breaking change to fix
-    // as connectorClient will now bein turnContext
     return await context.turnState.get<ConnectorClient>(this.ConnectorClientKey).getAttachment(attachmentId, viewId)
   }
 }
