@@ -27,7 +27,7 @@ export class HandlerStorage<TActiveHandler extends ActiveAuthorizationHandler = 
     if (!channelId || !userId) {
       throw new Error(`Both 'activity.channelId' and 'activity.from.id' are required to generate the ${HandlerStorage.name} key.`)
     }
-    return `${channelId}/${userId}`
+    return `auth/${channelId}/${userId}`
   }
 
   /**
@@ -41,14 +41,13 @@ export class HandlerStorage<TActiveHandler extends ActiveAuthorizationHandler = 
   /**
    * Writes handler state to storage.
    */
-  write (data: TActiveHandler) {
+  write (data: TActiveHandler) : Promise<void> {
     return this.storage.write({ [this.key]: data })
   }
 
   /**
    * Deletes handler state from storage.
    */
-  delete () {
+  delete(): Promise<void> {
     return this.storage.delete([this.key])
-  }
-}
+  }}

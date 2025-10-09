@@ -202,9 +202,14 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
     if (!token?.trim()) {
       const { activity } = context
+
+      if(!activity.channelId || !activity.from?.id || !activity.relatesTo) {
+        throw new Error('\'activity.channelId\', \'activity.from.id\' and \'activity.relatesTo\' are required to retrieve the token.')
+      }
+
       const userTokenClient = await this.getUserTokenClient()
       // Using getTokenOrSignInResource instead of getUserToken to avoid HTTP 404 errors.
-      const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
+      const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from.id, this._settings.name!, activity.channelId, activity.getConversationReference(), activity.relatesTo, '')
       token = tokenResponse?.token
     }
 
@@ -376,7 +381,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       return false
     }
     const payload = jwt.decode(token) as JwtPayload
-    return payload?.aud?.indexOf('api://') === 0
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud]
+    return audiences.some(aud => typeof aud === 'string' && aud.startsWith('api://'))
   }
 
   /**

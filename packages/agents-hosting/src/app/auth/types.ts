@@ -59,22 +59,22 @@ export interface AuthorizationHandler {
    * @param context The turn context.
    * @returns A promise that resolves to a boolean indicating the success of the sign-out attempt.
    */
-  signout: (context: TurnContext) => Promise<boolean>;
+  signout(context: TurnContext): Promise<boolean>;
   /**
    * Retrieves an access token for the specified scopes.
    * @param context The turn context.
    * @param scopes The scopes to request.
    * @returns The access token response.
    */
-  token: (context: TurnContext, scopes?: string[]) => Promise<TokenResponse>;
+  token(context: TurnContext, scopes?: string[]): Promise<TokenResponse>;
   /**
    * Registers a callback to be invoked when the sign-in process is successful.
    * @param callback The callback to invoke on success.
    */
-  onSuccess: (callback: (context: TurnContext) => Promise<void> | void) => void;
+  onSuccess(callback: (context: TurnContext) => Promise<void> | void): void;
   /**
-   * Registers a callback to be invoked when the sign-out process fails.
+   * Registers a callback to be invoked when the sign-in process fails.
    * @param callback The callback to invoke on failure.
    */
-  onFailure: (callback: (context: TurnContext, reason?: string) => Promise<void> | void) => void;
+  onFailure(callback: (context: TurnContext, reason?: string) => Promise<void> | void): void;
 }

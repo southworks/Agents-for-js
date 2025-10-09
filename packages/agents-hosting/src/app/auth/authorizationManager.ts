@@ -115,6 +115,7 @@ export class AuthorizationManager {
 
       if (active) {
         // Restore the original activity in the turn context for the next handler to process.
+        // This is done like this to avoid losing data that may be set in the turn context.
         (context as any)._activity = Activity.fromObject(active.data.activity)
         active = undefined
       }

@@ -613,6 +613,8 @@ export class AgentApplication<TState extends TurnState> {
         await state.load(context, storage)
 
         const { authorized } = await this._authorizationManager?.process(context, async activity => {
+          // The incoming activity may come from the storage, so we need to restore the auth handlers.
+          // Since the current route may not have auth handlers.
           const route = await this.getRoute(new TurnContext(context.adapter, activity))
           return route?.authHandlers ?? []
         }) ?? { authorized: true } // Default to authorized if no auth manager

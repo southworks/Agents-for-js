@@ -60,7 +60,7 @@ class OneProvider extends AgentApplication<TurnState> {
   private _profileRequest = async (context: TurnContext, state: TurnState): Promise<void> => {
     const userTokenResponse = await this.authorization.getToken(context, 'graph')
     if (!userTokenResponse?.token) {
-      await context.sendActivity(MessageFactory.text('Token not available. Enter "/prs" to sign in.'))
+      await context.sendActivity(MessageFactory.text('Token not available. Please sign in with Microsoft Graph.'))
       return
     }
 
@@ -74,9 +74,8 @@ class OneProvider extends AgentApplication<TurnState> {
 
   private _pullRequests = async (context: TurnContext, state: TurnState): Promise<void> => {
     const userTokenResponse = await this.authorization.getToken(context, 'github')
-
     if (!userTokenResponse.token) {
-      await context.sendActivity(MessageFactory.text('Token not available. Enter "/me" to sign in.'))
+      await context.sendActivity(MessageFactory.text('Token not available. Please sign in with GitHub.'))
       return
     }
 
