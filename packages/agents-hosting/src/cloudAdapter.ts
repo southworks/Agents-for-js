@@ -50,7 +50,7 @@ export class CloudAdapter extends BaseAdapter {
     super()
     this.authConfig = authConfig ?? loadAuthConfigFromEnv()
     this.authProvider = authProvider ?? new MsalTokenProvider()
-    this.userTokenClient = userTokenClient ?? new UserTokenClient(this.authConfig.clientId)
+    this.userTokenClient = userTokenClient ?? new UserTokenClient(this.authConfig.clientId!)
   }
 
   /**
