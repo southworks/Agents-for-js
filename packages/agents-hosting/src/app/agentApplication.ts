@@ -12,7 +12,6 @@ import { AdaptiveCardsActions } from './adaptiveCards'
 import { AgentApplicationOptions } from './agentApplicationOptions'
 import { ConversationUpdateEvents } from './conversationUpdateEvents'
 import { AgentExtension } from './extensions'
-import { Authorization, SignInState } from './authorization'
 import { RouteHandler } from './routeHandler'
 import { RouteSelector } from './routeSelector'
 import { TurnEvents } from './turnEvents'
@@ -21,6 +20,7 @@ import { RouteRank } from './routeRank'
 import { RouteList } from './routeList'
 import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
+import { Authorization, AuthorizationManager } from './auth'
 
 const logger = debug('agents:app')
 
@@ -74,6 +74,7 @@ export class AgentApplication<TState extends TurnState> {
   protected readonly _beforeTurn: ApplicationEventHandler<TState>[] = []
   protected readonly _afterTurn: ApplicationEventHandler<TState>[] = []
   private readonly _adapter?: CloudAdapter
+  private readonly _authorizationManager?: AuthorizationManager
   private readonly _authorization?: Authorization
   private _typingTimer: NodeJS.Timeout | undefined
   protected readonly _extensions: AgentExtension<TState>[] = []
@@ -125,7 +126,8 @@ export class AgentApplication<TState extends TurnState> {
     }
 
     if (this._options.authorization) {
-      this._authorization = new Authorization(this._options.storage!, this._options.authorization, this._adapter?.userTokenClient!)
+      this._authorizationManager = new AuthorizationManager(this)
+      this._authorization = new Authorization(this._authorizationManager)
     }
 
     if (this._options.longRunningMessages && !this._adapter && !this._options.agentAppId) {
@@ -587,6 +589,10 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
+    if (turnContext.activity.type === ActivityTypes.Typing) {
+      return false
+    }
+
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
       try {
@@ -606,23 +612,21 @@ export class AgentApplication<TState extends TurnState> {
         const state = turnStateFactory()
         await state.load(context, storage)
 
-        const signInState : SignInState = state.getValue('user.__SIGNIN_STATE_')
-        logger.debug('SignIn State:', signInState)
-        if (this._authorization && signInState && signInState.completed === false) {
-          const flowState = await this._authorization.authHandlers[signInState.handlerId!]?.flow?.getFlowState(context)
-          logger.debug('Flow State:', flowState)
-          if (flowState && flowState.flowStarted === true) {
-            const tokenResponse = await this._authorization.beginOrContinueFlow(turnContext, state, signInState?.handlerId!)
-            const savedAct = Activity.fromObject(signInState?.continuationActivity!)
-            if (tokenResponse?.token && tokenResponse.token.length > 0) {
-              logger.info('resending continuation activity:', savedAct.text)
-              await this.run(new TurnContext(context.adapter, savedAct))
-              await state.deleteValue('user.__SIGNIN_STATE_')
-              return true
-            }
-          }
+        const { authorized } = await this._authorizationManager?.process(context, async activity => {
+          const route = await this.getRoute(new TurnContext(context.adapter, activity))
+          return route?.authHandlers ?? []
+        }) ?? { authorized: true } // Default to authorized if no auth manager
 
-          // return true
+        if (!authorized) {
+          await state.save(context, storage)
+          return false
+        }
+
+        const route = await this.getRoute(context)
+
+        if (!route) {
+          logger.debug('No matching route found for activity:', context.activity)
+          return false
         }
 
         if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
@@ -636,38 +640,13 @@ export class AgentApplication<TState extends TurnState> {
           return false
         }
 
-        for (const route of this._routes) {
-          if (await route.selector(context)) {
-            if (route.authHandlers === undefined || route.authHandlers.length === 0) {
-              await route.handler(context, state)
-            } else {
-              let signInComplete = false
-              for (const authHandlerId of route.authHandlers) {
-                logger.info(`Executing route handler for authHandlerId: ${authHandlerId}`)
-                const tokenResponse = await this._authorization?.beginOrContinueFlow(turnContext, state, authHandlerId)
-                signInComplete = (tokenResponse?.token !== undefined && tokenResponse?.token.length > 0)
-                if (!signInComplete) {
-                  break
-                }
-              }
-              if (signInComplete) {
-                await route.handler(context, state)
-              }
-            }
-
-            if (await this.callEventHandlers(context, state, this._afterTurn)) {
-              await state.save(context, storage)
-            }
-
-            return true
-          }
-        }
+        await route.handler(context, state)
 
         if (await this.callEventHandlers(context, state, this._afterTurn)) {
           await state.save(context, storage)
         }
 
-        return false
+        return true
       } catch (err: any) {
         logger.error(err)
         throw err
@@ -675,6 +654,17 @@ export class AgentApplication<TState extends TurnState> {
         this.stopTypingTimer()
       }
     })
+  }
+
+  /**
+   * Finds the appropriate route for the given context.
+   */
+  private async getRoute (context: TurnContext) {
+    for (const route of this._routes) {
+      if (await route.selector(context)) {
+        return route
+      }
+    }
   }
 
   /**
