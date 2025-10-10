@@ -203,13 +203,9 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     if (!token?.trim()) {
       const { activity } = context
 
-      if(!activity.channelId || !activity.from?.id || !activity.relatesTo) {
-        throw new Error('\'activity.channelId\', \'activity.from.id\' and \'activity.relatesTo\' are required to retrieve the token.')
-      }
-
       const userTokenClient = await this.getUserTokenClient()
       // Using getTokenOrSignInResource instead of getUserToken to avoid HTTP 404 errors.
-      const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from.id, this._settings.name!, activity.channelId, activity.getConversationReference(), activity.relatesTo, '')
+      const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
       token = tokenResponse?.token
     }
 
@@ -358,9 +354,10 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       throw new Error(this.prefix('The current token is not exchangeable for an on-behalf-of flow. Ensure the token audience starts with \'api://\'.'))
     }
 
+    const msalTokenProvider = new MsalTokenProvider()
+    const authConfig = cnxPrefix ? loadAuthConfigFromEnv(cnxPrefix) : context.adapter.authConfig
+
     try {
-      const msalTokenProvider = new MsalTokenProvider()
-      const authConfig = cnxPrefix ? loadAuthConfigFromEnv(cnxPrefix) : context.adapter.authConfig
       const newToken = await msalTokenProvider.acquireTokenOnBehalfOf(authConfig, scopes, token)
       logger.debug(this.prefix('Successfully acquired on-behalf-of token'))
       await this._onSuccess?.(context)
@@ -397,6 +394,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     if (!tokenResponse && active) {
       logger.warn(this.prefix('Invalid code entered. Restarting sign-in flow'), activity)
       await context.sendActivity(MessageFactory.text(this.messages.invalidCode(code ?? '')))
+      return AuthorizationHandlerStatus.REJECTED
     }
 
     if (!tokenResponse) {
@@ -475,11 +473,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    */
   private async getUserTokenClient (): Promise<UserTokenClient> {
     const userTokenClient = this.app.adapter.userTokenClient
-    if (!userTokenClient?.client.defaults.headers.common.Authorization) {
-      const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
-      userTokenClient?.updateAuthToken(accessToken)
-    }
-
+    const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
+    userTokenClient?.updateAuthToken(accessToken)
     return userTokenClient!
   }
 
@@ -509,7 +504,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    */
   private messages = {
     invalidCode: (code: string) => {
-      const message = this._settings.messages?.invalidCode ?? 'The code entered is invalid. Please sign-in again to continue.'
+      const message = this._settings.messages?.invalidCode ?? 'Invalid **{code}** code entered. Please try again with a new sign-in request.'
       return message.replaceAll('{code}', code)
     },
     invalidCodeFormat: (attemptsLeft: number) => {
@@ -517,7 +512,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       return message.replaceAll('{attemptsLeft}', attemptsLeft.toString())
     },
     maxAttemptsExceeded: (maxAttempts: number) => {
-      const message = this._settings.messages?.maxAttemptsExceeded ?? 'You have exceeded the maximum number of sign-in attempts ({maxAttempts}).'
+      const message = this._settings.messages?.maxAttemptsExceeded ?? 'You have exceeded the maximum number of sign-in attempts ({maxAttempts}). Please try again with a new sign-in request.'
       return message.replaceAll('{maxAttempts}', maxAttempts.toString())
     },
   }

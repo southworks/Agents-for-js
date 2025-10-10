@@ -194,7 +194,7 @@ export class Authorization {
    */
   private getHandler (id: string) {
     if (!Object.prototype.hasOwnProperty.call(this.manager.handlers, id)) {
-      throw new Error(`AuthHandler with ID ${id} not configured`)
+      throw new Error(`Cannot find auth handler with ID '${id}'. Ensure it is configured in the agent application options.`)
     }
     return this.manager.handlers[id]
   }

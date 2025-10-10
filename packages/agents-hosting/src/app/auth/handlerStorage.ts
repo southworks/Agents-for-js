@@ -21,7 +21,7 @@ export class HandlerStorage<TActiveHandler extends ActiveAuthorizationHandler = 
   /**
    * Gets the unique key for a handler session.
    */
-  get key (): string {
+  public get key (): string {
     const channelId = this.context.activity.channelId?.trim()
     const userId = this.context.activity.from?.id?.trim()
     if (!channelId || !userId) {
@@ -33,7 +33,7 @@ export class HandlerStorage<TActiveHandler extends ActiveAuthorizationHandler = 
   /**
    * Reads the active handler state from storage.
    */
-  async read (): Promise<TActiveHandler | undefined> {
+  public async read (): Promise<TActiveHandler | undefined> {
     const ongoing = await this.storage.read([this.key])
     return ongoing?.[this.key]
   }
@@ -41,13 +41,21 @@ export class HandlerStorage<TActiveHandler extends ActiveAuthorizationHandler = 
   /**
    * Writes handler state to storage.
    */
-  write (data: TActiveHandler) : Promise<void> {
+  public write (data: TActiveHandler) : Promise<void> {
     return this.storage.write({ [this.key]: data })
   }
 
   /**
    * Deletes handler state from storage.
    */
-  delete(): Promise<void> {
-    return this.storage.delete([this.key])
-  }}
+  public async delete (): Promise<void> {
+    try {
+      await this.storage.delete([this.key])
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 404) {
+        return
+      }
+      throw error
+    }
+  }
+}

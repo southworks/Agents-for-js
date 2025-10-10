@@ -129,8 +129,7 @@ User enters an invalid magic code, sending the wrong magic code to the service, 
 1. 🧑 → Sends `/me` message
 2. 🤖 → Shows `oAuthCard`
 3. 🧑 → Sends correct format but invalid magic code (e.g., `123456`)
-4. 🤖 → Shows 'The code entered is invalid or has expired. Please sign-in again to continue.' message
-5. 🤖 → Shows `oAuthCard`
+4. 🤖 → Shows the code entered is invalid
 
 ### 8. Restart Conversation During Sign-In
 
@@ -219,15 +218,3 @@ User simulates having multiple server instances by removing the handler from sto
 5. 🤖 → Shows `oAuthCard`
 6. 🧑 → Retrieves and sends `magic code`
 7. 🤖 → Shows signed-in user information from the Graph provider
-
-### 14. Cancel During Sign-In
-
-**Description:**
-User cancels the authentication process during sign-in.
-
-**Steps:**
-
-1. 🧑 → Sends `/me` message
-2. 🤖 → Shows `oAuthCard`
-3. 🧑 → Sends `/cancel` trigger (configured in the handler `cancelTrigger` setting)
-4. 🤖 → Shows cancelled message

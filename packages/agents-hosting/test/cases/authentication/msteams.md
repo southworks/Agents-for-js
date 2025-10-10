@@ -128,19 +128,7 @@ User simulates having multiple server instances by removing the handler from sto
 6. 🤖 → Receives the `signin/verifyState` invoke activity with `magic code`
 7. 🤖 → Shows signed-in user information from the Graph provider
 
-### 8. Cancel During Sign-In
-
-**Description:**
-User cancels the authentication process during sign-in.
-
-**Steps:**
-
-1. 🧑 → Sends `/me` message
-2. 🤖 → Shows `oAuthCard`
-3. 🧑 → Sends `/cancel` trigger (configured in the handler `cancelTrigger` setting)
-4. 🤖 → Shows cancelled message
-
-### 9. Token Exchange
+### 8. Token Exchange
 
 **Description:**
 User logs in through token exchange to retrieve information from the Graph provider.
