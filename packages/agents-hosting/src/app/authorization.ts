@@ -8,7 +8,6 @@ import { debug } from '@microsoft/agents-activity/logger'
 import { TurnState } from './turnState'
 import { Storage } from '../storage'
 import { OAuthFlow, TokenResponse, UserTokenClient } from '../oauth'
-import { AuthConfiguration, loadAuthConfigFromEnv, MsalTokenProvider } from '../auth'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import { Activity } from '@microsoft/agents-activity'
 import { Connections } from '../auth/connections'
@@ -253,14 +252,9 @@ export class Authorization {
     let msalTokenProvider
     if (authHandler.oboConnectionName) {
       msalTokenProvider = this.connections.getConnection(authHandler.oboConnectionName)
-    }
-    else {
+    } else {
       msalTokenProvider = this.connections.getDefaultConnection()
     }
-    
-    //if (authHandler.cnxPrefix) {
-    //  authConfig = loadAuthConfigFromEnv(authHandler.cnxPrefix)
-    //}
 
     const newToken = await msalTokenProvider.acquireTokenOnBehalfOf(scopes, token)
     return { token: newToken }

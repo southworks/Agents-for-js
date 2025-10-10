@@ -54,7 +54,7 @@ export class CloudAdapter extends BaseAdapter {
   constructor (authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient) {
     super()
     authConfig = authConfig ?? loadAuthConfigFromEnv()
-    this.connectionManager = new MsalConnectionManager(undefined, undefined, authConfig);
+    this.connectionManager = new MsalConnectionManager(undefined, undefined, authConfig)
   }
 
   /**
@@ -115,42 +115,41 @@ export class CloudAdapter extends BaseAdapter {
     activity: Activity,
     scope: string,
     headers?: HeaderPropagationCollection) {
+    const tokenProvider = this.connectionManager.getTokenProvider(identity.aud, activity.serviceUrl ?? '');
 
-      const tokenProvider = this.connectionManager.getTokenProvider(identity.aud, activity.serviceUrl ?? '');
+    let connectorClient;
+    if (activity.isAgenticRequest()) {
+      logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
 
-      let connectorClient;
-      if (activity.isAgenticRequest()) {
-        logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
-
-        if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
-          // get agentic instance token
-          const token = await tokenProvider.getAgenticInstanceToken(activity.getAgenticInstanceId() ?? '')
-          connectorClient = ConnectorClient.createClientWithToken(
-            activity.serviceUrl!,
-            token,
-            headers
-          )
-        } else if (activity.recipient?.role === RoleTypes.AgenticUser && activity.getAgenticInstanceId() && activity.getAgenticUser()) {
-          const token = await tokenProvider.getAgenticUserToken(activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', [ApxProductionScope])
-
-          connectorClient = ConnectorClient.createClientWithToken(
-            activity.serviceUrl!,
-            token,
-            headers
-          )
-        } else {
-          throw new Error('Could not create connector client for agentic user')
-        }
-      } else {
-        const token = await tokenProvider.getAccessToken(scope)
+      if (activity.recipient?.role === RoleTypes.AgenticIdentity && activity.getAgenticInstanceId()) {
+        // get agentic instance token
+        const token = await tokenProvider.getAgenticInstanceToken(activity.getAgenticInstanceId() ?? '')
         connectorClient = ConnectorClient.createClientWithToken(
           activity.serviceUrl!,
           token,
           headers
         )
-      }
+      } else if (activity.recipient?.role === RoleTypes.AgenticUser && activity.getAgenticInstanceId() && activity.getAgenticUser()) {
+        const token = await tokenProvider.getAgenticUserToken(activity.getAgenticInstanceId() ?? '', activity.getAgenticUser() ?? '', [ApxProductionScope])
 
-      return connectorClient
+        connectorClient = ConnectorClient.createClientWithToken(
+          activity.serviceUrl!,
+          token,
+          headers
+        )
+      } else {
+        throw new Error('Could not create connector client for agentic user')
+      }
+    } else {
+      const token = await tokenProvider.getAccessToken(scope)
+      connectorClient = ConnectorClient.createClientWithToken(
+        activity.serviceUrl!,
+        token,
+        headers
+      )
+    }
+
+    return connectorClient
   }
 
   static createIdentity(appId: string) : JwtPayload {
@@ -408,20 +407,19 @@ export class CloudAdapter extends BaseAdapter {
    */
   async continueConversation (
     botAppIdOrIdentity: string | JwtPayload,
-    reference: ConversationReference, 
-    logic: (revocableContext: TurnContext) => Promise<void>, 
+    reference: ConversationReference,
+    logic: (revocableContext: TurnContext) => Promise<void>,
     isResponse: Boolean = false): Promise<void> {
-
     if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id) {
       throw new Error('Invalid conversation reference object')
     }
 
-    const botAppId = typeof botAppIdOrIdentity === 'string' ? botAppIdOrIdentity : botAppIdOrIdentity.aud as string;
+    const botAppId = typeof botAppIdOrIdentity === 'string' ? botAppIdOrIdentity : botAppIdOrIdentity.aud as string
 
     const identity =
         typeof botAppIdOrIdentity !== 'string'
-            ? botAppIdOrIdentity
-            : CloudAdapter.createIdentity(botAppId);
+          ? botAppIdOrIdentity
+          : CloudAdapter.createIdentity(botAppId)
 
     const continuationActivity = Activity.getContinuationActivity(reference)
     const context = this.createTurnContext(Activity.getContinuationActivity(reference), identity)
