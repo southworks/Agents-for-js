@@ -318,6 +318,9 @@ export class CloudAdapter extends BaseAdapter {
     const connectorClient = await this.createConnectorClientWithIdentity(request.user!, activity, scope, headers)
     this.setConnectorClient(context, connectorClient)
 
+    const userTokenClient = await this.createUserTokenClient(activity.serviceUrl!, 'https://api.botframework.com/.default', 'https://api.botframework.com')
+    this.setUserTokenClient(context, userTokenClient)
+
     if (
       activity?.type === ActivityTypes.InvokeResponse ||
       activity?.type === ActivityTypes.Invoke ||
@@ -426,6 +429,9 @@ export class CloudAdapter extends BaseAdapter {
     const scope = identity.azp ?? identity.appid ?? 'https://api.botframework.com'
     const connectorClient = await this.createConnectorClientWithIdentity(identity, continuationActivity, scope)
     this.setConnectorClient(context, connectorClient)
+
+    const userTokenClient = await this.createUserTokenClient(reference.serviceUrl, 'https://api.botframework.com/.default', 'https://api.botframework.com')
+    this.setUserTokenClient(context, userTokenClient)
 
     await this.runMiddleware(context, logic)
   }
