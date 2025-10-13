@@ -93,7 +93,7 @@ export class CloudAdapter extends BaseAdapter {
   protected async createConnectorClient (
     serviceUrl: string,
     scope: string,
-    audience: string | string[],
+    audience: string,
     headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
     // get the correct token provider
@@ -112,7 +112,12 @@ export class CloudAdapter extends BaseAdapter {
     activity: Activity,
     scope: string,
     headers?: HeaderPropagationCollection) {
-    const tokenProvider = this.connectionManager.getTokenProvider(identity.aud, activity.serviceUrl ?? '')
+    let audience
+    if (Array.isArray(identity.aud))
+      audience = identity.aud[0]
+    else
+      audience = identity.aud
+    const tokenProvider = this.connectionManager.getTokenProvider(audience!, activity.serviceUrl ?? '')
 
     let connectorClient
     if (activity.isAgenticRequest()) {
@@ -180,7 +185,7 @@ export class CloudAdapter extends BaseAdapter {
   protected async createUserTokenClient (
     serviceUrl: string,
     scope: string,
-    audience: string | string[],
+    audience: string,
     headers?: HeaderPropagationCollection
   ): Promise<UserTokenClient> {
     // get the correct token provider
