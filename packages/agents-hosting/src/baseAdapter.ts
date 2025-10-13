@@ -55,29 +55,14 @@ export abstract class BaseAdapter {
   }
 
   /**
-   * Symbol key used to store agent identity information in the TurnContext.
-   */
-  readonly AgentIdentityKey = Symbol('AgentIdentity')
-
-  /**
    * Symbol key used to store connector client instances in the TurnContext.
    */
   readonly ConnectorClientKey = Symbol('ConnectorClient')
 
   /**
-   * Symbol key used to store OAuth scope information in the TurnContext.
+   * Symbol key used to store User Token Client instances in the TurnContext.
    */
-  readonly OAuthScopeKey = Symbol('OAuthScope')
-
-  /**
-   * The authentication provider used for token management.
-   */
-  authProvider: AuthProvider = new MsalTokenProvider()
-
-  /**
-   * The user token client used for managing user tokens.
-   */
-  userTokenClient: UserTokenClient | null = null
+  readonly UserTokenClientKey = Symbol('UserTokenClient')
 
   /**
    * Sends a set of activities to the conversation.

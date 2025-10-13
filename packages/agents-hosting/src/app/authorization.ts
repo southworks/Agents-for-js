@@ -122,7 +122,7 @@ export class Authorization {
    * @throws {Error} If storage is null/undefined or no auth handlers are provided.
    *
    */
-  constructor (private storage: Storage, authHandlers: AuthorizationHandlers, userTokenClient: UserTokenClient, connections: Connections) {
+  constructor (private storage: Storage, authHandlers: AuthorizationHandlers, connections: Connections) {
     if (storage === undefined || storage === null) {
       throw new Error('Storage is required for UserAuthorization')
     }
@@ -141,7 +141,7 @@ export class Authorization {
       currentAuthHandler.text = currentAuthHandler.text ?? process.env[ah + '_connectionText'] as string
       currentAuthHandler.cnxPrefix = currentAuthHandler.cnxPrefix ?? process.env[ah + '_cnxPrefix'] as string
       currentAuthHandler.oboConnectionName = currentAuthHandler.text ?? process.env[ah + '_oboConnectionName'] as string
-      currentAuthHandler.flow = new OAuthFlow(this.storage, currentAuthHandler.name, userTokenClient, currentAuthHandler.title, currentAuthHandler.text)
+      currentAuthHandler.flow = new OAuthFlow(this.storage, currentAuthHandler.name, currentAuthHandler.title, currentAuthHandler.text)
     }
     logger.info('Authorization handlers configured with', Object.keys(this.authHandlers).length, 'handlers')
   }

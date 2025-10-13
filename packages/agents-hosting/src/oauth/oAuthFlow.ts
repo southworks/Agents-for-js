@@ -87,7 +87,7 @@ export class OAuthFlow {
    * @param cardTitle Optional title for the OAuth card. Defaults to 'Sign in'.
    * @param cardText Optional text for the OAuth card. Defaults to 'login'.
    */
-  constructor (private storage: Storage, absOauthConnectionName: string, tokenClient?: UserTokenClient, cardTitle?: string, cardText?: string) {
+  constructor (private storage: Storage, absOauthConnectionName: string, cardTitle?: string, cardText?: string) {
     this.state = { flowStarted: undefined, flowExpires: undefined, absOauthConnectionName }
     this.absOauthConnectionName = absOauthConnectionName
     this.cardTitle = cardTitle ?? this.cardTitle

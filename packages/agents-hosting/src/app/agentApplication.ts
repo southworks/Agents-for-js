@@ -126,7 +126,7 @@ export class AgentApplication<TState extends TurnState> {
     }
 
     if (this._options.authorization) {
-      this._authorization = new Authorization(this._options.storage!, this._options.authorization, this._adapter?.userTokenClient!, this._adapter.connectionManager)
+      this._authorization = new Authorization(this._options.storage!, this._options.authorization, this._adapter.connectionManager)
     }
 
     if (this._options.longRunningMessages && !this._adapter && !this._options.agentAppId) {

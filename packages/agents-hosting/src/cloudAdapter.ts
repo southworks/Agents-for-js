@@ -38,9 +38,6 @@ const logger = debug('agents:cloud-adapter')
  * and conversation continuations.
  */
 export class CloudAdapter extends BaseAdapter {
-  readonly ConnectorClientKey = Symbol('ConnectorClient')
-  readonly UserTokenClientKey = Symbol('UserTokenClient')
-
   /**
    * Client for connecting to the Azure Bot Service
    */
