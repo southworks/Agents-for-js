@@ -11,7 +11,6 @@ import { TurnContext } from '../../../turnContext'
 import { TokenExchangeRequest, TokenResponse, UserTokenClient } from '../../../oauth'
 import { loadAuthConfigFromEnv, MsalTokenProvider } from '../../../auth'
 import jwt, { JwtPayload } from 'jsonwebtoken'
-// import { RouteSelector } from '../../routeSelector'
 import { AgentApplication } from '../../agentApplication'
 import { HandlerStorage } from '../handlerStorage'
 import { Activity, ActivityTypes, Channels } from '@microsoft/agents-activity'
@@ -194,8 +193,10 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   }
 
   /**
-   * Gets the authorization context from the turn state.
+   * Retrieves the token for the user, optionally using on-behalf-of flow for specified scopes.
    * @param context The turn context.
+   * @param scopes Optional scopes for on-behalf-of token acquisition.
+   * @returns The token response containing the token or undefined if not available.
    */
   async token (context: TurnContext, scopes?: string[]): Promise<TokenResponse> {
     let { token } = this.getContext(context)
@@ -221,9 +222,9 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   }
 
   /**
-   * Logs out the user from the service.
+   * Signs out the user from the service.
    * @param context The turn context.
-   * @returns True if the logout was successful, false otherwise.
+   * @returns True if the signout was successful, false otherwise.
    */
   async signout (context: TurnContext): Promise<boolean> {
     const user = context.activity.from?.id
@@ -231,7 +232,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     const connection = this._settings.name!
 
     if (!channel || !user) {
-      throw new Error('Both \'activity.channelId\' and \'activity.from.id\' are required to perform logout.')
+      throw new Error('Both \'activity.channelId\' and \'activity.from.id\' are required to perform signout.')
     }
 
     logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
@@ -479,7 +480,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   }
 
   /**
-   *
+   * Sends an InvokeResponse activity if the channel is Microsoft Teams.
    */
   private sendInvokeResponse <T>(context: TurnContext, response: InvokeResponse<T>) {
     if (context.activity.channelId !== Channels.Msteams) {

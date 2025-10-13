@@ -72,7 +72,7 @@ export class AuthorizationManager {
    * Gets the registered authorization handlers.
    * @returns A record of authorization handlers by their IDs.
    */
-  public get handlers () {
+  public get handlers (): Record<string, AuthorizationHandler> {
     return this._handlers
   }
 
