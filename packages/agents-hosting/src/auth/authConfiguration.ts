@@ -6,6 +6,7 @@
 import { debug } from '@microsoft/agents-activity/logger'
 import { ConnectionMapItem } from './msalConnectionManager'
 import objectPath from 'object-path'
+import { Connections } from './connections'
 
 const logger = debug('agents:authConfiguration')
 const DEFAULT_CONNECTION = 'serviceConnection'
@@ -79,6 +80,7 @@ export interface AuthConfiguration {
    */
   altBlueprintConnectionName?: string
 }
+
 /**
  * Loads the authentication configuration from environment variables.
  *
@@ -259,6 +261,87 @@ function loadConnectionsMapFromEnv () {
   return {
     connections,
     connectionsMap,
+  }
+}
+
+/**
+ * Loads the authentication configuration from the provided config or from the environment variables
+ * providing default values for authority and issuers.
+ *
+ * @returns The authentication configuration.
+ * @throws Will throw an error if clientId is not provided in production.
+ *
+ * @example
+ * ```
+ * tenantId=your-tenant-id
+ * clientId=your-client-id
+ * clientSecret=your-client-secret
+ *
+ * certPemFile=your-cert-pem-file
+ * certKeyFile=your-cert-key-file
+ *
+ * FICClientId=your-FIC-client-id
+ *
+ * connectionName=your-connection-name
+ * authority=your-authority-endpoint
+ * ```
+ *
+ */
+export function getAuthConfigWithDefaults (config?: AuthConfiguration): AuthConfiguration {
+  if (!config) return loadAuthConfigFromEnv()
+
+  let envConfig: AuthConfiguration
+  let providedConnections
+
+  if (config.connections && config.connectionsMap) {
+    providedConnections = { connections: config.connections, connectionsMap: config.connectionsMap }
+  }
+  const connections = providedConnections ?? loadConnectionsMapFromEnv()
+
+  if (connections && connections.connectionsMap?.length === 0) {
+    // No connections provided, we need to populate the connections map with the old config settings
+    envConfig = buildLegacyAuthConfig()
+    envConfig.clientId = config.clientId ?? envConfig.clientId
+    envConfig.tenantId = config.tenantId ?? envConfig.tenantId
+    envConfig.clientSecret = config.clientSecret ?? envConfig.clientSecret
+    envConfig.certPemFile = config.certPemFile ?? envConfig.certPemFile
+    envConfig.certKeyFile = config.certKeyFile ?? envConfig.certKeyFile
+    envConfig.connectionName = config.connectionName ?? envConfig.connectionName
+    envConfig.FICClientId = config.FICClientId ?? envConfig.FICClientId
+    envConfig.authority = config.authority ?? envConfig.authority
+    envConfig.issuers = config.issuers ?? envConfig.issuers
+    envConfig.altBlueprintConnectionName = config.altBlueprintConnectionName ?? envConfig.altBlueprintConnectionName
+    connections.connections?.set(DEFAULT_CONNECTION, envConfig)
+    connections.connectionsMap.push({
+      serviceUrl: '*',
+      connection: DEFAULT_CONNECTION,
+    })
+  } else {
+    // There are connections provided, use the default or specified connection
+    const defaultItem = connections.connectionsMap?.find((item) => item.serviceUrl === '*')
+    const defaultConn = defaultItem ? connections.connections?.get(defaultItem.connection) : undefined
+    if (!defaultConn) {
+      throw new Error('No default connection found in environment connections.')
+    }
+    envConfig = buildLegacyAuthConfig()
+    envConfig.clientId = defaultConn.clientId ?? envConfig.clientId
+    envConfig.tenantId = defaultConn.tenantId ?? envConfig.tenantId
+    envConfig.clientSecret = defaultConn.clientSecret ?? envConfig.clientSecret
+    envConfig.certPemFile = defaultConn.certPemFile ?? envConfig.certPemFile
+    envConfig.certKeyFile = defaultConn.certKeyFile ?? envConfig.certKeyFile
+    envConfig.connectionName = defaultConn.connectionName ?? envConfig.connectionName
+    envConfig.FICClientId = defaultConn.FICClientId ?? envConfig.FICClientId
+    envConfig.authority = defaultConn.authority ?? envConfig.authority
+    envConfig.issuers = defaultConn.issuers ?? envConfig.issuers
+    envConfig.altBlueprintConnectionName = defaultConn.altBlueprintConnectionName ?? envConfig.altBlueprintConnectionName
+  }
+
+  envConfig.authority ??= 'https://login.microsoftonline.com'
+  envConfig.issuers ??= getDefaultIssuers(envConfig.tenantId ?? '', envConfig.authority)
+
+  return {
+    ...envConfig,
+    ...connections,
   }
 }
 
