@@ -6,7 +6,6 @@
 import { debug } from '@microsoft/agents-activity/logger'
 import { ConnectionMapItem } from './msalConnectionManager'
 import objectPath from 'object-path'
-import { Connections } from './connections'
 
 const logger = debug('agents:authConfiguration')
 const DEFAULT_CONNECTION = 'serviceConnection'
@@ -290,65 +289,40 @@ function loadConnectionsMapFromEnv () {
 export function getAuthConfigWithDefaults (config?: AuthConfiguration): AuthConfiguration {
   if (!config) return loadAuthConfigFromEnv()
 
-  let envConfig: AuthConfiguration
-  let providedConnections
+  const providedConnections = config.connections && config.connectionsMap
+    ? { connections: config.connections, connectionsMap: config.connectionsMap }
+    : undefined
 
-  if (config.connections && config.connectionsMap) {
-    providedConnections = { connections: config.connections, connectionsMap: config.connectionsMap }
-  }
   const connections = providedConnections ?? loadConnectionsMapFromEnv()
+
+  let mergedConfig: AuthConfiguration
 
   if (connections && connections.connectionsMap?.length === 0) {
     // No connections provided, we need to populate the connections map with the old config settings
-    envConfig = buildLegacyAuthConfig()
-    envConfig.clientId = config.clientId ?? envConfig.clientId
-    envConfig.tenantId = config.tenantId ?? envConfig.tenantId
-    envConfig.clientSecret = config.clientSecret ?? envConfig.clientSecret
-    envConfig.certPemFile = config.certPemFile ?? envConfig.certPemFile
-    envConfig.certKeyFile = config.certKeyFile ?? envConfig.certKeyFile
-    envConfig.connectionName = config.connectionName ?? envConfig.connectionName
-    envConfig.FICClientId = config.FICClientId ?? envConfig.FICClientId
-    envConfig.authority = config.authority ?? envConfig.authority
-    envConfig.issuers = config.issuers ?? envConfig.issuers
-    envConfig.altBlueprintConnectionName = config.altBlueprintConnectionName ?? envConfig.altBlueprintConnectionName
-    connections.connections?.set(DEFAULT_CONNECTION, envConfig)
-    connections.connectionsMap.push({
-      serviceUrl: '*',
-      connection: DEFAULT_CONNECTION,
-    })
+    mergedConfig = buildLegacyAuthConfig(undefined, config)
+    connections.connections?.set(DEFAULT_CONNECTION, mergedConfig)
+    connections.connectionsMap.push({ serviceUrl: '*', connection: DEFAULT_CONNECTION })
   } else {
-    // There are connections provided, use the default or specified connection
+    // There are connections provided, use the default connection
     const defaultItem = connections.connectionsMap?.find((item) => item.serviceUrl === '*')
     const defaultConn = defaultItem ? connections.connections?.get(defaultItem.connection) : undefined
     if (!defaultConn) {
       throw new Error('No default connection found in environment connections.')
     }
-    envConfig = buildLegacyAuthConfig()
-    envConfig.clientId = defaultConn.clientId ?? envConfig.clientId
-    envConfig.tenantId = defaultConn.tenantId ?? envConfig.tenantId
-    envConfig.clientSecret = defaultConn.clientSecret ?? envConfig.clientSecret
-    envConfig.certPemFile = defaultConn.certPemFile ?? envConfig.certPemFile
-    envConfig.certKeyFile = defaultConn.certKeyFile ?? envConfig.certKeyFile
-    envConfig.connectionName = defaultConn.connectionName ?? envConfig.connectionName
-    envConfig.FICClientId = defaultConn.FICClientId ?? envConfig.FICClientId
-    envConfig.authority = defaultConn.authority ?? envConfig.authority
-    envConfig.issuers = defaultConn.issuers ?? envConfig.issuers
-    envConfig.altBlueprintConnectionName = defaultConn.altBlueprintConnectionName ?? envConfig.altBlueprintConnectionName
+    mergedConfig = buildLegacyAuthConfig(undefined, defaultConn)
   }
 
-  envConfig.authority ??= 'https://login.microsoftonline.com'
-  envConfig.issuers ??= getDefaultIssuers(envConfig.tenantId ?? '', envConfig.authority)
-
   return {
-    ...envConfig,
+    ...mergedConfig,
     ...connections,
   }
 }
 
-function buildLegacyAuthConfig (envPrefix: string = ''): AuthConfiguration {
+function buildLegacyAuthConfig (envPrefix: string = '', customConfig?: AuthConfiguration): AuthConfiguration {
   const prefix = envPrefix ? `${envPrefix}_` : ''
-  const authority = process.env[`${prefix}authorityEndpoint`] ?? 'https://login.microsoftonline.com'
-  const clientId = process.env[`${prefix}clientId`]
+  const authority = customConfig?.authority ?? process.env[`${prefix}authorityEndpoint`] ?? 'https://login.microsoftonline.com'
+
+  const clientId = customConfig?.clientId ?? process.env[`${prefix}clientId`]
 
   if (!clientId && !envPrefix && process.env.NODE_ENV === 'production') {
     throw new Error('ClientId required in production')
@@ -357,17 +331,19 @@ function buildLegacyAuthConfig (envPrefix: string = ''): AuthConfiguration {
     throw new Error(`ClientId not found for connection: ${envPrefix}`)
   }
 
+  const tenantId = customConfig?.tenantId ?? process.env[`${prefix}tenantId`]
+
   return {
-    tenantId: process.env[`${prefix}tenantId`],
+    tenantId,
     clientId: clientId!,
-    clientSecret: process.env[`${prefix}clientSecret`],
-    certPemFile: process.env[`${prefix}certPemFile`],
-    certKeyFile: process.env[`${prefix}certKeyFile`],
-    connectionName: process.env[`${prefix}connectionName`],
-    FICClientId: process.env[`${prefix}FICClientId`],
+    clientSecret: customConfig?.clientSecret ?? process.env[`${prefix}clientSecret`],
+    certPemFile: customConfig?.certPemFile ?? process.env[`${prefix}certPemFile`],
+    certKeyFile: customConfig?.certKeyFile ?? process.env[`${prefix}certKeyFile`],
+    connectionName: customConfig?.connectionName ?? process.env[`${prefix}connectionName`],
+    FICClientId: customConfig?.FICClientId ?? process.env[`${prefix}FICClientId`],
     authority,
-    issuers: getDefaultIssuers(process.env[`${prefix}tenantId`] ?? '', authority),
-    altBlueprintConnectionName: process.env[`${prefix}altBlueprintConnectionName`],
+    issuers: customConfig?.issuers ?? getDefaultIssuers(tenantId as string, authority),
+    altBlueprintConnectionName: customConfig?.altBlueprintConnectionName ?? process.env[`${prefix}altBlueprintConnectionName`],
   }
 }
 

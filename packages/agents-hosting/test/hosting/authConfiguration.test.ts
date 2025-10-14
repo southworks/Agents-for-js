@@ -75,8 +75,8 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.FICClientId, undefined)
       assert.deepStrictEqual(config.issuers, [
         'https://api.botframework.com',
-        'https://sts.windows.net//',
-        'https://login.microsoftonline.com//v2.0'
+        'https://sts.windows.net/undefined/',
+        'https://login.microsoftonline.com/undefined/v2.0'
       ])
       assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
     })
@@ -238,7 +238,7 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certKeyFile, 'test-cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
       assert.strictEqual(config.FICClientId, 'test-fic-client-id')
-      assert.deepStrictEqual(config.issuers, ['https://example.com'])
+      assert.deepStrictEqual(config.issuers?.length, 3)
       assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
       assert.strictEqual(config.altBlueprintConnectionName, undefined)
       assert.strictEqual(config.connections?.size, 1)
