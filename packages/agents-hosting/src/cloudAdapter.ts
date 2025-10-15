@@ -9,7 +9,7 @@ import { TurnContext } from './turnContext'
 import { Response } from 'express'
 import { Request } from './auth/request'
 import { ConnectorClient } from './connector-client/connectorClient'
-import { AuthConfiguration, loadAuthConfigFromEnv } from './auth/authConfiguration'
+import { AuthConfiguration, getAuthConfigWithDefaults } from './auth/authConfiguration'
 import { AuthProvider } from './auth/authProvider'
 import { ApxProductionScope } from './auth/authConstants'
 import { MsalConnectionManager } from './auth/msalConnectionManager'
@@ -50,7 +50,7 @@ export class CloudAdapter extends BaseAdapter {
    */
   constructor (authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient) {
     super()
-    authConfig = authConfig ?? loadAuthConfigFromEnv()
+    authConfig = getAuthConfigWithDefaults(authConfig)
     this.connectionManager = new MsalConnectionManager(undefined, undefined, authConfig)
   }
 
@@ -194,7 +194,7 @@ export class CloudAdapter extends BaseAdapter {
    */
   protected async createUserTokenClient (
     tokenServiceEndpoint: string = 'https://api.botframework.com',
-    scope: string = 'https://api.botframework.com/.default',
+    scope: string = 'https://api.botframework.com',
     audience: string = 'https://api.botframework.com',
     headers?: HeaderPropagationCollection
   ): Promise<UserTokenClient> {

@@ -79,6 +79,7 @@ export interface AuthConfiguration {
    */
   altBlueprintConnectionName?: string
 }
+
 /**
  * Loads the authentication configuration from environment variables.
  *
@@ -262,10 +263,66 @@ function loadConnectionsMapFromEnv () {
   }
 }
 
-function buildLegacyAuthConfig (envPrefix: string = ''): AuthConfiguration {
+/**
+ * Loads the authentication configuration from the provided config or from the environment variables
+ * providing default values for authority and issuers.
+ *
+ * @returns The authentication configuration.
+ * @throws Will throw an error if clientId is not provided in production.
+ *
+ * @example
+ * ```
+ * tenantId=your-tenant-id
+ * clientId=your-client-id
+ * clientSecret=your-client-secret
+ *
+ * certPemFile=your-cert-pem-file
+ * certKeyFile=your-cert-key-file
+ *
+ * FICClientId=your-FIC-client-id
+ *
+ * connectionName=your-connection-name
+ * authority=your-authority-endpoint
+ * ```
+ *
+ */
+export function getAuthConfigWithDefaults (config?: AuthConfiguration): AuthConfiguration {
+  if (!config) return loadAuthConfigFromEnv()
+
+  const providedConnections = config.connections && config.connectionsMap
+    ? { connections: config.connections, connectionsMap: config.connectionsMap }
+    : undefined
+
+  const connections = providedConnections ?? loadConnectionsMapFromEnv()
+
+  let mergedConfig: AuthConfiguration
+
+  if (connections && connections.connectionsMap?.length === 0) {
+    // No connections provided, we need to populate the connections map with the old config settings
+    mergedConfig = buildLegacyAuthConfig(undefined, config)
+    connections.connections?.set(DEFAULT_CONNECTION, mergedConfig)
+    connections.connectionsMap.push({ serviceUrl: '*', connection: DEFAULT_CONNECTION })
+  } else {
+    // There are connections provided, use the default connection
+    const defaultItem = connections.connectionsMap?.find((item) => item.serviceUrl === '*')
+    const defaultConn = defaultItem ? connections.connections?.get(defaultItem.connection) : undefined
+    if (!defaultConn) {
+      throw new Error('No default connection found in environment connections.')
+    }
+    mergedConfig = buildLegacyAuthConfig(undefined, defaultConn)
+  }
+
+  return {
+    ...mergedConfig,
+    ...connections,
+  }
+}
+
+function buildLegacyAuthConfig (envPrefix: string = '', customConfig?: AuthConfiguration): AuthConfiguration {
   const prefix = envPrefix ? `${envPrefix}_` : ''
-  const authority = process.env[`${prefix}authorityEndpoint`] ?? 'https://login.microsoftonline.com'
-  const clientId = process.env[`${prefix}clientId`]
+  const authority = customConfig?.authority ?? process.env[`${prefix}authorityEndpoint`] ?? 'https://login.microsoftonline.com'
+
+  const clientId = customConfig?.clientId ?? process.env[`${prefix}clientId`]
 
   if (!clientId && !envPrefix && process.env.NODE_ENV === 'production') {
     throw new Error('ClientId required in production')
@@ -274,17 +331,19 @@ function buildLegacyAuthConfig (envPrefix: string = ''): AuthConfiguration {
     throw new Error(`ClientId not found for connection: ${envPrefix}`)
   }
 
+  const tenantId = customConfig?.tenantId ?? process.env[`${prefix}tenantId`]
+
   return {
-    tenantId: process.env[`${prefix}tenantId`],
+    tenantId,
     clientId: clientId!,
-    clientSecret: process.env[`${prefix}clientSecret`],
-    certPemFile: process.env[`${prefix}certPemFile`],
-    certKeyFile: process.env[`${prefix}certKeyFile`],
-    connectionName: process.env[`${prefix}connectionName`],
-    FICClientId: process.env[`${prefix}FICClientId`],
+    clientSecret: customConfig?.clientSecret ?? process.env[`${prefix}clientSecret`],
+    certPemFile: customConfig?.certPemFile ?? process.env[`${prefix}certPemFile`],
+    certKeyFile: customConfig?.certKeyFile ?? process.env[`${prefix}certKeyFile`],
+    connectionName: customConfig?.connectionName ?? process.env[`${prefix}connectionName`],
+    FICClientId: customConfig?.FICClientId ?? process.env[`${prefix}FICClientId`],
     authority,
-    issuers: getDefaultIssuers(process.env[`${prefix}tenantId`] ?? '', authority),
-    altBlueprintConnectionName: process.env[`${prefix}altBlueprintConnectionName`],
+    issuers: customConfig?.issuers ?? getDefaultIssuers(tenantId as string, authority),
+    altBlueprintConnectionName: customConfig?.altBlueprintConnectionName ?? process.env[`${prefix}altBlueprintConnectionName`],
   }
 }
 
