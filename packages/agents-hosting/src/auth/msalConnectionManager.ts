@@ -90,7 +90,7 @@ export class MsalConnectionManager implements Connections {
    * ServiceUrl is:  A regex to match with, or "*" for any serviceUrl value.
    * Connection is: A name in the 'Connections' list.
    */
-  getTokenProvider (audience: any, serviceUrl: string): MsalTokenProvider {
+  getTokenProvider (audience: string, serviceUrl: string): MsalTokenProvider {
     if (!audience || !serviceUrl) throw new Error('Audience and Service URL are required to get the token provider.')
 
     if (this._connectionsMap.length === 0) {

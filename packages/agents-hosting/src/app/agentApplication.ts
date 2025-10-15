@@ -21,6 +21,7 @@ import { RouteList } from './routeList'
 import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, AuthorizationManager } from './auth'
+import { JwtPayload } from 'jsonwebtoken'
 
 const logger = debug('agents:app')
 
@@ -229,6 +230,7 @@ export class AgentApplication<TState extends TurnState> {
    * @param isInvokeRoute - Whether this route is for invoke activities. Defaults to false.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
    * @param authHandlers - Array of authentication handler names for this route. Defaults to empty array.
+   * @param isAgenticRoute - Whether this route is for agentic requests only. Defaults to false.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -249,8 +251,8 @@ export class AgentApplication<TState extends TurnState> {
    * ```
    *
    */
-  public addRoute (selector: RouteSelector, handler: RouteHandler<TState>, isInvokeRoute: boolean = false, rank: number = RouteRank.Unspecified, authHandlers: string[] = []): this {
-    this._routes.addRoute(selector, handler, isInvokeRoute, rank, authHandlers)
+  public addRoute (selector: RouteSelector, handler: RouteHandler<TState>, isInvokeRoute: boolean = false, rank: number = RouteRank.Unspecified, authHandlers: string[] = [], isAgenticRoute: boolean = false): this {
+    this._routes.addRoute(selector, handler, isInvokeRoute, rank, authHandlers, isAgenticRoute)
     return this
   }
 
@@ -261,6 +263,7 @@ export class AgentApplication<TState extends TurnState> {
    * @param handler - The handler function that will be called when the specified activity type is received.
    * @param authHandlers - Array of authentication handler names for this activity. Defaults to empty array.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
+   * @param isAgenticRoute - Indicates if this handler is for agentic requests only. Defaults to false.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -279,11 +282,12 @@ export class AgentApplication<TState extends TurnState> {
     type: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
     authHandlers: string[] = [],
-    rank: RouteRank = RouteRank.Unspecified
+    rank: RouteRank = RouteRank.Unspecified,
+    isAgenticRoute: boolean = false
   ): this {
     (Array.isArray(type) ? type : [type]).forEach((t) => {
-      const selector = this.createActivitySelector(t)
-      this.addRoute(selector, handler, false, rank, authHandlers)
+      const selector = this.createActivitySelector(t, isAgenticRoute)
+      this.addRoute(selector, handler, false, rank, authHandlers, isAgenticRoute)
     })
     return this
   }
@@ -295,6 +299,7 @@ export class AgentApplication<TState extends TurnState> {
    * @param handler - The handler function that will be called when the specified event occurs.
    * @param authHandlers - Array of authentication handler names for this event. Defaults to empty array.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
+   * @param isAgenticRoute - Indicates if this handler is for agentic requests only. Defaults to false.
    * @returns The current instance of the application.
    * @throws Error if the handler is not a function.
    *
@@ -318,7 +323,8 @@ export class AgentApplication<TState extends TurnState> {
     event: ConversationUpdateEvents,
     handler: (context: TurnContext, state: TState) => Promise<void>,
     authHandlers: string[] = [],
-    rank: RouteRank = RouteRank.Unspecified
+    rank: RouteRank = RouteRank.Unspecified,
+    isAgenticRoute: boolean = false
   ): this {
     if (typeof handler !== 'function') {
       throw new Error(
@@ -326,8 +332,8 @@ export class AgentApplication<TState extends TurnState> {
       )
     }
 
-    const selector = this.createConversationUpdateSelector(event)
-    this.addRoute(selector, handler, false, rank, authHandlers)
+    const selector = this.createConversationUpdateSelector(event, isAgenticRoute)
+    this.addRoute(selector, handler, false, rank, authHandlers, isAgenticRoute)
     return this
   }
 
@@ -340,6 +346,7 @@ export class AgentApplication<TState extends TurnState> {
    * @throws Error if the adapter is not configured.
    */
   protected async continueConversationAsync (
+    botAppIdOrIdentity: string | JwtPayload,
     conversationReferenceOrContext: ConversationReference | TurnContext,
     logic: (context: TurnContext) => Promise<void>
   ): Promise<void> {
@@ -361,7 +368,7 @@ export class AgentApplication<TState extends TurnState> {
       reference = conversationReferenceOrContext
     }
 
-    await this._adapter.continueConversation(reference, logic)
+    await this._adapter.continueConversation(botAppIdOrIdentity, reference, logic)
   }
 
   /**
@@ -372,6 +379,7 @@ export class AgentApplication<TState extends TurnState> {
    * @param handler - The handler function that will be called when a matching message is received.
    * @param authHandlers - Array of authentication handler names for this message handler. Defaults to empty array.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
+   * @param isAgenticRoute - Indicates if this handler is for agentic requests only. Defaults to false.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -396,11 +404,12 @@ export class AgentApplication<TState extends TurnState> {
     keyword: string | RegExp | RouteSelector | (string | RegExp | RouteSelector)[],
     handler: (context: TurnContext, state: TState) => Promise<void>,
     authHandlers: string[] = [],
-    rank: RouteRank = RouteRank.Unspecified
+    rank: RouteRank = RouteRank.Unspecified,
+    isAgenticRoute: boolean = false
   ): this {
     (Array.isArray(keyword) ? keyword : [keyword]).forEach((k) => {
-      const selector = this.createMessageSelector(k)
-      this.addRoute(selector, handler, false, rank, authHandlers)
+      const selector = this.createMessageSelector(k, isAgenticRoute)
+      this.addRoute(selector, handler, false, rank, authHandlers, isAgenticRoute)
     })
     return this
   }
@@ -470,6 +479,7 @@ export class AgentApplication<TState extends TurnState> {
    *
    * @param handler - The handler function that will be called when a message reaction is added.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
+   * @param isAgenticRoute - Indicates if this handler is for agentic requests only. Defaults to false.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -489,14 +499,16 @@ export class AgentApplication<TState extends TurnState> {
    */
   public onMessageReactionAdded (
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    rank: RouteRank = RouteRank.Unspecified): this {
+    rank: RouteRank = RouteRank.Unspecified,
+    isAgenticRoute: boolean = false): this {
     const selector = async (context: TurnContext): Promise<boolean> => {
       return context.activity.type === ActivityTypes.MessageReaction &&
              Array.isArray(context.activity.reactionsAdded) &&
-             context.activity.reactionsAdded.length > 0
+             context.activity.reactionsAdded.length > 0 &&
+             (!isAgenticRoute || context.activity.isAgenticRequest())
     }
 
-    this.addRoute(selector, handler, false, rank)
+    this.addRoute(selector, handler, false, rank, [], isAgenticRoute)
     return this
   }
 
@@ -505,6 +517,7 @@ export class AgentApplication<TState extends TurnState> {
    *
    * @param handler - The handler function that will be called when a message reaction is removed.
    * @param rank - The rank of the route, used to determine the order of evaluation. Defaults to RouteRank.Unspecified.
+   * @param isAgenticRoute - Indicates if this handler is for agentic requests only. Defaults to false.
    * @returns The current instance of the application.
    *
    * @remarks
@@ -524,14 +537,16 @@ export class AgentApplication<TState extends TurnState> {
    */
   public onMessageReactionRemoved (
     handler: (context: TurnContext, state: TState) => Promise<void>,
-    rank: RouteRank = RouteRank.Unspecified): this {
+    rank: RouteRank = RouteRank.Unspecified,
+    isAgenticRoute: boolean = false): this {
     const selector = async (context: TurnContext): Promise<boolean> => {
       return context.activity.type === ActivityTypes.MessageReaction &&
              Array.isArray(context.activity.reactionsRemoved) &&
-             context.activity.reactionsRemoved.length > 0
+             context.activity.reactionsRemoved.length > 0 &&
+             (!isAgenticRoute || context.activity.isAgenticRequest())
     }
 
-    this.addRoute(selector, handler, false, rank)
+    this.addRoute(selector, handler, false, rank, undefined, isAgenticRoute)
     return this
   }
 
@@ -615,7 +630,7 @@ export class AgentApplication<TState extends TurnState> {
         const { authorized } = await this._authorizationManager?.process(context, async activity => {
           // The incoming activity may come from the storage, so we need to restore the auth handlers.
           // Since the current route may not have auth handlers.
-          const route = await this.getRoute(new TurnContext(context.adapter, activity))
+          const route = await this.getRoute(new TurnContext(context.adapter, activity, turnContext.identity))
           return route?.authHandlers ?? []
         }) ?? { authorized: true } // Default to authorized if no auth manager
 
@@ -692,13 +707,14 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public async sendProactiveActivity (
+    botAppIdOrIdentity: string | JwtPayload,
     context: TurnContext | ConversationReference,
     activityOrText: string | Activity,
     speak?: string,
     inputHint?: string
   ): Promise<ResourceResponse | undefined> {
     let response: ResourceResponse | undefined
-    await this.continueConversationAsync(context, async (ctx) => {
+    await this.continueConversationAsync(botAppIdOrIdentity, context, async (ctx) => {
       response = await ctx.sendActivity(activityOrText, speak, inputHint)
     })
 
@@ -897,7 +913,7 @@ export class AgentApplication<TState extends TurnState> {
   ): Promise<boolean> {
     if (context.activity.type === ActivityTypes.Message && this._options.longRunningMessages) {
       return new Promise<boolean>((resolve, reject) => {
-        this.continueConversationAsync(context, async (ctx) => {
+        this.continueConversationAsync(context.identity, context, async (ctx) => {
           try {
             for (const key in context.activity) {
               (ctx.activity as any)[key] = (context.activity as any)[key]
@@ -920,20 +936,25 @@ export class AgentApplication<TState extends TurnState> {
    * Creates a selector function for activity types.
    *
    * @param type - The activity type to match. Can be a string, RegExp, or RouteSelector function.
+   * @param isAgenticRoute - Indicates if the route is for agentic requests only. Defaults to false.
    * @returns A RouteSelector function that matches the specified activity type.
    */
-  private createActivitySelector (type: string | RegExp | RouteSelector): RouteSelector {
+  private createActivitySelector (type: string | RegExp | RouteSelector, isAgenticRoute: boolean = false): RouteSelector {
     if (typeof type === 'function') {
       return type
     } else if (type instanceof RegExp) {
       return (context: TurnContext) => {
-        return Promise.resolve(context?.activity?.type ? type.test(context.activity.type) : false)
+        return Promise.resolve(context?.activity?.type
+          ? type.test(context.activity.type) && (!isAgenticRoute || context.activity.isAgenticRequest())
+          : false)
       }
     } else {
       const typeName = type.toString().toLocaleLowerCase()
       return (context: TurnContext) => {
         return Promise.resolve(
-          context?.activity?.type ? context.activity.type.toLocaleLowerCase() === typeName : false
+          context?.activity?.type
+            ? context.activity.type.toLocaleLowerCase() === typeName && (!isAgenticRoute || context.activity.isAgenticRequest())
+            : false
         )
       }
     }
@@ -943,13 +964,15 @@ export class AgentApplication<TState extends TurnState> {
    * Creates a selector function for conversation update events.
    *
    * @param event - The conversation update event to match.
+   * @param isAgenticRoute - Indicates if the route is for agentic requests only. Defaults to false.
    * @returns A RouteSelector function that matches the specified conversation update event.
    */
-  private createConversationUpdateSelector (event: ConversationUpdateEvents): RouteSelector {
+  private createConversationUpdateSelector (event: ConversationUpdateEvents, isAgenticRoute: boolean = false): RouteSelector {
     switch (event) {
       case 'membersAdded':
         return (context: TurnContext): Promise<boolean> => {
           return Promise.resolve(
+            (!isAgenticRoute || context.activity.isAgenticRequest()) &&
             context?.activity?.type === ActivityTypes.ConversationUpdate &&
                           Array.isArray(context?.activity?.membersAdded) &&
                           context.activity.membersAdded.length > 0
@@ -958,6 +981,7 @@ export class AgentApplication<TState extends TurnState> {
       case 'membersRemoved':
         return (context: TurnContext): Promise<boolean> => {
           return Promise.resolve(
+            (!isAgenticRoute || context.activity.isAgenticRequest()) &&
             context?.activity?.type === ActivityTypes.ConversationUpdate &&
                           Array.isArray(context?.activity?.membersRemoved) &&
                           context.activity.membersRemoved.length > 0
@@ -966,6 +990,7 @@ export class AgentApplication<TState extends TurnState> {
       default:
         return (context: TurnContext): Promise<boolean> => {
           return Promise.resolve(
+            (!isAgenticRoute || context.activity.isAgenticRequest()) &&
             context?.activity?.type === ActivityTypes.ConversationUpdate &&
                           context?.activity?.channelData?.eventType === event
           )
@@ -977,14 +1002,17 @@ export class AgentApplication<TState extends TurnState> {
    * Creates a selector function for message content matching.
    *
    * @param keyword - The keyword, pattern, or selector function to match against message text.
+   * @param isAgenticRoute - Indicates if the route is for agentic requests only. Defaults to false.
    * @returns A RouteSelector function that matches messages based on the specified keyword.
    */
-  private createMessageSelector (keyword: string | RegExp | RouteSelector): RouteSelector {
+  private createMessageSelector (keyword: string | RegExp | RouteSelector, isAgenticRoute: boolean = false): RouteSelector {
     if (typeof keyword === 'function') {
       return keyword
     } else if (keyword instanceof RegExp) {
       return (context: TurnContext) => {
-        if (context?.activity?.type === ActivityTypes.Message && context.activity.text) {
+        if (context?.activity?.type === ActivityTypes.Message &&
+          context.activity.text &&
+          (!isAgenticRoute || context.activity.isAgenticRequest())) {
           return Promise.resolve(keyword.test(context.activity.text))
         } else {
           return Promise.resolve(false)
@@ -993,7 +1021,9 @@ export class AgentApplication<TState extends TurnState> {
     } else {
       const k = keyword.toString().toLocaleLowerCase()
       return (context: TurnContext) => {
-        if (context?.activity?.type === ActivityTypes.Message && context.activity.text) {
+        if (context?.activity?.type === ActivityTypes.Message &&
+          context.activity.text &&
+        (!isAgenticRoute || context.activity.isAgenticRequest())) {
           return Promise.resolve(context.activity.text.toLocaleLowerCase() === k)
         } else {
           return Promise.resolve(false)
