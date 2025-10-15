@@ -9,7 +9,6 @@ import { MessageFactory } from '../../../messageFactory'
 import { CardFactory } from '../../../cards'
 import { TurnContext } from '../../../turnContext'
 import { TokenExchangeRequest, TokenResponse, UserTokenClient } from '../../../oauth'
-import { loadAuthConfigFromEnv, MsalTokenProvider } from '../../../auth'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import { AgentApplication } from '../../agentApplication'
 import { HandlerStorage } from '../handlerStorage'
@@ -77,11 +76,6 @@ export interface AzureBotAuthorizationOptions {
    */
   text?: string,
   /**
-   * Prefix to load the authentication configuration from environment variables.
-   * @see {@link loadAuthConfigFromEnv}
-   */
-  cnxPrefix?: string
-  /**
    * Maximum number of attempts for entering the magic code. Defaults to 2.
    */
   maxAttempts?: number
@@ -127,16 +121,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    * @param app The agent application instance.
    */
   constructor (private app : AgentApplication<any>, public readonly id: string, settings: AzureBotAuthorizationOptions) {
-    if (!app.adapter.userTokenClient) {
-      throw new Error(this.prefix('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.'))
-    }
-
-    if (!app.adapter.authProvider) {
-      throw new Error(this.prefix('The \'authProvider\' is not available in the adapter. Ensure that the adapter supports authentication.'))
-    }
-
-    if (!app.adapter.authConfig) {
-      throw new Error(this.prefix('The \'authConfig\' is not available in the adapter. Ensure that the adapter is properly configured.'))
+    if (!this.app.options.connections) {
+      throw new Error(this.prefix('The \'connections\' option is not available in the app options. Ensure that the app is properly configured.'))
     }
 
     if (!app.options.storage) {
@@ -151,7 +137,6 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       name: settings.name ?? (process.env[`${this.id}_connectionName`]),
       title: settings.title ?? (process.env[`${this.id}_connectionTitle`]),
       text: settings.text ?? (process.env[`${this.id}_connectionText`]),
-      cnxPrefix: settings.cnxPrefix ?? (process.env[`${this.id}_cnxPrefix`]),
       maxAttempts: settings.maxAttempts ?? parseInt(process.env[`${this.id}_maxAttempts`]!),
       messages: {
         invalidCode: settings.messages?.invalidCode ?? process.env[`${this.id}_messages_invalidCode`],
@@ -204,7 +189,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     if (!token?.trim()) {
       const { activity } = context
 
-      const userTokenClient = await this.getUserTokenClient()
+      const userTokenClient = await this.getUserTokenClient(context)
       // Using getTokenOrSignInResource instead of getUserToken to avoid HTTP 404 errors.
       const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
       token = tokenResponse?.token
@@ -218,7 +203,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       return { token }
     }
 
-    return await this.handleOBO(context, token, scopes)
+    return await this.handleOBO(token, scopes)
   }
 
   /**
@@ -236,7 +221,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     }
 
     logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
-    const userTokenClient = await this.getUserTokenClient()
+    const userTokenClient = await this.getUserTokenClient(context)
     await userTokenClient.signOut(user, connection, channel)
     return true
   }
@@ -251,7 +236,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     const { activity } = context
 
     const storage = new HandlerStorage<AzureBotActiveHandler>(this.app.options.storage!, context)
-    const userTokenClient = await this.getUserTokenClient()
+    const userTokenClient = await this.getUserTokenClient(context)
 
     if (active) {
       logger.debug(this.prefix('Sign-in active session detected'), active.activity)
@@ -348,25 +333,20 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   /**
    * Handles on-behalf-of token acquisition.
    */
-  private async handleOBO (context: TurnContext, token:string, scopes: string[]): Promise<TokenResponse> {
-    const { cnxPrefix } = this._settings
-
+  private async handleOBO (token:string, scopes: string[]): Promise<TokenResponse> {
     if (!this.isExchangeable(token)) {
       throw new Error(this.prefix('The current token is not exchangeable for an on-behalf-of flow. Ensure the token audience starts with \'api://\'.'))
     }
 
-    const msalTokenProvider = new MsalTokenProvider()
-    const authConfig = cnxPrefix ? loadAuthConfigFromEnv(cnxPrefix) : context.adapter.authConfig
-
     try {
-      const newToken = await msalTokenProvider.acquireTokenOnBehalfOf(authConfig, scopes, token)
+      // TODO: add obo connection from setting in replacement of this._settings.name!, in this case
+      const oboProvider = this.app.options.connections!.getConnection(this._settings.name!)
+      const newToken = await oboProvider.acquireTokenOnBehalfOf(scopes, token)
       logger.debug(this.prefix('Successfully acquired on-behalf-of token'))
-      await this._onSuccess?.(context)
       return { token: newToken }
     } catch (error) {
       const reason = `Failed to exchange on-behalf-of token for scopes: [${scopes.join(', ')}]`
       logger.error(this.prefix(reason), error)
-      await this._onFailure?.(context, reason)
       return { token: undefined }
     }
   }
@@ -389,7 +369,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   private async setToken (storage: HandlerStorage<AzureBotActiveHandler>, context: TurnContext, active?: AzureBotActiveHandler, code?: string): Promise<AuthorizationHandlerStatus> {
     const { activity } = context
 
-    const userTokenClient = await this.getUserTokenClient()
+    const userTokenClient = await this.getUserTokenClient(context)
     const { tokenResponse, signInResource } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
 
     if (!tokenResponse && active) {
@@ -470,13 +450,14 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   }
 
   /**
-   * Gets the user token client, ensuring it has a valid auth token.
+   * Gets the user token client from the turn context.
    */
-  private async getUserTokenClient (): Promise<UserTokenClient> {
-    const userTokenClient = this.app.adapter.userTokenClient
-    const accessToken = await this.app.adapter.authProvider.getAccessToken(this.app.adapter.authConfig, 'https://api.botframework.com')
-    userTokenClient?.updateAuthToken(accessToken)
-    return userTokenClient!
+  private async getUserTokenClient (context: TurnContext): Promise<UserTokenClient> {
+    const userTokenClient = context.turnState.get<UserTokenClient>(this.app.adapter.UserTokenClientKey)
+    if (!userTokenClient) {
+      throw new Error(this.prefix('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.'))
+    }
+    return userTokenClient
   }
 
   /**
