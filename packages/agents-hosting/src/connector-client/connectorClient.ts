@@ -112,6 +112,38 @@ export class ConnectorClient {
   }
 
   /**
+   * Creates a new instance of ConnectorClient with token.
+   * @param baseURL - The base URL for the API.
+   * @param token - The authentication token.
+   * @param scope - The scope for the authentication token.
+   * @param headers - Optional headers to propagate in the request.
+   * @returns A new instance of ConnectorClient.
+   */
+  static async createClientWithToken (
+    baseURL: string,
+    token: string,
+    scope: string,
+    headers?: HeaderPropagationCollection
+  ): Promise<ConnectorClient> {
+    const headerPropagation = headers ?? new HeaderPropagation({ 'User-Agent': '' })
+    headerPropagation.concat({ 'User-Agent': getProductInfo() })
+    headerPropagation.override({ Accept: 'application/json' })
+
+    const axiosInstance = axios.create({
+      baseURL,
+      headers: headerPropagation.outgoing,
+      transformRequest: [
+        (data, headers) => {
+          return JSON.stringify(normalizeOutgoingActivity(data))
+        }]
+    })
+
+    axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`
+
+    return new ConnectorClient(axiosInstance)
+  }
+
+  /**
    * Retrieves a list of conversations.
    * @param continuationToken - The continuation token for pagination.
    * @returns A list of conversations.
