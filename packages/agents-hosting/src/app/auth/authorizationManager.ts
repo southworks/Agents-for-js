@@ -8,7 +8,8 @@ import { AgentApplication } from '../agentApplication'
 import { AgenticAuthorization, AzureBotAuthorization } from './handlers'
 import { TurnContext } from '../../turnContext'
 import { HandlerStorage } from './handlerStorage'
-import { ActiveAuthorizationHandler, AuthorizationHandlerStatus, AuthorizationHandler } from './types'
+import { ActiveAuthorizationHandler, AuthorizationHandlerStatus, AuthorizationHandler, AuthorizationHandlerSettings } from './types'
+import { Connections } from '../../auth/connections'
 
 const logger = debug('agents:authorization:manager')
 
@@ -50,7 +51,7 @@ export class AuthorizationManager {
    * Creates an instance of the AuthorizationManager.
    * @param app The agent application instance.
    */
-  constructor (private app: AgentApplication<any>) {
+  constructor (private app: AgentApplication<any>, connections: Connections) {
     if (!app.options.storage) {
       throw new Error('Storage is required for Authorization. Ensure that a storage provider is configured in the AgentApplication options.')
     }
@@ -59,11 +60,12 @@ export class AuthorizationManager {
       throw new Error('The AgentApplication.authorization does not have any auth handlers')
     }
 
+    const settings: AuthorizationHandlerSettings = { storage: app.options.storage, connections }
     for (const [id, handler] of Object.entries(app.options.authorization)) {
       if (handler.type === 'agentic') {
-        this._handlers[id] = new AgenticAuthorization(app, id, handler)
+        this._handlers[id] = new AgenticAuthorization(id, handler, settings)
       } else {
-        this._handlers[id] = new AzureBotAuthorization(app, id, handler)
+        this._handlers[id] = new AzureBotAuthorization(id, handler, settings)
       }
     }
   }

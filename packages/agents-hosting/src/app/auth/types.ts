@@ -4,10 +4,11 @@
  */
 
 import { Activity } from '@microsoft/agents-activity'
-import { StoreItem } from '../../storage'
+import { Storage, StoreItem } from '../../storage'
 import { TurnContext } from '../../turnContext'
 import { AgenticAuthorizationOptions, AzureBotAuthorizationOptions } from './handlers'
 import { TokenResponse } from '../../oauth'
+import { Connections } from '../../auth/connections'
 
 /**
  * Authorization configuration options.
@@ -77,4 +78,18 @@ export interface AuthorizationHandler {
    * @param callback The callback to invoke on failure.
    */
   onFailure(callback: (context: TurnContext, reason?: string) => Promise<void> | void): void;
+}
+
+/**
+ * Common settings required by authorization handlers.
+ */
+export interface AuthorizationHandlerSettings {
+  /**
+   * Storage instance for persisting handler state.
+   */
+  storage: Storage
+  /**
+   * Connections instance for managing authentication connections.
+   */
+  connections: Connections
 }

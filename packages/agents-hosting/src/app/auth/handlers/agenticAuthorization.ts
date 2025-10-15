@@ -6,7 +6,7 @@
 import { debug } from '@microsoft/agents-activity'
 import { AgentApplication } from '../..'
 import { TurnContext } from '../../../turnContext'
-import { ActiveAuthorizationHandler, AuthorizationHandler, AuthorizationHandlerStatus } from '../types'
+import { ActiveAuthorizationHandler, AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus } from '../types'
 import { TokenResponse } from '../../../oauth'
 
 const logger = debug('agents:authorization:agentic')
@@ -30,10 +30,15 @@ export interface AgenticAuthorizationOptions {
 }
 
 /**
+ * Settings for configuring the Agentic authorization handler.
+ */
+export interface AgenticAuthorizationSettings extends AuthorizationHandlerSettings {}
+
+/**
  * Authorization handler for Agentic authentication.
  */
 export class AgenticAuthorization implements AuthorizationHandler {
-  constructor (private app : AgentApplication<any>, public readonly id: string, private options: AgenticAuthorizationOptions) {}
+  constructor (public readonly id: string, private options: AgenticAuthorizationOptions, private settings: AgenticAuthorizationSettings) {}
 
   signin (context: TurnContext, active?: ActiveAuthorizationHandler): Promise<AuthorizationHandlerStatus> {
     logger.info('signin called')

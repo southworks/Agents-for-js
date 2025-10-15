@@ -4,13 +4,12 @@
  */
 
 import { debug } from '@microsoft/agents-activity/logger'
-import { AuthorizationHandlerStatus, AuthorizationHandler, ActiveAuthorizationHandler } from '../types'
+import { AuthorizationHandlerStatus, AuthorizationHandler, ActiveAuthorizationHandler, AuthorizationHandlerSettings } from '../types'
 import { MessageFactory } from '../../../messageFactory'
 import { CardFactory } from '../../../cards'
 import { TurnContext } from '../../../turnContext'
 import { TokenExchangeRequest, TokenResponse, UserTokenClient } from '../../../oauth'
 import jwt, { JwtPayload } from 'jsonwebtoken'
-import { AgentApplication } from '../../agentApplication'
 import { HandlerStorage } from '../handlerStorage'
 import { Activity, ActivityTypes, Channels } from '@microsoft/agents-activity'
 import { InvokeResponse } from '../../../invoke'
@@ -86,6 +85,11 @@ export interface AzureBotAuthorizationOptions {
 }
 
 /**
+ * Settings for configuring the AzureBot authorization handler.
+ */
+export interface AzureBotAuthorizationSettings extends AuthorizationHandlerSettings {}
+
+/**
  * Interface for token verification state.
  */
 interface TokenVerifyState {
@@ -110,29 +114,29 @@ interface TokenExchangeInvokeResponse {
  * Default implementation of an authorization handler using Azure Bot Service.
  */
 export class AzureBotAuthorization implements AuthorizationHandler {
-  private _settings: AzureBotAuthorizationOptions
+  private _options: AzureBotAuthorizationOptions
   private _onSuccess?: Parameters<AuthorizationHandler['onSuccess']>[0]
   private _onFailure?: Parameters<AuthorizationHandler['onFailure']>[0]
 
   /**
    * Creates an instance of the AzureBotAuthorization.
    * @param id The unique identifier for the handler.
-   * @param settings The settings for the handler.
+   * @param options The settings for the handler.
    * @param app The agent application instance.
    */
-  constructor (private app : AgentApplication<any>, public readonly id: string, settings: AzureBotAuthorizationOptions) {
-    if (!this.app.options.connections) {
-      throw new Error(this.prefix('The \'connections\' option is not available in the app options. Ensure that the app is properly configured.'))
-    }
-
-    if (!app.options.storage) {
+  constructor (public readonly id: string, options: AzureBotAuthorizationOptions, private settings: AzureBotAuthorizationSettings) {
+    if (!this.settings.storage) {
       throw new Error(this.prefix('The \'storage\' option is not available in the app options. Ensure that the app is properly configured.'))
     }
 
-    this._settings = this.loadSettings(settings)
+    if (!this.settings.connections) {
+      throw new Error(this.prefix('The \'connections\' option is not available in the app options. Ensure that the app is properly configured.'))
+    }
+
+    this._options = this.loadOptions(options)
   }
 
-  private loadSettings (settings: AzureBotAuthorizationOptions) {
+  private loadOptions (settings: AzureBotAuthorizationOptions) {
     const result: AzureBotAuthorizationOptions = {
       name: settings.name ?? (process.env[`${this.id}_connectionName`]),
       title: settings.title ?? (process.env[`${this.id}_connectionTitle`]),
@@ -156,7 +160,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    * Maximum number of attempts for magic code entry.
    */
   private get maxAttempts (): number {
-    const attempts = this._settings.maxAttempts
+    const attempts = this._options.maxAttempts
     const result = typeof attempts === 'number' && Number.isFinite(attempts) ? Math.round(attempts) : NaN
     return result > 0 ? result : DEFAULT_SIGN_IN_ATTEMPTS
   }
@@ -191,7 +195,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
       const userTokenClient = await this.getUserTokenClient(context)
       // Using getTokenOrSignInResource instead of getUserToken to avoid HTTP 404 errors.
-      const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
+      const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._options.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
       token = tokenResponse?.token
     }
 
@@ -214,7 +218,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   async signout (context: TurnContext): Promise<boolean> {
     const user = context.activity.from?.id
     const channel = context.activity.channelId
-    const connection = this._settings.name!
+    const connection = this._options.name!
 
     if (!channel || !user) {
       throw new Error('Both \'activity.channelId\' and \'activity.from.id\' are required to perform signout.')
@@ -235,7 +239,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   async signin (context: TurnContext, active?: AzureBotActiveHandler): Promise<AuthorizationHandlerStatus> {
     const { activity } = context
 
-    const storage = new HandlerStorage<AzureBotActiveHandler>(this.app.options.storage!, context)
+    const storage = new HandlerStorage<AzureBotActiveHandler>(this.settings.storage, context)
     const userTokenClient = await this.getUserTokenClient(context)
 
     if (active) {
@@ -256,30 +260,30 @@ export class AzureBotAuthorization implements AuthorizationHandler {
         const reason = 'The Agent received an InvokeActivity that is missing a TokenExchangeInvokeRequest value. This is required to be sent with the InvokeActivity.'
         await this.sendInvokeResponse<TokenExchangeInvokeResponse>(context, {
           status: 400,
-          body: { connectionName: this._settings.name!, failureDetail: reason }
+          body: { connectionName: this._options.name!, failureDetail: reason }
         })
         logger.error(this.prefix(reason))
         await this._onFailure?.(context, reason)
         return AuthorizationHandlerStatus.REJECTED
       }
 
-      if (tokenExchangeRequest.connectionName !== this._settings.name) {
-        const reason = `The Agent received an InvokeActivity with a TokenExchangeInvokeRequest for a different connection name ('${tokenExchangeRequest.connectionName}') than expected ('${this._settings.name}').`
+      if (tokenExchangeRequest.connectionName !== this._options.name) {
+        const reason = `The Agent received an InvokeActivity with a TokenExchangeInvokeRequest for a different connection name ('${tokenExchangeRequest.connectionName}') than expected ('${this._options.name}').`
         await this.sendInvokeResponse<TokenExchangeInvokeResponse>(context, {
           status: 400,
-          body: { id: tokenExchangeRequest.id, connectionName: this._settings.name!, failureDetail: reason }
+          body: { id: tokenExchangeRequest.id, connectionName: this._options.name!, failureDetail: reason }
         })
         logger.error(this.prefix(reason))
         await this._onFailure?.(context, reason)
         return AuthorizationHandlerStatus.REJECTED
       }
 
-      const { token } = await userTokenClient.exchangeTokenAsync(activity.from?.id!, this._settings.name!, activity.channelId!, tokenExchangeRequest)
+      const { token } = await userTokenClient.exchangeTokenAsync(activity.from?.id!, this._options.name!, activity.channelId!, tokenExchangeRequest)
       if (!token) {
         const reason = 'Unable to exchange token. The token provided in the TokenExchangeRequest was rejected by the token service.'
         await this.sendInvokeResponse<TokenExchangeInvokeResponse>(context, {
           status: 412,
-          body: { id: tokenExchangeRequest.id, connectionName: this._settings.name!, failureDetail: reason }
+          body: { id: tokenExchangeRequest.id, connectionName: this._options.name!, failureDetail: reason }
         })
         logger.error(this.prefix(reason))
         await this._onFailure?.(context, reason)
@@ -288,7 +292,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
       await this.sendInvokeResponse<TokenExchangeInvokeResponse>(context, {
         status: 200,
-        body: { id: tokenExchangeRequest.id, connectionName: this._settings.name! }
+        body: { id: tokenExchangeRequest.id, connectionName: this._options.name! }
       })
       logger.debug(this.prefix('Successfully exchanged token'))
       this.setContext(context, { token })
@@ -340,7 +344,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
     try {
       // TODO: add obo connection from setting in replacement of this._settings.name!, in this case
-      const oboProvider = this.app.options.connections!.getConnection(this._settings.name!)
+      const oboProvider = this.settings.connections.getConnection(this._options.name!)
       const newToken = await oboProvider.acquireTokenOnBehalfOf(scopes, token)
       logger.debug(this.prefix('Successfully acquired on-behalf-of token'))
       return { token: newToken }
@@ -370,7 +374,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     const { activity } = context
 
     const userTokenClient = await this.getUserTokenClient(context)
-    const { tokenResponse, signInResource } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._settings.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
+    const { tokenResponse, signInResource } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._options.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
 
     if (!tokenResponse && active) {
       logger.warn(this.prefix('Invalid code entered. Restarting sign-in flow'), activity)
@@ -380,7 +384,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
     if (!tokenResponse) {
       logger.debug(this.prefix('Cannot find token. Sending sign-in card'), activity)
-      const oCard = CardFactory.oauthCard(this._settings.name!, this._settings.title!, this._settings.text!, signInResource)
+      const oCard = CardFactory.oauthCard(this._options.name!, this._options.title!, this._options.text!, signInResource)
       await context.sendActivity(MessageFactory.attachment(oCard))
       await storage.write({ activity, id: this.id, ...(active ?? {}), attemptsLeft: this.maxAttempts })
       return AuthorizationHandlerStatus.PENDING
@@ -453,7 +457,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    * Gets the user token client from the turn context.
    */
   private async getUserTokenClient (context: TurnContext): Promise<UserTokenClient> {
-    const userTokenClient = context.turnState.get<UserTokenClient>(this.app.adapter.UserTokenClientKey)
+    const userTokenClient = context.turnState.get<UserTokenClient>(context.adapter.UserTokenClientKey)
     if (!userTokenClient) {
       throw new Error(this.prefix('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.'))
     }
@@ -486,15 +490,15 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    */
   private messages = {
     invalidCode: (code: string) => {
-      const message = this._settings.messages?.invalidCode ?? 'Invalid **{code}** code entered. Please try again with a new sign-in request.'
+      const message = this._options.messages?.invalidCode ?? 'Invalid **{code}** code entered. Please try again with a new sign-in request.'
       return message.replaceAll('{code}', code)
     },
     invalidCodeFormat: (attemptsLeft: number) => {
-      const message = this._settings.messages?.invalidCodeFormat ?? 'Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**{attemptsLeft} attempt(s) left...**'
+      const message = this._options.messages?.invalidCodeFormat ?? 'Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**{attemptsLeft} attempt(s) left...**'
       return message.replaceAll('{attemptsLeft}', attemptsLeft.toString())
     },
     maxAttemptsExceeded: (maxAttempts: number) => {
-      const message = this._settings.messages?.maxAttemptsExceeded ?? 'You have exceeded the maximum number of sign-in attempts ({maxAttempts}). Please try again with a new sign-in request.'
+      const message = this._options.messages?.maxAttemptsExceeded ?? 'You have exceeded the maximum number of sign-in attempts ({maxAttempts}). Please try again with a new sign-in request.'
       return message.replaceAll('{maxAttempts}', maxAttempts.toString())
     },
   }

@@ -127,7 +127,7 @@ export class AgentApplication<TState extends TurnState> {
     }
 
     if (this._options.authorization) {
-      this._authorizationManager = new AuthorizationManager(this)
+      this._authorizationManager = new AuthorizationManager(this, this._adapter.connectionManager)
       this._authorization = new Authorization(this._authorizationManager)
     }
 
