@@ -4,7 +4,6 @@
  */
 
 import { debug } from '@microsoft/agents-activity'
-import { AgentApplication } from '../..'
 import { TurnContext } from '../../../turnContext'
 import { ActiveAuthorizationHandler, AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus } from '../types'
 import { TokenResponse } from '../../../oauth'
