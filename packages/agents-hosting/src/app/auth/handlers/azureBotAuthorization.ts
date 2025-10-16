@@ -174,8 +174,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   private loadOptions (settings: AzureBotAuthorizationOptions) {
     const result: AzureBotAuthorizationOptions = {
       name: settings.name ?? (process.env[`${this.id}_connectionName`]),
-      title: settings.title ?? (process.env[`${this.id}_connectionTitle`]),
-      text: settings.text ?? (process.env[`${this.id}_connectionText`]),
+      title: settings.title ?? (process.env[`${this.id}_connectionTitle`]) ?? 'Sign-in',
+      text: settings.text ?? (process.env[`${this.id}_connectionText`]) ?? 'Please sign-in to continue',
       maxAttempts: settings.maxAttempts ?? parseInt(process.env[`${this.id}_maxAttempts`]!),
       messages: {
         invalidCode: settings.messages?.invalidCode ?? process.env[`${this.id}_messages_invalidCode`],
