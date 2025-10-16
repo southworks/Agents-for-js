@@ -65,8 +65,9 @@ export class MsalTokenProvider implements AuthProvider {
     }
     let token
     if (authConfig.WIDAssertionFile !== undefined) {
-      token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
+      token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
     } else if (authConfig.FICClientId !== undefined) {
+      token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
     } else if (authConfig.clientSecret !== undefined) {
       token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
     } else if (authConfig.certPemFile !== undefined &&
