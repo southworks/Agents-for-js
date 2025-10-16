@@ -96,10 +96,9 @@ export class Authorization {
    *
    * @param context - The context object for the current turn.
    * @param authHandlerId - ID of the auth handler to use.
-   * @param connection - Optional connection name to use for token acquisition.
-   * If not provided, the `AgentApplication.authorization.obo.connectionName` is used, otherwise the default connection is used.
-   * @param scopes - Optional Array of scopes to request for the new token.
-   * If not provided, the `AgentApplication.authorization.obo.scopes` are used.
+   * @param options - Optional token options.
+   * If `connection` is not provided, the `AgentApplication.authorization.obo.connection` is used, otherwise the default connection is used.
+   * If `scopes` are not provided, the `AgentApplication.authorization.obo.scopes` are used.
    * @returns A promise that resolves to the exchanged token response.
    * @throws {Error} If the auth handler is not configured.
    *
