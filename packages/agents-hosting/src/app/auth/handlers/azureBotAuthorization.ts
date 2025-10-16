@@ -223,8 +223,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   /**
    * Retrieves the token for the user, optionally using on-behalf-of flow for specified scopes.
    * @param context The turn context.
-   * @param connection Optional connection name for on-behalf-of token acquisition.
-   * @param scopes Optional scopes for on-behalf-of token acquisition.
+   * @param options Optional options for token acquisition, including connection and scopes for on-behalf-of flow.
    * @returns The token response containing the token or undefined if not available.
    */
   async token (context: TurnContext, options?: AuthorizationHandlerTokenOptions): Promise<TokenResponse> {

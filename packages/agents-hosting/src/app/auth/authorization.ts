@@ -122,7 +122,7 @@ export class Authorization {
   public async exchangeToken (context: TurnContext, authHandlerId: string, options?: AuthorizationHandlerTokenOptions): Promise<TokenResponse>
 
   /**
-   * @private
+   * @internal
    * Internal implementation of exchangeToken method.
    * Handles both overloads and performs the actual token exchange logic.
    */
