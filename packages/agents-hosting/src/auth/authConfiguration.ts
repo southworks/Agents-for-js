@@ -78,6 +78,11 @@ export interface AuthConfiguration {
    * An optional alternative blueprint Connection name used when constructing a connector client.
    */
   altBlueprintConnectionName?: string
+
+  /**
+   * The path to K8s provided token.
+   */
+  WIDAssertionFile?: string
 }
 
 /**
@@ -180,6 +185,7 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
       authority,
       issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority),
       altBlueprintConnectionName: process.env.altBlueprintConnectionName,
+      WIDAssertionFile: process.env.WIDAssertionFile,
     }
     envConnections.connections.set(DEFAULT_CONNECTION, authConfig)
     envConnections.connectionsMap.push({
@@ -344,6 +350,7 @@ function buildLegacyAuthConfig (envPrefix: string = '', customConfig?: AuthConfi
     authority,
     issuers: customConfig?.issuers ?? getDefaultIssuers(tenantId as string, authority),
     altBlueprintConnectionName: customConfig?.altBlueprintConnectionName ?? process.env[`${prefix}altBlueprintConnectionName`],
+    WIDAssertionFile: customConfig?.WIDAssertionFile ?? process.env[`${prefix}WIDAssertionFile`]
   }
 }
 
