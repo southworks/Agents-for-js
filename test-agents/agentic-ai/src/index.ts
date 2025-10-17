@@ -10,7 +10,7 @@ class AgenticAI extends AgentApplication<TurnState> {
       startTypingTimer: true,
       storage: new MemoryStorage(),
       authorization: {
-        agentic: { type: 'agentic', scopes: ['https://graph.microsoft.com/.default'] }
+        agentic: { } // We have the type and scopes set in the .env file
       },
     })
 
@@ -25,7 +25,7 @@ class AgenticAI extends AgentApplication<TurnState> {
 
   agentic = async (ctx: TurnContext) => {
     const aauToken = await this.authorization.getToken(ctx, 'agentic')
-    await ctx.sendActivity(`(Agentic) You said: ${ctx.activity.text}, user token length=${aauToken.token?.length}`)
+    await ctx.sendActivity(`(Agentic) You said: ${ctx.activity.text}, user token length=${aauToken.token?.length ?? 0}`)
   }
 
   echo = async (ctx: TurnContext) => {
