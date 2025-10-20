@@ -92,8 +92,8 @@ export class AgentClient {
     const stateChanges = JSON.stringify(convRef)
     logger.debug('stateChanges: ', stateChanges)
 
-    const authProvider = new MsalTokenProvider()
-    const token = await authProvider.getAccessToken(authConfig, this.agentClientConfig.clientId)
+    const authProvider = new MsalTokenProvider(authConfig)
+    const token = await authProvider.getAccessToken(this.agentClientConfig.clientId)
 
     logger.debug('agent request: ', activityCopy)
 
