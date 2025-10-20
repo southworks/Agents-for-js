@@ -6,6 +6,7 @@
 import path from 'path'
 import fs from 'fs'
 import { Storage, StorageWriteOptions, StoreItem, StoreItems } from './storage'
+import { ItemAlreadyExistsError } from './itemAlreadyExistsError'
 
 /**
  * A file-based storage implementation that persists data to the local filesystem.
@@ -127,7 +128,7 @@ export class FileStorage implements Storage {
     const keys = Object.keys(changes)
     for (const key of keys) {
       if (options?.ifNotExists && key in this._stateFile) {
-        throw new Error(`Storage: error writing "${key}" as it already exists.`)
+        throw new ItemAlreadyExistsError(`The key '${key}' already exists in storage.`)
       }
       this._stateFile[key] = changes[key]
     }

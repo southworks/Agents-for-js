@@ -62,6 +62,9 @@ export interface StoreItems {
  */
 export type StorageKeyFactory = (context: TurnContext) => string | Promise<string>
 
+/**
+ * Options for storage write operations.
+ */
 export interface StorageWriteOptions {
   /**
    * If true, the write operation will only succeed if the item does not already exist in storage.

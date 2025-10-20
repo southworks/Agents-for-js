@@ -5,7 +5,7 @@ import { Container, CosmosClient, ItemDefinition, ItemResponse, RequestOptions }
 import { CosmosDbKeyEscape } from './cosmosDbKeyEscape'
 import { DocumentStoreItem } from './documentStoreItem'
 import { CosmosDbPartitionedStorageOptions } from './cosmosDbPartitionedStorageOptions'
-import { Storage, StorageWriteOptions, StoreItems } from '@microsoft/agents-hosting'
+import { ETagConflictError, ItemAlreadyExistsError, Storage, StorageWriteOptions, StoreItems } from '@microsoft/agents-hosting'
 
 /**
  * A utility class to ensure that a specific asynchronous task is executed only once for a given key.
@@ -177,10 +177,15 @@ export class CosmosDbPartitionedStorage implements Storage {
           item = await this.container.items.upsert(document, requestOptions)
         }
         return { key, eTag: item.etag }
-      } catch (err: any) {
-        this.checkForNestingError(change, err)
-        this.throwInformativeError('Error upserting document', err)
-        throw err
+      } catch (cause: any) {
+        if (cause.code === 409) {
+          throw new ItemAlreadyExistsError(`Unable to write '${key}' because it already exists.`, { cause })
+        } else if (cause.code === 412) {
+          throw new ETagConflictError(`Unable to write '${key}' due to eTag conflict.`, { cause })
+        }
+        this.checkForNestingError(change, cause)
+        this.throwInformativeError('Error upserting document', cause)
+        throw cause
       }
     })
 

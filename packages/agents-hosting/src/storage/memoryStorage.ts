@@ -3,6 +3,8 @@
  * Licensed under the MIT License.
  */
 
+import { ETagConflictError } from './eTagConflictError'
+import { ItemAlreadyExistsError } from './itemAlreadyExistsError'
 import { Storage, StorageWriteOptions, StoreItem, StoreItems } from './storage'
 import { debug } from '@microsoft/agents-activity/logger'
 
@@ -98,7 +100,7 @@ export class MemoryStorage implements Storage {
     const result: StoreItems = {}
     for (const [key, newItem] of Object.entries(changes)) {
       if (options?.ifNotExists && key in this.memory) {
-        throw new Error(`Storage: error writing "${key}" as it already exists.`)
+        throw new ItemAlreadyExistsError(`The key '${key}' already exists in storage.`)
       }
 
       logger.debug(`Writing key: ${key}`)
@@ -111,7 +113,7 @@ export class MemoryStorage implements Storage {
         if (newItem.eTag === oldItem.eTag) {
           savedItem = this.saveItem(key, newItem)
         } else {
-          throw new Error(`Storage: error writing "${key}" due to eTag conflict.`)
+          throw new ETagConflictError(`Unable to write '${key}' due to eTag conflict.`, { cause: { oldItem, newItem } })
         }
       }
 

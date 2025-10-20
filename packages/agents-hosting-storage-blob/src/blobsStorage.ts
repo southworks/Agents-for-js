@@ -8,7 +8,7 @@ import {
   StoragePipelineOptions,
   StorageSharedKeyCredential,
 } from '@azure/storage-blob'
-import { Storage, StorageWriteOptions, StoreItems } from '@microsoft/agents-hosting'
+import { ETagConflictError, ItemAlreadyExistsError, Storage, StorageWriteOptions, StoreItems } from '@microsoft/agents-hosting'
 import { sanitizeBlobKey } from './blobsTranscriptStore'
 import { ignoreError, isStatusCodeError } from './ignoreError'
 import { debug } from '@microsoft/agents-activity/logger'
@@ -164,12 +164,14 @@ export class BlobsStorage implements Storage {
           })
 
           return { key, eTag: item.etag }
-        } catch (err: any) {
-          if (err.statusCode === 412) {
-            throw new Error(`Storage: error writing "${key}" due to eTag conflict.`, { cause: err })
-          } else {
-            throw err
+        } catch (cause: any) {
+          if (cause.code === 409) {
+            throw new ItemAlreadyExistsError(`Unable to write '${key}' because it already exists.`, { cause })
+          } else if (cause.statusCode === 412) {
+            throw new ETagConflictError(`Unable to write '${key}' due to eTag conflict.`, { cause })
           }
+
+          throw cause
         }
       })
     )
