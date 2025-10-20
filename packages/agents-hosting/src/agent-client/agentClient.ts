@@ -97,12 +97,18 @@ export class AgentClient {
 
     logger.debug('agent request: ', activityCopy)
 
+    let authHeader = '' // Allow anonymous auth.
+
+    if (token.trim().length > 0) {
+      authHeader = `Bearer ${token}`
+    }
+
     await conversationState.saveChanges(context, false, { channelId: activityCopy.channelId!, conversationId: activityCopy.conversation!.id })
     const response = await fetch(this.agentClientConfig.endPoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: authHeader,
         'x-ms-conversation-id': activityCopy.conversation!.id
       },
       body: JSON.stringify(activityCopy)
