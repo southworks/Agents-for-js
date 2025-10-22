@@ -425,11 +425,6 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     const userTokenClient = await this.getUserTokenClient(context)
 
     if (activity.name === 'signin/tokenExchange') {
-      if (await this.isTokenExchangeDuplicated(context)) {
-        logger.debug('Skipping duplicated signin/tokenExchange invoke activity.')
-        return AuthorizationHandlerStatus.IGNORED
-      }
-
       const tokenExchangeInvokeRequest = activity.value as TokenExchangeInvokeRequest
       const tokenExchangeRequest: TokenExchangeRequest = { token: tokenExchangeInvokeRequest.token }
 
@@ -466,6 +461,16 @@ export class AzureBotAuthorization implements AuthorizationHandler {
         return AuthorizationHandlerStatus.PENDING
       }
 
+      // Duplication check is done after successful token exchange to allow MS Teams show the consent prompt per platform (e.g., web, mobile) in case of failing the token exchange.
+      // If the duplication check is done before, only one platform will show the consent prompt.
+      // Note: in case this check needs to be done before token exchange, consider adding the isSsoUserConsentFlow === undefined flag,
+      // to allow multiple token exchanges when the flag is set (indicating user consent flow), duplicated across platforms will still apply (showing one consent prompt).
+      if (await this.isTokenExchangeDuplicated(context)) {
+        logger.debug('Skipping duplicated signin/tokenExchange invoke activity.')
+        // Using PENDING state to avoid deleting the active session, as the deletion will be done by the first token exchange activity.
+        return AuthorizationHandlerStatus.PENDING
+      }
+
       await this.sendInvokeResponse<TokenExchangeInvokeResponse>(context, {
         status: 200,
         body: { id: tokenExchangeInvokeRequest.id, connectionName: this._options.name! }
@@ -496,12 +501,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   /**
    * Verifies the magic code provided by the user.
    */
-  private async codeVerification (storage: HandlerStorage<AzureBotActiveHandler>, context: TurnContext, active?: AzureBotActiveHandler): Promise<{ status: AuthorizationHandlerStatus, code?: string }> {
-    if (!active) {
-      logger.debug(this.prefix('No active session found. Skipping code verification.'), context.activity)
-      return { status: AuthorizationHandlerStatus.IGNORED }
-    }
-
+  private async codeVerification (storage: HandlerStorage<AzureBotActiveHandler>, context: TurnContext, active: AzureBotActiveHandler): Promise<{ status: AuthorizationHandlerStatus, code?: string }> {
     const { activity } = context
     let state: string | undefined = activity.text
 
@@ -626,6 +626,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
   /**
    * Checks if a token exchange request is duplicated.
+   * This is used to prevent duplicating responses when receiving multiple identical token exchange requests
+   * from the same user across different platforms (e.g., web and mobile).
    * @param context The turn context.
    * @returns True if the token exchange request is duplicated, false otherwise.
    */
