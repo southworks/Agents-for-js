@@ -167,7 +167,7 @@ export class BlobsStorage implements Storage {
         } catch (cause: any) {
           if (cause.code === 409) {
             throw new ItemAlreadyExistsError(`Unable to write '${key}' because it already exists.`, { cause })
-          } else if (cause.statusCode === 412) {
+          } else if (cause.code === 412) {
             throw new ETagConflictError(`Unable to write '${key}' due to eTag conflict.`, { cause })
           }
 
