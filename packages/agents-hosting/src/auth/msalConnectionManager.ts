@@ -50,6 +50,14 @@ export class MsalConnectionManager implements Connections {
     if (!conn) {
       throw new Error(`Connection not found: ${connectionName}`)
     }
+    if (conn.connectionSettings) {
+      conn.connectionSettings.authority ??= 'https://login.microsoftonline.com'
+      conn.connectionSettings.issuers ??= [
+        'https://api.botframework.com',
+        `https://sts.windows.net/${conn.connectionSettings.tenantId}/`,
+        `${conn.connectionSettings.authority}/${conn.connectionSettings.tenantId}/v2.0`
+      ]
+    }
     return conn
   }
 
@@ -69,7 +77,18 @@ export class MsalConnectionManager implements Connections {
       }
     }
 
-    return this._connections.values().next().value as MsalTokenProvider
+    const conn = this._connections.values().next().value as MsalTokenProvider
+
+    if (conn.connectionSettings) {
+      conn.connectionSettings.authority ??= 'https://login.microsoftonline.com'
+      conn.connectionSettings.issuers ??= [
+        'https://api.botframework.com',
+        `https://sts.windows.net/${conn.connectionSettings.tenantId}/`,
+        `${conn.connectionSettings.authority}/${conn.connectionSettings.tenantId}/v2.0`
+      ]
+    }
+
+    return conn
   }
 
   /**
