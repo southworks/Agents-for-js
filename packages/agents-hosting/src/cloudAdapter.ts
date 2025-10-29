@@ -25,7 +25,7 @@ import { normalizeIncomingActivity } from './activityWireCompat'
 import { UserTokenClient } from './oauth'
 import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefinition } from './headerPropagation'
 import { JwtPayload } from 'jsonwebtoken'
-
+import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -194,7 +194,7 @@ export class CloudAdapter extends BaseAdapter {
    * @protected
    */
   protected async createUserTokenClient (
-    tokenServiceEndpoint: string = 'https://api.botframework.com',
+    tokenServiceEndpoint: string = getTokenServiceEndpoint(),
     scope: string = 'https://api.botframework.com',
     audience: string = 'https://api.botframework.com',
     headers?: HeaderPropagationCollection
@@ -258,9 +258,7 @@ export class CloudAdapter extends BaseAdapter {
       delete activity.id
       let response: ResourceResponse = { id: '' }
 
-      if (activity.type === ActivityTypes.Delay) {
-        await setTimeout(() => { }, typeof activity.value === 'number' ? activity.value : 1000)
-      } else if (activity.type === ActivityTypes.InvokeResponse) {
+      if (activity.type === ActivityTypes.InvokeResponse) {
         context.turnState.set(INVOKE_RESPONSE_KEY, activity)
       } else if (activity.type === ActivityTypes.Trace && activity.channelId !== Channels.Emulator) {
         // no-op
