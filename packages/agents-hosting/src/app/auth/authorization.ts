@@ -133,7 +133,7 @@ export class Authorization {
       return this.exchangeToken(context, handlerId, { scopes: handlerScopes })
     }
 
-    if (typeof authHandlerId === 'string' && typeof options === 'object') {
+    if (typeof authHandlerId === 'string' && typeof options !== 'string') {
       const handler = this.getHandler(authHandlerId)
       const { token } = await handler.token(context, options)
       return { token }
