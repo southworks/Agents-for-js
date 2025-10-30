@@ -213,36 +213,31 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
 
 function loadConnectionsMapFromEnv () {
   const envVars = process.env
-  const connections = new Map<string, AuthConfiguration>()
+  const connectionsObj: Record<string, any> = {}
   const connectionsMap: ConnectionMapItem[] = []
+  const CONNECTIONS_PREFIX = 'connections__'
+  const CONNECTIONS_MAP_PREFIX = 'connectionsMap__'
 
   for (const [key, value] of Object.entries(envVars)) {
-    if (key.startsWith('connections__')) {
-      const parts = key.split('__')
-      if (parts.length >= 4 && parts[2] === 'settings') {
-        const connectionName = parts[1]
-        const propertyPath = parts.slice(3).join('.') // e.g., 'issuers.0' or 'clientId'
+    if (key.startsWith(CONNECTIONS_PREFIX)) {
+      // Convert to dot notation
+      let path = key.substring(CONNECTIONS_PREFIX.length).replace(/__/g, '.')
+      // Remove ".settings." from the path
+      path = path.replace('.settings.', '.')
+      objectPath.set(connectionsObj, path, value)
+    } else if (key.startsWith(CONNECTIONS_MAP_PREFIX)) {
+      const path = key.substring(CONNECTIONS_MAP_PREFIX.length).replace(/__/g, '.')
+      objectPath.set(connectionsMap, path, value)
+    }
+  }
 
-        let config = connections.get(connectionName)
-        if (!config) {
-          config = {}
-          connections.set(connectionName, config)
-        }
-
-        objectPath.set(config, propertyPath, value)
-      }
-    } else if (key.startsWith('connectionsMap__')) {
-      const parts = key.split('__')
-      if (parts.length === 3) {
-        const index = parseInt(parts[1], 10)
-        const property = parts[2]
-
-        if (!connectionsMap[index]) {
-          connectionsMap[index] = { serviceUrl: '', connection: '' }
-        }
-
-        (connectionsMap[index] as any)[property] = value
-      }
+  // Convert connectionsObj to Map<string, AuthConfiguration>
+  const connections = new Map<string, AuthConfiguration>()
+  for (const [key, value] of Object.entries(connectionsObj)) {
+    if (typeof value === 'object' && value !== null) {
+      connections.set(key, value as AuthConfiguration)
+    } else {
+      logger.warn(`Invalid connection configuration for "${key}", skipping.`)
     }
   }
 
@@ -265,7 +260,6 @@ function loadConnectionsMapFromEnv () {
       }
     }
   }
-
   return {
     connections,
     connectionsMap,
