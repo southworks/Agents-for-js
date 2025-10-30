@@ -232,14 +232,7 @@ function loadConnectionsMapFromEnv () {
   }
 
   // Convert connectionsObj to Map<string, AuthConfiguration>
-  const connections = new Map<string, AuthConfiguration>()
-  for (const [key, value] of Object.entries(connectionsObj)) {
-    if (typeof value === 'object' && value !== null) {
-      connections.set(key, value as AuthConfiguration)
-    } else {
-      logger.warn(`Invalid connection configuration for "${key}", skipping.`)
-    }
-  }
+  const connections: Map<string, AuthConfiguration> = new Map(Object.entries(connectionsObj))
 
   if (connections.size === 0) {
     logger.warn('No connections found in configuration.')
