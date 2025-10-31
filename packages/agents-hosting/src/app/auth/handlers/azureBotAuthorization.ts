@@ -126,6 +126,8 @@ export interface AzureBotAuthorizationOptions {
    * - `${authHandlerId}_obo_scopes` (comma-separated values, e.g. `scope1,scope2`)
    */
   obo?: AzureBotAuthorizationOptionsOBO
+
+  enableSso?: boolean
 }
 
 /**
@@ -191,7 +193,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       obo: {
         connection: settings.obo?.connection ?? process.env[`${this.id}_obo_connection`],
         scopes: settings.obo?.scopes ?? this.loadScopes(process.env[`${this.id}_obo_scopes`]),
-      }
+      },
+      enableSso: process.env['enableSso'] !== 'false' // default value is true
     }
 
     if (!result.name) {
@@ -393,6 +396,10 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
     if (!tokenResponse) {
       logger.debug(this.prefix('Cannot find token. Sending sign-in card'), activity)
+
+      if (this._options.enableSso === false) {
+        delete (signInResource as any).tokenExchangeResource
+      }
       const oCard = CardFactory.oauthCard(this._options.name!, this._options.title!, this._options.text!, signInResource)
       await context.sendActivity(MessageFactory.attachment(oCard))
       await storage.write({ activity, id: this.id, ...(active ?? {}), attemptsLeft: this.maxAttempts })
