@@ -127,6 +127,9 @@ export interface AzureBotAuthorizationOptions {
    */
   obo?: AzureBotAuthorizationOptionsOBO
 
+  /**
+   * Option to enable SSO when authenticating using Azure Active Directory (AAD). Defaults to true.
+   */
   enableSso?: boolean
 }
 
@@ -397,7 +400,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     if (!tokenResponse) {
       logger.debug(this.prefix('Cannot find token. Sending sign-in card'), activity)
 
-      if (this._options.enableSso === false) {
+      if (!this._options.enableSso) {
         delete (signInResource as any).tokenExchangeResource
       }
       const oCard = CardFactory.oauthCard(this._options.name!, this._options.title!, this._options.text!, signInResource)
