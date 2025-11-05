@@ -4,7 +4,6 @@
 import { strict as assert } from 'assert'
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import { randomUUID } from 'crypto'
-import { existsSync } from 'fs'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
@@ -17,7 +16,7 @@ describe('FileTranscriptLogger', () => {
   let store: TranscriptStore
 
   beforeEach(async () => {
-    store = new FileTranscriptLogger(testFolder, false)
+    store = new FileTranscriptLogger(testFolder)
     await cleanup()
   })
 
@@ -538,6 +537,7 @@ describe('FileTranscriptLogger', () => {
         assert.ok(invalidChars.includes('*'))
         assert.ok(invalidChars.includes('/'))
         assert.ok(invalidChars.includes('\\'))
+        assert.ok(invalidChars.includes('\0'))
       } else {
         // Unix systems: at least / should be invalid
         assert.ok(invalidChars.includes('/'))
@@ -561,6 +561,7 @@ describe('FileTranscriptLogger', () => {
         // Should NOT include / and \ in path chars (allowed as separators)
         assert.ok(!invalidChars.includes('/'))
         assert.ok(!invalidChars.includes('\\'))
+        assert.ok(invalidChars.includes('\0'))
       } else {
         // Unix systems: only null byte is invalid
         assert.ok(invalidChars.includes('\0'))
@@ -572,7 +573,7 @@ describe('FileTranscriptLogger', () => {
       // Test with various invalid characters depending on platform
       // Use unique suffixes to prevent sanitized names from colliding
       const invalidCharsToTest = process.platform === 'win32'
-        ? ['<test>_1', 'test:id_2', 'test|conv_3', 'test?id_4', 'test*id_5', 'test/conv_6', 'test\\conv_7']
+        ? ['<test>_1', 'test:id_2', 'test|conv_3', 'test?id_4', 'test*id_5', 'test/conv_6', 'test\\conv_7', 'test\0conv_2']
         : ['test/conv_1', 'test\0conv_2']
 
       for (const conversationId of invalidCharsToTest) {
@@ -601,7 +602,7 @@ describe('FileTranscriptLogger', () => {
     it('should handle activities with invalid path characters in channel ID', async () => {
       // Test with various invalid characters depending on platform
       const invalidCharsToTest = process.platform === 'win32'
-        ? ['<chan>', 'chan:id', 'chan|id', 'chan?id', 'chan*id']
+        ? ['<chan>', 'chan:id', 'chan|id', 'chan?id', 'chan*id', 'chan\0id']
         : ['chan\0id']
 
       for (const channelId of invalidCharsToTest) {
@@ -632,6 +633,7 @@ describe('FileTranscriptLogger', () => {
 
 /**
  * Helper function to create test activities
+ * @remarks Creates pairs of user and bot messages with 1-minute intervals, thus the count is doubled.
  */
 function createActivities (conversationId: string, ts: Date, count: number = 5): Activity[] {
   const activities: Activity[] = []
@@ -685,7 +687,5 @@ async function runInBatches<T> (items: T[], size: number, fn: (item: T) => Promi
  */
 async function cleanup () {
   // Clean up test folder before each test
-  if (existsSync(testFolder)) {
-    await fs.rm(testFolder, { recursive: true, force: true })
-  }
+  await fs.rm(testFolder, { recursive: true, force: true })
 }

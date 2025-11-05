@@ -35,9 +35,8 @@ export class FileTranscriptLogger implements TranscriptStore {
   /**
    * Initializes a new instance of the FileTranscriptLogger class.
    * @param folder - Folder to place the transcript files (Default current directory).
-   * @param unitTestMode - Unit test mode will overwrite transcript files.
    */
-  constructor (folder?: string, private unitTestMode: boolean = true) {
+  constructor (folder?: string) {
     this._folder ??= path.normalize(folder ?? process.cwd())
   }
 
@@ -157,12 +156,13 @@ export class FileTranscriptLogger implements TranscriptStore {
    */
   async deleteTranscript (channelId: string, conversationId: string): Promise<void> {
     const file = this.getTranscriptFile(channelId, conversationId)
-    if (!await this.pathExists(file)) {
-      logger.debug(`Transcript file does not exist: ${this.protocol(file)}`)
-      return
-    }
-
-    await fs.unlink(file)
+    await this.withFileLock(file, async () => {
+      if (!await this.pathExists(file)) {
+        logger.debug(`Transcript file does not exist: ${this.protocol(file)}`)
+        return
+      }
+      await fs.unlink(file)
+    })
   }
 
   /**
@@ -173,15 +173,9 @@ export class FileTranscriptLogger implements TranscriptStore {
       return []
     }
 
-    try {
-      const json = await fs.readFile(transcriptFile, 'utf-8')
-      const result = JSON.parse(json)
-      return result.map(Activity.fromObject)
-    } catch (error) {
-      logger.error(`Error loading transcript from ${this.protocol(transcriptFile)}:`, error)
-    }
-
-    return []
+    const json = await fs.readFile(transcriptFile, 'utf-8')
+    const result = JSON.parse(json)
+    return result.map(Activity.fromObject)
   }
 
   /**
@@ -196,7 +190,6 @@ export class FileTranscriptLogger implements TranscriptStore {
     const newLock = existingLock.then(async () => {
       return await operation()
     }).catch(error => {
-      // Log error but don't break the chain
       logger.warn('Error in write chain:', error)
       throw error
     })
@@ -239,8 +232,7 @@ export class FileTranscriptLogger implements TranscriptStore {
       const position = Math.max(0, stats.size - 1)
 
       // Write the comma, new activity, and closing bracket
-      const eol = this.unitTestMode ? '' : EOL
-      const appendContent = `,${eol}${activityStr}]`
+      const appendContent = `,${EOL}${activityStr}]`
       await fileHandle.write(appendContent, position)
       // Truncate any remaining content (in case the file had trailing data)
       await fileHandle.truncate(position + Buffer.byteLength(appendContent))
@@ -401,7 +393,7 @@ export class FileTranscriptLogger implements TranscriptStore {
   private getInvalidPathChars (): string[] {
     // Similar to filename chars but allows directory separators in the middle
     if (process.platform === 'win32') {
-      return ['<', '>', ':', '"', '|', '?', '*']
+      return ['<', '>', ':', '"', '|', '?', '*', '\0']
     } else {
     // Unix/Linux: only null byte is invalid in paths
       return ['\0']
