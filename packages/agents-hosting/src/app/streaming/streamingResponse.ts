@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { Activity, addAIToActivity, Attachment, Entity, ClientCitation, SensitivityUsageInfo } from '@microsoft/agents-activity'
+import { Activity, addAIToActivity, Attachment, Entity, ClientCitation, SensitivityUsageInfo, DeliveryModes, Channels } from '@microsoft/agents-activity'
 import { TurnContext } from '../../turnContext'
 import { Citation } from './citation'
 import { CitationUtil } from './citationUtil'
@@ -29,7 +29,8 @@ export class StreamingResponse {
   private _message: string = ''
   private _attachments?: Attachment[]
   private _ended = false
-  private _delayInMs = 1500
+  private _delayInMs = 250
+  private _isStreamingChannel: boolean = true
 
   // Queue for outgoing activities
   private _queue: Array<() => Activity> = []
@@ -44,23 +45,24 @@ export class StreamingResponse {
   private _sensitivityLabel?: SensitivityUsageInfo
 
   /**
-     * Creates a new StreamingResponse instance.
-     *
-     * @param {TurnContext} context - Context for the current turn of conversation with the user.
-     * @returns {TurnContext} - The context for the current turn of conversation with the user.
-     */
+   * Creates a new StreamingResponse instance.
+   *
+   * @param {TurnContext} context - Context for the current turn of conversation with the user.
+   * @returns {TurnContext} - The context for the current turn of conversation with the user.
+   */
   public constructor (context: TurnContext) {
     this._context = context
+    this.loadDefaults(context.activity)
   }
 
   /**
-     * Gets the stream ID of the current response.
-     *
-     * @returns {string | undefined} - The stream ID of the current response.
-     *
-     * @remarks
-     * Assigned after the initial update is sent.
-     */
+   * Gets the stream ID of the current response.
+   *
+   * @returns {string | undefined} - The stream ID of the current response.
+   *
+   * @remarks
+   * Assigned after the initial update is sent.
+   */
   public get streamId (): string | undefined {
     return this._streamId
   }
@@ -73,19 +75,30 @@ export class StreamingResponse {
   }
 
   /**
-     * Gets the number of updates sent for the stream.
-     *
-     * @returns {number} - The number of updates sent for the stream.
-     */
+   * Gets the number of updates sent for the stream.
+   *
+   * @returns {number} - The number of updates sent for the stream.
+   */
   public get updatesSent (): number {
     return this._nextSequence - 1
   }
 
   /**
    * Gets the delay in milliseconds between chunks.
+   * @remarks
+   * Teams default: 1000 ms
+   * Web Chat / Direct Line default: 500 ms
+   * Other channels: 250 ms
    */
   public get delayInMs (): number {
     return this._delayInMs
+  }
+
+  /**
+   * Gets whether the channel supports streaming.
+   */
+  public get isStreamingChannel (): boolean {
+    return this._isStreamingChannel
   }
 
   /**
@@ -94,6 +107,10 @@ export class StreamingResponse {
      * @param {string} text Text of the update to send.
      */
   public queueInformativeUpdate (text: string): void {
+    if (!this.isStreamingChannel) {
+      return
+    }
+
     if (this._ended) {
       throw new Error('The stream has already ended.')
     }
@@ -132,6 +149,10 @@ export class StreamingResponse {
     // If there are citations, modify the content so that the sources are numbers instead of [doc1], [doc2], etc.
     this._message = CitationUtil.formatCitationsResponse(this._message)
 
+    if (!this.isStreamingChannel) {
+      return
+    }
+
     // Queue the next chunk
     this.queueNextChunk()
   }
@@ -146,8 +167,13 @@ export class StreamingResponse {
       throw new Error('The stream has already ended.')
     }
 
-    // Queue final message
     this._ended = true
+
+    if (!this.isStreamingChannel) {
+      return this.sendActivity(this.createFinalMessage())
+    }
+
+    // Queue final message
     this.queueNextChunk()
 
     // Wait for the queue to drain
@@ -274,16 +300,7 @@ export class StreamingResponse {
       this._chunkQueued = false
       if (this._ended) {
         // Send final message
-        return Activity.fromObject({
-          type: 'message',
-          text: this._message || 'end of stream response',
-          attachments: this._attachments,
-          entities: [{
-            type: 'streaminfo',
-            streamType: 'final',
-            streamSequence: this._nextSequence++
-          }]
-        })
+        return this.createFinalMessage()
       } else {
         // Send typing activity
         return Activity.fromObject({
@@ -341,6 +358,22 @@ export class StreamingResponse {
   }
 
   /**
+   * Creates the final message to be sent at the end of the stream.
+   */
+  private createFinalMessage (): Activity {
+    return Activity.fromObject({
+      type: 'message',
+      text: this._message || 'end of stream response',
+      attachments: this._attachments,
+      entities: [{
+        type: 'streaminfo',
+        streamType: 'final',
+        streamSequence: this._nextSequence++
+      }]
+    })
+  }
+
+  /**
      * Sends an activity to the client and saves the stream ID returned.
      *
      * @param {Activity} activity - The activity to send.
@@ -392,6 +425,23 @@ export class StreamingResponse {
     // Save assigned stream ID
     if (!this._streamId) {
       this._streamId = response?.id
+    }
+  }
+
+  /**
+   * Loads default values for the streaming response.
+   */
+  private loadDefaults (activity: Activity) {
+    if (activity.deliveryMode === DeliveryModes.ExpectReplies) {
+      this._isStreamingChannel = false
+    } else if (Channels.Msteams === activity.channelId) {
+      this._isStreamingChannel = true
+      this._delayInMs = 1000
+    } else if (Channels.Webchat === activity.channelId || Channels.Directline === activity.channelId) {
+      this._isStreamingChannel = true
+      this._delayInMs = 500
+    } else {
+      this._isStreamingChannel = false
     }
   }
 }
