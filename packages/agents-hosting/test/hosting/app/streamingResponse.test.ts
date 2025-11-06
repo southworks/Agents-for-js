@@ -6,6 +6,7 @@ import { CitationUtil } from '../../../src/app/streaming/citationUtil'
 import * as sinon from 'sinon'
 import { strict as assert } from 'assert'
 import { describe, it, beforeEach, afterEach } from 'node:test'
+import { Channels } from '../../../../agents-activity/src'
 
 describe('StreamingResponse', () => {
   let mockContext: sinon.SinonStubbedInstance<TurnContext>
@@ -14,6 +15,10 @@ describe('StreamingResponse', () => {
 
   beforeEach(() => {
     mockContext = sinon.createStubInstance(TurnContext)
+    Object.defineProperty(mockContext, 'activity', {
+      value: Activity.fromObject({ type: 'message', channelId: Channels.Webchat }),
+      configurable: true
+    })
     mockContext.sendActivity.resolves({ id: 'test-stream-id' })
     streamingResponse = new StreamingResponse(mockContext)
     clock = sinon.useFakeTimers()
@@ -27,7 +32,7 @@ describe('StreamingResponse', () => {
   it('should initialize with correct default values', () => {
     assert.equal(streamingResponse.streamId, undefined)
     assert.equal(streamingResponse.updatesSent, 0)
-    assert.equal(streamingResponse.delayInMs, 1500)
+    assert.equal(streamingResponse.delayInMs, 500)
     assert.equal(streamingResponse.getMessage(), '')
   })
 
