@@ -8,18 +8,23 @@ import { strict as assert } from 'assert'
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import { Channels } from '../../../../agents-activity/src'
 
+function createContext (activity: Partial<Activity>) {
+  const mockContext = sinon.createStubInstance(TurnContext)
+  Object.defineProperty(mockContext, 'activity', {
+    value: Activity.fromObject({ type: 'message', ...activity }),
+    configurable: true
+  })
+  mockContext.sendActivity.resolves({ id: 'test-stream-id' })
+  return mockContext
+}
+
 describe('StreamingResponse', () => {
   let mockContext: sinon.SinonStubbedInstance<TurnContext>
   let streamingResponse: StreamingResponse
   let clock: sinon.SinonFakeTimers
 
   beforeEach(() => {
-    mockContext = sinon.createStubInstance(TurnContext)
-    Object.defineProperty(mockContext, 'activity', {
-      value: Activity.fromObject({ type: 'message', channelId: Channels.Webchat }),
-      configurable: true
-    })
-    mockContext.sendActivity.resolves({ id: 'test-stream-id' })
+    mockContext = createContext({ channelId: Channels.Webchat })
     streamingResponse = new StreamingResponse(mockContext)
     clock = sinon.useFakeTimers()
   })
@@ -299,5 +304,29 @@ describe('StreamingResponse', () => {
     assert.doesNotThrow(() => {
       streamingResponse.queueTextChunk('more text')
     })
+  })
+
+  it('should send one activity for non-streaming channels', async () => {
+    mockContext = createContext({ channelId: Channels.Facebook })
+    streamingResponse = new StreamingResponse(mockContext)
+    streamingResponse.queueInformativeUpdate('test1')
+    streamingResponse.queueTextChunk('test2')
+
+    clock.restore() // Disable fake timers for this test
+    await streamingResponse.endStream()
+
+    assert.equal(streamingResponse.updatesSent, 1)
+  })
+
+  it('should send one activity for expect replies delivery mode', async () => {
+    mockContext = createContext({ deliveryMode: 'expectReplies' })
+    streamingResponse = new StreamingResponse(mockContext)
+    streamingResponse.queueInformativeUpdate('test1')
+    streamingResponse.queueTextChunk('test2')
+
+    clock.restore() // Disable fake timers for this test
+    await streamingResponse.endStream()
+
+    assert.equal(streamingResponse.updatesSent, 1)
   })
 })

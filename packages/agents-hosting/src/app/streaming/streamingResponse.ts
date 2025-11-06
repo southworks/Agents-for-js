@@ -432,6 +432,10 @@ export class StreamingResponse {
    * Loads default values for the streaming response.
    */
   private loadDefaults (activity: Activity) {
+    if (!activity) {
+      return
+    }
+
     if (activity.deliveryMode === DeliveryModes.ExpectReplies) {
       this._isStreamingChannel = false
     } else if (Channels.Msteams === activity.channelId) {
