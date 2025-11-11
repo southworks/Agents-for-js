@@ -141,11 +141,12 @@ describe('AgentApplication', () => {
     context.turnState.set(context.adapter.UserTokenClientKey, userTokenClient)
 
     // Provide an active session to hit the token exchange path
-    const active :AzureBotActiveHandler = { id: auth.id, activity: exchangeActivity, attemptsLeft: 2 }
+    const active: AzureBotActiveHandler = { id: auth.id, activity: exchangeActivity, attemptsLeft: 2 }
     const first = await auth.signin(context, active)
     const second = await auth.signin(context, active)
 
     assert.equal(first, AuthorizationHandlerStatus.APPROVED)
-    assert.equal(second, AuthorizationHandlerStatus.IGNORED)
+    // Second request should be pending to discard the duplicated exchange.
+    assert.equal(second, AuthorizationHandlerStatus.PENDING)
   })
 })
