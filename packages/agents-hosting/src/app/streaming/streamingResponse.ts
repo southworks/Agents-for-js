@@ -378,12 +378,13 @@ export class StreamingResponse {
 
     activity.entities ??= []
     activity.attachments = this._attachments
+    this._nextSequence++ // Increment sequence for final message, even if not streaming.
 
     if (this.isStreamingChannel) {
       activity.entities.push({
         type: 'streaminfo',
         streamType: 'final',
-        streamSequence: this._nextSequence++
+        streamSequence: this._nextSequence
       })
     }
 
