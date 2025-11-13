@@ -426,7 +426,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
     if (activity.name === 'signin/tokenExchange') {
       const tokenExchangeInvokeRequest = activity.value as TokenExchangeInvokeRequest
-      const tokenExchangeRequest: TokenExchangeRequest = { token: tokenExchangeInvokeRequest.token }
+      const tokenExchangeRequest: TokenExchangeRequest = { token: tokenExchangeInvokeRequest?.token }
 
       if (!tokenExchangeRequest?.token) {
         const reason = 'The Agent received an InvokeActivity that is missing a TokenExchangeInvokeRequest value. This is required to be sent with the InvokeActivity.'
