@@ -3,15 +3,16 @@
  * Licensed under the MIT License.
  */
 
-import { Attachment } from '@microsoft/agents-activity'
+import { Attachment, Channels } from '@microsoft/agents-activity'
+import { debug } from '@microsoft/agents-activity/logger'
 import { ConnectorClient } from '../connector-client'
 import { InputFile, InputFileDownloader } from './inputFileDownloader'
 import { TurnContext } from '../turnContext'
 import { TurnState } from './turnState'
 import axios, { AxiosInstance } from 'axios'
 import { z } from 'zod'
-import { CloudAdapter } from '../cloudAdapter'
-import { BaseAdapter } from '../baseAdapter'
+
+const logger = debug('agents:teamsAttachmentDownloader')
 
 /**
  * Downloads attachments from Teams using the bots access token.
@@ -19,6 +20,7 @@ import { BaseAdapter } from '../baseAdapter'
 export class TeamsAttachmentDownloader<TState extends TurnState = TurnState> implements InputFileDownloader<TState> {
   private _httpClient: AxiosInstance
   private _stateKey: string
+
   public constructor (stateKey: string = 'inputFiles') {
     this._httpClient = axios.create()
     this._stateKey = stateKey
@@ -31,8 +33,11 @@ export class TeamsAttachmentDownloader<TState extends TurnState = TurnState> imp
    * @returns {Promise<InputFile[]>} Promise that resolves to an array of downloaded input files.
    */
   public async downloadFiles (context: TurnContext): Promise<InputFile[]> {
+    if (context.activity.channelId !== Channels.Msteams && context.activity.channelId !== Channels.M365Copilot) {
+      return Promise.resolve([])
+    }
     // Filter out HTML attachments
-    const attachments = context.activity.attachments?.filter((a) => !a.contentType.startsWith('text/html'))
+    const attachments = context.activity.attachments?.filter((a) => a.contentType && !a.contentType.startsWith('text/html'))
     if (!attachments || attachments.length === 0) {
       return Promise.resolve([])
     }
@@ -58,21 +63,33 @@ export class TeamsAttachmentDownloader<TState extends TurnState = TurnState> imp
    */
   private async downloadFile (attachment: Attachment): Promise<InputFile | undefined> {
     let inputFile: InputFile | undefined
-    if (attachment.contentType === 'application/vnd.microsoft.teams.file.download.info') {
-      const contentSchema = z.object({ downloadUrl: z.string() })
-      const contentValue = contentSchema.parse(attachment.content)
-      const response = await this._httpClient.get(contentValue.downloadUrl, { responseType: 'arraybuffer' })
-      const content = Buffer.from(response.data, 'binary')
-      let contentType = attachment.contentType
-      if (contentType === 'image/*') {
-        contentType = 'image/png'
+
+    if (attachment.contentUrl && (attachment.contentUrl.startsWith('https://') || attachment.contentUrl.startsWith('http://localhost'))) {
+      try {
+        const contentSchema = z.object({ downloadUrl: z.string().url() })
+        const parsed = contentSchema.safeParse(attachment.content)
+        const downloadUrl = parsed.success ? parsed.data.downloadUrl : attachment.contentUrl
+        const response = await this._httpClient.get(downloadUrl, { responseType: 'arraybuffer' })
+
+        const content = Buffer.from(response.data, 'binary')
+        let contentType = response.headers['content-type'] || 'application/octet-stream'
+        if (contentType.startsWith('image/')) {
+          contentType = 'image/png'
+        }
+        inputFile = { content, contentType, contentUrl: attachment.contentUrl }
+      } catch (error) {
+        logger.error(`Failed to download Teams attachment: ${error}`)
+        return undefined
       }
-      inputFile = { content, contentType, contentUrl: attachment.contentUrl }
-    } else if (attachment.contentType === 'image/*') {
-      const response = await this._httpClient.get(attachment.contentUrl!, { responseType: 'arraybuffer' })
-      const content = Buffer.from(response.data, 'binary')
-      inputFile = { content, contentType: attachment.contentType, contentUrl: attachment.contentUrl }
     } else {
+      if (!attachment.content) {
+        logger.error('Attachment missing content')
+        return undefined
+      }
+      if (!(attachment.content instanceof ArrayBuffer) && !Buffer.isBuffer(attachment.content)) {
+        logger.error('Attachment content is not ArrayBuffer or Buffer')
+        return undefined
+      }
       inputFile = {
         content: Buffer.from(attachment.content as ArrayBuffer),
         contentType: attachment.contentType,
