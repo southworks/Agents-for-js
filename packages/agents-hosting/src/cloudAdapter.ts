@@ -8,7 +8,7 @@ import { BaseAdapter } from './baseAdapter'
 import { TurnContext } from './turnContext'
 import { Response } from 'express'
 import { Request } from './auth/request'
-import { ConnectorClient } from './connector-client/connectorClient'
+import { ConnectorClient, IConnectorClient } from './connector-client/connectorClient'
 import { AuthConfiguration, getAuthConfigWithDefaults } from './auth/authConfiguration'
 import { AuthProvider } from './auth/authProvider'
 import { ApxProductionScope } from './auth/authConstants'
@@ -26,6 +26,7 @@ import { UserTokenClient } from './oauth'
 import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefinition } from './headerPropagation'
 import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
+import { MCSConnectorClient } from './connector-client/mcsConnectorClient'
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -79,6 +80,28 @@ export class CloudAdapter extends BaseAdapter {
         break
     }
     return true
+  }
+
+  /**
+   * Creates a connector client for a specific service URL and scope.
+   *
+   * @param serviceUrl - The URL of the service to connect to
+   * @param scope - The authentication scope to use
+   * @param headers - Optional headers to propagate in the request
+   * @returns A promise that resolves to a ConnectorClient instance
+   * @protected
+   */
+  protected async createIConnectorClient (
+    context: TurnContext,
+    serviceUrl: string,
+    scope: string,
+    identity?: JwtPayload,
+    headers?: HeaderPropagationCollection
+  ): Promise<IConnectorClient> {
+    if (context.activity.recipient?.role && context.activity.recipient.role === RoleTypes.ConnectorUser) {
+      return MCSConnectorClient.createClient(serviceUrl, headers)
+    }
+    return this.createConnectorClient(serviceUrl, scope, identity!, headers)
   }
 
   /**
