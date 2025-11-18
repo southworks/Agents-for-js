@@ -1,4 +1,4 @@
-import { StreamingResponse } from '../../../src/app/streaming/streamingResponse'
+import { StreamingResponse, StreamingResponseResult } from '../../../src/app/streaming/streamingResponse'
 import { TurnContext } from '../../../src/turnContext'
 import { Activity, Attachment, SensitivityUsageInfo } from '@microsoft/agents-activity'
 import { Citation } from '../../../src/app/streaming/citation'
@@ -136,12 +136,10 @@ describe('StreamingResponse', () => {
     assert.equal(activity.text, 'end of stream response')
   })
 
-  it('should throw error when called twice', () => {
+  it('should throw error when called twice', async () => {
     streamingResponse.endStream()
-
-    assert.throws(() => {
-      streamingResponse.endStream()
-    }, /The stream has already ended/)
+    const result = await streamingResponse.endStream()
+    assert.equal(result, StreamingResponseResult.AlreadyEnded)
   })
 
   it('should include attachments in final message', () => {
