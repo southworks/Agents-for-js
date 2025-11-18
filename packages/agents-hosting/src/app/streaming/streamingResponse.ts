@@ -12,6 +12,28 @@ import { debug } from '@microsoft/agents-activity/logger'
 const logger = debug('agents:streamingResponse')
 
 /**
+ * Results for streaming response operations.
+ */
+export enum StreamingResponseResult {
+  /**
+   * The operation was successful.
+   */
+  Success = 'success',
+  /**
+   * The stream has already ended.
+   */
+  AlreadyEnded = 'alreadyEnded',
+  /**
+   * The user canceled the streaming response.
+   */
+  UserCanceled = 'userCanceled',
+  /**
+   * An error occurred during the streaming response.
+   */
+  Error = 'error'
+}
+
+/**
  * A helper class for streaming responses to the client.
  *
  * @remarks
@@ -32,6 +54,8 @@ export class StreamingResponse {
   private _delayInMs = 250
   private _isStreamingChannel: boolean = true
   private _finalMessage?: Activity
+  private _canceled = false
+  private _userCanceled = false
 
   // Queue for outgoing activities
   private _queue: Array<() => Activity> = []
@@ -108,7 +132,7 @@ export class StreamingResponse {
    * @param {string} text Text of the update to send.
    */
   public queueInformativeUpdate (text: string): void {
-    if (!this.isStreamingChannel) {
+    if (!this.isStreamingChannel || !text.trim() || this._canceled) {
       return
     }
 
@@ -140,6 +164,10 @@ export class StreamingResponse {
    *
    */
   public queueTextChunk (text: string, citations?: Citation[]): void {
+    if (!text.trim() || this._canceled) {
+      return
+    }
+
     if (this._ended) {
       throw new Error('The stream has already ended.')
     }
@@ -161,24 +189,49 @@ export class StreamingResponse {
   /**
    * Ends the stream by sending the final message to the client.
    *
-   * @returns {Promise<void>} - A promise representing the async operation
+   * @returns {Promise<StreamingResponseResult>} - StreamingResponseResult with the result of the streaming response.
    */
-  public endStream (): Promise<void> {
+  public async endStream (): Promise<StreamingResponseResult> {
     if (this._ended) {
-      throw new Error('The stream has already ended.')
+      return StreamingResponseResult.AlreadyEnded
     }
 
+    if (this._canceled) {
+      return this._userCanceled ? StreamingResponseResult.UserCanceled : StreamingResponseResult.Error
+    }
+
+    // Queue final message
     this._ended = true
 
     if (!this.isStreamingChannel) {
-      return this.sendActivity(this.createFinalMessage())
+      await this.sendActivity(this.createFinalMessage())
+      return StreamingResponseResult.Success
     }
 
     // Queue final message
     this.queueNextChunk()
 
     // Wait for the queue to drain
-    return this.waitForQueue()
+    await this.waitForQueue()
+    return StreamingResponseResult.Success
+  }
+
+  /**
+   * Resets the streaming response to its initial state.
+   * If the stream is still running, this will wait for completion.
+   */
+  public async reset () : Promise<void> {
+    await this.waitForQueue()
+
+    this._queueSync = undefined
+    this._queue = []
+    this._chunkQueued = false
+    this._ended = false
+    this._canceled = false
+    this._userCanceled = false
+    this._message = ''
+    this._nextSequence = 1
+    this._streamId = undefined
   }
 
   /**
@@ -436,13 +489,27 @@ export class StreamingResponse {
       }
     }
 
-    // Send activity
-    const response = await this._context.sendActivity(activity)
-    await new Promise((resolve) => setTimeout(resolve, this.delayInMs))
+    try {
+      const response = await this._context.sendActivity(activity)
+      if (!this._streamId) {
+        this._streamId = response?.id
+      }
+      await new Promise((resolve) => setTimeout(resolve, this.delayInMs))
+    } catch (error) {
+      const { message } = error as Error
+      this._canceled = true
+      this._queueSync = undefined
+      this._queue = []
 
-    // Save assigned stream ID
-    if (!this._streamId) {
-      this._streamId = response?.id
+      // MS Teams code list: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/streaming-ux?tabs=jsts#error-codes
+      if (message.includes('ContentStreamNotAllowed')) {
+        logger.warn('Streaming content is not allowed by the client side.', { originalError: message })
+        this._userCanceled = true
+      } else if (message.includes('BadArgument') && message.toLowerCase().includes('streaming api is not enabled')) {
+        logger.warn('Interaction does not support streaming. Defaulting to non-streaming response.', { originalError: message })
+        this._canceled = false
+        this._isStreamingChannel = false
+      }
     }
   }
 
@@ -457,8 +524,14 @@ export class StreamingResponse {
     if (activity.deliveryMode === DeliveryModes.ExpectReplies) {
       this._isStreamingChannel = false
     } else if (Channels.Msteams === activity.channelId) {
-      this._isStreamingChannel = true
-      this._delayInMs = 1000
+      if (activity.isAgenticRequest()) {
+        // Agentic requests do not support streaming responses at this time.
+        // TODO: Enable streaming for agentic requests when supported.
+        this._isStreamingChannel = false
+      } else {
+        this._isStreamingChannel = true
+        this._delayInMs = 1000
+      }
     } else if (Channels.Webchat === activity.channelId || Channels.Directline === activity.channelId) {
       this._isStreamingChannel = true
       this._delayInMs = 500
