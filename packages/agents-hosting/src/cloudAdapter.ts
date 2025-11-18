@@ -91,28 +91,6 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a ConnectorClient instance
    * @protected
    */
-  protected async createIConnectorClient (
-    context: TurnContext,
-    serviceUrl: string,
-    scope: string,
-    identity?: JwtPayload,
-    headers?: HeaderPropagationCollection
-  ): Promise<IConnectorClient> {
-    if (context.activity.recipient?.role && context.activity.recipient.role === RoleTypes.ConnectorUser) {
-      return MCSConnectorClient.createClient(serviceUrl, headers)
-    }
-    return this.createConnectorClient(serviceUrl, scope, identity!, headers)
-  }
-
-  /**
-   * Creates a connector client for a specific service URL and scope.
-   *
-   * @param serviceUrl - The URL of the service to connect to
-   * @param scope - The authentication scope to use
-   * @param headers - Optional headers to propagate in the request
-   * @returns A promise that resolves to a ConnectorClient instance
-   * @protected
-   */
   protected async createConnectorClient (
     serviceUrl: string,
     scope: string,
@@ -128,6 +106,28 @@ export class CloudAdapter extends BaseAdapter {
       token,
       headers
     )
+  }
+
+  /**
+   * Creates a connector client for a specific service URL and scope.
+   *
+   * @param serviceUrl - The URL of the service to connect to
+   * @param scope - The authentication scope to use
+   * @param headers - Optional headers to propagate in the request
+   * @returns A promise that resolves to a ConnectorClient instance
+   * @protected
+   */
+  protected async createIConnectorClient (
+    identity: JwtPayload,
+    activity: Activity,
+    headers?: HeaderPropagationCollection): Promise<IConnectorClient> {
+    if (activity.recipient?.role && activity.recipient.role.toLowerCase() === RoleTypes.ConnectorUser) {
+      if (!activity.serviceUrl) {
+        throw new Error('ServiceURL is required for creating MSC Connector Client')
+      }
+      return MCSConnectorClient.createClient(activity.serviceUrl!, headers)
+    }
+    return this.createConnectorClientWithIdentity(identity, activity, headers)
   }
 
   protected async createConnectorClientWithIdentity (
@@ -197,7 +197,7 @@ export class CloudAdapter extends BaseAdapter {
    */
   protected setConnectorClient (
     context: TurnContext,
-    connectorClient?: ConnectorClient
+    connectorClient?: IConnectorClient
   ) {
     context.turnState.set(this.ConnectorClientKey, connectorClient)
   }
@@ -357,7 +357,7 @@ export class CloudAdapter extends BaseAdapter {
     const context = new TurnContext(this, activity, request.user!)
     // if Delivery Mode == ExpectReplies, we don't need a connector client.
     if (this.resolveIfConnectorClientIsNeeded(activity)) {
-      const connectorClient = await this.createConnectorClientWithIdentity(request.user!, activity, headers)
+      const connectorClient = await this.createIConnectorClient(request.user!, activity, headers)
       this.setConnectorClient(context, connectorClient)
     }
 
@@ -475,7 +475,7 @@ export class CloudAdapter extends BaseAdapter {
           : CloudAdapter.createIdentity(botAppId)
 
     const context = new TurnContext(this, Activity.getContinuationActivity(reference), identity)
-    const connectorClient = await this.createConnectorClientWithIdentity(identity, context.activity)
+    const connectorClient = await this.createIConnectorClient(identity, context.activity)
     this.setConnectorClient(context, connectorClient)
 
     if (!context.activity.isAgenticRequest()) {
