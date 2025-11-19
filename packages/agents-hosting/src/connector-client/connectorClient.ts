@@ -36,6 +36,8 @@ export interface ConnectorClientBase {
   updateActivity(conversationId: string, activityId: string, body: Activity): Promise<ResourceResponse>
 
   deleteActivity(conversationId: string, activityId: string): Promise<void>
+
+  uploadAttachment(conversationId: string, body: AttachmentData): Promise<ResourceResponse>
 }
 /**
  * ConnectorClient is a client for interacting with the Microsoft Connector API.

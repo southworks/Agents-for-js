@@ -86,7 +86,7 @@ export class AuthorizationManager {
       type: (options.type ?? process.env[`${id}_type`])?.toLowerCase() as typeof options.type,
     }
 
-    // Validate supported types, agentic, connectorUser, and default (Azure Bot - undefined)
+    // Validate supported types, agentic, connectoruserauthorization, and default (Azure Bot - undefined)
     const supportedTypes = ['agentic', 'connectoruserauthorization', undefined]
     if (!supportedTypes.includes(result.type)) {
       throw new Error(`Unsupported authorization handler type: '${result.type}' for auth handler: '${id}'. Supported types are: '${supportedTypes.filter(Boolean).join('\', \'')}'.`)

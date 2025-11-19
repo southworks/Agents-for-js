@@ -171,9 +171,6 @@ export class MCSConnectorClient implements ConnectorClientBase {
 
     const config: AxiosRequestConfig = {
       method: 'post',
-      headers: {
-        'Content-Type': 'application/json'
-      },
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)

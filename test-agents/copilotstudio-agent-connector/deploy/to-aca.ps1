@@ -43,7 +43,7 @@ az containerapp up `
 
 $fqdn = az containerapp show --resource-g  $resourceGroup  --name $containerName --query properties.configuration.ingress.fqdn -o tsv
 $endpoint = "https://$fqdn/api/messages"
-echo "Created ACA app, listenting in endpoint: $endpoint"
+echo "Created ACA app, listening in endpoint: $endpoint"
 
 ## Create the Bot Service
 $botJson = az bot create `

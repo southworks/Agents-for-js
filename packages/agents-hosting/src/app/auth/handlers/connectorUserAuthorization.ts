@@ -87,7 +87,7 @@ export class ConnectorUserAuthorization implements AuthorizationHandler {
         connection: settings.obo?.connection ?? process.env[`${this.id}_obo_connection`],
         scopes: settings.obo?.scopes ?? this.loadScopes(process.env[`${this.id}_obo_scopes`]),
       },
-      enableSso: process.env[`${this.id}_enableSso`] !== 'false' // default value is true
+      enableSso: settings.enableSso ?? process.env[`${this.id}_enableSso`] !== 'false' // default value is true
     }
     return result
   }
@@ -141,9 +141,9 @@ export class ConnectorUserAuthorization implements AuthorizationHandler {
    */
   async signin (context: TurnContext): Promise<AuthorizationHandlerStatus> {
     // There is no "sign in" or external token retrieval in this handler.  A single impl is sufficient.
-    const token = await this.token(context)
+    const tokenResponse = await this.token(context)
 
-    if (token) {
+    if (tokenResponse.token) {
       return AuthorizationHandlerStatus.APPROVED
     } else {
       return AuthorizationHandlerStatus.REJECTED

@@ -24,31 +24,22 @@ class AgentConnector extends AgentApplication<TurnState> {
     await context.sendActivity('Welcome to the MCS Connector sample!')
   }
 
-  echo = async (context: TurnContext) => {
-    await context.sendActivity(`You said now: ${context.activity.text}`)
-  }
-
   mcsMessage = async (ctx: TurnContext, state: TurnState) => {
     const accessToken = await this.authorization.getToken(ctx, 'graph')
-    const name = this.getDisplayName(accessToken)
+    const name = await this.getDisplayName(accessToken)
     await ctx.sendActivity(`Hi ${name}!`)
   }
 
   mcsMessageSelector: RouteSelector = async (context: TurnContext) => {
-    if (context.activity.type === ActivityTypes.Message &&
-        context.activity.recipient?.role &&
-        context.activity.recipient.role === RoleTypes.ConnectorUser) {
-      return true
-    } else {
-      return false
-    }
+    return context.activity.type === ActivityTypes.Message &&
+           context.activity.recipient?.role === RoleTypes.ConnectorUser
   }
 
   private async getDisplayName (tokenResponse: TokenResponse) {
     let displayName = 'Unknown'
     if (tokenResponse.token) {
       const graphInfo = await this.getGraphInfo(tokenResponse.token)
-      if (graphInfo) {
+      if (graphInfo && graphInfo.displayName) {
         displayName = graphInfo.displayName
       }
     }
@@ -56,15 +47,13 @@ class AgentConnector extends AgentApplication<TurnState> {
   }
 
   private async getGraphInfo (token: string) {
-    const graphApiUrl = 'https://graph.microsoft.com/v1.0/me'
     try {
-      const axiosInstance: AxiosInstance = axios.create({ baseURL: graphApiUrl })
-      axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`
+      const response = await axios.get('https://graph.microsoft.com/v1.0/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
 
-      const response = await axiosInstance.get(graphApiUrl)
       if (response.status === 200) {
-        const content = response.data
-        return JSON.parse(content)
+        return response.data
       }
     } catch (err) {
       // Handle error response from Graph API

@@ -109,12 +109,12 @@ export class CloudAdapter extends BaseAdapter {
   }
 
   /**
-   * Creates a connector client for a specific service URL and scope.
+   * Creates a connector client base, choosing between MCSConnectorClient and standard ConnectorClient.
    *
-   * @param serviceUrl - The URL of the service to connect to
-   * @param scope - The authentication scope to use
+   * @param identity - The JWT payload containing authentication information
+   * @param activity - The activity being processed
    * @param headers - Optional headers to propagate in the request
-   * @returns A promise that resolves to a ConnectorClient instance
+   * @returns A promise that resolves to a ConnectorClientBase instance (MCSConnectorClient for ConnectorUser role, otherwise standard ConnectorClient)
    * @protected
    */
   protected async createConnectorClientBase (
