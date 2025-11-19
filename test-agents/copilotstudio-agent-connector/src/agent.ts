@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import axios, { AxiosInstance } from 'axios'
+import axios from 'axios'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { AgentApplication, MemoryStorage, RouteSelector, TokenResponse, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { ActivityTypes, RoleTypes } from '@microsoft/agents-activity'
