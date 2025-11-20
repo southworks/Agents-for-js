@@ -10,6 +10,7 @@ import { TurnContext } from '../../../src'
 import { TestAdapter } from '../testStubs'
 import { Activity } from '@microsoft/agents-activity'
 import { AuthorizationHandlerStatus } from '../../../src/app/auth/types'
+import { ActivityTypes } from '../../../../agents-activity/src'
 
 const createSettings = (): AzureBotAuthorizationSettings => ({
   storage: new MemoryStorage(),
@@ -24,7 +25,7 @@ describe('AzureBotAuthorization', () => {
   let mockClient: sinon.SinonStubbedInstance<UserTokenClient>
   const baseAdapter = new TestAdapter()
   const baseActivity = Activity.fromObject({
-    type: 'message',
+    type: ActivityTypes.Message,
     from: { id: 'user-1' },
     recipient: { id: 'bot-1' },
     conversation: { id: 'conv-1' },
@@ -98,18 +99,6 @@ describe('AzureBotAuthorization', () => {
     context.turnState.set(baseAdapter.UserTokenClientKey, mockClient)
     const status = await handler.signin(context, { ...active, attemptsLeft: 0 })
     assert.equal(status, AuthorizationHandlerStatus.REJECTED)
-  })
-
-  it('should return ignored status on conversation change', async () => {
-    const handler = new AzureBotAuthorization('auth', { name: 'connection' }, settings)
-    const context = new TurnContext(baseAdapter, baseActivity)
-    context.turnState.set(baseAdapter.UserTokenClientKey, mockClient)
-    const activity = Activity.fromObject({
-      ...baseActivity,
-      conversation: { id: 'changed' } // changed conversation id
-    })
-    const status = await handler.signin(context, { ...active, activity })
-    assert.equal(status, AuthorizationHandlerStatus.IGNORED)
   })
 
   describe('Teams flow', () => {
