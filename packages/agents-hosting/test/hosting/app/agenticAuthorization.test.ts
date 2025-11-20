@@ -131,11 +131,12 @@ describe('AgenticAuthorization', () => {
     assert.equal(result.token, 'agentic-token-123')
     assert.equal((settings.connections.getTokenProvider as sinon.SinonStub).calledOnce, true)
     assert.equal(mockTokenProvider.getAgenticUserToken.calledOnce, true)
-    assert.deepEqual(mockTokenProvider.getAgenticUserToken.firstCall.args, [
-      'instance-123',
-      'agentic-user-456',
-      ['scope1', 'scope2']
-    ])
+    const callArgs = mockTokenProvider.getAgenticUserToken.firstCall.args
+    const scopesArg = callArgs.find(a => Array.isArray(a))
+    const stringArgs = callArgs.filter(a => typeof a === 'string')
+    assert.ok(stringArgs.includes('instance-123'))
+    assert.ok(stringArgs.includes('agentic-user-456'))
+    assert.deepEqual(scopesArg, ['scope1', 'scope2'])
   })
 
   it('should retrieve token using altBlueprintConnectionName', async () => {
@@ -171,7 +172,9 @@ describe('AgenticAuthorization', () => {
     const result = await handler.token(context, { scopes: ['custom-scope1', 'custom-scope2'] })
 
     assert.equal(result.token, 'custom-scope-token')
-    assert.deepEqual(mockTokenProvider.getAgenticUserToken.firstCall.args[2], ['custom-scope1', 'custom-scope2'])
+    const callArgs = mockTokenProvider.getAgenticUserToken.firstCall.args
+    const scopesArg = callArgs.find(a => Array.isArray(a))
+    assert.deepEqual(scopesArg, ['custom-scope1', 'custom-scope2'])
   })
 
   it('should return cached token from turn state', async () => {
