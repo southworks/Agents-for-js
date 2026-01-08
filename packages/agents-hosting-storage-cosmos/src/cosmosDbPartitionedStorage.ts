@@ -211,11 +211,11 @@ export class CosmosDbPartitionedStorage implements Storage {
         return { key, eTag: item.etag }
       } catch (cause: any) {
         if (cause.code === 409) {
-          ExceptionHelper.generateException(Error, Errors.ItemAlreadyExists, cause, { key })
+          throw ExceptionHelper.generateException(Error, Errors.ItemAlreadyExists, cause, { key })
         }
 
         if (cause.code === 412) {
-          ExceptionHelper.generateException(Error, Errors.ETagConflict, cause, { key })
+          throw ExceptionHelper.generateException(Error, Errors.ETagConflict, cause, { key })
         }
 
         this.checkForNestingError(change, cause)
