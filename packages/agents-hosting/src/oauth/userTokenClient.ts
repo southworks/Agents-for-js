@@ -109,8 +109,14 @@ export class UserTokenClient {
     scope: string,
     headers?: HeaderPropagationCollection
   ): Promise<UserTokenClient> {
-    const headerPropagation = headers ?? new HeaderPropagation({ 'User-Agent': '' })
-    headerPropagation.concat({ 'User-Agent': getProductInfo() })
+    const headerPropagation = headers ?? new HeaderPropagation({})
+    const userAgent = headerPropagation.outgoing['user-agent']
+    const productInfo = getProductInfo()
+    if (!userAgent) {
+      headerPropagation.add({ 'User-Agent': productInfo })
+    } else if (!userAgent.includes(productInfo)) {
+      headerPropagation.concat({ 'User-Agent': productInfo })
+    }
     headerPropagation.override({
       Accept: 'application/json',
       'Content-Type': 'application/json', // Required by transformRequest
