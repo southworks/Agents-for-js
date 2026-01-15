@@ -84,10 +84,12 @@ export interface AzureBotAuthorizationOptionsOBO {
  * Interface defining an authorization handler configuration.
  * @remarks
  * Properties can be configured via environment variables (case-insensitive).
- * The environment variable prefix is `AgentApplication__UserAuthorization__handlers__{handlerId}__settings__`.
+ * Use the format: `AgentApplication__UserAuthorization__handlers__{handlerId}__settings__{propertyName}`
+ * where `{handlerId}` is the handler's unique identifier and `{propertyName}` matches the property name.
  *
  * @example
  * ```env
+ * # For a handler with id "myAuth":
  * AgentApplication__UserAuthorization__handlers__myAuth__settings__azureBotOAuthConnectionName=MyConnection
  * AgentApplication__UserAuthorization__handlers__myAuth__settings__oboScopes=api://scope1 api://scope2
  * ```
@@ -101,58 +103,49 @@ export interface AzureBotAuthorizationOptions {
   type?: undefined
   /**
    * Connection name for the auth provider.
-   * @remarks Env: `{prefix}__azureBotOAuthConnectionName`
    */
   azureBotOAuthConnectionName?: string,
   /**
    * Title to display on auth cards/UI.
-   * @remarks Env: `{prefix}__title`
    */
   title?: string,
   /**
    * Text to display on auth cards/UI.
-   * @remarks Env: `{prefix}__text`
    */
   text?: string,
   /**
    * Maximum number of attempts for entering the magic code. Defaults to 2.
-   * @remarks Env: `{prefix}__invalidSignInRetryMax`
    */
   invalidSignInRetryMax?: number
   /**
    * Message displayed when an invalid code is entered.
    * Use `{code}` as a placeholder to display the entered code.
    * Defaults to: 'The code entered is invalid. Please sign-in again to continue.'
-   * @remarks Env: `{prefix}__invalidSignInRetryMessage`
    */
   invalidSignInRetryMessage?: string
   /**
    * Message displayed when the entered code format is invalid.
    * Use `{attemptsLeft}` as a placeholder to display the number of attempts left.
    * Defaults to: 'Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**{attemptsLeft} attempt(s) left...**'
-   * @remarks Env: `{prefix}__invalidSignInRetryMessageFormat`
    */
   invalidSignInRetryMessageFormat?: string
   /**
    * Message displayed when the maximum number of attempts is exceeded.
    * Use `{maxAttempts}` as a placeholder to display the maximum number of attempts.
    * Defaults to: 'You have exceeded the maximum number of sign-in attempts ({maxAttempts}).'
-   * @remarks Env: `{prefix}__invalidSignInRetryMaxExceededMessage`
    */
   invalidSignInRetryMaxExceededMessage?: string
   /**
    * Connection name to use for on-behalf-of token acquisition.
-   * @remarks Env: `{prefix}__oboConnectionName`
    */
   oboConnectionName?: string
   /**
    * Scopes to request for on-behalf-of token acquisition.
-   * @remarks Env: `{prefix}__oboScopes` (comma or space-separated, e.g. `scope1,scope2` or `scope1 scope2`)
+   * @remarks When set via environment variable, use comma or space-separated values (e.g. `scope1,scope2` or `scope1 scope2`).
    */
   oboScopes?: string[]
   /**
    * Option to enable SSO when authenticating using Azure Active Directory (AAD). Defaults to true.
-   * @remarks Env: `{prefix}__enableSso`
    */
   enableSso?: boolean
   /**

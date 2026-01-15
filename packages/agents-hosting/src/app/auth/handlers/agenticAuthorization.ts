@@ -13,24 +13,30 @@ const logger = debug('agents:authorization:agentic')
 
 /**
  * Options for configuring the Agentic authorization handler.
+ * @remarks
+ * Properties can be configured via environment variables (case-insensitive).
+ * Use the format: `AgentApplication__UserAuthorization__handlers__{handlerId}__settings__{propertyName}`
+ * where `{handlerId}` is the handler's unique identifier and `{propertyName}` matches the property name.
+ *
+ * @example
+ * ```env
+ * # For a handler with id "myAuth":
+ * AgentApplication__UserAuthorization__handlers__myAuth__settings__type=AgenticUserAuthorization
+ * AgentApplication__UserAuthorization__handlers__myAuth__settings__scopes=api://scope1 api://scope2
+ * ```
  */
 export interface AgenticAuthorizationOptions {
   /**
    * The type of authorization handler.
-   * @remarks
-   * When using environment variables, this can be set using the `${authHandlerId}_type` variable.
    */
   type: 'AgenticUserAuthorization' | 'agentic'
   /**
    * The scopes required for the authorization.
-   * @remarks
-   * When using environment variables, this can be set using the `${authHandlerId}_scopes` variable (comma-separated values, e.g. `scope1,scope2`).
+   * @remarks When set via environment variable, use comma or space-separated values (e.g. `scope1,scope2` or `scope1 scope2`).
    */
   scopes?: string[]
   /**
-   * (Optional) An alternative connection name to use for the authorization process.
-   * @remarks
-   * When using environment variables, this can be set using the `${authHandlerId}_altBlueprintConnectionName` variable.
+   * An alternative connection name to use for the authorization process.
    */
   altBlueprintConnectionName?: string
 }
