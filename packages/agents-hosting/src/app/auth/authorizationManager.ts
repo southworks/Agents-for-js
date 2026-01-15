@@ -386,10 +386,10 @@ export class AuthorizationManager {
   /**
    * Parses a comma or whitespace separated scopes string into an array of scopes.
    */
-  private parseScopes (scopes?: string): string[] | undefined {
+  private parseScopes (scopes?: string): string[] {
     return scopes
       ?.split(scopes?.includes(',') ? ',' : /\s+/) // Use comma as delimiter; otherwise use whitespace
       .map(e => e.trim())
-      .filter(item => item.length > 0) || []
+      .filter(item => item.length > 0) ?? []
   }
 }

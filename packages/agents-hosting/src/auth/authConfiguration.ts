@@ -379,20 +379,20 @@ function getDefaultIssuers (tenantId: string, authority: string) : string[] {
  */
 export function env<Label extends string, Prop extends string> (config: Record<Label, Record<Prop, string>>): Record<Label, Record<Prop, string> | undefined> {
   const result = {} as Record<Label, Record<Prop, string>>
-  const list = new Map<string, { assing: (value: string | undefined) => void }>()
+  const list = new Map<string, { assign: (value: string | undefined) => void }>()
 
   for (const [labelKey, labelValue] of Object.entries(config) as ([Label, Record<Prop, string>][])) {
     for (const [propKey, propValue] of Object.entries(labelValue) as ([Prop, string][])) {
       const id = propValue.toUpperCase()
       const previous = list.get(id)
       list.set(id, {
-        assing (value) {
+        assign (value) {
           if (!value) {
             return
           }
 
           result[labelKey] ??= {} as Record<Prop, string> // Initialize if undefined
-          previous?.assing(value)
+          previous?.assign(value)
           result[labelKey][propKey] = value
         }
       })
@@ -400,7 +400,7 @@ export function env<Label extends string, Prop extends string> (config: Record<L
   }
 
   for (const [envKey, envValue] of Object.entries(process.env)) {
-    list.get(envKey.toUpperCase())?.assing(envValue)
+    list.get(envKey.toUpperCase())?.assign(envValue)
   }
 
   return result
