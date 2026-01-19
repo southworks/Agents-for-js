@@ -118,7 +118,7 @@ export class AuthorizationManager {
 
     // Validate supported types: agentic, and default (Azure Bot - undefined)
     const supportedTypes = ['agentic', undefined]
-    if (result.type && !supportedTypes.includes(result.type.toLowerCase())) {
+    if (result.type && !supportedTypes.includes(result.type)) {
       throw new Error(`Unsupported authorization handler type: '${result.type}' for auth handler: '${id}'. Supported types are: '${supportedTypes.filter(Boolean).join('\', \'')}'.`)
     }
 
@@ -147,7 +147,8 @@ export class AuthorizationManager {
     const handlers = active?.handlers ?? this.mapHandlers(await getHandlerIds(context.activity) ?? []) ?? []
 
     // AutoSignIn feature: performs automatic sign-in using the provided default or first available handler.
-    if (this._userAuthorizationOptions.autoSignIn?.(context) && handlers.length === 0) {
+    const shouldAutoSignIn = await this._userAuthorizationOptions.autoSignIn?.(context)
+    if (shouldAutoSignIn && handlers.length === 0) {
       const firstHandler = Object.values(this._handlers)[0]
       const defaultHandler = this._handlers[this._userAuthorizationOptions.defaultHandlerName ?? '']
       if (!defaultHandler && this._userAuthorizationOptions.defaultHandlerName) {

@@ -37,8 +37,19 @@ export type AutoSignInSelector = (context: TurnContext) => Promise<boolean> | bo
 
 /**
  * User authorization configuration options.
+ *
  * @remarks
- * Use this interface to configure authorization handlers with explicit settings.
+ * Properties can be configured via environment variables.
+ * Use the format:
+ * `AgentApplication__UserAuthorization__{propertyName}`
+ *
+ * @example
+ * ```env
+ * # For all handlers
+ *
+ * AGENTAPPLICATION__USERAUTHORIZATION__DEFAULTHANDLERNAME=graph
+ * AGENTAPPLICATION__USERAUTHORIZATION__AUTOSIGNIN=true
+ * ```
  *
  * @example
  * ```typescript

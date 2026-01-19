@@ -109,7 +109,7 @@ export interface AgentApplicationOptions<TState extends TurnState> {
    * ```typescript
    * userAuthorization: {
    *   defaultHandlerName: 'graph',
-   *   autoSignIn: true,
+   *   autoSignIn: () => true,
    *   handlers: {
    *     graph: {
    *       settings: { text: 'Sign in', title: 'Graph Sign In' }
