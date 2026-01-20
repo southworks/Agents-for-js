@@ -75,7 +75,7 @@ export interface UserAuthorizationOptions {
   defaultHandlerName?: string
   /**
    * Indicates whether to automatically sign in users when they interact with the application.
-   * @remarks Enabled by default if not specified.
+   * @remarks Auto sign-in is enabled by default and remains enabled unless explicitly disabled (for example, by setting the corresponding configuration or environment variable to 'false').
    */
   autoSignIn?: AutoSignInSelector
   /**

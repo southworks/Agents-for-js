@@ -69,10 +69,14 @@ export class AgentApplicationBuilder<TState extends TurnState = TurnState> {
    */
   public withAuthorization (authHandlers: AuthorizationOptions): this
   public withAuthorization (options: UserAuthorizationOptions | AuthorizationOptions): this {
-    if ('handlers' in options) {
+    if (
+      'handlers' in options &&
+      typeof options.handlers === 'object' &&
+      Object.values(options.handlers).some(handler => typeof handler === 'object' && 'settings' in handler)
+    ) {
       this._options.userAuthorization = options as UserAuthorizationOptions
     } else {
-      this._options.authorization = options
+      this._options.authorization = options as AuthorizationOptions
     }
     return this
   }
