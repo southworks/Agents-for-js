@@ -381,7 +381,7 @@ describe('TurnContext', { timeout: 5000 }, function () {
 
   it('should accept valid activity in updateActivity()', async function () {
     const context = new TurnContext(new SimpleAdapter(), testMessage)
-    const validActivity = Activity.fromObject({ type: 'message', text: 'Updated', id: '1234' })
+    const validActivity = { type: 'message', text: 'Updated', id: '1234' } as Activity
     await context.updateActivity(validActivity)
   })
 })
