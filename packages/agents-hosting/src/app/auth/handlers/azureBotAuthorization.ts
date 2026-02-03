@@ -38,49 +38,6 @@ export interface AzureBotActiveHandler extends ActiveAuthorizationHandler {
 }
 
 /**
- * Messages configuration for the AzureBotAuthorization handler.
- */
-export interface AzureBotAuthorizationOptionsMessages {
-  /**
-   * @deprecated Use `invalidSignInRetryMessage` instead.
-   * Message displayed when an invalid code is entered.
-   * Use `{code}` as a placeholder for the entered code.
-   * Defaults to: 'The code entered is invalid. Please sign-in again to continue.'
-   */
-  invalidCode?: string
-  /**
-   * @deprecated Use `invalidSignInRetryMessageFormat` instead.
-   * Message displayed when the entered code format is invalid.
-   * Use `{attemptsLeft}` as a placeholder for the number of attempts left.
-   * Defaults to: 'Please enter a valid **6-digit** code format (_e.g. 123456_).\r\n**{attemptsLeft} attempt(s) left...**'
-   */
-  invalidCodeFormat?: string
-  /**
-   * @deprecated Use `invalidSignInRetryMaxExceededMessage` instead.
-   * Message displayed when the maximum number of attempts is exceeded.
-   * Use `{maxAttempts}` as a placeholder for the maximum number of attempts.
-   * Defaults to: 'You have exceeded the maximum number of sign-in attempts ({maxAttempts}).'
-   */
-  maxAttemptsExceeded?: string
-}
-
-/**
- * Settings for on-behalf-of token acquisition.
- */
-export interface AzureBotAuthorizationOptionsOBO {
-  /**
-   * @deprecated Use `oboConnectionName` instead.
-   * Connection name to use for on-behalf-of token acquisition.
-   */
-  connection?: string
-  /**
-   * @deprecated Use `oboScopes` instead.
-   * Scopes to request for on-behalf-of token acquisition.
-   */
-  scopes?: string[]
-}
-
-/**
  * Interface defining an authorization handler configuration.
  * @remarks
  * Properties can be configured via environment variables (case-insensitive).
@@ -100,7 +57,7 @@ export interface AzureBotAuthorizationOptions {
    * This property is optional and should not be set when configuring this handler.
    * It is included here for completeness and type safety.
    */
-  type?: undefined
+  type?: 'AzureBotUserAuthorization' | undefined
   /**
    * Connection name for the auth provider.
    */
@@ -148,37 +105,6 @@ export interface AzureBotAuthorizationOptions {
    * Option to enable SSO when authenticating using Azure Active Directory (AAD). Defaults to true.
    */
   enableSso?: boolean
-  /**
-   * Connection name for the auth provider.
-   * @deprecated Use `azureBotOAuthConnectionName` instead.
-   * @remarks Env (legacy): `{handlerId}_connectionName`
-   */
-  name?: string,
-  /**
-   * Maximum number of attempts for entering the magic code. Defaults to 2.
-   * @deprecated Use `invalidSignInRetryMax` instead.
-   * @remarks Env (legacy): `{handlerId}_maxAttempts`
-   */
-  maxAttempts?: number
-  /**
-   * Messages to display for various authentication scenarios.
-   * @deprecated Use `invalidSignInRetryMessage`, `invalidSignInRetryMessageFormat`, and `invalidSignInRetryMaxExceededMessage` instead.
-   * @remarks
-   * Env (legacy):
-   * - `{handlerId}_messages_invalidCode`
-   * - `{handlerId}_messages_invalidCodeFormat`
-   * - `{handlerId}_messages_maxAttemptsExceeded`
-   */
-  messages?: AzureBotAuthorizationOptionsMessages
-  /**
-   * Settings for on-behalf-of token acquisition.
-   * @deprecated Use `oboConnectionName` and `oboScopes` instead.
-   * @remarks
-   * Env (legacy):
-   * - `{handlerId}_obo_connection`
-   * - `{handlerId}_obo_scopes` (comma or space-separated)
-   */
-  obo?: AzureBotAuthorizationOptionsOBO
 }
 
 /**

@@ -1,5 +1,5 @@
 import { strict as assert } from 'assert'
-import { afterEach, beforeEach, describe, it } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import sinon from 'sinon'
 
 import { UserAuthorization } from '../../../src/app/auth/authorization'
@@ -26,7 +26,9 @@ describe('AgentApplication - Authorization Setup', () => {
   it('should throw when authorization configured without storage', () => {
     assert.throws(() => {
       const app = new AgentApplication({
-        authorization: {}
+        authorization: {
+          testAuth: {}
+        }
       })
       assert.equal(app.options.authorization, undefined)
     }, { message: 'Storage is required for Authorization. Ensure that a storage provider is configured in the AgentApplication options.' })
@@ -39,7 +41,7 @@ describe('AgentApplication - Authorization Setup', () => {
         authorization: {}
       })
       assert.equal(app.options.authorization, undefined)
-    }, { message: 'The AgentApplication.authorization does not have any auth handlers' })
+    }, { message: 'The AgentApplication.authorization does not have any auth handlers configured.' })
   })
 
   it('should initialize successfully with valid auth configuration', () => {
@@ -51,6 +53,21 @@ describe('AgentApplication - Authorization Setup', () => {
     })
     assert.ok(app.authorization)
     assert.deepEqual(Object.keys(app.options.authorization!), ['testAuth'])
+  })
+
+  it('should initialize successfully with valid auth configuration from env', () => {
+    // Set test environment variables
+    const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
+    process.env = {
+      ...process.env,
+      [`${key}__azureBotOAuthConnectionName`]: 'EnvConnection',
+      [`${key}__title`]: 'Env Title',
+      [`${key}__text`]: 'Env Text'
+    }
+
+    const app = new AgentApplication({ storage: new MemoryStorage() })
+    assert.equal(app.options.authorization, undefined)
+    assert.notEqual(app.authorization, undefined)
   })
 
   it('should throw when accessing authorization without configuring it', () => {
@@ -86,18 +103,18 @@ describe('AgentApplication - Authorization Setup', () => {
   })
 
   it('should use connection parameters from environment when not explicitly provided', () => {
+    // Set test environment variables
     process.env = {
       ...process.env,
       testAuth_connectionName: 'EnvConnection',
       testAuth_connectionTitle: 'Env Title',
-      testAuth_connectionText: 'Env Text',
-      testAuth_connectionAuto: 'true'
+      testAuth_connectionText: 'Env Text'
     }
 
     const app = new AgentApplication({
       storage: new MemoryStorage(),
       authorization: {
-        testAuth: {}
+        testAuth: { }
       }
     })
 
@@ -127,7 +144,7 @@ describe('UserAuthorization', () => {
   beforeEach(() => {
     graph = createHandler('graph')
     github = createHandler('github')
-    manager = { handlers: { graph, github } }
+    manager = { handlers: [graph, github] }
   })
 
   it('getToken should call handler.token with context', async () => {

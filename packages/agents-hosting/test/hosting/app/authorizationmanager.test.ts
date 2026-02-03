@@ -61,15 +61,38 @@ describe('AuthorizationManager - Configuration', () => {
     assert.deepEqual(authHandler.oboScopes, ['constructor.scope1', 'constructor.scope2'])
   })
 
+  it('should merge constructor options with legacy env variables', () => {
+    process.env = {
+      ...process.env,
+      testAuth_connectionName: 'EnvConnection',
+      testAuth_obo_scopes: 'env.scope1,env.scope2'
+    }
+
+    const app = new AgentApplication({
+      storage: new MemoryStorage(),
+      authorization: {
+        testAuth: {
+          maxAttempts: 3,
+          obo: {
+            connection: 'ConstructorOboConnection',
+            scopes: ['constructor.scope1', 'constructor.scope2']
+          }
+        }
+      }
+    })
+
+    const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
+    assert.equal(authHandler.azureBotOAuthConnectionName, 'EnvConnection')
+    assert.equal(authHandler.invalidSignInRetryMax, 3)
+    assert.equal(authHandler.oboConnectionName, 'ConstructorOboConnection')
+    assert.deepEqual(authHandler.oboScopes, ['constructor.scope1', 'constructor.scope2'])
+  })
+
   it('should use constructor options over latest env variables', () => {
     const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
     process.env = {
       ...process.env,
       [`${key}__azureBotOAuthConnectionName`]: 'EnvConnection',
-      [`${key}__title`]: 'Env Title',
-      [`${key}__text`]: 'Env Text',
-      [`${key}__invalidSignInRetryMax`]: '5',
-      [`${key}__oboConnectionName`]: 'EnvOboConnection',
       [`${key}__oboScopes`]: 'env.scope1,env.scope2'
     }
 
@@ -78,26 +101,18 @@ describe('AuthorizationManager - Configuration', () => {
       authorization: {
         testAuth: {
           azureBotOAuthConnectionName: 'ConstructorConnection',
-          title: 'Constructor Title',
-          text: 'Constructor Text',
-          invalidSignInRetryMax: 3,
-          oboConnectionName: 'ConstructorOboConnection',
-          oboScopes: ['constructor.scope1', 'constructor.scope2']
+          // Empty oboScopes
         }
       }
     })
 
     const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
     assert.equal(authHandler.azureBotOAuthConnectionName, 'ConstructorConnection')
-    assert.equal(authHandler.title, 'Constructor Title')
-    assert.equal(authHandler.text, 'Constructor Text')
-    assert.equal(authHandler.invalidSignInRetryMax, 3)
-    assert.equal(authHandler.oboConnectionName, 'ConstructorOboConnection')
-    assert.deepEqual(authHandler.oboScopes, ['constructor.scope1', 'constructor.scope2'])
+    assert.deepEqual(authHandler.oboScopes, []) // The real test comparison.
   })
 
   // Env variables as fallback
-  it('should use legacy env variables when constructor options are undefined', () => {
+  it('should use legacy env variables when constructor options are not provided', () => {
     process.env = {
       ...process.env,
       testAuth_connectionName: 'EnvConnection',
@@ -115,7 +130,7 @@ describe('AuthorizationManager - Configuration', () => {
     const app = new AgentApplication({
       storage: new MemoryStorage(),
       authorization: {
-        testAuth: { name: undefined } // triggers legacy mode
+        testAuth: {}
       }
     })
 
@@ -132,7 +147,7 @@ describe('AuthorizationManager - Configuration', () => {
     assert.equal(authHandler.enableSso, true)
   })
 
-  it('should use latest env variables when constructor options are undefined', () => {
+  it('should use latest env variables when constructor options are not provided', () => {
     const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
     process.env = {
       ...process.env,
@@ -148,12 +163,7 @@ describe('AuthorizationManager - Configuration', () => {
       [`${key}__enableSso`]: 'true'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {}
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
     assert.equal(authHandler.azureBotOAuthConnectionName, 'EnvConnection')
@@ -213,12 +223,7 @@ describe('AuthorizationManager - Configuration', () => {
       [`${key}__oboScopes`]: 'scope1,scope2,scope3'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {}
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
     assert.deepEqual(authHandler.oboScopes, ['scope1', 'scope2', 'scope3'])
@@ -232,12 +237,7 @@ describe('AuthorizationManager - Configuration', () => {
       [`${key}__oboScopes`]: 'scope1 scope2 scope3'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {}
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
     assert.deepEqual(authHandler.oboScopes, ['scope1', 'scope2', 'scope3'])
@@ -359,12 +359,7 @@ describe('AuthorizationManager - Configuration', () => {
       [`${key}__invalidSignInRetryMax`]: '10'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {}
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
     assert.equal(authHandler.invalidSignInRetryMax, 10)
@@ -453,12 +448,7 @@ describe('AuthorizationManager - Configuration', () => {
       [`${key}__title`]: 'Latest Title'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {}
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const authHandler: AzureBotAuthorizationOptions = (app.authorization as any).manager._handlers['testAuth'].options
     assert.equal(authHandler.azureBotOAuthConnectionName, 'LatestEnvConnection')
@@ -566,7 +556,6 @@ describe('AuthorizationManager - Configuration', () => {
 
   // Error handling
   it('should throw when azureBotOAuthConnectionName is not provided with latest options', () => {
-    const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
     assert.throws(() => {
       const app = new AgentApplication({
         storage: new MemoryStorage(),
@@ -575,7 +564,7 @@ describe('AuthorizationManager - Configuration', () => {
         }
       })
       assert.equal(app, undefined)
-    }, { message: `[handler:testAuth] The 'azureBotOAuthConnectionName' property or '${key}__azureBotOAuthConnectionName' env variable is required to initialize the handler.` })
+    }, { message: '[handler:testAuth] The \'azureBotOAuthConnectionName\' option is not available in the app options. Ensure that the app is properly configured.' })
   })
 
   // AgenticUserAuthorization type tests
@@ -583,60 +572,30 @@ describe('AuthorizationManager - Configuration', () => {
     const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
     process.env = {
       ...process.env,
+      [`${key}__type`]: 'AgenticUserAuthorization',
       [`${key}__scopes`]: 'scope1,scope2'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {
-          type: 'AgenticUserAuthorization'
-        }
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const handler = (app.authorization as any).manager._handlers['testAuth']
     assert.equal(handler.constructor.name, 'AgenticAuthorization')
+    assert.deepEqual(handler.options.scopes, ['scope1', 'scope2'])
   })
 
   it('should create AgenticAuthorization handler when type is agentic (deprecated)', () => {
     const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
     process.env = {
       ...process.env,
+      [`${key}__type`]: 'agentic',
       [`${key}__scopes`]: 'scope1,scope2'
     }
 
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {
-          type: 'agentic'
-        } as any
-      }
-    })
+    const app = new AgentApplication({ storage: new MemoryStorage() })
 
     const handler = (app.authorization as any).manager._handlers['testAuth']
     assert.equal(handler.constructor.name, 'AgenticAuthorization')
-  })
-
-  it('should load agentic scopes from latest env variables', () => {
-    const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
-    process.env = {
-      ...process.env,
-      [`${key}__scopes`]: 'scope1,scope2,scope3'
-    }
-
-    const app = new AgentApplication({
-      storage: new MemoryStorage(),
-      authorization: {
-        testAuth: {
-          type: 'AgenticUserAuthorization'
-        }
-      }
-    })
-
-    const handler = (app.authorization as any).manager._handlers['testAuth']
-    assert.deepEqual(handler.options.scopes, ['scope1', 'scope2', 'scope3'])
+    assert.deepEqual(handler.options.scopes, ['scope1', 'scope2'])
   })
 
   it('should load agentic scopes from legacy env variables', () => {
@@ -697,21 +656,84 @@ describe('AuthorizationManager - Configuration', () => {
     const key = 'AgentApplication__UserAuthorization__handlers__testAuth__settings'
     process.env = {
       ...process.env,
+      [`${key}__type`]: 'AgenticUserAuthorization',
       [`${key}__scopes`]: 'scope1',
       [`${key}__altBlueprintConnectionName`]: 'MyAltConnection'
+    }
+
+    const app = new AgentApplication({ storage: new MemoryStorage() })
+
+    const handler = (app.authorization as any).manager._handlers['testAuth']
+    assert.equal(handler.options.altBlueprintConnectionName, 'MyAltConnection')
+  })
+
+  it('should maintain handler properties casing', () => {
+    const key = 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS'
+    process.env = {
+      ...process.env,
+      [`${key}__TESTAUTH__SETTINGS__AZUREBOTOAUTHCONNECTIONNAME`]: 'TestAuthLatestEnvConnection',
+    }
+
+    const app = new AgentApplication({ storage: new MemoryStorage() })
+
+    const handler1 = (app.authorization as any).manager._handlers['TESTAUTH']
+    assert.equal(handler1.options.azureBotOAuthConnectionName, 'TestAuthLatestEnvConnection')
+  })
+
+  it('should maintain handler id casing for latest env variables', () => {
+    const key = 'AgentApplication__UserAuthorization__handlers'
+    process.env = {
+      ...process.env,
+      [`${key}__testAuth__settings__azureBotOAuthConnectionName`]: 'TestAuthLatestEnvConnection',
+      [`${key}__TESTUPPER_AUTH__settings__azureBotOAuthConnectionName`]: 'LatestEnvConnection',
+    }
+
+    const app = new AgentApplication({ storage: new MemoryStorage() })
+
+    const handler1 = (app.authorization as any).manager._handlers['testAuth']
+    const handler2 = (app.authorization as any).manager._handlers['TESTUPPER_AUTH']
+    assert.notEqual(handler1, undefined)
+    assert.notEqual(handler2, undefined)
+  })
+
+  it('should maintain handler id casing for legacy env variables', () => {
+    process.env = {
+      ...process.env,
+      testAuth_connectionName: 'TestAuthLegacyEnvConnection',
+      TESTUPPER_AUTH_connectionName: 'LegacyEnvConnection',
     }
 
     const app = new AgentApplication({
       storage: new MemoryStorage(),
       authorization: {
+        testAuth: {},
+        TESTUPPER_AUTH: {}
+      }
+    })
+
+    const handler1 = (app.authorization as any).manager._handlers['testAuth']
+    const handler2 = (app.authorization as any).manager._handlers['TESTUPPER_AUTH']
+    assert.notEqual(handler1, undefined)
+    assert.notEqual(handler2, undefined)
+  })
+
+  it('should maintain handler id casing for constructor options', () => {
+    const app = new AgentApplication({
+      storage: new MemoryStorage(),
+      authorization: {
         testAuth: {
-          type: 'AgenticUserAuthorization'
+          name: 'TestAuthConstructorConnection'
+        },
+        TESTUPPER_AUTH: {
+          name: 'ConstructorConnection'
         }
       }
     })
 
-    const handler = (app.authorization as any).manager._handlers['testAuth']
-    assert.equal(handler.options.altBlueprintConnectionName, 'MyAltConnection')
+    const handler1 = (app.authorization as any).manager._handlers['testAuth']
+    const handler2 = (app.authorization as any).manager._handlers['TESTUPPER_AUTH']
+    assert.notEqual(handler1, undefined)
+    assert.notEqual(handler2, undefined)
   })
 })
 
@@ -763,17 +785,6 @@ describe('AuthorizationManager - Processing', () => {
     }, /Storage is required for Authorization/)
   })
 
-  it('should throw error if no authorization handlers are configured', () => {
-    const app = new AgentApplication({
-      storage
-    })
-
-    assert.throws(() => {
-      // eslint-disable-next-line no-new
-      new AuthorizationManager(app, mockConnections)
-    }, /does not have any auth handlers/)
-  })
-
   it('should throw error for unsupported handler type', () => {
     assert.throws(() => {
       // eslint-disable-next-line no-new
@@ -790,10 +801,10 @@ describe('AuthorizationManager - Processing', () => {
     const manager = new AuthorizationManager(app, mockConnections)
 
     assert.notEqual(manager.handlers, undefined)
-    assert.equal(Object.keys(manager.handlers).length, 3)
-    assert.notEqual(manager.handlers['handler1'], undefined)
-    assert.notEqual(manager.handlers['handler2'], undefined)
-    assert.notEqual(manager.handlers['handler3'], undefined)
+    assert.equal(manager.handlers.length, 3)
+    assert.notEqual(manager.handlers.find(handler => handler.id === 'handler1'), undefined)
+    assert.notEqual(manager.handlers.find(handler => handler.id === 'handler2'), undefined)
+    assert.notEqual(manager.handlers.find(handler => handler.id === 'handler3'), undefined)
   })
 
   it('should return registered handlers', () => {
@@ -801,10 +812,10 @@ describe('AuthorizationManager - Processing', () => {
 
     const handlers = manager.handlers
 
-    assert.equal(Object.keys(handlers).length, 3)
-    assert.notEqual(handlers['handler1'], undefined)
-    assert.notEqual(handlers['handler2'], undefined)
-    assert.notEqual(handlers['handler3'], undefined)
+    assert.equal(handlers.length, 3)
+    assert.notEqual(handlers.find(handler => handler.id === 'handler1'), undefined)
+    assert.notEqual(handlers.find(handler => handler.id === 'handler2'), undefined)
+    assert.notEqual(handlers.find(handler => handler.id === 'handler3'), undefined)
   })
 
   it('should return authorized:true when conversation changes', async () => {
@@ -819,7 +830,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should return authorized:true when handler returns APPROVED', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     const signinStub = sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
     const result = await manager.process(context, getHandlerIds)
@@ -829,7 +840,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should return authorized:true when handler returns IGNORED', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     const signinStub = sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.IGNORED)
 
     const result = await manager.process(context, getHandlerIds)
@@ -839,7 +850,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should return authorized:false when handler returns PENDING', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     const signinStub = sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.PENDING)
 
     const result = await manager.process(context, getHandlerIds)
@@ -849,7 +860,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should return authorized:false when handler returns REJECTED', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     const signinStub = sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.REJECTED)
 
     const result = await manager.process(context, getHandlerIds)
@@ -859,7 +870,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should recursively call process when handler returns REVALIDATE', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     const signinStub = sinon.stub(handler, 'signin')
     signinStub.onFirstCall().resolves(AuthorizationHandlerStatus.REVALIDATE)
     signinStub.onSecondCall().resolves(AuthorizationHandlerStatus.APPROVED)
@@ -871,7 +882,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should throw error for unexpected status', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').resolves('unexpected_status' as any)
 
     await assert.rejects(
@@ -883,8 +894,8 @@ describe('AuthorizationManager - Processing', () => {
   it('should process multiple handlers in sequence', async () => {
     getHandlerIds.resolves(['handler1', 'handler2'])
 
-    const handler1 = manager.handlers['handler1']
-    const handler2 = manager.handlers['handler2']
+    const handler1 = manager.handlers.find(handler => handler.id === 'handler1')!
+    const handler2 = manager.handlers.find(handler => handler.id === 'handler2')!
     const signin1Stub = sinon.stub(handler1, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
     const signin2Stub = sinon.stub(handler2, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
@@ -898,8 +909,8 @@ describe('AuthorizationManager - Processing', () => {
   it('should stop processing on first PENDING', async () => {
     getHandlerIds.resolves(['handler1', 'handler2'])
 
-    const handler1 = manager.handlers['handler1']
-    const handler2 = manager.handlers['handler2']
+    const handler1 = manager.handlers.find(handler => handler.id === 'handler1')!
+    const handler2 = manager.handlers.find(handler => handler.id === 'handler2')!
     const signin1Stub = sinon.stub(handler1, 'signin').resolves(AuthorizationHandlerStatus.PENDING)
     const signin2Stub = sinon.stub(handler2, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
@@ -913,8 +924,8 @@ describe('AuthorizationManager - Processing', () => {
   it('should stop processing on first REJECTED', async () => {
     getHandlerIds.resolves(['handler1', 'handler2'])
 
-    const handler1 = manager.handlers['handler1']
-    const handler2 = manager.handlers['handler2']
+    const handler1 = manager.handlers.find(handler => handler.id === 'handler1')!
+    const handler2 = manager.handlers.find(handler => handler.id === 'handler2')!
     const signin1Stub = sinon.stub(handler1, 'signin').resolves(AuthorizationHandlerStatus.REJECTED)
     const signin2Stub = sinon.stub(handler2, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
@@ -928,9 +939,9 @@ describe('AuthorizationManager - Processing', () => {
   it('should continue processing on IGNORED', async () => {
     getHandlerIds.resolves(['handler1', 'handler2', 'handler3'])
 
-    const handler1 = manager.handlers['handler1']
-    const handler2 = manager.handlers['handler2']
-    const handler3 = manager.handlers['handler3']
+    const handler1 = manager.handlers.find(handler => handler.id === 'handler1')!
+    const handler2 = manager.handlers.find(handler => handler.id === 'handler2')!
+    const handler3 = manager.handlers.find(handler => handler.id === 'handler3')!
     const signin1Stub = sinon.stub(handler1, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
     const signin2Stub = sinon.stub(handler2, 'signin').resolves(AuthorizationHandlerStatus.IGNORED)
     const signin3Stub = sinon.stub(handler3, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
@@ -944,7 +955,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should delete storage on APPROVED', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
     const handlerStorage = new HandlerStorage(storage, context)
@@ -957,7 +968,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should delete storage on IGNORED', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.IGNORED)
 
     const handlerStorage = new HandlerStorage(storage, context)
@@ -970,7 +981,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should delete storage on REJECTED', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.REJECTED)
 
     const handlerStorage = new HandlerStorage(storage, context)
@@ -983,7 +994,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should not delete storage on PENDING', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.PENDING)
 
     const handlerStorage = new HandlerStorage(storage, context)
@@ -1002,7 +1013,7 @@ describe('AuthorizationManager - Processing', () => {
     const handlerStorage = new HandlerStorage(storage, context)
     await handlerStorage.write({ id: 'handler1', activity: originalActivity, eTag: '*' })
 
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     const signinStub = sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
     await manager.process(context, getHandlerIds)
@@ -1020,8 +1031,8 @@ describe('AuthorizationManager - Processing', () => {
     const handlerStorage = new HandlerStorage(storage, context)
     await handlerStorage.write({ id: 'handler2', activity: testActivity, eTag: '*' })
 
-    const handler1 = manager.handlers['handler1']
-    const handler2 = manager.handlers['handler2']
+    const handler1 = manager.handlers.find(handler => handler.id === 'handler1')!
+    const handler2 = manager.handlers.find(handler => handler.id === 'handler2')!
     const signin1Stub = sinon.stub(handler1, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
     const signin2Stub = sinon.stub(handler2, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
@@ -1043,7 +1054,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should throw error when signin fails', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').rejects(new Error('Signin failed'))
 
     await assert.rejects(
@@ -1053,7 +1064,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should delete storage when signin throws error', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').rejects(new Error('Signin failed'))
 
     const handlerStorage = new HandlerStorage(storage, context)
@@ -1078,7 +1089,7 @@ describe('AuthorizationManager - Processing', () => {
   })
 
   it('should call getHandlerIds with current activity', async () => {
-    const handler = manager.handlers['handler1']
+    const handler = manager.handlers.find(handler => handler.id === 'handler1')!
     sinon.stub(handler, 'signin').resolves(AuthorizationHandlerStatus.APPROVED)
 
     await manager.process(context, getHandlerIds)
