@@ -144,6 +144,12 @@ export class AuthorizationManager {
 
     let active = await this.active(storage, getHandlerIds)
 
+    if (active !== undefined && active?.data.activity.conversation?.id !== context.activity.conversation?.id) {
+      logger.warn('Discarding the active session due to the conversation has changed during an active sign-in process', active?.data.activity)
+      await storage.delete()
+      return { authorized: true }
+    }
+
     const handlers = active?.handlers ?? this.mapHandlers(await getHandlerIds(context.activity) ?? []) ?? []
 
     for (const handler of handlers) {
@@ -152,7 +158,7 @@ export class AuthorizationManager {
 
       if (status === AuthorizationHandlerStatus.IGNORED) {
         await storage.delete()
-        return { authorized: true }
+        continue
       }
 
       if (status === AuthorizationHandlerStatus.PENDING) {
