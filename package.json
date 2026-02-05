@@ -20,7 +20,8 @@
   "scripts": {
     "play": "agentsplayground",
     "lint": "eslint",
-    "lint:deps": "knip",
+    "lint:deps": "knip --treat-config-hints-as-errors",
+    "lint:deps:ci": "knip --treat-config-hints-as-errors --reporter github-actions",
     "compat": "node compat.mjs",
     "test": "node --test  --test-reporter=spec  --import tsx  --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-report.xml './packages/*/test/**/*.test.ts'",
     "docs": "typedoc --skipErrorChecking",
