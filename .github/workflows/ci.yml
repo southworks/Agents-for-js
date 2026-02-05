@@ -31,9 +31,12 @@ jobs:
       - name: Install dependencies with CI
         run: npm ci
 
-      - name: lint
+      - name: Check for linting errors
         run: npm run lint
-        
+
+      - name: Check for unused code
+        run: npm run lint:deps
+
       - name: Build TS
         run: npm run build
 
