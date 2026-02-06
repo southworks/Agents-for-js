@@ -3,10 +3,12 @@
 
 import { startServer } from '@microsoft/agents-hosting-express'
 import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { SpanStatusCode, trace, type Span } from '@opentelemetry/api'
+import { context, trace, SpanStatusCode, type Span } from '@opentelemetry/api'
+import { AgentTelemetry } from './agentTelemetry'
+import { isTracingSuppressed } from '@opentelemetry/core'
 
 class OTelAgent extends AgentApplication<TurnState> {
-  private tracer = trace.getTracer('OTelAgent')
+  private tracer = AgentTelemetry.tracer
 
   constructor () {
     super({ startTypingTimer: true, storage: new MemoryStorage() })
@@ -23,16 +25,24 @@ class OTelAgent extends AgentApplication<TurnState> {
         span.setAttribute('members.added.count', ctx.activity.membersAdded?.length ?? 0)
 
         ctx.activity.membersAdded?.forEach(async (member) => {
-          span.addEvent(
-            'member.added',
-            {
-              'member.id': member.id,
-              'member.name': member.name,
-            },
-            Date.now())
+          if (member.id !== ctx.activity.recipient?.id) {
+            span.addEvent(
+              'member.added',
+              {
+                'member.id': member.id,
+                'member.name': member.name,
+              },
+              Date.now())
+          }
         })
         await ctx.sendActivity('Hello and Welcome!')
-        // TODO: Add RouteExecutedCounter
+
+        AgentTelemetry.routeExecutedCounter.add(1,
+          {
+            'route.type': 'welcome_message',
+            'conversation.id': ctx.activity.conversation?.id ?? 'unknown'
+          }
+        )
         span.setStatus({ code: SpanStatusCode.OK })
       } catch (error) {
         if (error instanceof Error) {
@@ -56,6 +66,14 @@ class OTelAgent extends AgentApplication<TurnState> {
 
   echo = async (ctx: TurnContext) => {
     return this.tracer.startActiveSpan('agent.message_handler', async (span: Span) => {
+      console.log('[custom] span.isRecording=', span.isRecording())
+
+      const parent = trace.getSpan(context.active())
+      console.log('[custom] parentSpan=', parent?.spanContext())
+      console.log('[custom] parentSampled=', (parent?.spanContext().traceFlags ?? 0) & 1)
+      console.log('[custom] tracingSuppressed=', isTracingSuppressed(context.active()))
+
+      const t0 = performance.now()
       try {
         span.setAttribute('conversation.id', ctx.activity.conversation?.id ?? '')
         span.setAttribute('channel.id', ctx.activity.channelId ?? '')
@@ -71,9 +89,39 @@ class OTelAgent extends AgentApplication<TurnState> {
             'channel.id': ctx.activity.channelId,
           },
           Date.now())
-        // TODO: Add HTTP call
+        // OUTBOUND HTTP CALL
+        span.addEvent(
+          'external_call.started',
+          {
+            'app.http.target': 'https://www.bing.com'
+          },
+          Date.now())
+        const res = await fetch('https://www.bing.com', { method: 'GET' })
+        const elapsedMs = performance.now() - t0
+        span.addEvent(
+          'external_call.completed',
+          {
+            'app.http.status_code': res.status,
+            'app.http.elapsed_ms': elapsedMs
+          },
+          Date.now())
 
         await ctx.sendActivity(`You said now: ${ctx.activity.text}`)
+        span.addEvent(
+          'response.sent',
+          Date.now())
+
+        AgentTelemetry.messageProcessingDuration.record(elapsedMs,
+          {
+            'conversation.id': ctx.activity.conversation?.id ?? 'unknown',
+            'channel.id': ctx.activity.channelId ?? 'unknown'
+          })
+        AgentTelemetry.routeExecutedCounter.add(1,
+          {
+            'route.type': 'message_handler',
+            'conversation.id': ctx.activity.conversation?.id ?? 'unknown'
+          })
+        span.setStatus({ code: SpanStatusCode.OK })
       } catch (error) {
         if (error instanceof Error) {
           span.recordException(error)
@@ -85,6 +133,13 @@ class OTelAgent extends AgentApplication<TurnState> {
               'exception.stacktrace': error.stack,
             },
             Date.now())
+          const elapsedMs = performance.now() - t0
+          AgentTelemetry.routeExecutionDuration.record(elapsedMs,
+            {
+              'conversation.id': ctx.activity.conversation?.id ?? 'unknown',
+              'channel.id': ctx.activity.channelId ?? 'unknown',
+              status: 'error'
+            })
         }
         span.setStatus({ code: SpanStatusCode.ERROR })
         throw error

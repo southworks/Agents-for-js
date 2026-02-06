@@ -15,8 +15,10 @@
     "docker": "docker build -t \"$npm_package_name:$npm_package_version\" ."
   },
   "dependencies": {
+    "@azure/monitor-opentelemetry-exporter": "^1.0.0-beta.32",
     "@microsoft/agents-hosting-express": "file:../../packages/agents-hosting-express",
-    "@opentelemetry/auto-instrumentations-node": "^0.68.0",
-    "@opentelemetry/sdk-node": "^0.210.0"
+    "@opentelemetry/instrumentation-http": "^0.211.0",
+    "@opentelemetry/instrumentation-express": "^0.59.0",
+    "@opentelemetry/sdk-node": "^0.211.0"
   }
 }
