@@ -20,7 +20,7 @@
     "@azure/storage-blob": "^12.30.0",
     "@microsoft/agents-hosting": "file:../../packages/agents-hosting",
     "@microsoft/agents-activity": "file:../../packages/agents-activity",
-    "zod": "3.25.75"
+    "zod": "^3.25.75"
   },
   "license": "MIT",
   "files": [
