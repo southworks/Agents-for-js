@@ -36,9 +36,6 @@
     "packages/*",
     "test-agents/*"
   ],
-  "overrides": {
-    "@opentelemetry/sdk-logs": "0.211.0"
-  },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.55.2",
     "@microsoft/m365agentsplayground": "^0.2.22",

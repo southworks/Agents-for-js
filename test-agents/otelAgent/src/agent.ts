@@ -3,9 +3,8 @@
 
 import { startServer } from '@microsoft/agents-hosting-express'
 import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { context, trace, SpanStatusCode, type Span } from '@opentelemetry/api'
+import { SpanStatusCode, type Span } from '@opentelemetry/api'
 import { AgentTelemetry } from './agentTelemetry'
-import { isTracingSuppressed } from '@opentelemetry/core'
 
 class OTelAgent extends AgentApplication<TurnState> {
   private tracer = AgentTelemetry.tracer
@@ -24,7 +23,7 @@ class OTelAgent extends AgentApplication<TurnState> {
         span.setAttribute('channel.id', ctx.activity.channelId ?? '')
         span.setAttribute('members.added.count', ctx.activity.membersAdded?.length ?? 0)
 
-        ctx.activity.membersAdded?.forEach(async (member) => {
+        ctx.activity.membersAdded?.forEach((member) => {
           if (member.id !== ctx.activity.recipient?.id) {
             span.addEvent(
               'member.added',
@@ -66,13 +65,6 @@ class OTelAgent extends AgentApplication<TurnState> {
 
   echo = async (ctx: TurnContext) => {
     return this.tracer.startActiveSpan('agent.message_handler', async (span: Span) => {
-      console.log('[custom] span.isRecording=', span.isRecording())
-
-      const parent = trace.getSpan(context.active())
-      console.log('[custom] parentSpan=', parent?.spanContext())
-      console.log('[custom] parentSampled=', (parent?.spanContext().traceFlags ?? 0) & 1)
-      console.log('[custom] tracingSuppressed=', isTracingSuppressed(context.active()))
-
       const t0 = performance.now()
       try {
         span.setAttribute('conversation.id', ctx.activity.conversation?.id ?? '')
@@ -111,6 +103,12 @@ class OTelAgent extends AgentApplication<TurnState> {
           'response.sent',
           Date.now())
 
+        AgentTelemetry.messageProcessedCounter.add(1,
+          {
+            'agent.type': this.constructor.name,
+            status: 'success'
+          }
+        )
         AgentTelemetry.messageProcessingDuration.record(elapsedMs,
           {
             'conversation.id': ctx.activity.conversation?.id ?? 'unknown',
@@ -134,7 +132,7 @@ class OTelAgent extends AgentApplication<TurnState> {
             },
             Date.now())
           const elapsedMs = performance.now() - t0
-          AgentTelemetry.routeExecutionDuration.record(elapsedMs,
+          AgentTelemetry.messageProcessingDuration.record(elapsedMs,
             {
               'conversation.id': ctx.activity.conversation?.id ?? 'unknown',
               'channel.id': ctx.activity.channelId ?? 'unknown',

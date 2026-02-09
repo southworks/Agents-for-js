@@ -3,10 +3,8 @@
 
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node'
-// import { registerInstrumentations } from '@opentelemetry/instrumentation'
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
 import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express'
-// import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { AzureMonitorMetricExporter, AzureMonitorTraceExporter } from '@azure/monitor-opentelemetry-exporter'
 import {
   PeriodicExportingMetricReader,
@@ -17,10 +15,7 @@ import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions'
-import { trace, diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api'
 import { ParentBasedSampler, AlwaysOnSampler } from '@opentelemetry/sdk-trace-base'
-
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG)
 
 const connectionString = process.env['APPLICATIONINSIGHTS_CONNECTION_STRING'] || ''
 let traceExporter: any
@@ -37,8 +32,10 @@ if (connectionString.trim() !== '') {
   metricExporter = new ConsoleMetricExporter()
 }
 
-const metricReaderOptions = { exporter: metricExporter }
+const metricsExportInterval = Number(process.env.OTEL_METRICS_EXPORT_INTERVAL) || 5000
+const metricReaderOptions = { exporter: metricExporter, exportIntervalMillis: metricsExportInterval }
 
+// configure the SDK to export telemetry data.
 const sdk = new NodeSDK({
   resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: 'OTelAgent',
@@ -58,11 +55,3 @@ const sdk = new NodeSDK({
 })
 
 sdk.start()
-
-const tp: any = trace.getTracerProvider()
-console.log('TracerProvider:', tp.constructor?.name)
-
-if (typeof tp.getDelegate === 'function') {
-  const delegate = tp.getDelegate()
-  console.log('Delegate:', delegate?.constructor?.name ?? '<not set yet>')
-}
