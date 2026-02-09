@@ -17,8 +17,7 @@
   "dependencies": {
     "@azure/monitor-opentelemetry-exporter": "^1.0.0-beta.32",
     "@microsoft/agents-hosting-express": "file:../../packages/agents-hosting-express",
-    "@opentelemetry/instrumentation-http": "^0.211.0",
-    "@opentelemetry/instrumentation-express": "^0.59.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.69.0",
     "@opentelemetry/sdk-node": "^0.211.0"
   }
 }

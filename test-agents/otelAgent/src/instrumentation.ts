@@ -2,9 +2,8 @@
 // Licensed under the MIT License.
 
 import { NodeSDK } from '@opentelemetry/sdk-node'
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { ConsoleSpanExporter } from '@opentelemetry/sdk-trace-node'
-import { HttpInstrumentation } from '@opentelemetry/instrumentation-http'
-import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express'
 import { AzureMonitorMetricExporter, AzureMonitorTraceExporter } from '@azure/monitor-opentelemetry-exporter'
 import {
   PeriodicExportingMetricReader,
@@ -41,10 +40,7 @@ const sdk = new NodeSDK({
     [ATTR_SERVICE_NAME]: 'OTelAgent',
     [ATTR_SERVICE_VERSION]: '1.0.0'
   }),
-  instrumentations: [
-    new HttpInstrumentation(),
-    new ExpressInstrumentation(),
-  ],
+  instrumentations: [getNodeAutoInstrumentations()],
   traceExporter,
   metricReader: new PeriodicExportingMetricReader(metricReaderOptions),
   sampler: new ParentBasedSampler({
