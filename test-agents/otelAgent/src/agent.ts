@@ -101,6 +101,7 @@ class OTelAgent extends AgentApplication<TurnState> {
         await ctx.sendActivity(`You said now: ${ctx.activity.text}`)
         span.addEvent(
           'response.sent',
+          undefined,
           Date.now())
 
         AgentTelemetry.messageProcessedCounter.add(1,
@@ -128,9 +129,10 @@ class OTelAgent extends AgentApplication<TurnState> {
             {
               'exception.name': error.name,
               'exception.message': error.message,
-              'exception.stacktrace': error.stack,
+              'exception.stacktrace': error.stack, // don't do this in production!
             },
             Date.now())
+
           const elapsedMs = performance.now() - t0
           AgentTelemetry.messageProcessingDuration.record(elapsedMs,
             {

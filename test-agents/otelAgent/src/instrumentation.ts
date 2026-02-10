@@ -31,7 +31,11 @@ if (connectionString.trim() !== '') {
   metricExporter = new ConsoleMetricExporter()
 }
 
-const metricsExportInterval = Number(process.env.OTEL_METRICS_EXPORT_INTERVAL) || 5000
+const rawMetricsExportInterval = Number(process.env.OTEL_METRICS_EXPORT_INTERVAL)
+const metricsExportInterval =
+  Number.isFinite(rawMetricsExportInterval) && rawMetricsExportInterval > 0
+    ? rawMetricsExportInterval
+    : 5000
 const metricReaderOptions = { exporter: metricExporter, exportIntervalMillis: metricsExportInterval }
 
 // configure the SDK to export telemetry data.
@@ -51,3 +55,10 @@ const sdk = new NodeSDK({
 })
 
 sdk.start()
+
+process.on('SIGTERM', () => {
+  sdk.shutdown()
+    .then(() => console.log('OTel SDK shut down successfully'))
+    .catch((error) => console.error('Error shutting down OTel SDK', error))
+    .finally(() => process.exit(0))
+})
