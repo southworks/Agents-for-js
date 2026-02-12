@@ -8,17 +8,18 @@ import { AzureMonitorMetricExporter, AzureMonitorTraceExporter } from '@azure/mo
 import {
   PeriodicExportingMetricReader,
   ConsoleMetricExporter,
+  PushMetricExporter,
 } from '@opentelemetry/sdk-metrics'
 import { resourceFromAttributes } from '@opentelemetry/resources'
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions'
-import { ParentBasedSampler, AlwaysOnSampler } from '@opentelemetry/sdk-trace-base'
+import { ParentBasedSampler, AlwaysOnSampler, SpanExporter } from '@opentelemetry/sdk-trace-base'
 
 const connectionString = process.env['APPLICATIONINSIGHTS_CONNECTION_STRING'] || ''
-let traceExporter: any
-let metricExporter: any
+let traceExporter: SpanExporter
+let metricExporter: PushMetricExporter
 
 // Use Azure Monitor Exporter if connection string is provided, otherwise use Console Exporter.
 if (connectionString.trim() !== '') {
@@ -59,6 +60,8 @@ sdk.start()
 process.on('SIGTERM', () => {
   sdk.shutdown()
     .then(() => console.log('OTel SDK shut down successfully'))
-    .catch((error) => console.error('Error shutting down OTel SDK', error))
-    .finally(() => process.exit(0))
+    .catch((error) => {
+      console.error('Error shutting down OTel SDK', error)
+      process.exitCode = 1
+    })
 })

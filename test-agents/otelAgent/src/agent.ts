@@ -104,13 +104,14 @@ class OTelAgent extends AgentApplication<TurnState> {
           undefined,
           Date.now())
 
+        const processedMs = performance.now() - t0
         AgentTelemetry.messageProcessedCounter.add(1,
           {
             'agent.type': this.constructor.name,
             status: 'success'
           }
         )
-        AgentTelemetry.messageProcessingDuration.record(elapsedMs,
+        AgentTelemetry.messageProcessingDuration.record(processedMs,
           {
             'conversation.id': ctx.activity.conversation?.id ?? 'unknown',
             'channel.id': ctx.activity.channelId ?? 'unknown'
