@@ -6,6 +6,7 @@ import { findChoices, FindChoicesOptions, FoundChoice } from './findChoices'
 import { ModelResult } from './modelResult'
 import { Choice } from './choice'
 import { debug } from '@microsoft/agents-activity/logger'
+import * as Recognizers from '@microsoft/recognizers-text-number'
 
 const logger = debug('dialogs:recognizeChoices')
 
@@ -70,17 +71,13 @@ export function recognizeChoices (
   if (matched.length === 0) {
     // Next try finding by ordinal
     if (options.recognizeOrdinals) {
-      // TODO: Review recognizeOrdinal function
-      // const ordinals: ModelResult[] = Recognizers.recognizeOrdinal(utterance, options.locale ?? '')
-      const ordinals: ModelResult[] = []
+      const ordinals: ModelResult[] = Recognizers.recognizeOrdinal(utterance, options.locale ?? '')
       ordinals.forEach(matchChoiceByIndex)
     }
 
     // Finally try by numerical index
     if (matched.length === 0 && options.recognizeNumbers) {
-      // TODO: Review recognizeNumber function
-      // const numbers: ModelResult[] = Recognizers.recognizeNumber(utterance, options.locale ?? '').forEach(matchChoiceByIndex)
-      const numbers: ModelResult[] = []
+      const numbers: ModelResult[] = Recognizers.recognizeNumber(utterance, options.locale ?? '')
       numbers.forEach(matchChoiceByIndex)
     }
 
