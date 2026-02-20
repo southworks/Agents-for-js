@@ -1,0 +1,16 @@
+{
+  "name": "@microsoft/agents-telemetry",
+  "version": "0.1.0",
+  "description": "OpenTelemetry instrumentation for Microsoft Agents SDK",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "dependencies": {},
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
+  }
+}
