@@ -161,9 +161,8 @@ export class CloudAdapter extends BaseAdapter {
         throw new Error('Could not create connector client for agentic user')
       }
     } else {
-      // ABS tokens will not have an azp/appid so use the botframework scope.
-      // Otherwise use the appId.  This will happen when communicating back to another agent.
-      const scope = identity.azp ?? identity.appid ?? 'https://api.botframework.com'
+      const scope = this.resolveConnectorScope(identity, tokenProvider.connectionSettings?.tenantId)
+
       const token = await tokenProvider.getAccessToken(scope)
       connectorClient = ConnectorClient.createClientWithToken(
         activity.serviceUrl!,
@@ -172,6 +171,36 @@ export class CloudAdapter extends BaseAdapter {
       )
     }
     return connectorClient
+  }
+
+  /**
+   * Resolves the appropriate authentication scope for the connector client based on the identity and tenant ID.
+   * @param identity The JWT payload containing the identity claims.
+   * @param tenantId The tenant ID, if available, to help determine the scope. If not provided, it will be derived from the identity claims.
+   * @returns The resolved authentication scope for the connector client. If the identity is determined to be from an agent, the appId will be used as the scope. Otherwise, the default Bot Framework scope will be returned.
+   * @remarks ABS tokens will not have an azp/appid so use the botframework scope.
+   * For single tenant agents, the tenantId will be used to determine if the token is from an agent.
+   * For multi-tenant agents, the issuer will be used to determine if the token is from an agent since the tenantId will be 'botframework.com' for all multi-tenant agents.
+   */
+  private resolveConnectorScope (identity: JwtPayload, tenantId?: string): string {
+    const botframeworkTenantId = 'botframework.com'
+    const botFrameworkScope = 'https://api.botframework.com'
+    // TODO: we might need to consolidate this list with 'tokenProvider.connectionSettings?.issuers'
+    const multiTenantIssuers = [
+      'https://sts.windows.net/d6d49420-f39b-4df7-a1dc-d59a935871db',
+      'https://login.microsoftonline.com/d6d49420-f39b-4df7-a1dc-d59a935871db',
+      'https://sts.windows.net/f8cdef31-a31e-4b4a-93e4-5f571e91255a/',
+      'https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a'
+    ]
+
+    const normalizedTenantId = tenantId ?? botframeworkTenantId
+    const appId = identity.azp ?? identity.appid
+
+    const isSingleTenantAgent = normalizedTenantId !== botframeworkTenantId && identity.iss?.includes(normalizedTenantId)
+    const isMultiTenantAgent = normalizedTenantId === botframeworkTenantId && multiTenantIssuers.some(issuer => identity.iss?.startsWith(issuer))
+    const isAgent = (isSingleTenantAgent || isMultiTenantAgent) && appId !== undefined && appId !== identity.aud
+
+    return isAgent ? appId : botFrameworkScope
   }
 
   /**

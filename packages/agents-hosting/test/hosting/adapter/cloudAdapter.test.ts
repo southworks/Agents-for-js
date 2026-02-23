@@ -5,6 +5,7 @@ import sinon, { SinonSandbox } from 'sinon'
 import { Activity, ActivityTypes, ConversationReference, DeliveryModes } from '@microsoft/agents-activity'
 import { ConnectorClient } from '../../../src/connector-client/connectorClient'
 import { Response } from 'express'
+import { JwtPayload } from 'jsonwebtoken'
 
 describe('CloudAdapter', function () {
   let sandbox: SinonSandbox
@@ -301,6 +302,195 @@ describe('CloudAdapter', function () {
         }),
         error
       )
+    })
+  })
+
+  describe('resolveConnectorScope', function () {
+    const agentSingleTenantId = 'SingleTenant-1111-1111-1111-111111111111'
+    const agentMultiTenantId = 'botframework.com'
+    const agent1AppId = '11111111-1111-1111-1111-111111111111'
+    const agent2AppId = '22222222-2222-2222-2222-222222222222'
+
+    it('Agent2(SingleTenant) to Agent1(MultiTenant) should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        azp: agent2AppId, // v2.0 tokens use azp for client app id
+        iss: `https://sts.windows.net/${agentSingleTenantId}/v2.0`
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      // Using this scope for SingleTenant to MultiTenant scenario for ConnectorClient calls will fail.
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('Agent2(MultiTenant) to Agent1(SingleTenant) should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        azp: agent2AppId, // v2.0 tokens use azp for client app id
+        iss: 'https://sts.windows.net/f8cdef31-a31e-4b4a-93e4-5f571e91255a/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentSingleTenantId)
+
+      // Using this scope for MultiTenant to SingleTenant scenario for ConnectorClient calls will fail.
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[SingleTenant] Agent2 to Agent1 with same tenant should use Agent2 appid as scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent2AppId,
+        iss: `https://sts.windows.net/${agentSingleTenantId}/v2.0`
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentSingleTenantId)
+
+      assert.equal(scope, agent2AppId)
+    })
+
+    it('[SingleTenant] Agent2 to Agent1 with different tenant should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent2AppId,
+        iss: 'https://sts.windows.net/different-tenant/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentSingleTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[SingleTenant] ABS to Agent1 with no azp/appid should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        iss: `https://login.microsoftonline.com/${agentSingleTenantId}/v2.0`
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentSingleTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[SingleTenant] same appId and aud should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent1AppId,
+        iss: `https://login.microsoftonline.com/${agentSingleTenantId}/v2.0`
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentSingleTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[SingleTenant] missing issuer should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent2AppId
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[SingleTenant] Agent2 to Agent1 with same appId should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent1AppId,
+        iss: `https://sts.windows.net/${agentSingleTenantId}/v2.0`
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentSingleTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[MultiTenant] Agent2 to Agent1 should use Agent2 appid as scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        azp: agent2AppId, // v2.0 tokens use azp for client app id
+        iss: 'https://sts.windows.net/f8cdef31-a31e-4b4a-93e4-5f571e91255a/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      assert.equal(scope, agent2AppId)
+    })
+
+    it('[MultiTenant] Agent2 to Agent1 with unknown issuer should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent2AppId,
+        iss: 'https://sts.windows.net/unknown-issuer/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[MultiTenant] Agent2 to Agent1 with same appId should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent1AppId,
+        iss: 'https://sts.windows.net/d6d49420-f39b-4df7-a1dc-d59a935871db/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[MultiTenant] ABS to Agent1 with no azp/appid should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        iss: 'https://login.microsoftonline.com/d6d49420-f39b-4df7-a1dc-d59a935871db/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[MultiTenant] undefined tenant should default to MultiTenant and use Agent2 appid as scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent2AppId,
+        iss: 'https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, undefined)
+
+      assert.equal(scope, agent2AppId)
+    })
+
+    it('[MultiTenant] undefined tenant with unknown issuer should use Bot Framework scope', function () {
+      const identity = {
+        aud: agent1AppId,
+        appid: agent2AppId,
+        iss: 'https://login.microsoftonline.com/unknown-issuer/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, undefined)
+
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('[MultiTenant] when both azp and appid are present it should prefer azp', function () {
+      // Not a real scenario since azp should only be present in v2.0 tokens and appid in v1.0 tokens,
+      // but adding this test for completeness since the code checks for both.
+      const identity = {
+        aud: agent1AppId,
+        azp: agent2AppId,
+        appid: '33333333-3333-3333-3333-333333333333',
+        iss: 'https://login.microsoftonline.com/d6d49420-f39b-4df7-a1dc-d59a935871db/v2.0'
+      } as JwtPayload
+
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, agentMultiTenantId)
+
+      assert.equal(scope, agent2AppId)
     })
   })
 })
