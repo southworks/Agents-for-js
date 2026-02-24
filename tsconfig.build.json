@@ -26,6 +26,9 @@
         "path": "packages/agents-hosting-extensions-teams"
       },
       {
+        "path": "packages/agents-telemetry"
+      },
+      {
         "path": "test-agents/application-style"
       },
       {

@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 export const SpanNames = {
   // CloudAdapter / BaseAdapter
   ADAPTER_PROCESS: 'agents.adapter.process',

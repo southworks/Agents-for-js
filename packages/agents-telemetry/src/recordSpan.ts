@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 import type { Span, SpanOptions } from '@opentelemetry/api'
 import { noopSpan } from './noop'
 import { getOtel } from './otel'
@@ -9,6 +12,13 @@ export interface RecordSpanOptions {
   fn: (span: Span) => Promise<unknown> | unknown
 }
 
+/*
+ * A utility function to create and manage OpenTelemetry spans.
+ * It attempts to get the OpenTelemetry tracer and, if available, starts a new span with the provided name and attributes.
+ * If OpenTelemetry is not initialized, it uses a no-operation span to allow the function to execute without errors.
+ * The function executes the provided callback with the span, and ensures that any exceptions are recorded on the span before rethrowing.
+ * Finally, it ends the span after the callback execution is complete.
+ */
 export async function recordSpan<T> ({ name, attributes, options, fn }: RecordSpanOptions & { fn: (span: Span) => Promise<T> | T }): Promise<T> {
   const otel = getOtel()
   if (otel === null) {
@@ -38,5 +48,5 @@ export async function recordSpan<T> ({ name, attributes, options, fn }: RecordSp
     } finally {
       span.end()
     }
-  })
+  }) as T
 }

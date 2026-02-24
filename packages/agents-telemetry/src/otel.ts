@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 import type { Tracer, SpanStatusCode as SpanStatusCodeType, PropagationAPI, ContextAPI } from '@opentelemetry/api'
 
 export interface OTelModules {
@@ -9,6 +12,9 @@ export interface OTelModules {
 
 let otelPromise: Promise<OTelModules> | null = null
 
+/*
+ * Initializes OpenTelemetry by dynamically importing the API and setting up the tracer.
+ */
 export function initTelemetry (options?: { serviceName?: string }): void {
   const serviceName = options?.serviceName ?? 'microsoft-agents'
   otelPromise = import('@opentelemetry/api')
