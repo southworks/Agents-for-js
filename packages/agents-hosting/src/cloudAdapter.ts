@@ -181,13 +181,13 @@ export class CloudAdapter extends BaseAdapter {
   private resolveConnectorScope (identity: JwtPayload, activity: Activity): string {
     const defaultScope = 'https://api.botframework.com'
 
-    if (activity.channelIdChannel === Channels.Msteams && activity.recipient?.role !== RoleTypes.Skill) {
-      return defaultScope
-    }
-
     // ABS tokens will not have an azp/appid so use the botframework scope.
     // Otherwise use the appId. This will happen when communicating back to another agent.
-    return identity.azp ?? identity.appid ?? defaultScope
+    if (activity.recipient?.role === RoleTypes.Skill) {
+      return identity.azp ?? identity.appid ?? defaultScope
+    }
+
+    return defaultScope
   }
 
   /**

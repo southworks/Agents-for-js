@@ -2,10 +2,9 @@ import { strict as assert, strict } from 'assert'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { AuthConfiguration, CloudAdapter, INVOKE_RESPONSE_KEY, MsalConnectionManager, Request, UserTokenClient, TurnContext } from '../../../src'
 import sinon, { SinonSandbox } from 'sinon'
-import { Activity, ActivityTypes, ConversationReference, DeliveryModes, Channels, RoleTypes } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes, ConversationReference, DeliveryModes, RoleTypes } from '@microsoft/agents-activity'
 import { ConnectorClient } from '../../../src/connector-client/connectorClient'
 import { Response } from 'express'
-import { JwtPayload } from 'jsonwebtoken'
 
 describe('CloudAdapter', function () {
   let sandbox: SinonSandbox
@@ -168,6 +167,27 @@ describe('CloudAdapter', function () {
 
       stubfromObject.restore()
     })
+
+    it('Non-Skill role should use api.botframework scope', function () {
+      const identity = { azp: 'agentId' }
+      const activity = { type: ActivityTypes.Message }
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, activity)
+      assert.equal(scope, 'https://api.botframework.com')
+    })
+
+    it('Skill role should use Agent appid as scope', function () {
+      const identity = { azp: 'agentId' }
+      const activity = { recipient: { role: RoleTypes.Skill } }
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, activity)
+      assert.equal(scope, 'agentId')
+    })
+
+    it('Skill role without azp/appid should use api.botframework as scope', function () {
+      const identity = {}
+      const activity = { recipient: { role: RoleTypes.Skill } }
+      const scope = (cloudAdapter as any).resolveConnectorScope(identity, activity)
+      assert.equal(scope, 'https://api.botframework.com')
+    })
   })
 
   describe('sendActivities', function () {
@@ -302,60 +322,6 @@ describe('CloudAdapter', function () {
         }),
         error
       )
-    })
-  })
-
-  describe('resolveConnectorScope', function () {
-    const agent1AppId = '11111111-1111-1111-1111-111111111111'
-    const agent2AppId = '22222222-2222-2222-2222-222222222222'
-
-    it('MSTeams channel should use Bot Framework scope', function () {
-      const identity = {
-        aud: agent1AppId,
-        azp: agent2AppId, // v2.0 tokens use azp for client app id
-      } as JwtPayload
-
-      const activity = Activity.fromObject({
-        type: ActivityTypes.Message,
-        channelId: Channels.Msteams
-      })
-
-      const scope = (cloudAdapter as any).resolveConnectorScope(identity, activity)
-
-      assert.equal(scope, 'https://api.botframework.com')
-    })
-
-    it('MSTeams channel with Skill role should use Agent2 appid as scope', function () {
-      const identity = {
-        aud: agent1AppId,
-        azp: agent2AppId, // v2.0 tokens use azp for client app id
-      } as JwtPayload
-
-      const activity = Activity.fromObject({
-        type: ActivityTypes.Message,
-        channelId: Channels.Msteams,
-        recipient: { role: RoleTypes.Skill }
-      })
-
-      const scope = (cloudAdapter as any).resolveConnectorScope(identity, activity)
-
-      assert.equal(scope, agent2AppId)
-    })
-
-    it('WebChat channel should use Agent2 appid as scope', function () {
-      const identity = {
-        aud: agent1AppId,
-        azp: agent2AppId, // v2.0 tokens use azp for client app id
-      } as JwtPayload
-
-      const activity = Activity.fromObject({
-        type: ActivityTypes.Message,
-        channelId: Channels.Webchat,
-      })
-
-      const scope = (cloudAdapter as any).resolveConnectorScope(identity, activity)
-
-      assert.equal(scope, agent2AppId)
     })
   })
 })
