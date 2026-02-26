@@ -11,8 +11,8 @@ import { MessagingExtensionAction } from './messagingExtensionAction'
 type RouteQueryHandler<TState extends TurnState> = (context: TurnContext, state: TState, query: MessagingExtensionQuery) => Promise<MessagingExtensionResult>
 type SelectItemHandler<TState extends TurnState> = (context: TurnContext, state: TState, item: unknown) => Promise<MessagingExtensionResult>
 type QueryLinkHandler<TState extends TurnState> = (context: TurnContext, state: TState, url: string) => Promise<MessagingExtensionResult>
-type FetchTaskHanlder<TState extends TurnState> = (context: TurnContext, state: TState) => Promise<TaskModuleResponse>
-type SubmitActionHanlder<TState extends TurnState> = (context: TurnContext, state: TState, data: unknown) => Promise<MessagingExtensionActionResponse>
+type FetchTaskHandler<TState extends TurnState> = (context: TurnContext, state: TState) => Promise<TaskModuleResponse>
+type SubmitActionHandler<TState extends TurnState> = (context: TurnContext, state: TState, data: unknown) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewEditHandler<TState extends TurnState> = (context: TurnContext, state: TState, activity: Activity) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewSendHandler<TState extends TurnState> = (context: TurnContext, state: TState, activity: Activity) => Promise<void>
 type ConfigureQuerySettingUrlHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: unknown) => Promise<MessagingExtensionResponse>
@@ -146,7 +146,7 @@ export class MessageExtension<TState extends TurnState> {
    * @param handler - The handler to call when a fetch task is requested
    * @returns this (for method chaining)
   */
-  onFetchTask (handler: FetchTaskHanlder<TurnState>) {
+  onFetchTask (handler: FetchTaskHandler<TurnState>) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -172,7 +172,7 @@ export class MessageExtension<TState extends TurnState> {
    * @param handler - The handler to call when an action is submitted
    * @returns this (for method chaining)
    */
-  onSubmitAction (handler: SubmitActionHanlder<TurnState>) {
+  onSubmitAction (handler: SubmitActionHandler<TurnState>) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
