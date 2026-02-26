@@ -28,6 +28,7 @@ import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefini
 import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
+import { withSpan, SpanNames } from '@microsoft/agents-telemetry'
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -324,61 +325,65 @@ export class CloudAdapter extends BaseAdapter {
     res: Response,
     logic: (context: TurnContext) => Promise<void>,
     headerPropagation?: HeaderPropagationDefinition): Promise<void> {
-    const headers = new HeaderPropagation(request.headers)
-    if (headerPropagation && typeof headerPropagation === 'function') {
-      headerPropagation(headers)
-      logger.debug('Headers to propagate: ', headers)
-    }
-
-    const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
-      res.status(status)
-      if (isInvokeResponseOrExpectReplies) {
-        res.setHeader('content-type', 'application/json')
+    return withSpan(SpanNames.ADAPTER_PROCESS, async (span) => {
+      span.setAttribute('process.http.method', request.method ?? 'unknown')
+      const headers = new HeaderPropagation(request.headers)
+      if (headerPropagation && typeof headerPropagation === 'function') {
+        headerPropagation(headers)
+        logger.debug('Headers to propagate: ', headers)
       }
-      if (body) {
-        res.send(body)
+
+      const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
+        res.status(status)
+        span.setAttribute('process.status_code', status ?? 'unknown')
+        if (isInvokeResponseOrExpectReplies) {
+          res.setHeader('content-type', 'application/json')
+        }
+        if (body) {
+          res.send(body)
+        }
+        res.end()
       }
-      res.end()
-    }
-    if (!request.body) {
-      throw new TypeError('`request.body` parameter required, make sure express.json() is used as middleware')
-    }
-    const incoming = normalizeIncomingActivity(request.body!)
-    const activity = Activity.fromObject(incoming)
-    logger.info(`--> Processing incoming activity, type:${activity.type} channel:${activity.channelId}`)
+      if (!request.body) {
+        throw new TypeError('`request.body` parameter required, make sure express.json() is used as middleware')
+      }
+      const incoming = normalizeIncomingActivity(request.body!)
+      const activity = Activity.fromObject(incoming)
+      logger.info(`--> Processing incoming activity, type:${activity.type} channel:${activity.channelId}`)
 
-    if (!this.isValidChannelActivity(activity)) {
-      return end(StatusCodes.BAD_REQUEST)
-    }
+      if (!this.isValidChannelActivity(activity)) {
+        return end(StatusCodes.BAD_REQUEST)
+      }
 
-    logger.debug('Received activity: ', activity)
+      logger.debug('Received activity: ', activity)
 
-    const context = new TurnContext(this, activity, request.user!)
-    // if Delivery Mode == ExpectReplies, we don't need a connector client.
-    if (this.resolveIfConnectorClientIsNeeded(activity)) {
-      const connectorClient = await this.createConnectorClientWithIdentity(request.user!, activity, headers)
-      this.setConnectorClient(context, connectorClient)
-    }
+      const context = new TurnContext(this, activity, request.user!)
+      // if Delivery Mode == ExpectReplies, we don't need a connector client.
+      if (this.resolveIfConnectorClientIsNeeded(activity)) {
+        const connectorClient = await this.createConnectorClientWithIdentity(request.user!, activity, headers)
+        this.setConnectorClient(context, connectorClient)
+      }
 
-    if (!activity.isAgenticRequest()) {
-      const userTokenClient = await this.createUserTokenClient(request.user!, undefined, undefined, undefined, headers)
-      this.setUserTokenClient(context, userTokenClient)
-    }
+      if (!activity.isAgenticRequest()) {
+        const userTokenClient = await this.createUserTokenClient(request.user!, undefined, undefined, undefined, headers)
+        this.setUserTokenClient(context, userTokenClient)
+      }
 
-    if (
-      activity?.type === ActivityTypes.InvokeResponse ||
-      activity?.type === ActivityTypes.Invoke ||
-      activity?.deliveryMode === DeliveryModes.ExpectReplies
-    ) {
+      if (
+        activity?.type === ActivityTypes.InvokeResponse ||
+        activity?.type === ActivityTypes.Invoke ||
+        activity?.deliveryMode === DeliveryModes.ExpectReplies
+      ) {
+        await this.runMiddleware(context, logic)
+        const invokeResponse = this.processTurnResults(context)
+        logger.debug('Activity Response (invoke/expect replies): ', invokeResponse)
+        return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body, true)
+      }
+
       await this.runMiddleware(context, logic)
       const invokeResponse = this.processTurnResults(context)
-      logger.debug('Activity Response (invoke/expect replies): ', invokeResponse)
-      return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body, true)
-    }
-
-    await this.runMiddleware(context, logic)
-    const invokeResponse = this.processTurnResults(context)
-    return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
+      return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
+    })
   }
 
   private isValidChannelActivity (activity: Activity): Boolean {

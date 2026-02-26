@@ -2,5 +2,5 @@
 // Licensed under the MIT License.
 
 export * from './otel'
-export * from './recordSpan'
 export * from './constants'
+export * from './initOtel'
