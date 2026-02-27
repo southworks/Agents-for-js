@@ -4,3 +4,4 @@
 export * from './otel'
 export * from './constants'
 export { loadOtelApi } from './initOtel'
+export * from './traceDecorator'
