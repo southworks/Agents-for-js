@@ -1,48 +1,13 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 import type { Tracer, Span, SpanOptions } from '@opentelemetry/api'
-import { getOtelApi } from './initOtel'
+import { loadOtelApi } from './initOtel'
 
 const LIBRARY_NAME = 'Agents SDK'
 const LIBRARY_VERSION = '1.0.0'
 
 let otelApi: typeof import('@opentelemetry/api') | undefined
-let resolveAttempted = false
-let importOverride: (() => Promise<typeof import('@opentelemetry/api') | undefined>) | undefined
-
-/**
- * @internal
- * Resets the internal module state for testing purposes.
- * Allows tests to simulate scenarios where `@opentelemetry/api` is not installed.
- *
- * @param options.mockImport - Optional function to override the dynamic import behavior
- */
-export function _resetForTesting (options?: {
-  mockImport?: () => Promise<typeof import('@opentelemetry/api') | undefined>
-}): void {
-  otelApi = undefined
-  resolveAttempted = false
-  importOverride = options?.mockImport
-}
-
-/**
- * Attempts to load `@opentelemetry/api` once.
- * If the package is not installed, logs a warning and silently disables telemetry.
- */
-async function loadOtelApi2 (): Promise<typeof import('@opentelemetry/api') | undefined> {
-  if (resolveAttempted) return otelApi
-  resolveAttempted = true
-
-  try {
-    otelApi = await import('@opentelemetry/api')
-  } catch {
-    console.warn(
-      `[${LIBRARY_NAME}] @opentelemetry/api is not installed. ` +
-      'Telemetry is disabled. To enable instrumentation, install it:\n\n' +
-      '  npm install @opentelemetry/api\n'
-    )
-  }
-
-  return otelApi
-}
 
 /**
  * Returns a tracer scoped to this library, or `undefined` if the
@@ -56,9 +21,9 @@ async function loadOtelApi2 (): Promise<typeof import('@opentelemetry/api') | un
  *   all telemetry functions become no-ops.
  */
 async function getTracer (): Promise<Tracer | undefined> {
-  const api = getOtelApi() // await loadOtelApi()
-  if (!api) console.log(`[${LIBRARY_NAME}] OpenTelemetry API not available, returning undefined tracer`)
-  return api?.trace.getTracer(LIBRARY_NAME, LIBRARY_VERSION)
+  otelApi = await loadOtelApi()
+  if (!otelApi) console.log(`[${LIBRARY_NAME}] OpenTelemetry API not available, returning undefined tracer`)
+  return otelApi?.trace.getTracer(LIBRARY_NAME, LIBRARY_VERSION)
 }
 
 /**
@@ -128,7 +93,7 @@ export async function startSpan (spanName: string, options?: SpanOptions): Promi
  * OpenTelemetry API is not available or no span is active.
  */
 export async function getActiveSpan (): Promise<Span | undefined> {
-  const api = getOtelApi() // await loadOtelApi()
+  const api = await loadOtelApi()
   return api?.trace.getActiveSpan()
 }
 
@@ -139,7 +104,7 @@ export async function getActiveSpan (): Promise<Span | undefined> {
 export async function injectTraceContext (
   carrier: Record<string, string> = {}
 ): Promise<Record<string, string>> {
-  const api = getOtelApi() // await loadOtelApi()
+  const api = await loadOtelApi()
   if (api) {
     api.propagation.inject(api.context.active(), carrier)
   }

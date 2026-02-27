@@ -3,4 +3,4 @@
 
 export * from './otel'
 export * from './constants'
-export * from './initOtel'
+export { loadOtelApi } from './initOtel'

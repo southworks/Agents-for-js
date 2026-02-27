@@ -1,14 +1,19 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 const LIBRARY_NAME = 'Agents SDK'
 
 let otelApi: typeof import('@opentelemetry/api') | undefined
-const resolveAttempted = false
+let resolveAttempted = false
+let importOverride: (() => Promise<typeof import('@opentelemetry/api') | undefined>) | undefined
 
-// async function loadOtelApi (): Promise<typeof import('@opentelemetry/api') | undefined> {
-//   if (resolveAttempted) return otelApi
-//   resolveAttempted = true
-;(async () => {
+export async function loadOtelApi (): Promise<typeof import('@opentelemetry/api') | undefined> {
+  if (resolveAttempted) return otelApi
+  resolveAttempted = true
   try {
-    otelApi = await import('@opentelemetry/api')
+    otelApi = importOverride
+      ? await importOverride()
+      : require('@opentelemetry/api') as typeof import('@opentelemetry/api')
   } catch {
     console.warn(
       `[${LIBRARY_NAME}] @opentelemetry/api is not installed. ` +
@@ -17,9 +22,20 @@ const resolveAttempted = false
     )
   }
 
-  // return otelApi
-})()
-
-export function getOtelApi () {
   return otelApi
+}
+
+/**
+ * @internal
+ * Resets the internal module state for testing purposes.
+ * Allows tests to simulate scenarios where `@opentelemetry/api` is not installed.
+ *
+ * @param options.mockImport - Optional function to override the dynamic import behavior
+ */
+export function _resetForTesting (options?: {
+  mockImport?: () => Promise<typeof import('@opentelemetry/api') | undefined>
+}): void {
+  otelApi = undefined
+  resolveAttempted = false
+  importOverride = options?.mockImport
 }
