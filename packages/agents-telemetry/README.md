@@ -76,6 +76,38 @@ const result = await recordSpan({
 - **Status tracking**: Span status is set to ERROR on failures
 - **No-op fallback**: If telemetry is not initialized, operations run with a no-op span (zero overhead)
 
+## Using `@otelTrace` decorator
+
+You can instrument class methods with the `@otelTrace` decorator:
+
+```ts
+import { otelTrace, SpanNames } from '@microsoft/agents-telemetry'
+import type { Span } from '@opentelemetry/api'
+
+class CloudAdapter {
+  @otelTrace<CloudAdapter, [unknown, unknown, (...args: unknown[]) => Promise<unknown>, unknown]>({
+    name: SpanNames.ADAPTER_PROCESS,
+    injectSpan: true,
+  })
+  public async process (
+    request: unknown,
+    res: unknown,
+    logic: (...args: unknown[]) => Promise<unknown>,
+    headerPropagation?: unknown,
+    span?: Span
+  ): Promise<unknown> {
+    span?.setAttribute('agents.adapter.hasHeaderPropagation', Boolean(headerPropagation))
+    return await logic(request, res)
+  }
+}
+```
+
+Decorator options:
+
+- `name`: static span name or a callback to derive it from method arguments
+- `options`: static `SpanOptions` or a callback to derive span options at call time
+- `injectSpan`: when `true`, appends the active span as the final argument
+
 ## Span Names
 
 The package exports predefined span names for consistent tracing across the SDK:

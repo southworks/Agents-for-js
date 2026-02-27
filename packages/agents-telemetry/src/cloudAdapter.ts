@@ -1,18 +1,22 @@
-// In CloudAdapter.process():
-import { recordSpan, SpanNames } from '@microsoft/agents-telemetry'
+import { getActiveSpanSync } from './otel'
+import { traceAdapterProcess } from './decorators'
 
-public async process(request, res, logic, headerPropagation?) {
-  return recordSpan({
-    name: SpanNames.ADAPTER_PROCESS,
-    attributes: {
-      'agents.activity.type': activity.type ?? 'unknown',
-      'agents.activity.channel': activity.channelId ?? 'unknown',
-      'http.method': 'POST',
-    },
-    fn: async (span) => {
-      // ... existing process logic ...
-      // Set additional attributes after processing:
-      span.setAttribute('http.status_code', statusCode)
-    }
-  })
+type HeaderPropagation = ((headers: Record<string, string>) => void) | undefined
+
+export class CloudAdapter {
+  @traceAdapterProcess
+  public async process (
+    request: unknown,
+    res: unknown,
+    logic: (...args: unknown[]) => Promise<unknown>,
+    headerPropagation?: HeaderPropagation
+  ): Promise<unknown> {
+    const span = getActiveSpanSync()
+    span?.setAttribute('agents.adapter.hasHeaderPropagation', Boolean(headerPropagation))
+
+    const result = await logic(request, res)
+
+    span?.setAttribute('http.status_code', 200)
+    return result
+  }
 }
