@@ -14,7 +14,7 @@ import assert from 'assert'
 import * as otelApi from '@opentelemetry/api'
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
-import { _resetForTesting } from '../dist/src/initOtel.js'
+import { _resetForTesting } from '../dist/src/initOtel'
 
 describe('otel', () => {
   // ============================================================================

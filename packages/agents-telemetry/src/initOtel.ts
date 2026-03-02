@@ -7,13 +7,14 @@ let otelApi: typeof import('@opentelemetry/api') | undefined
 let resolveAttempted = false
 let importOverride: (() => Promise<typeof import('@opentelemetry/api') | undefined>) | undefined
 
-export async function loadOtelApi (): Promise<typeof import('@opentelemetry/api') | undefined> {
+// TODO: we need to rethink how we are loading the package, as of now we are installing it as dev dependency, which is retrieved from node_modules in this function.
+export async function loadOtelApi () {
   if (resolveAttempted) return otelApi
   resolveAttempted = true
   try {
     otelApi = importOverride
       ? await importOverride()
-      : require('@opentelemetry/api') as typeof import('@opentelemetry/api')
+      : require('@opentelemetry/api')
   } catch {
     console.warn(
       `[${LIBRARY_NAME}] @opentelemetry/api is not installed. ` +

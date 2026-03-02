@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import type { Tracer, Span, SpanOptions } from '@opentelemetry/api'
+import type { Span, SpanOptions } from '@opentelemetry/api'
 import { loadOtelApi } from './initOtel'
 
 const LIBRARY_NAME = 'Agents SDK'
@@ -20,7 +20,7 @@ let otelApi: typeof import('@opentelemetry/api') | undefined
  * - If the OTel API cannot be loaded at all, this returns `undefined` and
  *   all telemetry functions become no-ops.
  */
-async function getTracer (): Promise<Tracer | undefined> {
+async function getTracer () {
   otelApi = await loadOtelApi()
   if (!otelApi) console.log(`[${LIBRARY_NAME}] OpenTelemetry API not available, returning undefined tracer`)
   return otelApi?.trace.getTracer(LIBRARY_NAME, LIBRARY_VERSION)
@@ -47,11 +47,7 @@ async function getTracer (): Promise<Tracer | undefined> {
  * });
  * ```
  */
-export async function withSpan<T> (
-  spanName: string,
-  fn: (span: Span | undefined) => Promise<T>,
-  options?: SpanOptions
-): Promise<T> {
+export async function withSpan<T> (spanName: string, fn: (span: Span | undefined) => Promise<T>, options?: SpanOptions) {
   const tracer = await getTracer()
 
   if (!tracer) {
@@ -83,7 +79,7 @@ export async function withSpan<T> (
  * Useful when the span lifetime does not map to a single function scope
  * (e.g. streaming responses, event-driven workflows).
  */
-export async function startSpan (spanName: string, options?: SpanOptions): Promise<Span | undefined> {
+export async function startSpan (spanName: string, options?: SpanOptions) {
   const tracer = await getTracer()
   return tracer?.startSpan(spanName, options)
 }
@@ -92,7 +88,7 @@ export async function startSpan (spanName: string, options?: SpanOptions): Promi
  * Returns the currently active span, or `undefined` if the
  * OpenTelemetry API is not available or no span is active.
  */
-export async function getActiveSpan (): Promise<Span | undefined> {
+export async function getActiveSpan () {
   const api = await loadOtelApi()
   return api?.trace.getActiveSpan()
 }
@@ -101,9 +97,7 @@ export async function getActiveSpan (): Promise<Span | undefined> {
  * Injects the current W3C trace-context headers into a carrier object.
  * Returns the carrier unchanged if `@opentelemetry/api` is not available.
  */
-export async function injectTraceContext (
-  carrier: Record<string, string> = {}
-): Promise<Record<string, string>> {
+export async function injectTraceContext (carrier: Record<string, string> = {}) {
   const api = await loadOtelApi()
   if (api) {
     api.propagation.inject(api.context.active(), carrier)
