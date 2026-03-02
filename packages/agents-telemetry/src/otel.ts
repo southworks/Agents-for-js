@@ -77,6 +77,30 @@ export interface OTelTraceOptions<This = unknown, Args extends unknown[] = unkno
   injectSpan?: boolean
 }
 
+let _tracingEnabled = true
+
+/**
+ * Programmatically enable or disable the `@otelTrace` decorator tracing.
+ * When disabled, decorated methods execute directly without span creation.
+ *
+ * Can also be controlled via the `OTEL_TRACE_ENABLED` environment variable
+ * (set to `"false"` or `"0"` to disable).
+ */
+export function setTracingEnabled (enabled: boolean): void {
+  _tracingEnabled = enabled
+}
+
+/**
+ * Returns whether `@otelTrace` decorator tracing is currently enabled.
+ */
+export function isTracingEnabled (): boolean {
+  if (typeof process !== 'undefined' && process.env?.OTEL_TRACE_ENABLED) {
+    const envVal = process.env.OTEL_TRACE_ENABLED.toLowerCase()
+    if (envVal === 'false' || envVal === '0') return false
+  }
+  return _tracingEnabled
+}
+
 function resolveClassName (thisArg: unknown): string {
   if (!thisArg || typeof thisArg !== 'object') return 'UnknownClass'
   return (thisArg as { constructor?: { name?: string } }).constructor?.name ?? 'UnknownClass'
@@ -93,6 +117,10 @@ function buildDecoratorWrapper<This, Args extends unknown[], Return> (
   options?: OTelTraceOptions<This, Args>
 ): AnyMethod<This, Args, Promise<Awaited<Return>>> {
   return async function tracedMethod (this: This, ...args: Args): Promise<Awaited<Return>> {
+    if (!isTracingEnabled()) {
+      return await originalMethod.apply(this, args) as Awaited<Return>
+    }
+
     const className = resolveClassName(this)
     const executionContext: OTelTraceExecutionContext<This, Args> = {
       thisArg: this,
