@@ -13,7 +13,7 @@ export const tracedProcess = createTracedDecorator<
     void
     >({
       spanName: SpanNames.ADAPTER_PROCESS,
-      spanOptions: { kind: SpanKind.SERVER },
+      // spanOptions: { kind: SpanKind.SERVER },
       extractAttributes: (req) => ({
         'process.http.method': req.method ?? 'unknown',
       }),

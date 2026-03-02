@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { trace, SpanStatusCode, type Span, type SpanOptions, type Attributes } from '@opentelemetry/api'
+import { trace, SpanStatusCode, type Span, type SpanOptions, type Attributes, context as otelContext, createContextKey } from '@opentelemetry/api'
 
 const tracer = trace.getTracer('my-app')
 
@@ -25,6 +25,8 @@ interface TracedMethodConfig<TArgs extends any[], TResult> {
   onEnd?: (span: Span, args: TArgs) => void
 }
 
+const CONTEXT_KEY = createContextKey('agents-telemetry:createTracedDecorator-context')
+
 export function createTracedDecorator<TArgs extends any[], TResult> (
   config: TracedMethodConfig<TArgs, TResult> = {}
 ) {
@@ -45,11 +47,19 @@ export function createTracedDecorator<TArgs extends any[], TResult> (
         config.onStart?.(span, args)
 
         try {
-          const result = originalMethod.apply(this, args)
+          const state: any = {}
+          const ctx = otelContext.active().setValue(CONTEXT_KEY, state)
+          const result = otelContext.with(ctx, () => originalMethod.apply(this, args))
 
           if (isPromise(result)) {
             return result
               .then((res) => {
+                // TODO: replicate to the rest of callbacks.
+                // TODO: We should expose this to a config callback instead of hardcoding http.status_code here.
+                if (state.activity?.id != null) {
+                  span.setAttribute('activity.id', state.activity.id)
+                }
+
                 config.onSuccess?.(span, res as TResult, args)
                 span.setStatus({ code: SpanStatusCode.OK })
                 return res
@@ -81,6 +91,13 @@ export function createTracedDecorator<TArgs extends any[], TResult> (
     }
 
     return wrappedMethod as T
+  }
+}
+
+// TODO: this shouldnt be createTracedDecorator, it should be the returning function of createTracedDecorator.
+export namespace createTracedDecorator {
+  export function context <T extends Record<string, unknown>> (data: T): void {
+    otelContext.active().setValue(CONTEXT_KEY, data)
   }
 }
 

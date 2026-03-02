@@ -382,6 +382,10 @@ export class CloudAdapter extends BaseAdapter {
 
     await this.runMiddleware(context, logic)
     const invokeResponse = this.processTurnResults(context)
+
+    // TODO: enable this when supported
+    // tracedProcess.context({ activity: context.activity })
+
     return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
   }
 
