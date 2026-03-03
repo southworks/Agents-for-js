@@ -29,7 +29,7 @@ import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
 import { share } from '@microsoft/agents-telemetry'
-import { tracedProcess } from './decorators'
+import { tracedProcess } from './observability/decorators'
 const logger = debug('agents:cloud-adapter')
 
 /**
