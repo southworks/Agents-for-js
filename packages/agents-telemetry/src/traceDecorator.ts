@@ -44,8 +44,16 @@ type DecoratorShape = {
   result?: unknown
 }
 
+type TracedDecorator<TArgs extends DecoratorShape> = {
+  <T extends (...args: TArgs['args']) => TArgs['result']>(
+    originalMethod: T,
+    context: ClassMethodDecoratorContext
+  ): T | void
+  share: (data: TArgs['data']) => void
+}
+
 export function createTracedDecorator<TArgs extends DecoratorShape> (config: TracedMethodConfig<TArgs> = {}) {
-  return function <T extends (...args: TArgs['args']) => TArgs['result']>(
+  const decorator = function <T extends (...args: TArgs['args']) => TArgs['result']>(
     originalMethod: T,
     context: ClassMethodDecoratorContext
   ): T | void {
@@ -104,7 +112,14 @@ export function createTracedDecorator<TArgs extends DecoratorShape> (config: Tra
     }
 
     return wrappedMethod as T
+  } as TracedDecorator<TArgs>
+
+  decorator.share = (data: TArgs['data']) => {
+    const sharedState = otelContext.active().getValue(CONTEXT_KEY) as DecoratorShape
+    sharedState.data = data
   }
+
+  return decorator
 }
 
 export function share<T> (data: T): void {

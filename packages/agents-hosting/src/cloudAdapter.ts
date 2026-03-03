@@ -28,8 +28,7 @@ import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefini
 import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
-import { share } from '@microsoft/agents-telemetry'
-import { tracedProcess } from './decorators'
+import * as Traces from './decorators'
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -321,8 +320,7 @@ export class CloudAdapter extends BaseAdapter {
    * @param logic - The logic to execute.
    * @param headerPropagation - Optional function to handle header propagation.
    */
-  // @trace(Traces.CloudAdapterProcess)
-  @tracedProcess
+  @Traces.CloudAdapterProcess
   public async process (
     request: Request,
     res: Response,
@@ -383,10 +381,7 @@ export class CloudAdapter extends BaseAdapter {
 
     await this.runMiddleware(context, logic)
     const invokeResponse = this.processTurnResults(context)
-
-    // TODO: replace with tracedProcess.share so we can get typesafety
-    share(context)
-
+    Traces.CloudAdapterProcess.share(context)
     return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
   }
 

@@ -5,16 +5,15 @@ import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
 import { TurnContext } from './turnContext'
 import { CloudAdapter } from './cloudAdapter'
 
+const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
+
 interface ProcessDecoratorSignature {
   args: Parameters<CloudAdapter['process']>
   data?: TurnContext
   result?: ReturnType<CloudAdapter['process']>
 }
 
-const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
-
-// Decorator for `process` method
-export const tracedProcess = createTracedDecorator<ProcessDecoratorSignature>({
+export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorSignature>({
   spanName: SpanNames.ADAPTER_PROCESS,
   // spanOptions: { kind: SpanKind.SERVER },
   onStart (span) {
