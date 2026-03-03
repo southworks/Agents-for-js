@@ -6,6 +6,8 @@ import { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
 import { HostingMetrics } from './metrics'
 
+const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
+
 interface ProcessDecoratorSignature {
   args: Parameters<CloudAdapter['process']>
   data?: TurnContext
@@ -13,17 +15,15 @@ interface ProcessDecoratorSignature {
   durationMs?: { startTime: number }
 }
 
-const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
-
-// Decorator for `process` method
-export const tracedProcess = createTracedDecorator<ProcessDecoratorSignature>({
+export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorSignature>({
   spanName: SpanNames.ADAPTER_PROCESS,
   // spanOptions: { kind: SpanKind.SERVER },
   onStart (span, context) {
+    span.addEvent('process.started')
     context.durationMs = { startTime: performance.now() }
   },
   onSuccess (span) {
-    // span.addEvent('process.completed')
+    span.addEvent('process.completed')
   },
   onError (span, error) {
     span.addEvent('process.failed', {
@@ -32,6 +32,7 @@ export const tracedProcess = createTracedDecorator<ProcessDecoratorSignature>({
   },
   onEnd (span, context) {
     const { args: [req], data, durationMs } = context
+    console.log('tracedProcess onEnd - adding attributes', { method: req.method, activityId: context?.activity?.id })
     span.setAttribute('process.http.method', fallback(req.method))
     span.setAttribute('activity.id', fallback(data?.activity?.id))
     HostingMetrics.activitiesProcessedCounter.add(1, {
