@@ -28,7 +28,7 @@ import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefini
 import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
-import * as Traces from './decorators'
+import * as Traces from './observability/decorators'
 const logger = debug('agents:cloud-adapter')
 
 /**

@@ -19,11 +19,11 @@ export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorSignatu
   spanName: SpanNames.ADAPTER_PROCESS,
   // spanOptions: { kind: SpanKind.SERVER },
   onStart (span, context) {
-    span.addEvent('process.started')
+    // span.addEvent('process.started')
     context.durationMs = { startTime: performance.now() }
   },
   onSuccess (span) {
-    span.addEvent('process.completed')
+    // span.addEvent('process.completed')
   },
   onError (span, error) {
     span.addEvent('process.failed', {
@@ -31,13 +31,15 @@ export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorSignatu
     })
   },
   onEnd (span, context) {
-    const { args: [req], data, durationMs } = context
-    console.log('tracedProcess onEnd - adding attributes', { method: req.method, activityId: context?.activity?.id })
-    span.setAttribute('process.http.method', fallback(req.method))
-    span.setAttribute('activity.id', fallback(data?.activity?.id))
+    const { data, durationMs } = context
+    span.setAttribute('activity.type', fallback(data?.activity?.type))
+    span.setAttribute('activity.channelId', fallback(data?.activity?.channelId))
+    span.setAttribute('activity.deliveryMode', fallback(data?.activity?.deliveryMode))
+    span.setAttribute('activity.conversationId', fallback(data?.activity?.conversation?.id))
+    span.setAttribute('activity.isAgentic', fallback(data?.activity?.isAgenticRequest()))
     HostingMetrics.activitiesProcessedCounter.add(1, {
       'activity.type': fallback(data?.activity?.type),
-      'channel.id': fallback(data?.activity?.channelId)
+      'activity.channelId': fallback(data?.activity?.channelId)
     })
     const processDuration = durationMs?.startTime ? performance.now() - durationMs.startTime : 0
     HostingMetrics.messageProcessingDuration.record(processDuration!, {
