@@ -21,6 +21,8 @@ import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, UserAuthorization, AuthorizationManager } from './auth'
 import { JwtPayload } from 'jsonwebtoken'
+import * as Traces from '../observability/decorators'
+import { SpanNames } from '@microsoft/agents-telemetry'
 
 const logger = debug('agents:app')
 
@@ -602,6 +604,7 @@ export class AgentApplication<TState extends TurnState> {
    * ```
    *
    */
+  @Traces.AgentApplicationRun
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
     if (turnContext.activity.type === ActivityTypes.Typing) {
       return false
@@ -633,6 +636,8 @@ export class AgentApplication<TState extends TurnState> {
           return route?.authHandlers ?? []
         }) ?? { authorized: true } // Default to authorized if no auth manager
 
+        Traces.AgentApplicationRun.share({ authorized })
+
         if (!authorized) {
           await state.save(context, storage)
           return false
@@ -640,25 +645,45 @@ export class AgentApplication<TState extends TurnState> {
 
         const route = await this.getRoute(context)
 
+        Traces.AgentApplicationRun.share({
+          route: route ? { name: route.selector.name, isInvokeRoute: route.isInvokeRoute, isAgenticRoute: route.isAgenticRoute } : undefined
+        })
+
         if (!route) {
           logger.debug('No matching route found for activity:', context.activity)
           return false
         }
 
         if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
-          for (let i = 0; i < this._options.fileDownloaders.length; i++) {
-            await this._options.fileDownloaders[i].downloadAndStoreFiles(context, state)
-          }
+          Traces.AgentApplicationRun.share({ attachmentsCount: context.activity.attachments?.length ?? 0 })
+          await Traces.AgentApplicationRun.withChildSpan(SpanNames.AGENTS_APP_DOWNLOAD_FILES, async () => {
+            for (let i = 0; i < this._options.fileDownloaders!.length; i++) {
+              await this._options.fileDownloaders![i].downloadAndStoreFiles(context, state)
+            }
+          })
         }
 
-        if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
+        let continueExecution = true
+        if (this._beforeTurn.length > 0) {
+          await Traces.AgentApplicationRun.withChildSpan(SpanNames.AGENTS_APP_BEFORE_TURN, async () => {
+            continueExecution = await this.callEventHandlers(context, state, this._beforeTurn)
+          })
+        }
+        if (!continueExecution) {
           await state.save(context, storage)
           return false
         }
 
-        await route.handler(context, state)
+        await Traces.AgentApplicationRun.withChildSpan(SpanNames.AGENTS_APP_ROUTE_HANDLER, async () => {
+          await route.handler(context, state)
+        })
 
-        if (await this.callEventHandlers(context, state, this._afterTurn)) {
+        if (this._afterTurn.length > 0) {
+          await Traces.AgentApplicationRun.withChildSpan(SpanNames.AGENTS_APP_AFTER_TURN, async () => {
+            continueExecution = await this.callEventHandlers(context, state, this._afterTurn)
+          })
+        }
+        if (continueExecution) {
           await state.save(context, storage)
         }
 

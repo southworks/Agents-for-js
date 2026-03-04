@@ -28,6 +28,8 @@ interface TracedMethodConfig<TArgs extends DecoratorContextShape> {
   onError?: (span: Span, error: unknown, context: TArgs) => void
   // Called in finally block
   onEnd?: (span: Span, context: TArgs) => void
+  // Optional callback to create child spans within the method execution
+  onChildSpan?: (spanName: string, span: Span, context: TArgs) => void
 }
 
 const CONTEXT_KEY = createContextKey('agents-telemetry:createTracedDecorator-context')
@@ -36,6 +38,10 @@ type DecoratorContextShape = {
   args: unknown[]
   data?: unknown
   result?: unknown
+}
+
+type InternalContextShape<T extends DecoratorContextShape> = T & {
+  onChildSpan?: (spanName: string, span: Span, context: T) => void
 }
 
 export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {
@@ -51,7 +57,12 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
 
       // TODO: see if we can use tracer.startSpan(name) and context.with() instead of startActiveSpan, to have more control over the context and span lifecycle.
       return tracer.startActiveSpan(spanName, config.spanOptions ?? {}, (span) => {
-        const sharedContext = { args, data: undefined, result: undefined } as TContext
+        const sharedContext = {
+          args,
+          data: undefined,
+          result: undefined,
+          onChildSpan: config.onChildSpan
+        } as InternalContextShape<TContext>
         const ctx = otelContext.active().setValue(CONTEXT_KEY, sharedContext)
 
         config.onStart?.(span, sharedContext)
@@ -99,7 +110,40 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
 
   decorator.share = (data: TContext['data']) => {
     const sharedState = otelContext.active().getValue(CONTEXT_KEY) as DecoratorContextShape
-    sharedState.data = data
+    if (isPlainObject(sharedState.data) && isPlainObject(data)) {
+      sharedState.data = { ...sharedState.data, ...data }
+    } else {
+      sharedState.data = data
+    }
+  }
+
+  /**
+   * Creates a child span within the current active span context.
+   * If the parent decorator has an `onChildSpan` callback configured, it will be called
+   * with the span name, span, and shared context.
+   */
+  decorator.withChildSpan = async <T>(
+    spanName: string,
+    fn: (span: Span | undefined) => Promise<T>,
+    options?: SpanOptions
+  ): Promise<T> => {
+    const sharedState = otelContext.active().getValue(CONTEXT_KEY) as InternalContextShape<TContext> | undefined
+
+    return tracer.startActiveSpan(spanName, options ?? {}, async (span) => {
+      try {
+        // Call the onChildSpan callback if defined in the parent decorator
+        sharedState?.onChildSpan?.(spanName, span, sharedState)
+
+        const result = await fn(span)
+        span.setStatus({ code: SpanStatusCode.OK })
+        return result
+      } catch (error) {
+        recordError(span, error)
+        throw error
+      } finally {
+        span.end()
+      }
+    })
   }
 
   return decorator
@@ -116,4 +160,8 @@ function recordError (span: Span, error: unknown): void {
 
 function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
   return typeof value === 'object' && value !== null && 'then' in value
+}
+
+function isPlainObject (value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && value.constructor === Object
 }

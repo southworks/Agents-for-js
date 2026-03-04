@@ -5,6 +5,9 @@
         "path": "packages/agents-activity"
       },
       {
+        "path": "packages/agents-telemetry"
+      },
+      {
         "path": "packages/agents-hosting"
       },
       {
@@ -24,9 +27,6 @@
       },
       {
         "path": "packages/agents-hosting-extensions-teams"
-      },
-      {
-        "path": "packages/agents-telemetry"
       },
       {
         "path": "test-agents/application-style"

@@ -4,10 +4,12 @@
 import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
 import { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
+import { AgentApplication } from '../app/agentApplication'
 import { HostingMetrics } from './metrics'
 
 const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
 
+// CloudAdapter decorators
 interface ProcessDecoratorContext {
   args: Parameters<CloudAdapter['process']>
   data?: TurnContext
@@ -131,7 +133,7 @@ interface ContinueConversationDecoratorContext {
 }
 
 export const CloudAdapterContinueConversation = createTracedDecorator<ContinueConversationDecoratorContext>({
-  spanName: 'agents.adapter.continueConversation',
+  spanName: SpanNames.ADAPTER_CONTINUE_CONVERSATION,
   onError (span, error) {
     span.addEvent('continueConversation.failed', {
       'error.type': fallback(error?.constructor?.name)
@@ -155,7 +157,7 @@ interface CreateConnectorClientDecoratorContext {
 }
 
 export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateConnectorClientDecoratorContext>({
-  spanName: 'agents.adapter.createConnectorClient',
+  spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
   onError (span, error) {
     span.addEvent('createConnectorClient.failed', {
       'error.type': fallback(error?.constructor?.name)
@@ -178,7 +180,7 @@ interface CreateConnectorClientWithIdentityDecoratorContext {
 }
 
 export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorator<CreateConnectorClientWithIdentityDecoratorContext>({
-  spanName: 'agents.adapter.createConnectorClient',
+  spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
   onError (span, error) {
     span.addEvent('createConnectorClientWithIdentity.failed', {
       'error.type': fallback(error?.constructor?.name)
@@ -193,5 +195,47 @@ export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorat
     span.setAttribute('serviceUrl', serviceUrl)
     span.setAttribute('scope', scope)
     span.setAttribute('isAgenticRequest', isAgenticRequest)
+  }
+})
+
+// AgentApplication decorators
+interface AppRunDecoratorContext {
+  args: Parameters<AgentApplication<any>['runInternal']>
+  data: {
+    authorized?: boolean
+    route?: { name?: string, isInvokeRoute?: boolean, isAgenticRoute?: boolean }
+    attachmentsCount?: number
+  }
+  result?: ReturnType<AgentApplication<any>['runInternal']>
+}
+
+export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>({
+  spanName: SpanNames.AGENTS_APP_RUN,
+  onChildSpan (spanName, span, context) {
+    switch (spanName) {
+      case SpanNames.AGENTS_APP_ROUTE_HANDLER:
+        span.setAttribute('route.name', fallback(context.data?.route?.name))
+        span.setAttribute('route.isInvoke', context.data?.route?.isInvokeRoute ?? false)
+        span.setAttribute('route.isAgentic', context.data?.route?.isAgenticRoute ?? false)
+        break
+      case SpanNames.AGENTS_APP_DOWNLOAD_FILES:
+        span.setAttribute('attachments.count', context.data?.attachmentsCount ?? 0)
+        break
+    }
+  },
+  onError (span, error) {
+    span.addEvent('appRun.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [turnContext] = context.args
+    const activityType = fallback(turnContext.activity?.type)
+    const activityId = fallback(turnContext.activity?.id)
+    const authorized = context.data?.authorized ?? false
+
+    span.setAttribute('activity.type', activityType)
+    span.setAttribute('activity.id', activityId)
+    span.setAttribute('authorized', authorized)
   }
 })

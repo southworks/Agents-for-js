@@ -7,6 +7,8 @@ export const SpanNames = {
   ADAPTER_SEND_ACTIVITIES: 'agents.adapter.sendActivities',
   ADAPTER_UPDATE_ACTIVITY: 'agents.adapter.updateActivity',
   ADAPTER_DELETE_ACTIVITY: 'agents.adapter.deleteActivity',
+  ADAPTER_CONTINUE_CONVERSATION: 'agents.adapter.continueConversation',
+  ADAPTER_CREATE_CONNECTOR_CLIENT: 'agents.adapter.createConnectorClient',
   ADAPTER_RUN_MIDDLEWARE: 'agents.adapter.runMiddleware',
 
   // ActivityHandler
@@ -17,8 +19,11 @@ export const SpanNames = {
   HANDLER_ON_CONVERSATION_UPDATE: 'agents.handler.onConversationUpdate',
 
   // AgentApplication
-  APP_RUN: 'agents.app.run',
-  APP_ROUTE: 'agents.app.route',
+  AGENTS_APP_RUN: 'agents.app.run',
+  AGENTS_APP_ROUTE_HANDLER: 'agents.app.routeHandler',
+  AGENTS_APP_BEFORE_TURN: 'agents.app.beforeTurn',
+  AGENTS_APP_AFTER_TURN: 'agents.app.afterTurn',
+  AGENTS_APP_DOWNLOAD_FILES: 'agents.app.downloadFiles',
 
   // Dialogs
   DIALOG_BEGIN: 'agents.dialog.begin',
