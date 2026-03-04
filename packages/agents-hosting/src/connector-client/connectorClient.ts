@@ -13,6 +13,7 @@ import { AttachmentData } from './attachmentData'
 import { normalizeOutgoingActivity } from '../activityWireCompat'
 import { getProductInfo } from '../getProductInfo'
 import { HeaderPropagation, HeaderPropagationCollection } from '../headerPropagation'
+import * as Traces from '../observability/decorators'
 const logger = debug('agents:connector-client')
 
 export { getProductInfo }
@@ -138,6 +139,7 @@ export class ConnectorClient {
    * @param continuationToken - The continuation token for pagination.
    * @returns A list of conversations.
    */
+  @Traces.ConnectorGetConversations
   public async getConversations (continuationToken?: string): Promise<ConversationsResult> {
     const config: AxiosRequestConfig = {
       method: 'get',
@@ -145,9 +147,11 @@ export class ConnectorClient {
       params: continuationToken ? { continuationToken } : undefined
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorGetConversations.share(response)
     return response.data
   }
 
+  @Traces.ConnectorGetConversationMember
   public async getConversationMember (userId: string, conversationId: string): Promise<ChannelAccount> {
     if (!userId || !conversationId) {
       throw ExceptionHelper.generateException(Error, Errors.UserIdAndConversationIdRequired)
@@ -160,6 +164,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorGetConversationMember.share(response)
     return response.data
   }
 
@@ -168,6 +173,7 @@ export class ConnectorClient {
    * @param body - The conversation parameters.
    * @returns The conversation resource response.
    */
+  @Traces.ConnectorCreateConversation
   public async createConversation (body: ConversationParameters): Promise<ConversationResourceResponse> {
     const payload = {
       ...body,
@@ -182,6 +188,7 @@ export class ConnectorClient {
       data: payload
     }
     const response: AxiosResponse = await this._axiosInstance(config)
+    Traces.ConnectorCreateConversation.share(response)
     return response.data
   }
 
@@ -192,6 +199,7 @@ export class ConnectorClient {
    * @param body - The activity object.
    * @returns The resource response.
    */
+  @Traces.ConnectorReplyToActivity
   public async replyToActivity (
     conversationId: string,
     activityId: string,
@@ -213,6 +221,7 @@ export class ConnectorClient {
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorReplyToActivity.share(response)
     logger.info('Reply to conversation/activity: ', response.data.id!, activityId)
     return response.data
   }
@@ -243,6 +252,7 @@ export class ConnectorClient {
    * @param body - The activity object.
    * @returns The resource response.
    */
+  @Traces.ConnectorSendToConversation
   public async sendToConversation (
     conversationId: string,
     body: Activity
@@ -263,6 +273,7 @@ export class ConnectorClient {
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorSendToConversation.share(response)
     return response.data
   }
 
@@ -273,6 +284,7 @@ export class ConnectorClient {
    * @param body - The activity object.
    * @returns The resource response.
    */
+  @Traces.ConnectorUpdateActivity
   public async updateActivity (
     conversationId: string,
     activityId: string,
@@ -290,6 +302,7 @@ export class ConnectorClient {
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorUpdateActivity.share(response)
     return response.data
   }
 
@@ -299,6 +312,7 @@ export class ConnectorClient {
    * @param activityId - The ID of the activity.
    * @returns A promise that resolves when the activity is deleted.
    */
+  @Traces.ConnectorDeleteActivity
   public async deleteActivity (
     conversationId: string,
     activityId: string
@@ -314,6 +328,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorDeleteActivity.share(response)
     return response.data
   }
 
@@ -323,6 +338,7 @@ export class ConnectorClient {
      * @param body - The attachment data.
      * @returns The resource response.
      */
+  @Traces.ConnectorUploadAttachment
   public async uploadAttachment (
     conversationId: string,
     body: AttachmentData
@@ -339,6 +355,7 @@ export class ConnectorClient {
       data: body
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorUploadAttachment.share(response)
     return response.data
   }
 
@@ -347,6 +364,7 @@ export class ConnectorClient {
    * @param attachmentId - The ID of the attachment.
    * @returns The attachment information.
    */
+  @Traces.ConnectorGetAttachmentInfo
   public async getAttachmentInfo (
     attachmentId: string
   ): Promise<AttachmentInfo> {
@@ -361,6 +379,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorGetAttachmentInfo.share(response)
     return response.data
   }
 
@@ -370,6 +389,7 @@ export class ConnectorClient {
    * @param viewId - The ID of the view.
    * @returns The attachment as a readable stream.
    */
+  @Traces.ConnectorGetAttachment
   public async getAttachment (
     attachmentId: string,
     viewId: string
@@ -388,6 +408,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
+    Traces.ConnectorGetAttachment.share(response)
     return response.data
   }
 }

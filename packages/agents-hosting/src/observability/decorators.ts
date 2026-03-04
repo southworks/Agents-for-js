@@ -2,11 +2,17 @@
 // Licensed under the MIT License.
 
 import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
+import { AxiosResponse } from 'axios'
 import { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
+import { ConnectorClient } from '../connector-client/connectorClient'
 import { HostingMetrics } from './metrics'
 
 const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
+
+/**
+ * CloudAdapter method decorators
+ */
 
 interface ProcessDecoratorContext {
   args: Parameters<CloudAdapter['process']>
@@ -131,7 +137,7 @@ interface ContinueConversationDecoratorContext {
 }
 
 export const CloudAdapterContinueConversation = createTracedDecorator<ContinueConversationDecoratorContext>({
-  spanName: 'agents.adapter.continueConversation',
+  spanName: SpanNames.ADAPTER_CONTINUE_CONVERSATION,
   onError (span, error) {
     span.addEvent('continueConversation.failed', {
       'error.type': fallback(error?.constructor?.name)
@@ -155,7 +161,7 @@ interface CreateConnectorClientDecoratorContext {
 }
 
 export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateConnectorClientDecoratorContext>({
-  spanName: 'agents.adapter.createConnectorClient',
+  spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
   onError (span, error) {
     span.addEvent('createConnectorClient.failed', {
       'error.type': fallback(error?.constructor?.name)
@@ -178,7 +184,7 @@ interface CreateConnectorClientWithIdentityDecoratorContext {
 }
 
 export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorator<CreateConnectorClientWithIdentityDecoratorContext>({
-  spanName: 'agents.adapter.createConnectorClient',
+  spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
   onError (span, error) {
     span.addEvent('createConnectorClientWithIdentity.failed', {
       'error.type': fallback(error?.constructor?.name)
@@ -193,5 +199,270 @@ export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorat
     span.setAttribute('serviceUrl', serviceUrl)
     span.setAttribute('scope', scope)
     span.setAttribute('isAgenticRequest', isAgenticRequest)
+  }
+})
+
+/**
+ * ConnectorClient method decorators
+ */
+
+function recordConnectorMetrics (_operation: string, context: Pick<ConnectorReplyToActivityDecoratorContext, 'data' | 'duration'>): void {
+  const operation = fallback(_operation)
+  const httpMethod = fallback(context.data?.config?.method?.toUpperCase())
+  const httpStatusCode = context.data?.status ?? -1
+
+  HostingMetrics.connectorRequestsCounter.add(1, {
+    operation,
+    'http.method': httpMethod,
+    'http.status_code': httpStatusCode
+  })
+
+  HostingMetrics.connectorRequestDuration.record(context.duration(), { operation })
+}
+
+interface ConnectorReplyToActivityDecoratorContext {
+  args: Parameters<ConnectorClient['replyToActivity']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['replyToActivity']>
+  duration: () => number
+}
+
+export const ConnectorReplyToActivity = createTracedDecorator<ConnectorReplyToActivityDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_REPLY_TO_ACTIVITY,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('replyToActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [conversationId, activityId] = context.args
+    span.setAttribute('conversation.id', fallback(conversationId))
+    span.setAttribute('activity.id', fallback(activityId))
+    recordConnectorMetrics('replyToActivity', context)
+  }
+})
+
+interface ConnectorSendToConversationDecoratorContext {
+  args: Parameters<ConnectorClient['sendToConversation']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['sendToConversation']>
+  duration: () => number
+}
+
+export const ConnectorSendToConversation = createTracedDecorator<ConnectorSendToConversationDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_SEND_TO_CONVERSATION,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('sendToConversation.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [conversationId] = context.args
+    span.setAttribute('conversation.id', fallback(conversationId))
+    recordConnectorMetrics('sendToConversation', context)
+  }
+})
+
+interface ConnectorUpdateActivityDecoratorContext {
+  args: Parameters<ConnectorClient['updateActivity']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['updateActivity']>
+  duration: () => number
+}
+
+export const ConnectorUpdateActivity = createTracedDecorator<ConnectorUpdateActivityDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_UPDATE_ACTIVITY,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('updateActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [conversationId, activityId] = context.args
+    span.setAttribute('conversation.id', fallback(conversationId))
+    span.setAttribute('activity.id', fallback(activityId))
+    recordConnectorMetrics('updateActivity', context)
+  }
+})
+
+interface ConnectorDeleteActivityDecoratorContext {
+  args: Parameters<ConnectorClient['deleteActivity']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['deleteActivity']>
+  duration: () => number
+}
+
+export const ConnectorDeleteActivity = createTracedDecorator<ConnectorDeleteActivityDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_DELETE_ACTIVITY,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('deleteActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [conversationId, activityId] = context.args
+    span.setAttribute('conversation.id', fallback(conversationId))
+    span.setAttribute('activity.id', fallback(activityId))
+    recordConnectorMetrics('deleteActivity', context)
+  }
+})
+
+interface ConnectorCreateConversationDecoratorContext {
+  args: Parameters<ConnectorClient['createConversation']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['createConversation']>
+  duration: () => number
+}
+
+export const ConnectorCreateConversation = createTracedDecorator<ConnectorCreateConversationDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_CREATE_CONVERSATION,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('createConversation.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    recordConnectorMetrics('createConversation', context)
+  }
+})
+
+interface ConnectorGetConversationsDecoratorContext {
+  args: Parameters<ConnectorClient['getConversations']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['getConversations']>
+  duration: () => number
+}
+
+export const ConnectorGetConversations = createTracedDecorator<ConnectorGetConversationsDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_GET_CONVERSATIONS,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getConversations.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    recordConnectorMetrics('getConversations', context)
+  }
+})
+
+interface ConnectorGetConversationMemberDecoratorContext {
+  args: Parameters<ConnectorClient['getConversationMember']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['getConversationMember']>
+  duration: () => number
+}
+
+export const ConnectorGetConversationMember = createTracedDecorator<ConnectorGetConversationMemberDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_GET_CONVERSATION_MEMBERS,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getConversationMember.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    recordConnectorMetrics('getConversationMembers', context)
+  }
+})
+
+interface ConnectorUploadAttachmentDecoratorContext {
+  args: Parameters<ConnectorClient['uploadAttachment']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['uploadAttachment']>
+  duration: () => number
+}
+
+export const ConnectorUploadAttachment = createTracedDecorator<ConnectorUploadAttachmentDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_UPLOAD_ATTACHMENT,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('uploadAttachment.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [conversationId] = context.args
+    span.setAttribute('conversation.id', fallback(conversationId))
+    recordConnectorMetrics('uploadAttachment', context)
+  }
+})
+
+interface ConnectorGetAttachmentInfoDecoratorContext {
+  args: Parameters<ConnectorClient['getAttachmentInfo']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['getAttachmentInfo']>
+  duration: () => number
+}
+
+export const ConnectorGetAttachmentInfo = createTracedDecorator<ConnectorGetAttachmentInfoDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_GET_ATTACHMENT,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getAttachmentInfo.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [attachmentId] = context.args
+    span.setAttribute('attachment.id', fallback(attachmentId))
+    recordConnectorMetrics('getAttachmentInfo', context)
+  }
+})
+
+interface ConnectorGetAttachmentDecoratorContext {
+  args: Parameters<ConnectorClient['getAttachment']>
+  data?: AxiosResponse
+  result?: ReturnType<ConnectorClient['getAttachment']>
+  duration: () => number
+}
+
+export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachmentDecoratorContext>({
+  spanName: SpanNames.CONNECTOR_GET_ATTACHMENT,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getAttachment.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [attachmentId] = context.args
+    span.setAttribute('attachment.id', fallback(attachmentId))
+    recordConnectorMetrics('getAttachment', context)
   }
 })
