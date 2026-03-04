@@ -12,7 +12,7 @@ const tracer = trace.getTracer('my-app')
 /*
  * Factory for creating method-specific traced decorators
  */
-interface TracedMethodConfig<TArgs extends DecoratorShape> {
+interface TracedMethodConfig<TArgs extends DecoratorContextShape> {
   // Span name (defaults to method name if not provided)
   spanName?: string
   // Base span options (kind, links, etc.)
@@ -32,43 +32,26 @@ interface TracedMethodConfig<TArgs extends DecoratorShape> {
 
 const CONTEXT_KEY = createContextKey('agents-telemetry:createTracedDecorator-context')
 
-// export interface DecoratorData {
-//   args: []
-//   data: Record<string, unknown>
-//   result?: unknown
-// }
-
-type DecoratorShape = {
+type DecoratorContextShape = {
   args: unknown[]
   data?: unknown
   result?: unknown
 }
 
-type TracedDecorator<TArgs extends DecoratorShape> = {
-  <T extends (...args: TArgs['args']) => TArgs['result']>(
-    originalMethod: T,
-    context: ClassMethodDecoratorContext
-  ): T | void
-  share: (data: TArgs['data']) => void
-}
-
-export function createTracedDecorator<TArgs extends DecoratorShape> (config: TracedMethodConfig<TArgs> = {}) {
-  const decorator = function <T extends (...args: TArgs['args']) => TArgs['result']>(
+export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {
+  const decorator = function <T extends (...args: TContext['args']) => TContext['result']>(
     originalMethod: T,
     context: ClassMethodDecoratorContext
   ): T | void {
     const methodName = String(context.name)
 
-    const wrappedMethod = function (this: any, ...args: TArgs['args']): TArgs['result'] {
+    const wrappedMethod = function (this: any, ...args: TContext['args']): TContext['result'] {
       const spanName = config.spanName ?? `${this.constructor.name}.${methodName}`
       // const attributes = config.extractAttributes?.(...args) ?? {}
 
       // TODO: see if we can use tracer.startSpan(name) and context.with() instead of startActiveSpan, to have more control over the context and span lifecycle.
-      return tracer.startActiveSpan(spanName, {
-        ...config.spanOptions,
-        // attributes: { ...config.spanOptions?.attributes, ...attributes }
-      }, (span) => {
-        const sharedContext = { args, data: undefined, result: undefined } as TArgs
+      return tracer.startActiveSpan(spanName, config.spanOptions ?? {}, (span) => {
+        const sharedContext = { args, data: undefined, result: undefined } as TContext
         const ctx = otelContext.active().setValue(CONTEXT_KEY, sharedContext)
 
         config.onStart?.(span, sharedContext)
@@ -112,19 +95,14 @@ export function createTracedDecorator<TArgs extends DecoratorShape> (config: Tra
     }
 
     return wrappedMethod as T
-  } as TracedDecorator<TArgs>
+  }
 
-  decorator.share = (data: TArgs['data']) => {
-    const sharedState = otelContext.active().getValue(CONTEXT_KEY) as DecoratorShape
+  decorator.share = (data: TContext['data']) => {
+    const sharedState = otelContext.active().getValue(CONTEXT_KEY) as DecoratorContextShape
     sharedState.data = data
   }
 
   return decorator
-}
-
-export function share<T> (data: T): void {
-  const sharedState = otelContext.active().getValue(CONTEXT_KEY) as DecoratorShape
-  sharedState.data = data
 }
 
 function recordError (span: Span, error: unknown): void {

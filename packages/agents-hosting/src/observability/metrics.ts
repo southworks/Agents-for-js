@@ -8,12 +8,29 @@ export class HostingMetrics {
   public static tracer = trace.getTracer('OTelAgent', '1.0.0')
   private static meter = metrics.getMeter('OTelAgent', '1.0.0')
 
-  public static activitiesProcessedCounter = this.meter.createCounter(MetricNames.ADAPTER_PROCESSED_ACTIVITIES, {
+  // Counters
+  public static activitiesReceivedCounter = this.meter.createCounter('agents.activities.received', {
     unit: 'activities',
-    description: 'Total number of activities processed by the adapter'
+    description: 'Total number of activities received by the adapter'
   })
 
-  public static messageProcessingDuration = this.meter.createHistogram(MetricNames.ADAPTER_PROCESS_DURATION, {
+  public static activitiesSentCounter = this.meter.createCounter('agents.activities.sent', {
+    unit: 'activities',
+    description: 'Total number of outbound activities sent by the adapter'
+  })
+
+  public static activitiesUpdatedCounter = this.meter.createCounter('agents.activities.updated', {
+    unit: 'activities',
+    description: 'Total number of activities updated by the adapter'
+  })
+
+  public static activitiesDeletedCounter = this.meter.createCounter('agents.activities.deleted', {
+    unit: 'activities',
+    description: 'Total number of activities deleted by the adapter'
+  })
+
+  // Duration Histograms
+  public static adapterProcessDuration = this.meter.createHistogram('agents.adapter.process.duration', {
     unit: 'ms',
     description: 'Duration of the adapter process method in milliseconds'
   })

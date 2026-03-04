@@ -95,6 +95,7 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a ConnectorClient instance.
    * @protected
    */
+  @Traces.CloudAdapterCreateConnectorClient
   protected async createConnectorClient (
     serviceUrl: string,
     scope: string,
@@ -121,6 +122,7 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a ConnectorClient instance.
    * @protected
    */
+  @Traces.CloudAdapterCreateConnectorClientWithIdentity
   protected async createConnectorClientWithIdentity (
     identity: JwtPayload,
     activity: Activity,
@@ -171,6 +173,7 @@ export class CloudAdapter extends BaseAdapter {
         token,
         headers
       )
+      Traces.CloudAdapterCreateConnectorClientWithIdentity.share({ scope })
     }
     return connectorClient
   }
@@ -269,6 +272,7 @@ export class CloudAdapter extends BaseAdapter {
    * @param activities - The activities to send.
    * @returns A promise representing the array of ResourceResponses for the sent activities.
    */
+  @Traces.CloudAdapterSendActivities
   async sendActivities (context: TurnContext, activities: Activity[]): Promise<ResourceResponse[]> {
     if (!context) {
       throw ExceptionHelper.generateException(TypeError, Errors.ContextParameterRequired)
@@ -334,7 +338,6 @@ export class CloudAdapter extends BaseAdapter {
 
     const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
       res.status(status)
-      // span.setAttribute('process.status_code', status ?? 'unknown')
       if (isInvokeResponseOrExpectReplies) {
         res.setHeader('content-type', 'application/json')
       }
@@ -410,6 +413,7 @@ export class CloudAdapter extends BaseAdapter {
    * @param activity - The activity to update.
    * @returns A promise representing the ResourceResponse for the updated activity.
    */
+  @Traces.CloudAdapterUpdateActivity
   async updateActivity (context: TurnContext, activity: Activity): Promise<ResourceResponse | void> {
     if (!context) {
       throw new TypeError('`context` parameter required')
@@ -438,6 +442,7 @@ export class CloudAdapter extends BaseAdapter {
    * @param reference - The conversation reference of the activity to delete.
    * @returns A promise representing the completion of the delete operation.
    */
+  @Traces.CloudAdapterDeleteActivity
   async deleteActivity (context: TurnContext, reference: Partial<ConversationReference>): Promise<void> {
     if (!context) {
       throw new TypeError('`context` parameter required')
@@ -459,6 +464,7 @@ export class CloudAdapter extends BaseAdapter {
    * @param isResponse - No longer used.
    * @returns A promise representing the completion of the continue operation.
    */
+  @Traces.CloudAdapterContinueConversation
   async continueConversation (
     botAppIdOrIdentity: string | JwtPayload,
     reference: ConversationReference,
@@ -490,6 +496,7 @@ export class CloudAdapter extends BaseAdapter {
     }
 
     await this.runMiddleware(context, logic)
+    Traces.CloudAdapterContinueConversation.share(context)
   }
 
   /**
