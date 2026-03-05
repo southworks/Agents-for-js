@@ -34,6 +34,11 @@ export class HostingMetrics {
     description: 'Total number of outbound connector HTTP requests'
   })
 
+  public static agentClientRequestsCounter = this.meter.createCounter(MetricNames.AGENT_CLIENT_REQUESTS, {
+    unit: 'request',
+    description: 'Total number of inter-agent calls'
+  })
+
   // Duration Histograms
   public static adapterProcessDuration = this.meter.createHistogram(MetricNames.ADAPTER_PROCESS_DURATION, {
     unit: 'ms',
@@ -43,5 +48,10 @@ export class HostingMetrics {
   public static connectorRequestDuration = this.meter.createHistogram(MetricNames.CONNECTOR_REQUEST_DURATION, {
     unit: 'ms',
     description: 'Duration of outbound connector HTTP requests in milliseconds'
+  })
+
+  public static agentClientRequestDuration = this.meter.createHistogram(MetricNames.AGENT_CLIENT_REQUEST_DURATION, {
+    unit: 'ms',
+    description: 'Duration of inter-agent call latency in milliseconds'
   })
 }

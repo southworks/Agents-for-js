@@ -47,6 +47,9 @@ export const SpanNames = {
   COPILOT_CONNECT: 'agents.copilot.connect',
   COPILOT_SEND_ACTIVITY: 'agents.copilot.sendActivity',
   COPILOT_RECEIVE_ACTIVITY: 'agents.copilot.receiveActivity',
+
+  // AgentClient
+  AGENT_CLIENT_POST_ACTIVITY: 'agents.agentClient.postActivity',
 } as const
 
 export const SpanKind = {
@@ -90,4 +93,8 @@ export const MetricNames = {
   // Connector metrics
   CONNECTOR_REQUESTS: 'agents.connector.requests',
   CONNECTOR_REQUEST_DURATION: 'agents.connector.request.duration',
+
+  // AgentClient metrics
+  AGENT_CLIENT_REQUESTS: 'agents.agentClient.requests',
+  AGENT_CLIENT_REQUEST_DURATION: 'agents.agentClient.request.duration',
 } as const

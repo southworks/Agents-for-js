@@ -6,6 +6,7 @@ import { AxiosResponse } from 'axios'
 import { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
 import { ConnectorClient } from '../connector-client/connectorClient'
+import type { AgentClient } from '../agent-client/agentClient'
 import { HostingMetrics } from './metrics'
 
 const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
@@ -217,7 +218,10 @@ function recordConnectorMetrics (_operation: string, context: Pick<ConnectorRepl
     'http.status_code': httpStatusCode
   })
 
-  HostingMetrics.connectorRequestDuration.record(context.duration(), { operation })
+  HostingMetrics.connectorRequestDuration.record(context.duration(), {
+    operation,
+    'http.status_code': httpStatusCode
+  })
 }
 
 interface ConnectorReplyToActivityDecoratorContext {
@@ -464,5 +468,52 @@ export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachme
     const [attachmentId] = context.args
     span.setAttribute('attachment.id', fallback(attachmentId))
     recordConnectorMetrics('getAttachment', context)
+  }
+})
+
+/**
+ * AgentClient method decorators
+ */
+
+interface AgentClientPostActivityData {
+  response: Response
+  targetEndpoint: string
+  targetClientId: string
+}
+
+interface AgentClientPostActivityDecoratorContext {
+  args: Parameters<AgentClient['postActivity']>
+  data?: AgentClientPostActivityData
+  result?: ReturnType<AgentClient['postActivity']>
+  duration: () => number
+}
+
+export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActivityDecoratorContext>({
+  spanName: SpanNames.AGENT_CLIENT_POST_ACTIVITY,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('postActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const targetEndpoint = fallback(context.data?.targetEndpoint)
+    const targetClientId = fallback(context.data?.targetClientId)
+    const httpStatusCode = context.data?.response?.status ?? -1
+
+    span.setAttribute('target.endpoint', targetEndpoint)
+    span.setAttribute('target.clientId', targetClientId)
+    span.setAttribute('http.status_code', httpStatusCode)
+
+    HostingMetrics.agentClientRequestsCounter.add(1, {
+      'target.endpoint': targetEndpoint,
+      'http.status_code': httpStatusCode
+    })
+    HostingMetrics.agentClientRequestDuration.record(context.duration(), {
+      'target.endpoint': targetEndpoint
+    })
   }
 })
