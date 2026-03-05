@@ -211,7 +211,7 @@ interface AppRunDecoratorContext {
   args: Parameters<AgentApplication<any>['runInternal']>
   data: {
     authorized?: boolean
-    route?: { name?: string, isInvokeRoute?: boolean, isAgenticRoute?: boolean }
+    route?: { matched?: boolean, isInvokeRoute?: boolean, isAgenticRoute?: boolean }
     attachmentsCount?: number
   }
   result?: ReturnType<AgentApplication<any>['runInternal']>
@@ -222,7 +222,6 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
   onChildSpan (spanName, span, context) {
     switch (spanName) {
       case SpanNames.AGENTS_APP_ROUTE_HANDLER:
-        span.setAttribute('route.name', fallback(context.data?.route?.name))
         span.setAttribute('route.isInvoke', context.data?.route?.isInvokeRoute ?? false)
         span.setAttribute('route.isAgentic', context.data?.route?.isAgenticRoute ?? false)
         break
@@ -241,10 +240,11 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
     const activityType = fallback(turnContext.activity?.type)
     const activityId = fallback(turnContext.activity?.id)
     const authorized = context.data?.authorized ?? false
-
+    const routeMatched = context.data?.route?.matched ?? false
     span.setAttribute('activity.type', activityType)
     span.setAttribute('activity.id', activityId)
     span.setAttribute('authorized', authorized)
+    span.setAttribute('routeMatched', routeMatched)
   }
 })
 

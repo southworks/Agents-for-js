@@ -646,7 +646,7 @@ export class AgentApplication<TState extends TurnState> {
         const route = await this.getRoute(context)
 
         Traces.AgentApplicationRun.share({
-          route: route ? { name: route.selector.name, isInvokeRoute: route.isInvokeRoute, isAgenticRoute: route.isAgenticRoute } : undefined
+          route: route ? { matched: !!route, isInvokeRoute: route.isInvokeRoute, isAgenticRoute: route.isAgenticRoute } : undefined
         })
 
         if (!route) {
