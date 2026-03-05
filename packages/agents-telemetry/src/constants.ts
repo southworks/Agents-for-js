@@ -35,6 +35,11 @@ export const SpanNames = {
   CONNECTOR_REPLY_TO_ACTIVITY: 'agents.connector.replyToActivity',
   CONNECTOR_UPDATE_ACTIVITY: 'agents.connector.updateActivity',
   CONNECTOR_DELETE_ACTIVITY: 'agents.connector.deleteActivity',
+  CONNECTOR_CREATE_CONVERSATION: 'agents.connector.createConversation',
+  CONNECTOR_GET_CONVERSATIONS: 'agents.connector.getConversations',
+  CONNECTOR_GET_CONVERSATION_MEMBERS: 'agents.connector.getConversationMembers',
+  CONNECTOR_UPLOAD_ATTACHMENT: 'agents.connector.uploadAttachment',
+  CONNECTOR_GET_ATTACHMENT: 'agents.connector.getAttachment',
 
   // Storage
   STORAGE_READ: 'agents.storage.read',
@@ -45,6 +50,9 @@ export const SpanNames = {
   COPILOT_CONNECT: 'agents.copilot.connect',
   COPILOT_SEND_ACTIVITY: 'agents.copilot.sendActivity',
   COPILOT_RECEIVE_ACTIVITY: 'agents.copilot.receiveActivity',
+
+  // AgentClient
+  AGENT_CLIENT_POST_ACTIVITY: 'agents.agentClient.postActivity',
 } as const
 
 export const SpanKind = {
@@ -78,4 +86,18 @@ export const MetricNames = {
   // CloudAdapter
   ADAPTER_PROCESSED_ACTIVITIES: 'agents.adapter.processed.activities',
   ADAPTER_PROCESS_DURATION: 'agents.adapter.process.duration',
+
+  // Hosting activity counters
+  ACTIVITIES_RECEIVED: 'agents.activities.received',
+  ACTIVITIES_SENT: 'agents.activities.sent',
+  ACTIVITIES_UPDATED: 'agents.activities.updated',
+  ACTIVITIES_DELETED: 'agents.activities.deleted',
+
+  // Connector metrics
+  CONNECTOR_REQUESTS: 'agents.connector.requests',
+  CONNECTOR_REQUEST_DURATION: 'agents.connector.request.duration',
+
+  // AgentClient metrics
+  AGENT_CLIENT_REQUESTS: 'agents.agentClient.requests',
+  AGENT_CLIENT_REQUEST_DURATION: 'agents.agentClient.request.duration',
 } as const

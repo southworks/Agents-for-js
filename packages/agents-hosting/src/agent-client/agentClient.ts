@@ -4,6 +4,7 @@ import { v4 } from 'uuid'
 import { debug } from '@microsoft/agents-activity/logger'
 import { ConversationState } from '../state'
 import { TurnContext } from '../turnContext'
+import * as Traces from '../observability/decorators'
 
 const logger = debug('agents:agent-client')
 
@@ -67,6 +68,7 @@ export class AgentClient {
    * @returns A promise that resolves to the HTTP status text of the agent response
    * @throws Error if the request to the agent endpoint fails
    */
+  @Traces.AgentClientPostActivity
   public async postActivity (activity: Activity, authConfig: AuthConfiguration, conversationState: ConversationState, context: TurnContext): Promise<string> {
     const activityCopy = activity.clone()
     activityCopy.serviceUrl = this.agentClientConfig.serviceUrl
@@ -113,6 +115,13 @@ export class AgentClient {
       },
       body: JSON.stringify(activityCopy)
     })
+
+    Traces.AgentClientPostActivity.share({
+      response,
+      targetEndpoint: this.agentClientConfig.endPoint,
+      targetClientId: this.agentClientConfig.clientId
+    })
+
     if (!response.ok) {
       await conversationDataAccessor.delete(context, { channelId: activityCopy.channelId!, conversationId: activityCopy.conversation!.id })
       throw new Error(`Failed to post activity to agent: ${response.statusText}`)
