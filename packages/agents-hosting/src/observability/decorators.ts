@@ -39,18 +39,18 @@ export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorContext
     const type = fallback(data?.activity?.type)
     const channelId = fallback(data?.activity?.channelId)
 
-    span.setAttribute('activity.type', type)
-    span.setAttribute('activity.channelId', channelId)
-    span.setAttribute('activity.deliveryMode', fallback(data?.activity?.deliveryMode))
-    span.setAttribute('activity.conversation.id', fallback(data?.activity?.conversation?.id))
-    span.setAttribute('activity.isAgenticRequest', data?.activity?.isAgenticRequest() ?? false)
+    span.setAttribute('agents.activity.type', type)
+    span.setAttribute('agents.activity.channel_id', channelId)
+    span.setAttribute('agents.activity.delivery_mode', fallback(data?.activity?.deliveryMode))
+    span.setAttribute('agents.activity.conversation_id', fallback(data?.activity?.conversation?.id))
+    span.setAttribute('agents.activity.is_agentic', data?.activity?.isAgenticRequest() ?? false)
 
     HostingMetrics.activitiesReceivedCounter.add(1, {
-      'activity.type': type,
-      'activity.channelId': channelId
+      'agents.activity.type': type,
+      'agents.activity.channel_id': channelId
     })
     HostingMetrics.adapterProcessDuration.record(duration(), {
-      'activity.type': type
+      'agents.activity.type': type
     })
   }
 })
@@ -71,13 +71,13 @@ export const CloudAdapterSendActivities = createTracedDecorator<SendActivitiesDe
     const [, _activities] = context.args
     const activities = _activities ?? []
 
-    span.setAttribute('activity.count', activities?.length ?? 0)
-    span.setAttribute('conversation.id', fallback(activities[0]?.conversation?.id))
+    span.setAttribute('agents.activity.count', activities?.length ?? 0)
+    span.setAttribute('agents.activity.conversation_id', fallback(activities[0]?.conversation?.id))
 
     for (const activity of activities) {
       HostingMetrics.activitiesSentCounter.add(1, {
-        'activity.type': fallback(activity?.type),
-        'channel.id': fallback(activity?.channelId)
+        'agents.activity.type': fallback(activity?.type),
+        'agents.activity.channel_id': fallback(activity?.channelId)
       })
     }
   }
@@ -98,11 +98,11 @@ export const CloudAdapterUpdateActivity = createTracedDecorator<UpdateActivityDe
   onEnd (span, context) {
     const [, activity] = context.args
 
-    span.setAttribute('activity.id', fallback(activity?.id))
-    span.setAttribute('conversation.id', fallback(activity?.conversation?.id))
+    span.setAttribute('agents.activity.id', fallback(activity?.id))
+    span.setAttribute('agents.activity.conversation_id', fallback(activity?.conversation?.id))
 
     HostingMetrics.activitiesUpdatedCounter.add(1, {
-      'channel.id': fallback(activity?.channelId),
+      'agents.activity.channel_id': fallback(activity?.channelId),
     })
   }
 })
@@ -123,11 +123,11 @@ export const CloudAdapterDeleteActivity = createTracedDecorator<DeleteActivityDe
   onEnd (span, context) {
     const [, reference] = context.args
 
-    span.setAttribute('activity.id', fallback(reference?.activityId))
-    span.setAttribute('conversation.id', fallback(reference?.conversation?.id))
+    span.setAttribute('agents.activity.id', fallback(reference?.activityId))
+    span.setAttribute('agents.activity.conversation_id', fallback(reference?.conversation?.id))
 
     HostingMetrics.activitiesDeletedCounter.add(1, {
-      'channel.id': fallback(reference?.channelId)
+      'agents.activity.channel_id': fallback(reference?.channelId)
     })
   }
 })
@@ -151,9 +151,9 @@ export const CloudAdapterContinueConversation = createTracedDecorator<ContinueCo
     const isAgenticRequest = context.data?.activity?.isAgenticRequest() ?? false
     const conversationId = fallback(reference?.conversation?.id)
 
-    span.setAttribute('botAppId', botAppId)
-    span.setAttribute('conversation.id', conversationId)
-    span.setAttribute('isAgenticRequest', isAgenticRequest)
+    span.setAttribute('agents.bot.app_id', botAppId)
+    span.setAttribute('agents.activity.conversation_id', conversationId)
+    span.setAttribute('agents.is_agentic', isAgenticRequest)
   }
 })
 
@@ -174,8 +174,8 @@ export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateCon
     const serviceUrl = fallback(_serviceUrl)
     const scope = fallback(_scope)
 
-    span.setAttribute('serviceUrl', serviceUrl)
-    span.setAttribute('scope', scope)
+    span.setAttribute('agents.service_url', serviceUrl)
+    span.setAttribute('agents.auth.scope', scope)
   }
 })
 
@@ -198,9 +198,9 @@ export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorat
     const scope = fallback(context.data.scope)
     const serviceUrl = fallback(activity?.serviceUrl)
 
-    span.setAttribute('serviceUrl', serviceUrl)
-    span.setAttribute('scope', scope)
-    span.setAttribute('isAgenticRequest', isAgenticRequest)
+    span.setAttribute('agents.service_url', serviceUrl)
+    span.setAttribute('agents.auth.scope', scope)
+    span.setAttribute('agents.is_agentic', isAgenticRequest)
   }
 })
 
@@ -222,11 +222,11 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
   onChildSpan (spanName, span, context) {
     switch (spanName) {
       case SpanNames.AGENTS_APP_ROUTE_HANDLER:
-        span.setAttribute('route.isInvoke', context.data?.route?.isInvokeRoute ?? false)
-        span.setAttribute('route.isAgentic', context.data?.route?.isAgenticRoute ?? false)
+        span.setAttribute('agents.route.is_invoke', context.data?.route?.isInvokeRoute ?? false)
+        span.setAttribute('agents.route.is_agentic', context.data?.route?.isAgenticRoute ?? false)
         break
       case SpanNames.AGENTS_APP_DOWNLOAD_FILES:
-        span.setAttribute('attachments.count', context.data?.attachmentsCount ?? 0)
+        span.setAttribute('agents.attachments.count', context.data?.attachmentsCount ?? 0)
         break
     }
   },
@@ -241,10 +241,10 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
     const activityId = fallback(turnContext.activity?.id)
     const authorized = context.data?.authorized ?? false
     const routeMatched = context.data?.route?.matched ?? false
-    span.setAttribute('activity.type', activityType)
-    span.setAttribute('activity.id', activityId)
-    span.setAttribute('authorized', authorized)
-    span.setAttribute('routeMatched', routeMatched)
+    span.setAttribute('agents.activity.type', activityType)
+    span.setAttribute('agents.activity.id', activityId)
+    span.setAttribute('agents.route.authorized', authorized)
+    span.setAttribute('agents.route.matched', routeMatched)
   }
 })
 
@@ -289,8 +289,8 @@ export const ConnectorReplyToActivity = createTracedDecorator<ConnectorReplyToAc
   },
   onEnd (span, context) {
     const [conversationId, activityId] = context.args
-    span.setAttribute('conversation.id', fallback(conversationId))
-    span.setAttribute('activity.id', fallback(activityId))
+    span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
+    span.setAttribute('agents.activity.id', fallback(activityId))
     recordConnectorMetrics('replyToActivity', context)
   }
 })
@@ -315,7 +315,7 @@ export const ConnectorSendToConversation = createTracedDecorator<ConnectorSendTo
   },
   onEnd (span, context) {
     const [conversationId] = context.args
-    span.setAttribute('conversation.id', fallback(conversationId))
+    span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
     recordConnectorMetrics('sendToConversation', context)
   }
 })
@@ -340,8 +340,8 @@ export const ConnectorUpdateActivity = createTracedDecorator<ConnectorUpdateActi
   },
   onEnd (span, context) {
     const [conversationId, activityId] = context.args
-    span.setAttribute('conversation.id', fallback(conversationId))
-    span.setAttribute('activity.id', fallback(activityId))
+    span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
+    span.setAttribute('agents.activity.id', fallback(activityId))
     recordConnectorMetrics('updateActivity', context)
   }
 })
@@ -366,8 +366,8 @@ export const ConnectorDeleteActivity = createTracedDecorator<ConnectorDeleteActi
   },
   onEnd (span, context) {
     const [conversationId, activityId] = context.args
-    span.setAttribute('conversation.id', fallback(conversationId))
-    span.setAttribute('activity.id', fallback(activityId))
+    span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
+    span.setAttribute('agents.activity.id', fallback(activityId))
     recordConnectorMetrics('deleteActivity', context)
   }
 })
@@ -461,7 +461,7 @@ export const ConnectorUploadAttachment = createTracedDecorator<ConnectorUploadAt
   },
   onEnd (span, context) {
     const [conversationId] = context.args
-    span.setAttribute('conversation.id', fallback(conversationId))
+    span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
     recordConnectorMetrics('uploadAttachment', context)
   }
 })
@@ -486,7 +486,7 @@ export const ConnectorGetAttachmentInfo = createTracedDecorator<ConnectorGetAtta
   },
   onEnd (span, context) {
     const [attachmentId] = context.args
-    span.setAttribute('attachment.id', fallback(attachmentId))
+    span.setAttribute('agents.attachment.id', fallback(attachmentId))
     recordConnectorMetrics('getAttachmentInfo', context)
   }
 })
@@ -511,7 +511,7 @@ export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachme
   },
   onEnd (span, context) {
     const [attachmentId] = context.args
-    span.setAttribute('attachment.id', fallback(attachmentId))
+    span.setAttribute('agents.attachment.id', fallback(attachmentId))
     recordConnectorMetrics('getAttachment', context)
   }
 })
@@ -549,16 +549,16 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
     const targetClientId = fallback(context.data?.targetClientId)
     const httpStatusCode = context.data?.response?.status ?? -1
 
-    span.setAttribute('target.endpoint', targetEndpoint)
-    span.setAttribute('target.clientId', targetClientId)
+    span.setAttribute('agents.target.endpoint', targetEndpoint)
+    span.setAttribute('agents.target.client_id', targetClientId)
     span.setAttribute('http.status_code', httpStatusCode)
 
     HostingMetrics.agentClientRequestsCounter.add(1, {
-      'target.endpoint': targetEndpoint,
+      'agents.target.endpoint': targetEndpoint,
       'http.status_code': httpStatusCode
     })
     HostingMetrics.agentClientRequestDuration.record(context.duration(), {
-      'target.endpoint': targetEndpoint
+      'agents.target.endpoint': targetEndpoint
     })
   }
 })
