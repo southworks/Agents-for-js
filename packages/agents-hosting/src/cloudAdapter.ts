@@ -379,6 +379,7 @@ export class CloudAdapter extends BaseAdapter {
       await this.runMiddleware(context, logic)
       const invokeResponse = this.processTurnResults(context)
       logger.debug('Activity Response (invoke/expect replies): ', invokeResponse)
+      Traces.CloudAdapterProcess.share(context)
       return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body, true)
     }
 

@@ -3,14 +3,65 @@
 
 import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
 import { AxiosResponse } from 'axios'
-import { TurnContext } from '../turnContext'
+import { Activity } from '@microsoft/agents-activity'
+import type { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
 import { AgentApplication } from '../app/agentApplication'
 import { ConnectorClient } from '../connector-client/connectorClient'
 import type { AgentClient } from '../agent-client/agentClient'
 import { HostingMetrics } from './metrics'
+import { BaseAdapter } from '../baseAdapter'
 
 const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
+
+/**
+ * BaseAdapter method decorators
+ */
+
+interface BaseAdapterTurnDecoratorContext {
+  args: Parameters<BaseAdapter['runMiddleware']>
+  data?: Error
+  result?: ReturnType<BaseAdapter['runMiddleware']>
+  duration: () => number
+}
+
+export const BaseAdapterTurn = createTracedDecorator<BaseAdapterTurnDecoratorContext>({
+  spanName: SpanNames.ADAPTER_TURN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    const type = fallback(error?.constructor?.name)
+    span.addEvent('turn.failed', {
+      'error.type': type
+    })
+    HostingMetrics.turnsErrorsCounter.add(1, {
+      'error.type': type
+    })
+  },
+  onEnd (span, context) {
+    const { args: [turnContext], data, duration } = context
+    const type = fallback(turnContext?.activity?.type)
+    const channelId = fallback(turnContext?.activity?.channelId)
+
+    if (data instanceof Error) {
+      HostingMetrics.turnsErrorsCounter.add(1, {
+        'error.type': type
+      })
+    }
+
+    HostingMetrics.turnsTotalCounter.add(1, {
+      'activity.type': type,
+      'conversation.id': fallback(turnContext?.activity?.conversation?.id)
+    })
+    HostingMetrics.turnDuration.record(duration(), {
+      'activity.type': type,
+      'channel.id': channelId,
+      'conversation.id': fallback(turnContext?.activity?.conversation?.id)
+    })
+  }
+})
 
 /**
  * CloudAdapter method decorators
@@ -560,6 +611,98 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
     HostingMetrics.agentClientRequestDuration.record(context.duration(), {
       'agents.target.endpoint': targetEndpoint
     })
+  }
+})
+
+/**
+ * TurnContext method decorators
+ */
+
+interface TurnContextSendActivityDecoratorContext {
+  args: Parameters<TurnContext['sendActivity']>
+  result?: ReturnType<TurnContext['sendActivity']>
+}
+
+export const TurnContextSendActivity = createTracedDecorator<TurnContextSendActivityDecoratorContext>({
+  spanName: SpanNames.TURN_SEND_ACTIVITY,
+  onError (span, error) {
+    span.addEvent('sendActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [activityOrText] = context.args
+    const activity = typeof activityOrText === 'string'
+      ? Activity.fromObject({ type: 'message', text: activityOrText })
+      : activityOrText
+
+    span.setAttribute('activity.type', fallback(activity.type))
+    span.setAttribute('activity.id', fallback(activity.id))
+    span.setAttribute('activity.count', 1)
+  }
+})
+
+interface TurnContextSendActivitiesDecoratorContext {
+  args: Parameters<TurnContext['sendActivities']>
+  result?: ReturnType<TurnContext['sendActivities']>
+}
+
+export const TurnContextSendActivities = createTracedDecorator<TurnContextSendActivitiesDecoratorContext>({
+  spanName: SpanNames.TURN_SEND_ACTIVITIES,
+  onError (span, error) {
+    span.addEvent('sendActivities.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [activities] = context.args
+
+    span.setAttribute('activity.count', activities.length ?? 0)
+
+    for (const activity of activities) {
+      span.setAttribute('activity.type', fallback(activity.type))
+      span.setAttribute('activity.id', fallback(activity.id))
+    }
+  }
+})
+
+interface TurnContextUpdateActivityDecoratorContext {
+  args: Parameters<TurnContext['updateActivity']>
+  result?: ReturnType<TurnContext['updateActivity']>
+}
+
+export const TurnContextUpdateActivity = createTracedDecorator<TurnContextUpdateActivityDecoratorContext>({
+  spanName: SpanNames.TURN_UPDATE_ACTIVITY,
+  onError (span, error) {
+    span.addEvent('updateActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [activity] = context.args
+    span.setAttribute('activity.id', fallback(activity?.id))
+  }
+})
+
+interface TurnContextDeleteActivityDecoratorContext {
+  args: Parameters<TurnContext['deleteActivity']>
+  result?: ReturnType<TurnContext['deleteActivity']>
+}
+
+export const TurnContextDeleteActivity = createTracedDecorator<TurnContextDeleteActivityDecoratorContext>({
+  spanName: SpanNames.TURN_DELETE_ACTIVITY,
+  onError (span, error) {
+    span.addEvent('deleteActivity.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [idOrReference] = context.args
+    const activityId = typeof idOrReference === 'string'
+      ? idOrReference
+      : idOrReference.activityId
+
+    span.setAttribute('activity.id', fallback(activityId))
   }
 })
 

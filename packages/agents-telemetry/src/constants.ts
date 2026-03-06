@@ -9,7 +9,7 @@ export const SpanNames = {
   ADAPTER_DELETE_ACTIVITY: 'agents.adapter.deleteActivity',
   ADAPTER_CONTINUE_CONVERSATION: 'agents.adapter.continueConversation',
   ADAPTER_CREATE_CONNECTOR_CLIENT: 'agents.adapter.createConnectorClient',
-  ADAPTER_RUN_MIDDLEWARE: 'agents.adapter.runMiddleware',
+  ADAPTER_TURN: 'agents.adapter.turn',
 
   // ActivityHandler
   HANDLER_RUN: 'agents.handler.run',
@@ -53,6 +53,12 @@ export const SpanNames = {
 
   // AgentClient
   AGENT_CLIENT_POST_ACTIVITY: 'agents.agentClient.postActivity',
+
+  // TurnContext
+  TURN_SEND_ACTIVITY: 'agents.turn.sendActivity',
+  TURN_SEND_ACTIVITIES: 'agents.turn.sendActivities',
+  TURN_UPDATE_ACTIVITY: 'agents.turn.updateActivity',
+  TURN_DELETE_ACTIVITY: 'agents.turn.deleteActivity',
 } as const
 
 export const SpanKind = {
@@ -100,6 +106,11 @@ export const MetricNames = {
   // AgentClient metrics
   AGENT_CLIENT_REQUESTS: 'agents.agentClient.requests',
   AGENT_CLIENT_REQUEST_DURATION: 'agents.agentClient.request.duration',
+
+  // Turn metrics
+  TURNS_TOTAL: 'agents.turns.total',
+  TURNS_ERRORS: 'agents.turns.errors',
+  TURN_DURATION: 'agents.turn.duration',
 
   // Storage metrics
   STORAGE_OPERATION_DURATION: 'agents.storage.operation.duration'
