@@ -39,6 +39,16 @@ export class HostingMetrics {
     description: 'Total number of inter-agent calls'
   })
 
+  public static turnsTotalCounter = this.meter.createCounter(MetricNames.TURNS_TOTAL, {
+    unit: 'turn',
+    description: 'Total turns processed'
+  })
+
+  public static turnsErrorsCounter = this.meter.createCounter(MetricNames.TURNS_ERRORS, {
+    unit: 'turn',
+    description: 'Total turns that resulted in an error'
+  })
+
   // Duration Histograms
   public static adapterProcessDuration = this.meter.createHistogram(MetricNames.ADAPTER_PROCESS_DURATION, {
     unit: 'ms',
@@ -53,5 +63,10 @@ export class HostingMetrics {
   public static agentClientRequestDuration = this.meter.createHistogram(MetricNames.AGENT_CLIENT_REQUEST_DURATION, {
     unit: 'ms',
     description: 'Duration of inter-agent call latency in milliseconds'
+  })
+
+  public static turnDuration = this.meter.createHistogram(MetricNames.TURN_DURATION, {
+    unit: 'ms',
+    description: 'Duration of end-to-end turn processing in milliseconds'
   })
 }

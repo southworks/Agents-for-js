@@ -8,6 +8,7 @@ import { AttachmentInfo } from './connector-client/attachmentInfo'
 import { AttachmentData } from './connector-client/attachmentData'
 import { StreamingResponse } from './app/streaming/streamingResponse'
 import { JwtPayload } from 'jsonwebtoken'
+import * as Traces from './observability/decorators'
 
 /**
  * Defines a handler for processing and sending activities.
@@ -139,6 +140,7 @@ export class TurnContext {
    * addresses the response to the correct conversation and recipient using
    * information from the incoming activity.
    */
+  @Traces.TurnContextSendActivity
   async sendActivity (activityOrText: string | Activity, speak?: string, inputHint?: string): Promise<ResourceResponse | undefined> {
     let activity: Activity
     if (typeof activityOrText === 'string') {
@@ -165,6 +167,7 @@ export class TurnContext {
    * emits them through the middleware chain before sending them to
    * the adapter.
    */
+  @Traces.TurnContextSendActivities
   async sendActivities (activities: Activity[]): Promise<ResourceResponse[]> {
     let sentNonTraceActivity = false
     const ref = this.activity.getConversationReference()
@@ -223,6 +226,7 @@ export class TurnContext {
    * This can be used to edit previously sent activities, for example to
    * update the content of an adaptive card or change a message.
    */
+  @Traces.TurnContextUpdateActivity
   async updateActivity (activity: Activity): Promise<void> {
     const newActivity = Activity.fromObject(activity)
     const ref = this.activity.getConversationReference()
@@ -238,6 +242,7 @@ export class TurnContext {
    * @param idOrReference The ID of the activity to delete or a conversation reference
    * @returns A promise that resolves when the activity has been deleted
    */
+  @Traces.TurnContextDeleteActivity
   async deleteActivity (idOrReference: string | ConversationReference): Promise<void> {
     let reference: ConversationReference
     if (typeof idOrReference === 'string') {

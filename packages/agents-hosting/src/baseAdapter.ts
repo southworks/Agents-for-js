@@ -11,6 +11,7 @@ import { ResourceResponse } from './connector-client/resourceResponse'
 import { AttachmentData } from './connector-client/attachmentData'
 import { AttachmentInfo } from './connector-client/attachmentInfo'
 import { JwtPayload } from 'jsonwebtoken'
+import * as Traces from './observability/decorators'
 
 const logger = debug('agents:base-adapter')
 
@@ -184,6 +185,7 @@ export abstract class BaseAdapter {
    * @param next - The next function to call in the pipeline.
    * @returns A promise representing the completion of the middleware pipeline.
    */
+  @Traces.BaseAdapterTurn
   protected async runMiddleware (
     context: TurnContext,
     next: (revocableContext: TurnContext) => Promise<void>
@@ -200,6 +202,7 @@ export abstract class BaseAdapter {
     } catch (err: Error | any) {
       if (this.onTurnError) {
         if (err instanceof Error) {
+          Traces.BaseAdapterTurn.share(err)
           await this.onTurnError(pContext.proxy, err)
         } else {
           throw new Error('Unknown error type: ' + err.message)
