@@ -100,4 +100,7 @@ export const MetricNames = {
   // AgentClient metrics
   AGENT_CLIENT_REQUESTS: 'agents.agentClient.requests',
   AGENT_CLIENT_REQUEST_DURATION: 'agents.agentClient.request.duration',
+
+  // Storage metrics
+  STORAGE_OPERATION_DURATION: 'agents.storage.operation.duration'
 } as const

@@ -54,4 +54,9 @@ export class HostingMetrics {
     unit: 'ms',
     description: 'Duration of inter-agent call latency in milliseconds'
   })
+
+  public static storageOperationDuration = this.meter.createHistogram(MetricNames.STORAGE_OPERATION_DURATION, {
+    unit: 'ms',
+    description: 'Duration of storage operations in milliseconds'
+  })
 }

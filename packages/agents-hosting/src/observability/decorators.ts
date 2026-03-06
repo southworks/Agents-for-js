@@ -562,3 +562,73 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
     })
   }
 })
+
+/**
+ * Storage method decorators
+ */
+
+interface StorageDecoratorContext {
+  args: [keys: string[]]
+  result?: Promise<any>
+  duration: () => number
+}
+
+export const StorageRead = createTracedDecorator<StorageDecoratorContext>({
+  spanName: SpanNames.STORAGE_READ,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('storage.read.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [keys] = context.args
+    span.setAttribute('storage.keys.count', keys?.length ?? 0)
+    HostingMetrics.storageOperationDuration.record(context.duration(), {
+      'agents.storage.operation': 'read'
+    })
+  }
+})
+
+export const StorageWrite = createTracedDecorator<StorageDecoratorContext>({
+  spanName: SpanNames.STORAGE_WRITE,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('storage.write.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [changes] = context.args
+    span.setAttribute('storage.keys.count', changes ? Object.keys(changes).length : 0)
+    HostingMetrics.storageOperationDuration.record(context.duration(), {
+      'agents.storage.operation': 'write'
+    })
+  }
+})
+
+export const StorageDelete = createTracedDecorator<StorageDecoratorContext>({
+  spanName: SpanNames.STORAGE_DELETE,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('storage.delete.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [keys] = context.args
+    span.setAttribute('storage.keys.count', keys?.length ?? 0)
+    HostingMetrics.storageOperationDuration.record(context.duration(), {
+      'agents.storage.operation': 'delete'
+    })
+  }
+})
