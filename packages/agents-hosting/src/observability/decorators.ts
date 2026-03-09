@@ -9,59 +9,10 @@ import { CloudAdapter } from '../cloudAdapter'
 import { AgentApplication } from '../app/agentApplication'
 import { ConnectorClient } from '../connector-client/connectorClient'
 import type { AgentClient } from '../agent-client/agentClient'
+import type { MsalTokenProvider } from '../auth/msalTokenProvider'
 import { HostingMetrics } from './metrics'
-import { BaseAdapter } from '../baseAdapter'
 
 const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
-
-/**
- * BaseAdapter method decorators
- */
-
-interface BaseAdapterTurnDecoratorContext {
-  args: Parameters<BaseAdapter['runMiddleware']>
-  data?: Error
-  result?: ReturnType<BaseAdapter['runMiddleware']>
-  duration: () => number
-}
-
-export const BaseAdapterTurn = createTracedDecorator<BaseAdapterTurnDecoratorContext>({
-  spanName: SpanNames.ADAPTER_TURN,
-  onStart (span, context) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    const type = fallback(error?.constructor?.name)
-    span.addEvent('turn.failed', {
-      'error.type': type
-    })
-    HostingMetrics.turnsErrorsCounter.add(1, {
-      'error.type': type
-    })
-  },
-  onEnd (span, context) {
-    const { args: [turnContext], data, duration } = context
-    const type = fallback(turnContext?.activity?.type)
-    const channelId = fallback(turnContext?.activity?.channelId)
-
-    if (data instanceof Error) {
-      HostingMetrics.turnsErrorsCounter.add(1, {
-        'error.type': type
-      })
-    }
-
-    HostingMetrics.turnsTotalCounter.add(1, {
-      'activity.type': type,
-      'conversation.id': fallback(turnContext?.activity?.conversation?.id)
-    })
-    HostingMetrics.turnDuration.record(duration(), {
-      'activity.type': type,
-      'channel.id': channelId,
-      'conversation.id': fallback(turnContext?.activity?.conversation?.id)
-    })
-  }
-})
 
 /**
  * CloudAdapter method decorators
@@ -266,10 +217,15 @@ interface AppRunDecoratorContext {
     attachmentsCount?: number
   }
   result?: ReturnType<AgentApplication<any>['runInternal']>
+  duration: () => number
 }
 
 export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>({
   spanName: SpanNames.AGENTS_APP_RUN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
   onChildSpan (spanName, span, context) {
     switch (spanName) {
       case SpanNames.AGENTS_APP_ROUTE_HANDLER:
@@ -282,20 +238,36 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
     }
   },
   onError (span, error) {
+    const type = fallback(error?.constructor?.name)
     span.addEvent('appRun.failed', {
-      'error.type': fallback(error?.constructor?.name)
+      'error.type': type
+    })
+    HostingMetrics.turnsErrorsCounter.add(1, {
+      'error.type': type
     })
   },
   onEnd (span, context) {
-    const [turnContext] = context.args
+    const { args: [turnContext], data, duration } = context
     const activityType = fallback(turnContext.activity?.type)
     const activityId = fallback(turnContext.activity?.id)
-    const authorized = context.data?.authorized ?? false
+    const channelId = fallback(turnContext.activity?.channelId)
+    const conversationId = fallback(turnContext.activity?.conversation?.id)
+    const authorized = data?.authorized ?? false
     const routeMatched = context.data?.route?.matched ?? false
     span.setAttribute('agents.activity.type', activityType)
     span.setAttribute('agents.activity.id', activityId)
     span.setAttribute('agents.route.authorized', authorized)
     span.setAttribute('agents.route.matched', routeMatched)
+
+    HostingMetrics.turnsTotalCounter.add(1, {
+      'activity.type': activityType,
+      'conversation.id': conversationId
+    })
+    HostingMetrics.turnDuration.record(duration(), {
+      'activity.type': activityType,
+      'channel.id': channelId,
+      'conversation.id': conversationId
+    })
   }
 })
 
@@ -611,6 +583,135 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
     HostingMetrics.agentClientRequestDuration.record(context.duration(), {
       'agents.target.endpoint': targetEndpoint
     })
+  }
+})
+
+/**
+ * Authentication method decorators
+ */
+
+interface AuthTokenBase {
+  method: string
+  success: boolean
+}
+
+function recordAuthMetrics (context: Pick<AuthGetAccessTokenDecoratorContext, 'data' | 'duration'>): void {
+  const authMethod = fallback(context.data?.method)
+  const authSuccess = context.data?.success ?? false
+
+  HostingMetrics.authTokenRequestsCounter.add(1, {
+    'auth.method': authMethod,
+    'auth.success': authSuccess
+  })
+
+  HostingMetrics.authTokenDuration.record(context.duration(), {
+    'auth.method': authMethod
+  })
+}
+
+interface AuthGetAccessTokenDecoratorContext {
+  args: Parameters<MsalTokenProvider['getAccessToken']>
+  data?: AuthTokenBase
+  result?: ReturnType<MsalTokenProvider['getAccessToken']>
+  duration: () => number
+}
+
+export const AuthGetAccessToken = createTracedDecorator<AuthGetAccessTokenDecoratorContext>({
+  spanName: SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getAccessToken.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [, scope] = context.args
+    span.setAttribute('auth.scopes', [fallback(scope)])
+    span.setAttribute('auth.method', fallback(context.data?.method))
+    recordAuthMetrics(context)
+  }
+})
+
+interface AuthAcquireTokenOnBehalfOfDecoratorData extends AuthTokenBase {
+  scopes?: string[]
+}
+
+interface AuthAcquireTokenOnBehalfOfDecoratorContext {
+  args: Parameters<MsalTokenProvider['acquireTokenOnBehalfOf']>
+  data?: AuthAcquireTokenOnBehalfOfDecoratorData
+  result?: ReturnType<MsalTokenProvider['acquireTokenOnBehalfOf']>
+  duration: () => number
+}
+
+export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<AuthAcquireTokenOnBehalfOfDecoratorContext>({
+  spanName: SpanNames.AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('acquireTokenOnBehalfOf.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    span.setAttribute('auth.scopes', context.data?.scopes ?? [])
+    recordAuthMetrics(context)
+  }
+})
+
+interface AuthGetAgenticInstanceTokenDecoratorContext {
+  args: Parameters<MsalTokenProvider['getAgenticInstanceToken']>
+  data?: AuthTokenBase
+  result?: ReturnType<MsalTokenProvider['getAgenticInstanceToken']>
+  duration: () => number
+}
+
+export const AuthGetAgenticInstanceToken = createTracedDecorator<AuthGetAgenticInstanceTokenDecoratorContext>({
+  spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getAgenticInstanceToken.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [, agentAppInstanceId] = context.args
+    span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
+    recordAuthMetrics(context)
+  }
+})
+
+interface AuthGetAgenticUserTokenDecoratorContext {
+  args: Parameters<MsalTokenProvider['getAgenticUserToken']>
+  data?: AuthTokenBase
+  result?: ReturnType<MsalTokenProvider['getAgenticUserToken']>
+  duration: () => number
+}
+
+export const AuthGetAgenticUserToken = createTracedDecorator<AuthGetAgenticUserTokenDecoratorContext>({
+  spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_USER_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('getAgenticUserToken.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [, agentAppInstanceId, agentUserId, scopes] = context.args
+    span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
+    span.setAttribute('agentic.user_id', fallback(agentUserId))
+    span.setAttribute('auth.scopes', scopes ?? [])
+    recordAuthMetrics(context)
   }
 })
 

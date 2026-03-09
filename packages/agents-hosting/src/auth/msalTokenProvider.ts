@@ -11,6 +11,7 @@ import { debug } from '@microsoft/agents-activity/logger'
 import { v4 } from 'uuid'
 import { MemoryCache } from './MemoryCache'
 import jwt from 'jsonwebtoken'
+import * as Traces from '../observability/decorators'
 
 import fs from 'fs'
 import crypto from 'crypto'
@@ -44,6 +45,7 @@ export class MsalTokenProvider implements AuthProvider {
    */
   public async getAccessToken (authConfig: AuthConfiguration, scope: string): Promise<string>
 
+  @Traces.AuthGetAccessToken
   public async getAccessToken (authConfigOrScope: AuthConfiguration | string, scope?: string): Promise<string> {
     let authConfig: AuthConfiguration
     let actualScope: string
@@ -61,36 +63,54 @@ export class MsalTokenProvider implements AuthProvider {
       actualScope = scope as string
     }
 
-    if (!authConfig.clientId && process.env.NODE_ENV !== 'production') {
-      return ''
-    }
-    let token
-    if (authConfig.WIDAssertionFile !== undefined) {
-      token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
-    } else if (authConfig.FICClientId !== undefined) {
-      token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
-    } else if (authConfig.clientSecret !== undefined) {
-      token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
-    } else if (authConfig.certPemFile !== undefined &&
-      authConfig.certKeyFile !== undefined) {
-      token = await this.acquireTokenWithCertificate(authConfig, actualScope)
-    } else if (authConfig.clientSecret === undefined &&
-      authConfig.certPemFile === undefined &&
-      authConfig.certKeyFile === undefined) {
-      token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
-    } else {
-      throw new Error('Invalid authConfig. ')
-    }
-    if (token === undefined) {
-      throw new Error('Failed to acquire token')
-    }
+    let authMethod = 'unknown'
+    let authSuccess = false
 
-    return token
+    try {
+      if (!authConfig.clientId && process.env.NODE_ENV !== 'production') {
+        authSuccess = true
+        return ''
+      }
+      let token
+      if (authConfig.WIDAssertionFile !== undefined) {
+        authMethod = 'wid'
+        token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
+      } else if (authConfig.FICClientId !== undefined) {
+        authMethod = 'fic'
+        token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
+      } else if (authConfig.clientSecret !== undefined) {
+        authMethod = 'secret'
+        token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
+      } else if (authConfig.certPemFile !== undefined &&
+        authConfig.certKeyFile !== undefined) {
+        authMethod = 'certificate'
+        token = await this.acquireTokenWithCertificate(authConfig, actualScope)
+      } else if (authConfig.clientSecret === undefined &&
+        authConfig.certPemFile === undefined &&
+        authConfig.certKeyFile === undefined) {
+        authMethod = 'managed_identity'
+        token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
+      } else {
+        throw new Error('Invalid authConfig. ')
+      }
+      if (token === undefined) {
+        throw new Error('Failed to acquire token')
+      }
+
+      authSuccess = true
+      return token
+    } finally {
+      Traces.AuthGetAccessToken.share({
+        method: authMethod,
+        success: authSuccess
+      })
+    }
   }
 
   public async acquireTokenOnBehalfOf (scopes: string[], oboAssertion: string): Promise<string>
   public async acquireTokenOnBehalfOf (authConfig: AuthConfiguration, scopes: string[], oboAssertion: string): Promise<string>
 
+  @Traces.AuthAcquireTokenOnBehalfOf
   public async acquireTokenOnBehalfOf (
     authConfigOrScopes: AuthConfiguration | string[],
     scopesOrOboAssertion?: string[] | string,
@@ -115,49 +135,71 @@ export class MsalTokenProvider implements AuthProvider {
       actualOboAssertion = oboAssertion!
     }
 
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId: authConfig.clientId as string,
-        authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
-        clientSecret: authConfig.clientSecret
-      },
-      system: this.sysOptions
-    })
-    const token = await cca.acquireTokenOnBehalfOf({
-      oboAssertion: actualOboAssertion,
-      scopes: actualScopes
-    })
-    if (!token?.accessToken) {
-      throw new Error('Failed to acquire token on behalf of user')
+    let authSuccess = false
+    try {
+      const cca = new ConfidentialClientApplication({
+        auth: {
+          clientId: authConfig.clientId as string,
+          authority: `${authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
+          clientSecret: authConfig.clientSecret
+        },
+        system: this.sysOptions
+      })
+      const token = await cca.acquireTokenOnBehalfOf({
+        oboAssertion: actualOboAssertion,
+        scopes: actualScopes
+      })
+      if (!token?.accessToken) {
+        throw new Error('Failed to acquire token on behalf of user')
+      }
+
+      authSuccess = true
+      return token.accessToken
+    } finally {
+      Traces.AuthAcquireTokenOnBehalfOf.share({
+        method: 'obo',
+        success: authSuccess,
+        scopes: actualScopes,
+      })
     }
-    return token.accessToken
   }
 
+  @Traces.AuthGetAgenticInstanceToken
   public async getAgenticInstanceToken (tenantId: string, agentAppInstanceId: string): Promise<string> {
     logger.debug('Getting agentic instance token')
     if (!this.connectionSettings) {
       throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
     }
-    const appToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId: agentAppInstanceId,
-        clientAssertion: appToken,
-        authority: this.resolveAuthority(tenantId),
-      },
-      system: this.sysOptions
-    })
 
-    const token = await cca.acquireTokenByClientCredential({
-      scopes: ['api://AzureAdTokenExchange/.default'],
-      correlationId: v4()
-    })
+    let authSuccess = false
+    try {
+      const appToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
+      const cca = new ConfidentialClientApplication({
+        auth: {
+          clientId: agentAppInstanceId,
+          clientAssertion: appToken,
+          authority: this.resolveAuthority(tenantId),
+        },
+        system: this.sysOptions
+      })
 
-    if (!token?.accessToken) {
-      throw new Error(`Failed to acquire instance token for agent instance: ${agentAppInstanceId}`)
+      const token = await cca.acquireTokenByClientCredential({
+        scopes: ['api://AzureAdTokenExchange/.default'],
+        correlationId: v4()
+      })
+
+      if (!token?.accessToken) {
+        throw new Error(`Failed to acquire instance token for agent instance: ${agentAppInstanceId}`)
+      }
+
+      authSuccess = true
+      return token.accessToken
+    } finally {
+      Traces.AuthGetAgenticInstanceToken.share({
+        method: 'agentic_instance',
+        success: authSuccess,
+      })
     }
-
-    return token.accessToken
   }
 
   /**
@@ -258,22 +300,32 @@ export class MsalTokenProvider implements AuthProvider {
     return token.data.access_token
   }
 
+  @Traces.AuthGetAgenticUserToken
   public async getAgenticUserToken (tenantId: string, agentAppInstanceId: string, agenticUserId: string, scopes: string[]): Promise<string> {
     logger.debug('Getting agentic user token')
-    const agentToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
-    const instanceToken = await this.getAgenticInstanceToken(tenantId, agentAppInstanceId)
+    let authSuccess = false
+    try {
+      const agentToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
+      const instanceToken = await this.getAgenticInstanceToken(tenantId, agentAppInstanceId)
 
-    const token = await this.acquireTokenForAgenticScenarios(tenantId, agentAppInstanceId, agentToken, scopes, {
-      user_id: agenticUserId,
-      user_federated_identity_credential: instanceToken,
-      grant_type: 'user_fic',
-    })
+      const token = await this.acquireTokenForAgenticScenarios(tenantId, agentAppInstanceId, agentToken, scopes, {
+        user_id: agenticUserId,
+        user_federated_identity_credential: instanceToken,
+        grant_type: 'user_fic',
+      })
 
-    if (!token) {
-      throw new Error(`Failed to acquire instance token for user token: ${agentAppInstanceId}`)
+      if (!token) {
+        throw new Error(`Failed to acquire instance token for user token: ${agentAppInstanceId}`)
+      }
+
+      authSuccess = true
+      return token
+    } finally {
+      Traces.AuthGetAgenticUserToken.share({
+        method: 'agentic_user',
+        success: authSuccess,
+      })
     }
-
-    return token
   }
 
   public async getAgenticApplicationToken (tenantId: string, agentAppInstanceId: string): Promise<string> {

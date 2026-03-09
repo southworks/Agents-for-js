@@ -54,6 +54,12 @@ export const SpanNames = {
   // AgentClient
   AGENT_CLIENT_POST_ACTIVITY: 'agents.agentClient.postActivity',
 
+  // Authentication
+  AUTHENTICATION_GET_ACCESS_TOKEN: 'agents.authentication.getAccessToken',
+  AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF: 'agents.authentication.acquireTokenOnBehalfOf',
+  AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN: 'agents.authentication.getAgenticInstanceToken',
+  AUTHENTICATION_GET_AGENTIC_USER_TOKEN: 'agents.authentication.getAgenticUserToken',
+
   // TurnContext
   TURN_SEND_ACTIVITY: 'agents.turn.sendActivity',
   TURN_SEND_ACTIVITIES: 'agents.turn.sendActivities',
@@ -113,5 +119,9 @@ export const MetricNames = {
   TURN_DURATION: 'agents.turn.duration',
 
   // Storage metrics
-  STORAGE_OPERATION_DURATION: 'agents.storage.operation.duration'
+  STORAGE_OPERATION_DURATION: 'agents.storage.operation.duration',
+
+  // Authentication metrics
+  AUTH_TOKEN_REQUESTS: 'agents.auth.token_requests',
+  AUTH_TOKEN_DURATION: 'agents.auth.token.duration'
 } as const
