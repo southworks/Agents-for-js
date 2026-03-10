@@ -48,8 +48,14 @@ export const SpanNames = {
 
   // CopilotStudio Client
   COPILOT_CONNECT: 'agents.copilot.connect',
+  COPILOT_START_CONVERSATION: 'agents.copilot.startConversation',
   COPILOT_SEND_ACTIVITY: 'agents.copilot.sendActivity',
   COPILOT_RECEIVE_ACTIVITY: 'agents.copilot.receiveActivity',
+  COPILOT_ASK_QUESTION: 'agents.copilot.askQuestion',
+  COPILOT_POST_REQUEST: 'agents.copilot.postRequest',
+  COPILOT_WEBCHAT_POST: 'agents.copilot.webchat.post',
+  COPILOT_WEBCHAT_START: 'agents.copilot.webchat.start',
+  COPILOT_CREATE_CONNECTION: 'agents.copilot.webchat.createConnection',
 
   // AgentClient
   AGENT_CLIENT_POST_ACTIVITY: 'agents.agentClient.postActivity',
@@ -123,5 +129,15 @@ export const MetricNames = {
 
   // Authentication metrics
   AUTH_TOKEN_REQUESTS: 'agents.auth.token_requests',
-  AUTH_TOKEN_DURATION: 'agents.auth.token.duration'
+  AUTH_TOKEN_DURATION: 'agents.auth.token.duration',
+
+  // CopilotStudio Client metrics
+  CSC_ACTIVITIES_RECEIVED: 'agents.copilotClient.activities.received',
+  CSC_ACTIVITIES_SENT: 'agents.copilotClient.activities.sent',
+  CSC_CONVERSATIONS_STARTED: 'agents.copilotClient.conversations.started',
+  CSC_WEBCHAT_CONNECTIONS: 'agents.copilotClient.webchat.connections',
+  CSC_REQUESTS_TOTAL: 'agents.copilotClient.requests.total',
+  CSC_REQUESTS_ERRORS: 'agents.copilotClient.requests.errors',
+  CSC_STREAM_DURATION: 'agents.copilotClient.stream.duration',
+  CSC_REQUEST_DURATION: 'agents.copilotClient.request.duration',
 } as const

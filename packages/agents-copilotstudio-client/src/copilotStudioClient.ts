@@ -10,6 +10,7 @@ import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-
 import { ExecuteTurnRequest } from './executeTurnRequest'
 import { debug } from '@microsoft/agents-activity/logger'
 import { version } from '../package.json'
+import * as Traces from './observability/decorators'
 import os from 'os'
 
 const logger = debug('copilot-studio:client')
@@ -56,6 +57,7 @@ export class CopilotStudioClient {
    * @param method Optional. The HTTP method (default: POST).
    * @returns An async generator yielding the Agent's Activities.
    */
+  @Traces.tracePostRequestAsync
   private async * postRequestAsync (url: string, body?: any, method: string = 'POST'): AsyncGenerator<Activity> {
     logger.debug(`>>> SEND TO ${url}`)
 
@@ -187,6 +189,7 @@ export class CopilotStudioClient {
    * @param emitStartConversationEvent Whether to emit a start conversation event. Defaults to true.
    * @returns An async generator yielding the Agent's Activities.
    */
+  @Traces.traceStartConversation
   public async * startConversationStreaming (emitStartConversationEvent: boolean = true): AsyncGenerator<Activity> {
     const uriStart: string = getCopilotStudioConnectionUrl(this.settings)
     const body = { emitStartConversationEvent }
@@ -202,6 +205,7 @@ export class CopilotStudioClient {
    * @param conversationId The ID of the conversation. Defaults to the current conversation ID.
    * @returns An async generator yielding the Agent's Activities.
    */
+  @Traces.traceSendActivityStreaming
   public async * sendActivityStreaming (activity: Activity, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
     const localConversationId = activity.conversation?.id ?? conversationId
     const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)

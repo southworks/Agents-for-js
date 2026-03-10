@@ -10,6 +10,7 @@ import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
 import { debug } from '@microsoft/agents-activity/logger'
+import * as Traces from './observability/decorators'
 
 const logger = debug('copilot-studio:webchat')
 
@@ -219,6 +220,7 @@ export class CopilotStudioWebChat {
    * }, document.getElementById('webchat'));
    * ```
    */
+  @Traces.traceCreateConnection
   static createConnection (
     client: CopilotStudioClient,
     settings?: CopilotStudioWebChatSettings
@@ -249,6 +251,10 @@ export class CopilotStudioWebChat {
           }
 
           notifyActivity(activity)
+          Traces.traceCreateConnection.addEvent('Activity received from Copilot Studio', {
+            'activity.type': activity.type,
+            'activity.conversation.id': activity.conversation?.id
+          })
         }
         // If no activities received from bot, we should still acknowledge.
         await handleAcknowledgementOnce()
@@ -304,6 +310,10 @@ export class CopilotStudioWebChat {
             })
 
             notifyActivity(newActivity)
+            Traces.traceCreateConnection.addEvent('Activity sent to WebChat', {
+              'activity.type': newActivity.type,
+              'activity.conversation.id': newActivity.conversation?.id
+            })
             notifyTyping()
 
             // Notify WebChat immediately that the message was sent
@@ -312,6 +322,10 @@ export class CopilotStudioWebChat {
             // Stream the agent's response, but don't block the UI
             for await (const responseActivity of client.sendActivityStreaming(newActivity)) {
               notifyActivity(responseActivity)
+              Traces.traceCreateConnection.addEvent('Activity received from Copilot Studio', {
+                'activity.type': responseActivity.type,
+                'activity.conversation.id': responseActivity.conversation?.id
+              })
               logger.info('<-- Activity received correctly from Copilot Studio.')
             }
 

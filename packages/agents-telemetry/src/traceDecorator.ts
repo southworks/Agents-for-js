@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { trace, SpanStatusCode, type Span, type SpanOptions, context as otelContext, createContextKey } from '@opentelemetry/api'
+import { trace, SpanStatusCode, type Span, type SpanOptions, type Attributes, context as otelContext, createContextKey } from '@opentelemetry/api'
 
 // Initialize context manager asynchronously (no top-level await for CJS compatibility)
 setupContextManager().catch(() => { /* silently ignore */ })
@@ -29,6 +29,8 @@ interface TracedMethodConfig<TArgs extends DecoratorContextShape> {
   onEnd?: (span: Span, context: TArgs) => void
   // Optional callback to create child spans within the method execution
   onChildSpan?: (spanName: string, span: Span, context: TArgs) => void
+  // Called when addEvent is invoked from within the decorated method
+  onEvent?: (span: Span, eventName: string, eventData: unknown, context: TArgs) => void
 }
 
 const CONTEXT_KEY = createContextKey('agents-telemetry:createTracedDecorator-context')
@@ -41,6 +43,7 @@ type DecoratorContextShape = {
 
 type InternalContextShape<T extends DecoratorContextShape> = T & {
   onChildSpan?: (spanName: string, span: Span, context: T) => void
+  onEvent?: (span: Span, eventName: string, eventData: unknown, context: T) => void
 }
 
 /**
@@ -85,7 +88,8 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
           args,
           data: undefined,
           result: undefined,
-          onChildSpan: config.onChildSpan
+          onChildSpan: config.onChildSpan,
+          onEvent: config.onEvent
         } as InternalContextShape<TContext>
         const ctx = otelContext.active().setValue(CONTEXT_KEY, sharedContext)
 
@@ -168,6 +172,18 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
         span.end()
       }
     })
+  }
+
+  /**
+   * Adds an event to the current active span. If no span is active, this is a no-op.
+   * Events are used to represent discrete occurrences during the span's lifetime.
+   *
+   * @param name - The name of the event to add
+   * @param attributes - Optional attributes to attach to the event
+   */
+  decorator.addEvent = (name: string, attributes?: Attributes): void => {
+    const activeSpan = trace.getActiveSpan()
+    activeSpan?.addEvent(name, attributes)
   }
 
   return decorator
