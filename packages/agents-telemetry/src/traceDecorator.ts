@@ -2,10 +2,9 @@
 // Licensed under the MIT License.
 
 import { trace, SpanStatusCode, type Span, type SpanOptions, context as otelContext, createContextKey } from '@opentelemetry/api'
-import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks'
 
-// TODO: test if this can be overriden from sample
-otelContext.setGlobalContextManager(new AsyncLocalStorageContextManager().enable())
+// Initialize context manager asynchronously (no top-level await for CJS compatibility)
+setupContextManager().catch(() => { /* silently ignore */ })
 
 const tracer = trace.getTracer('my-app')
 
@@ -42,6 +41,31 @@ type DecoratorContextShape = {
 
 type InternalContextShape<T extends DecoratorContextShape> = T & {
   onChildSpan?: (spanName: string, span: Span, context: T) => void
+}
+
+/**
+ * Sets up the OpenTelemetry context manager appropriate for the current runtime environment.
+ *
+ * - **Node.js**: Uses `AsyncLocalStorageContextManager` from `@opentelemetry/context-async-hooks`
+ * - **Browser**: Uses the default `StackContextManager` (no additional setup needed)
+ *
+ * This function is opt-in and should be called once at application startup if you want
+ * the library to handle context manager configuration. Alternatively, applications can
+ * configure their own context manager directly.
+ *
+ * @returns Promise that resolves to `true` if a context manager was set up, `false` otherwise
+ */
+export async function setupContextManager (): Promise<void> {
+  // Check if we're in Node.js
+  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+    try {
+      const { AsyncLocalStorageContextManager } = await import('@opentelemetry/context-async-hooks')
+      otelContext.setGlobalContextManager(new AsyncLocalStorageContextManager().enable())
+    } catch {
+      // Fallback: use default StackContextManager (no-op)
+    }
+  }
+  // Browser: default StackContextManager works automatically
 }
 
 export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {

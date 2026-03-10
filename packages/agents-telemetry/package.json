@@ -20,10 +20,14 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "peerDependencies": {
-    "@opentelemetry/api": "^1.9.0"
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/context-async-hooks": "^2.0.0"
   },
   "peerDependenciesMeta": {
     "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/context-async-hooks": {
       "optional": true
     }
   },
@@ -31,6 +35,9 @@
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-trace-base": "^2.6.0",
     "@opentelemetry/sdk-trace-node": "^2.6.0"
+  },
+  "scripts": {
+    "build:browser": "esbuild --platform=browser --target=es2019 --format=esm --bundle --sourcemap --minify --external:@opentelemetry/* --outfile=dist/src/browser.mjs src/index.ts"
   },
   "license": "MIT",
   "files": [
