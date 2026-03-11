@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { trace, SpanStatusCode, type Span, type SpanOptions, context as otelContext, createContextKey } from '@opentelemetry/api'
+import { trace, SpanStatusCode, type Span, type SpanOptions, context as otelContext, createContextKey, propagation } from '@opentelemetry/api'
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks'
 
 // TODO: test if this can be overriden from sample
@@ -43,6 +43,21 @@ type DecoratorContextShape = {
 type InternalContextShape<T extends DecoratorContextShape> = T & {
   onChildSpan?: (spanName: string, span: Span, context: T) => void
 }
+
+// const spanContext = {} as any
+// tracer.startActiveSpan('test.a', {}, (span) => {
+//   spanContext = span.spanContext()
+//   span.end()
+// })
+
+// setTimeout(() => {
+//   tracer.startActiveSpan('test.b', {}, (span) => {
+//     console.log('In span test.a', spanContext)
+//     console.log('In span test.b', span.spanContext())
+//     span.addLink({ context: spanContext })
+//     span.end()
+//   })
+// }, 1000)
 
 export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {
   const decorator = function <T extends (...args: TContext['args']) => TContext['result']>(

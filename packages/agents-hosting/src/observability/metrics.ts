@@ -54,6 +54,11 @@ export class HostingMetrics {
     description: 'Total number of token acquisition attempts'
   })
 
+  public static userTokenClientRequestsCounter = this.meter.createCounter(MetricNames.USER_TOKEN_CLIENT_REQUESTS, {
+    unit: 'request',
+    description: 'Total number of user token client HTTP requests'
+  })
+
   // Duration Histograms
   public static adapterProcessDuration = this.meter.createHistogram(MetricNames.ADAPTER_PROCESS_DURATION, {
     unit: 'ms',
@@ -83,5 +88,10 @@ export class HostingMetrics {
   public static authTokenDuration = this.meter.createHistogram(MetricNames.AUTH_TOKEN_DURATION, {
     unit: 'ms',
     description: 'Duration of token acquisition latency in milliseconds'
+  })
+
+  public static userTokenClientRequestDuration = this.meter.createHistogram(MetricNames.USER_TOKEN_CLIENT_REQUEST_DURATION, {
+    unit: 'ms',
+    description: 'Duration of user token client HTTP requests in milliseconds'
   })
 }

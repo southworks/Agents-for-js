@@ -60,6 +60,22 @@ export const SpanNames = {
   AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN: 'agents.authentication.getAgenticInstanceToken',
   AUTHENTICATION_GET_AGENTIC_USER_TOKEN: 'agents.authentication.getAgenticUserToken',
 
+  // Authorization
+  AUTHORIZATION_MANAGER_PROCESS: 'agents.authorization.manager.process',
+  AUTHORIZATION_AGENTIC_TOKEN: 'agents.authorization.agentic.token',
+  AUTHORIZATION_AZURE_BOT_TOKEN: 'agents.authorization.azureBot.token',
+  AUTHORIZATION_AZURE_BOT_SIGNIN: 'agents.authorization.azureBot.signin',
+  AUTHORIZATION_AZURE_BOT_SIGNOUT: 'agents.authorization.azureBot.signout',
+
+  // UserTokenClient
+  USER_TOKEN_CLIENT_GET_USER_TOKEN: 'agents.userTokenClient.getUserToken',
+  USER_TOKEN_CLIENT_SIGN_OUT: 'agents.userTokenClient.signOut',
+  USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE: 'agents.userTokenClient.getSignInResource',
+  USER_TOKEN_CLIENT_EXCHANGE_TOKEN: 'agents.userTokenClient.exchangeToken',
+  USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGNIN_RESOURCE: 'agents.userTokenClient.getTokenOrSignInResource',
+  USER_TOKEN_CLIENT_GET_TOKEN_STATUS: 'agents.userTokenClient.getTokenStatus',
+  USER_TOKEN_CLIENT_GET_AAD_TOKENS: 'agents.userTokenClient.getAadTokens',
+
   // TurnContext
   TURN_SEND_ACTIVITY: 'agents.turn.sendActivity',
   TURN_SEND_ACTIVITIES: 'agents.turn.sendActivities',
@@ -123,5 +139,13 @@ export const MetricNames = {
 
   // Authentication metrics
   AUTH_TOKEN_REQUESTS: 'agents.auth.token_requests',
-  AUTH_TOKEN_DURATION: 'agents.auth.token.duration'
+  AUTH_TOKEN_DURATION: 'agents.auth.token.duration',
+
+  // Authorization metrics
+  AUTHORIZATION_REQUESTS: 'agents.authorization.requests',
+  AUTHORIZATION_DURATION: 'agents.authorization.duration',
+
+  // UserTokenClient metrics
+  USER_TOKEN_CLIENT_REQUESTS: 'agents.userTokenClient.requests',
+  USER_TOKEN_CLIENT_REQUEST_DURATION: 'agents.userTokenClient.request.duration'
 } as const

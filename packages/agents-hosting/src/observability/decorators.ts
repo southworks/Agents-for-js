@@ -10,6 +10,9 @@ import { AgentApplication } from '../app/agentApplication'
 import { ConnectorClient } from '../connector-client/connectorClient'
 import type { AgentClient } from '../agent-client/agentClient'
 import type { MsalTokenProvider } from '../auth/msalTokenProvider'
+import type { AgenticAuthorization } from '../app/auth/handlers/agenticAuthorization'
+import type { AzureBotAuthorization } from '../app/auth/handlers/azureBotAuthorization'
+import type { UserTokenClient } from '../oauth'
 import { HostingMetrics } from './metrics'
 
 const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
@@ -712,6 +715,323 @@ export const AuthGetAgenticUserToken = createTracedDecorator<AuthGetAgenticUserT
     span.setAttribute('agentic.user_id', fallback(agentUserId))
     span.setAttribute('auth.scopes', scopes ?? [])
     recordAuthMetrics(context)
+  }
+})
+
+/**
+ * Authorization method decorators
+ */
+
+interface AuthorizationAgenticTokenDecoratorContext {
+  args: Parameters<AgenticAuthorization['token']>
+  data?: Partial<{ handlerId: string, connection: string, scopes: string[] }>
+  result?: ReturnType<AgenticAuthorization['token']>
+  duration: () => number
+}
+
+export const AuthorizationAgenticToken = createTracedDecorator<AuthorizationAgenticTokenDecoratorContext>({
+  spanName: SpanNames.AUTHORIZATION_AGENTIC_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('agenticAuthorization.token.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    span.setAttribute('handler.id', fallback(context.data?.handlerId))
+    span.setAttribute('connection.name', fallback(context.data?.connection))
+    span.setAttribute('scopes', context.data?.scopes ?? [])
+  }
+})
+
+interface AuthorizationAzureBotTokenDecoratorData {
+  handlerId: string
+  connection?: string
+  scopes?: string[]
+}
+
+interface AuthorizationAzureBotTokenDecoratorContext {
+  args: Parameters<AzureBotAuthorization['token']>
+  result?: ReturnType<AzureBotAuthorization['token']>
+  data: AuthorizationAzureBotTokenDecoratorData
+  duration: () => number
+}
+
+export const AuthorizationAzureBotToken = createTracedDecorator<AuthorizationAzureBotTokenDecoratorContext>({
+  spanName: SpanNames.AUTHORIZATION_AZURE_BOT_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('azureBotAuthorization.token.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    span.setAttribute('handler.id', fallback(context.data?.handlerId))
+    span.setAttribute('connection.name', fallback(context.data?.connection))
+    if (context.data?.scopes) {
+      span.setAttribute('flow', 'obo')
+      span.setAttribute('scopes', context.data.scopes ?? [])
+    }
+  }
+})
+
+interface AuthorizationAzureBotSigninDecoratorContext {
+  args: Parameters<AzureBotAuthorization['signin']>
+  data?: Partial<{ handlerId: string, connection: string, reason: string }>
+  result?: ReturnType<AzureBotAuthorization['signin']>
+  duration: () => number
+}
+
+export const AuthorizationAzureBotSignin = createTracedDecorator<AuthorizationAzureBotSigninDecoratorContext>({
+  spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNIN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('azureBotAuthorization.signin.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const status = context.result as Awaited<typeof context.result>
+    span.setAttribute('handler.id', fallback(context.data?.handlerId))
+    span.setAttribute('handler.status', fallback(status))
+    span.setAttribute('handler.status.reason', fallback(context.data?.reason))
+    span.setAttribute('connection.name', fallback(context.data?.connection))
+  }
+})
+
+interface AuthorizationAzureBotSignoutDecoratorContext {
+  args: Parameters<AzureBotAuthorization['signout']>
+  data?: Partial<{ handlerId: string, connection: string, channel: string }>
+  result?: ReturnType<AzureBotAuthorization['signout']>
+  duration: () => number
+}
+
+export const AuthorizationAzureBotSignout = createTracedDecorator<AuthorizationAzureBotSignoutDecoratorContext>({
+  spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNOUT,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('azureBotAuthorization.signout.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    span.setAttribute('handler.id', fallback(context.data?.handlerId))
+    span.setAttribute('connection.name', fallback(context.data?.connection))
+    span.setAttribute('channel.id', fallback(context.data?.channel))
+  }
+})
+
+function recordUserTokenClientMetrics (operation: string, context: Pick<UserTokenClientGetUserTokenDecoratorContext, 'data' | 'duration'>): void {
+  const httpMethod = fallback(context.data?.config?.method?.toUpperCase())
+  const httpStatusCode = context.data?.status ?? -1
+
+  HostingMetrics.userTokenClientRequestsCounter.add(1, {
+    operation: fallback(operation),
+    'http.method': httpMethod,
+    'http.status_code': httpStatusCode
+  })
+
+  HostingMetrics.userTokenClientRequestDuration.record(context.duration(), {
+    operation: fallback(operation),
+    'http.status_code': httpStatusCode
+  })
+}
+
+interface UserTokenClientGetUserTokenDecoratorContext {
+  args: Parameters<UserTokenClient['getUserToken']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['getUserToken']>
+  duration: () => number
+}
+
+export const UserTokenClientGetUserToken = createTracedDecorator<UserTokenClientGetUserTokenDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_GET_USER_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.getUserToken.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [connectionName, channelId, userId] = context.args
+    span.setAttribute('auth.connection.name', fallback(connectionName))
+    span.setAttribute('agents.activity.channel_id', fallback(channelId))
+    span.setAttribute('user.id', fallback(userId))
+    recordUserTokenClientMetrics('getUserToken', context)
+  }
+})
+
+interface UserTokenClientSignOutDecoratorContext {
+  args: Parameters<UserTokenClient['signOut']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['signOut']>
+  duration: () => number
+}
+
+export const UserTokenClientSignOut = createTracedDecorator<UserTokenClientSignOutDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_SIGN_OUT,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.signOut.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [userId, connectionName, channelId] = context.args
+    span.setAttribute('user.id', fallback(userId))
+    span.setAttribute('auth.connection.name', fallback(connectionName))
+    span.setAttribute('agents.activity.channel_id', fallback(channelId))
+    recordUserTokenClientMetrics('signOut', context)
+  }
+})
+
+interface UserTokenClientGetSignInResourceDecoratorContext {
+  args: Parameters<UserTokenClient['getSignInResource']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['getSignInResource']>
+  duration: () => number
+}
+
+export const UserTokenClientGetSignInResource = createTracedDecorator<UserTokenClientGetSignInResourceDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.getSignInResource.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [, connectionName] = context.args
+    span.setAttribute('auth.connection.name', fallback(connectionName))
+    recordUserTokenClientMetrics('getSignInResource', context)
+  }
+})
+
+interface UserTokenClientExchangeTokenDecoratorContext {
+  args: Parameters<UserTokenClient['exchangeTokenAsync']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['exchangeTokenAsync']>
+  duration: () => number
+}
+
+export const UserTokenClientExchangeToken = createTracedDecorator<UserTokenClientExchangeTokenDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_EXCHANGE_TOKEN,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.exchangeToken.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [userId, connectionName, channelId] = context.args
+    span.setAttribute('user.id', fallback(userId))
+    span.setAttribute('auth.connection.name', fallback(connectionName))
+    span.setAttribute('agents.activity.channel_id', fallback(channelId))
+    recordUserTokenClientMetrics('exchangeToken', context)
+  }
+})
+
+interface UserTokenClientGetTokenOrSignInResourceDecoratorContext {
+  args: Parameters<UserTokenClient['getTokenOrSignInResource']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['getTokenOrSignInResource']>
+  duration: () => number
+}
+
+export const UserTokenClientGetTokenOrSignInResource = createTracedDecorator<UserTokenClientGetTokenOrSignInResourceDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGNIN_RESOURCE,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.getTokenOrSignInResource.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [userId, connectionName, channelId] = context.args
+    span.setAttribute('user.id', fallback(userId))
+    span.setAttribute('auth.connection.name', fallback(connectionName))
+    span.setAttribute('agents.activity.channel_id', fallback(channelId))
+    recordUserTokenClientMetrics('getTokenOrSignInResource', context)
+  }
+})
+
+interface UserTokenClientGetTokenStatusDecoratorContext {
+  args: Parameters<UserTokenClient['getTokenStatus']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['getTokenStatus']>
+  duration: () => number
+}
+
+export const UserTokenClientGetTokenStatus = createTracedDecorator<UserTokenClientGetTokenStatusDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_STATUS,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.getTokenStatus.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [userId, channelId] = context.args
+    span.setAttribute('user.id', fallback(userId))
+    span.setAttribute('agents.activity.channel_id', fallback(channelId))
+    recordUserTokenClientMetrics('getTokenStatus', context)
+  }
+})
+
+interface UserTokenClientGetAadTokensDecoratorContext {
+  args: Parameters<UserTokenClient['getAadTokens']>
+  data?: AxiosResponse
+  result?: ReturnType<UserTokenClient['getAadTokens']>
+  duration: () => number
+}
+
+export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClientGetAadTokensDecoratorContext>({
+  spanName: SpanNames.USER_TOKEN_CLIENT_GET_AAD_TOKENS,
+  onStart (span, context) {
+    const start = performance.now()
+    context.duration = () => performance.now() - start
+  },
+  onError (span, error) {
+    span.addEvent('userTokenClient.getAadTokens.failed', {
+      'error.type': fallback(error?.constructor?.name)
+    })
+  },
+  onEnd (span, context) {
+    const [userId, connectionName, channelId] = context.args
+    span.setAttribute('user.id', fallback(userId))
+    span.setAttribute('auth.connection.name', fallback(connectionName))
+    span.setAttribute('agents.activity.channel_id', fallback(channelId))
+    recordUserTokenClientMetrics('getAadTokens', context)
   }
 })
 

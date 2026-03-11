@@ -8,6 +8,7 @@ import { TurnContext } from '../../../turnContext'
 import { AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus, AuthorizationHandlerTokenOptions } from '../types'
 import { TokenResponse } from '../../../oauth'
 import { AuthProvider } from '../../../auth'
+import * as Traces from '../../../observability/decorators'
 
 const logger = debug('agents:authorization:agentic')
 
@@ -97,16 +98,15 @@ export class AgenticAuthorization implements AuthorizationHandler {
    * @inheritdoc
    */
   async token (context: TurnContext, options?: AuthorizationHandlerTokenOptions): Promise<TokenResponse> {
-    try {
-      const scopes = options?.scopes || this._options.scopes!
+    let connection: AuthProvider | undefined
+    const scopes = options?.scopes || this._options.scopes!
 
+    try {
       const tokenResponse = this.getContext(context, scopes)
       if (tokenResponse.token) {
         logger.debug(this.prefix('Using cached Agentic user token'))
         return tokenResponse
       }
-
-      let connection: AuthProvider
 
       if (this._options.altBlueprintConnectionName?.trim()) {
         connection = this.settings.connections.getConnection(this._options.altBlueprintConnectionName)
@@ -129,6 +129,12 @@ export class AgenticAuthorization implements AuthorizationHandler {
       logger.error(this.prefix(reason), error)
       this._onFailure?.(context, `${reason}: ${(error as Error).message}`)
       return { token: undefined }
+    } finally {
+      Traces.AuthorizationAgenticToken.share({
+        handlerId: this.id,
+        connection: connection?.connectionSettings?.connectionName ?? this._options.altBlueprintConnectionName,
+        scopes
+      })
     }
   }
 
