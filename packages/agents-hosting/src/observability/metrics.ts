@@ -1,12 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { MetricNames } from '@microsoft/agents-telemetry'
-import { metrics, trace } from '@opentelemetry/api'
+import { otel, MetricNames } from '@microsoft/agents-telemetry'
+import { name, version } from '../../package.json'
 
 export class HostingMetrics {
-  public static tracer = trace.getTracer('OTelAgent', '1.0.0')
-  private static meter = metrics.getMeter('OTelAgent', '1.0.0')
+  private static meter = otel.metrics.getMeter(name, version)
 
   // Counters
   public static activitiesReceivedCounter = this.meter.createCounter(MetricNames.ACTIVITIES_RECEIVED, {
