@@ -10,7 +10,7 @@ import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
 import { debug } from '@microsoft/agents-activity/logger'
-import * as Traces from './observability/decorators'
+import { startManagedSpan, SpanNames, type ManagedSpan } from '@microsoft/agents-telemetry'
 
 const logger = debug('copilot-studio:webchat')
 
@@ -220,7 +220,6 @@ export class CopilotStudioWebChat {
    * }, document.getElementById('webchat'));
    * ```
    */
-  @Traces.traceCreateConnection
   static createConnection (
     client: CopilotStudioClient,
     settings?: CopilotStudioWebChatSettings
@@ -229,6 +228,13 @@ export class CopilotStudioWebChat {
     let sequence = 0
     let activitySubscriber: Subscriber<Partial<Activity>> | undefined
     let conversation: ConversationAccount | undefined
+
+    // Start a managed span that will live for the duration of the connection
+    const connectionSpan = startManagedSpan(SpanNames.COPILOT_CREATE_CONNECTION, {
+      attributes: {
+        'agents.copilot.webchat.show_typing': settings?.showTyping ?? false
+      }
+    })
 
     const connectionStatus$ = new BehaviorSubject(0)
     const activity$ = createObservable<Partial<Activity>>(async (subscriber) => {
@@ -251,9 +257,9 @@ export class CopilotStudioWebChat {
           }
 
           notifyActivity(activity)
-          Traces.traceCreateConnection.addEvent('Activity received from Copilot Studio', {
-            'activity.type': activity.type,
-            'activity.conversation.id': activity.conversation?.id
+          connectionSpan?.addEvent('Activity received from Copilot Studio', {
+            'activity.type': activity.type ?? 'unknown',
+            'activity.conversation.id': activity.conversation?.id ?? 'unknown'
           })
         }
         // If no activities received from bot, we should still acknowledge.
@@ -310,9 +316,9 @@ export class CopilotStudioWebChat {
             })
 
             notifyActivity(newActivity)
-            Traces.traceCreateConnection.addEvent('Activity sent to WebChat', {
-              'activity.type': newActivity.type,
-              'activity.conversation.id': newActivity.conversation?.id
+            connectionSpan?.addEvent('Activity sent to WebChat', {
+              'activity.type': newActivity.type ?? 'unknown',
+              'activity.conversation.id': newActivity.conversation?.id ?? 'unknown'
             })
             notifyTyping()
 
@@ -322,9 +328,9 @@ export class CopilotStudioWebChat {
             // Stream the agent's response, but don't block the UI
             for await (const responseActivity of client.sendActivityStreaming(newActivity)) {
               notifyActivity(responseActivity)
-              Traces.traceCreateConnection.addEvent('Activity received from Copilot Studio', {
-                'activity.type': responseActivity.type,
-                'activity.conversation.id': responseActivity.conversation?.id
+              connectionSpan?.addEvent('Activity received from Copilot Studio', {
+                'activity.type': responseActivity.type ?? 'unknown',
+                'activity.conversation.id': responseActivity.conversation?.id ?? 'unknown'
               })
               logger.info('<-- Activity received correctly from Copilot Studio.')
             }
@@ -344,6 +350,8 @@ export class CopilotStudioWebChat {
           activitySubscriber.complete()
           activitySubscriber = undefined
         }
+        // End the connection span
+        connectionSpan.end()
       },
     }
   }

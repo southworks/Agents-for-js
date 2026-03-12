@@ -6,7 +6,14 @@ import { trace, SpanStatusCode, type Span, type SpanOptions, type Attributes, co
 // Initialize context manager asynchronously (no top-level await for CJS compatibility)
 setupContextManager().catch(() => { /* silently ignore */ })
 
-const tracer = trace.getTracer('my-app')
+/**
+ * Get the tracer lazily to ensure the provider is registered before use.
+ * This is important in browser environments where the instrumentation module
+ * must register the provider before any spans are created.
+ */
+function getTracer () {
+  return trace.getTracer('my-app')
+}
 
 /*
  * Factory for creating method-specific traced decorators
@@ -59,8 +66,13 @@ type InternalContextShape<T extends DecoratorContextShape> = T & {
  * @returns Promise that resolves to `true` if a context manager was set up, `false` otherwise
  */
 export async function setupContextManager (): Promise<void> {
-  // Check if we're in Node.js
-  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.versions?.node) {
+  // Check if we're in a real Node.js runtime (avoid browser process polyfills)
+  const isNodeRuntime =
+    typeof process !== 'undefined' &&
+    process.release?.name === 'node' &&
+    !!process.versions?.node
+
+  if (isNodeRuntime) {
     try {
       const { AsyncLocalStorageContextManager } = await import('@opentelemetry/context-async-hooks')
       otelContext.setGlobalContextManager(new AsyncLocalStorageContextManager().enable())
@@ -82,8 +94,8 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
       const spanName = config.spanName ?? `${this.constructor.name}.${methodName}`
       // const attributes = config.extractAttributes?.(...args) ?? {}
 
-      // TODO: see if we can use tracer.startSpan(name) and context.with() instead of startActiveSpan, to have more control over the context and span lifecycle.
-      return tracer.startActiveSpan(spanName, config.spanOptions ?? {}, (span) => {
+      // TODO: see if we can use getTracer().startSpan(name) and context.with() instead of startActiveSpan, to have more control over the context and span lifecycle.
+      return getTracer().startActiveSpan(spanName, config.spanOptions ?? {}, (span) => {
         const sharedContext = {
           args,
           data: undefined,
@@ -157,7 +169,7 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
   ): Promise<T> => {
     const sharedState = otelContext.active().getValue(CONTEXT_KEY) as InternalContextShape<TContext> | undefined
 
-    return tracer.startActiveSpan(spanName, options ?? {}, async (span) => {
+    return getTracer().startActiveSpan(spanName, options ?? {}, async (span) => {
       try {
         // Call the onChildSpan callback if defined in the parent decorator
         sharedState?.onChildSpan?.(spanName, span, sharedState)
