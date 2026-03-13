@@ -31,7 +31,7 @@
     "postbuild": "npm run build:esm",
     "build:esm": "tsc --project tsconfig.esm.json"
   },
-  "devDependencies": {
+  "dependencies": {
     "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1"
   },
   "license": "MIT",
