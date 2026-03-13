@@ -186,7 +186,7 @@ export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateCon
 
 interface CreateConnectorClientWithIdentityDecoratorContext {
   args: Parameters<CloudAdapter['createConnectorClientWithIdentity']>
-  data: { scope: string }
+  data?: { scope?: string }
   result?: ReturnType<CloudAdapter['createConnectorClientWithIdentity']>
 }
 
@@ -200,7 +200,7 @@ export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorat
   onEnd (span, context) {
     const [, activity] = context.args
     const isAgenticRequest = activity?.isAgenticRequest() ?? false
-    const scope = fallback(context.data.scope)
+    const scope = fallback(context.data?.scope)
     const serviceUrl = fallback(activity?.serviceUrl)
 
     span.setAttribute('agents.service_url', serviceUrl)

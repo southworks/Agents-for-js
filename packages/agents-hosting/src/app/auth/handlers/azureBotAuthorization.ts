@@ -260,7 +260,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
     const result = await this.handleOBO(token, options)
     if (result.token === token) {
-      Traces.AuthorizationAzureBotToken.share({
+      Traces.AuthorizationAzureBotToken.share.call(this, {
         handlerId: this.id,
         connection: this._options.name
       })
@@ -286,7 +286,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
     const userTokenClient = await this.getUserTokenClient(context)
     await userTokenClient.signOut(user, connection, channel)
-    Traces.AuthorizationAzureBotSignout.share({ handlerId: this.id, connection, channel })
+    Traces.AuthorizationAzureBotSignout.share.call(this, { handlerId: this.id, connection, channel })
     return true
   }
 
@@ -298,7 +298,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    */
   @Traces.AuthorizationAzureBotSignin
   async signin (context: TurnContext, active?: AzureBotActiveHandler): Promise<AuthorizationHandlerStatus> {
-    Traces.AuthorizationAzureBotSignin.share({ handlerId: this.id, connection: this._options.name! })
+    Traces.AuthorizationAzureBotSignin.share.call(this, { handlerId: this.id, connection: this._options.name! })
 
     const { activity } = context
     const [category] = activity.name?.split('/') ?? [Category.UNKNOWN]
@@ -315,7 +315,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       const reason = 'Maximum sign-in attempts exceeded'
       logger.warn(this.prefix(reason), activity)
       await context.sendActivity(MessageFactory.text(this.messages.maxAttemptsExceeded(this.maxAttempts)))
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return AuthorizationHandlerStatus.REJECTED
     }
 
@@ -330,7 +330,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       // e.g., user interrupts the flow by clicking the Consent Cancel button.
       const reason = 'The incoming activity will be revalidated due to a change in the sign-in flow. Usually by user clicking the Consent Cancel button.'
       logger.warn(this.prefix(reason), activity)
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return AuthorizationHandlerStatus.REVALIDATE
     }
 
@@ -383,7 +383,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       logger.error(this.prefix('Failed to exchange on-behalf-of token'), { connection: oboConnection, scopes: oboScopes }, error)
       return { token: undefined }
     } finally {
-      Traces.AuthorizationAzureBotToken.share({
+      Traces.AuthorizationAzureBotToken.share.call(this, {
         handlerId: this.id,
         connection: provider?.connectionSettings?.connectionName ?? oboConnection,
         scopes: oboScopes
@@ -416,7 +416,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       const reason = `Invalid code entered (${code}). Restarting sign-in flow`
       logger.warn(this.prefix(reason), activity)
       await context.sendActivity(MessageFactory.text(this.messages.invalidCode(code)))
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return AuthorizationHandlerStatus.REJECTED
     }
 
@@ -427,14 +427,14 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       const oCard = CardFactory.oauthCard(this._options.name!, this._options.title!, this._options.text!, signInResource, this._options.enableSso)
       await context.sendActivity(MessageFactory.attachment(oCard))
       await storage.write({ activity, id: this.id, ...(active ?? {}), attemptsLeft: this.maxAttempts })
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return AuthorizationHandlerStatus.PENDING
     }
 
     const reason = 'Successfully acquired token'
     logger.debug(this.prefix(reason), activity)
     this.setContext(context, { token: tokenResponse.token })
-    Traces.AuthorizationAzureBotSignin.share({ reason })
+    Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
     return AuthorizationHandlerStatus.APPROVED
   }
 
@@ -463,7 +463,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
         })
         logger.error(this.prefix(reason))
         await this._onFailure?.(context, reason)
-        Traces.AuthorizationAzureBotSignin.share({ reason })
+        Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
         return AuthorizationHandlerStatus.REJECTED
       }
 
@@ -475,7 +475,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
         })
         logger.error(this.prefix(reason))
         await this._onFailure?.(context, reason)
-        Traces.AuthorizationAzureBotSignin.share({ reason })
+        Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
         return AuthorizationHandlerStatus.REJECTED
       }
 
@@ -487,7 +487,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
           body: { id: tokenExchangeInvokeRequest.id, connectionName: this._options.name!, failureDetail: reason }
         })
         logger.debug(this.prefix(reason))
-        Traces.AuthorizationAzureBotSignin.share({ reason })
+        Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
         return AuthorizationHandlerStatus.PENDING
       }
 
@@ -499,7 +499,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       logger.debug(this.prefix(reason))
       this.setContext(context, { token })
       await this._onSuccess?.(context)
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return AuthorizationHandlerStatus.APPROVED
     }
 
@@ -513,13 +513,13 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       } else {
         await context.sendActivity(MessageFactory.text(`${reason}. Please try again.`))
       }
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return AuthorizationHandlerStatus.REJECTED
     }
 
     const reason = `Unknown sign-in activity name: ${activity.name}`
     logger.error(this.prefix(reason), activity)
-    Traces.AuthorizationAzureBotSignin.share({ reason })
+    Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
     return AuthorizationHandlerStatus.REJECTED
   }
 
@@ -545,7 +545,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       await this.sendInvokeResponse(context, { status: 200 })
       const reason = 'Sign-in process was cancelled by the user'
       logger.warn(this.prefix(reason), activity)
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return { status: AuthorizationHandlerStatus.REJECTED }
     }
 
@@ -554,14 +554,14 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       logger.warn(this.prefix(reason), activity)
       await context.sendActivity(MessageFactory.text(this.messages.invalidCodeFormat(active.attemptsLeft)))
       await storage.write({ ...active, attemptsLeft: active.attemptsLeft - 1 })
-      Traces.AuthorizationAzureBotSignin.share({ reason })
+      Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
       return { status: AuthorizationHandlerStatus.PENDING }
     }
 
     await this.sendInvokeResponse(context, { status: 200 })
     const reason = 'Code verification successful'
     logger.debug(this.prefix(reason), activity)
-    Traces.AuthorizationAzureBotSignin.share({ reason })
+    Traces.AuthorizationAzureBotSignin.share.call(this, { reason })
     return { status: AuthorizationHandlerStatus.APPROVED, code: state }
   }
 

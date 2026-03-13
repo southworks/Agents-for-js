@@ -636,7 +636,7 @@ export class AgentApplication<TState extends TurnState> {
           return route?.authHandlers ?? []
         }) ?? { authorized: true } // Default to authorized if no auth manager
 
-        Traces.AgentApplicationRun.share({ authorized })
+        Traces.AgentApplicationRun.share.call(this, { authorized })
 
         if (!authorized) {
           await state.save(context, storage)
@@ -645,7 +645,7 @@ export class AgentApplication<TState extends TurnState> {
 
         const route = await this.getRoute(context)
 
-        Traces.AgentApplicationRun.share({
+        Traces.AgentApplicationRun.share.call(this, {
           route: route ? { matched: !!route, isInvokeRoute: route.isInvokeRoute, isAgenticRoute: route.isAgenticRoute } : undefined
         })
 
@@ -655,7 +655,7 @@ export class AgentApplication<TState extends TurnState> {
         }
 
         if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
-          Traces.AgentApplicationRun.share({ attachmentsCount: context.activity.attachments?.length ?? 0 })
+          Traces.AgentApplicationRun.share.call(this, { attachmentsCount: context.activity.attachments?.length ?? 0 })
           await Traces.AgentApplicationRun.withChildSpan(SpanNames.AGENTS_APP_DOWNLOAD_FILES, async () => {
             for (let i = 0; i < this._options.fileDownloaders!.length; i++) {
               await this._options.fileDownloaders![i].downloadAndStoreFiles(context, state)

@@ -40,8 +40,10 @@ let otel: OTelAPI
 
 export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {
   const tracer = otel.trace.getTracer(`tracer[${config.spanName ?? 'agents.telemetry'}]`, '1.0.0')
+  const invocationStacks = new WeakMap<object, Array<InternalContextShape<TContext>>>()
 
   const sharedContext = {
+    args: [] as unknown[] as TContext['args'],
     data: undefined,
     result: undefined,
     onChildSpan: config.onChildSpan
@@ -55,6 +57,22 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
 
     const wrappedMethod = function (this: any, ...args: TContext['args']): TContext['result'] {
       const spanName = config.spanName ?? `${this.constructor.name}.${methodName}`
+      const thisArgObject = (typeof this === 'object' && this !== null) || typeof this === 'function'
+        ? this as object
+        : undefined
+
+      const invocationContext = {
+        args,
+        data: undefined,
+        result: undefined,
+        onChildSpan: config.onChildSpan
+      } as InternalContextShape<TContext>
+
+      if (thisArgObject) {
+        const stack = invocationStacks.get(thisArgObject) ?? []
+        stack.push(invocationContext)
+        invocationStacks.set(thisArgObject, stack)
+      }
 
       const span = tracer.startSpan(spanName, config.spanOptions ?? {})
       const activeContext = otel.context.active()
@@ -63,10 +81,24 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
         return spanContext ? (otel.context.with(spanContext, fn) ?? fn()) : fn()
       }
 
-      return runInSpanContext(() => {
-        sharedContext.args = args
+      const cleanupInvocationContext = () => {
+        if (!thisArgObject) {
+          return
+        }
 
-        config.onStart?.(span, sharedContext)
+        const stack = invocationStacks.get(thisArgObject)
+        if (!stack) {
+          return
+        }
+
+        stack.pop()
+        if (stack.length === 0) {
+          invocationStacks.delete(thisArgObject)
+        }
+      }
+
+      return runInSpanContext(() => {
+        config.onStart?.(span, invocationContext)
 
         const result = originalMethod.apply(this, args)
 
@@ -74,33 +106,36 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
           if (isPromise(result)) {
             return result
               .then((res) => runInSpanContext(() => {
-                sharedContext.result = res
-                config.onSuccess?.(span, sharedContext)
+                invocationContext.result = res
+                config.onSuccess?.(span, invocationContext)
                 span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
                 return res
               }))
               .catch((error: unknown) => runInSpanContext(() => {
-                config.onError?.(span, error, sharedContext)
+                config.onError?.(span, error, invocationContext)
                 recordError(span, error)
                 throw error
               }))
               .finally(() => runInSpanContext(() => {
-                config.onEnd?.(span, sharedContext)
+                config.onEnd?.(span, invocationContext)
                 span.end()
+                cleanupInvocationContext()
               }))
           }
 
-          sharedContext.result = result
-          config.onSuccess?.(span, sharedContext)
+          invocationContext.result = result
+          config.onSuccess?.(span, invocationContext)
           span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
-          config.onEnd?.(span, sharedContext)
+          config.onEnd?.(span, invocationContext)
           span.end()
+          cleanupInvocationContext()
           return result
         } catch (error) {
-          config.onError?.(span, error, sharedContext)
+          config.onError?.(span, error, invocationContext)
           recordError(span, error)
-          config.onEnd?.(span, sharedContext)
+          config.onEnd?.(span, invocationContext)
           span.end()
+          cleanupInvocationContext()
           throw error
         }
       })
@@ -109,11 +144,17 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
     return wrappedMethod as T
   }
 
-  decorator.share = (data: TContext['data']) => {
-    if (isPlainObject(sharedContext.data) && isPlainObject(data)) {
-      sharedContext.data = { ...sharedContext.data, ...data }
+  decorator.share = function (this: unknown, data: TContext['data']) {
+    const thisArgObject = (typeof this === 'object' && this !== null) || typeof this === 'function'
+      ? this as object
+      : undefined
+    const activeInvocationContext = thisArgObject ? invocationStacks.get(thisArgObject)?.at(-1) : undefined
+    const targetContext = activeInvocationContext ?? sharedContext
+
+    if (isPlainObject(targetContext.data) && isPlainObject(data)) {
+      targetContext.data = { ...targetContext.data, ...data }
     } else {
-      sharedContext.data = data
+      targetContext.data = data
     }
   }
 
@@ -122,11 +163,12 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
    * If the parent decorator has an `onChildSpan` callback configured, it will be called
    * with the span name, span, and shared context.
    */
-  decorator.withChildSpan = async <T>(
+  decorator.withChildSpan = async function <T> (
+    this: unknown,
     spanName: string,
     fn: (span: Span | undefined) => Promise<T>,
     options?: SpanOptions
-  ): Promise<T | undefined> => {
+  ): Promise<T | undefined> {
     const span = tracer?.startSpan(spanName, options ?? {})
     if (!span) {
       return fn(undefined)
@@ -138,10 +180,16 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
       return spanContext ? (otel.context.with(spanContext, callback) ?? callback()) : callback()
     }
 
+    const thisArgObject = (typeof this === 'object' && this !== null) || typeof this === 'function'
+      ? this as object
+      : undefined
+    const activeInvocationContext = thisArgObject ? invocationStacks.get(thisArgObject)?.at(-1) : undefined
+    const targetContext = activeInvocationContext ?? sharedContext
+
     return runInSpanContext(async () => {
       try {
         // Call the onChildSpan callback if defined in the parent decorator
-        sharedContext?.onChildSpan?.(spanName, span, sharedContext)
+        targetContext?.onChildSpan?.(spanName, span, targetContext)
 
         const result = await fn(span)
         span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
