@@ -1,0 +1,4 @@
+{
+  // Editor-only project file for ESM sources under src/esm; this is not used by the build scripts.
+  "extends": "../../tsconfig.esm.json"
+}

@@ -27,6 +27,10 @@
       "optional": true
     }
   },
+  "scripts": {
+    "postbuild": "npm run build:esm",
+    "build:esm": "tsc --project tsconfig.esm.json"
+  },
   "devDependencies": {
     "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1"
   },
@@ -39,9 +43,14 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "import": "./dist/src/index.js",
-      "require": "./dist/src/index.js"
+      "import": {
+        "default": "./dist/src/esm/index.js",
+        "types": "./dist/src/esm/index.d.ts"
+      },
+      "require": {
+        "default": "./dist/src/cjs/index.js",
+        "types": "./dist/src/cjs/index.d.ts"
+      }
     },
     "./package.json": "./package.json"
   },

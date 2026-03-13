@@ -1,8 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-// @ts-ignore-next-line
-import { otel, Span, SpanOptions } from './otel'
+import { Span, SpanOptions, OTelAPI } from './types'
 
 /*
  * Factory for creating method-specific traced decorators
@@ -36,6 +35,8 @@ type DecoratorContextShape = {
 type InternalContextShape<T extends DecoratorContextShape> = T & {
   onChildSpan?: (spanName: string, span: Span, context: T) => void
 }
+
+let otel: OTelAPI
 
 export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {
   const tracer = otel.trace.getTracer(`tracer[${config.spanName ?? 'agents.telemetry'}]`, '1.0.0')
@@ -172,4 +173,9 @@ function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
 
 function isPlainObject (value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && value.constructor === Object
+}
+
+export function TraceDecoratorFactory (_otel: OTelAPI) {
+  otel = _otel
+  return createTracedDecorator
 }

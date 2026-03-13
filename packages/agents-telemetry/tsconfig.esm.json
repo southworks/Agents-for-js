@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*",
+    "package.json"
+  ],
+  "exclude": [
+    "src/cjs/**/*"
+  ],
+  "compilerOptions": {
+    "composite": false,
+    "module": "es2022",
+    "moduleResolution": "bundler"
+  }
+}

@@ -4,6 +4,9 @@
     "src/**/*",
     "package.json"
   ],
+  "exclude": [
+    "src/esm/**/*"
+  ],
   "compilerOptions": {
     "rootDirs": [ "src/", "test/"],
     "outDir": "dist",
