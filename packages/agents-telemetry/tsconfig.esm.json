@@ -1,13 +1,10 @@
 {
   "extends": "./tsconfig.json",
-  "include": [
-    "src/**/*",
-    "package.json"
-  ],
   "exclude": [
     "src/cjs/**/*"
   ],
   "compilerOptions": {
+    "outDir": "dist/esm",
     "composite": false,
     "module": "es2022",
     "moduleResolution": "bundler"

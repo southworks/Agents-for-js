@@ -4,10 +4,10 @@
 // IMPORTANT: make sure not to export '@microsoft/agents-opentelemetry-api' types directly as this is a development dependency.
 // Instead, re-export types from 'typeof import('@opentelemetry/api')' directly.
 
-import { TraceDecoratorFactory } from '../traceDecorator'
-import { otel } from './otel'
+import { TraceDecoratorFactory } from '../traceDecorator.js'
+import { otel } from './otel.js'
 
-export * from '../constants'
-export { otel } from './otel'
+export * from '../constants.js'
+export { otel } from './otel.js'
 
 export const createTracedDecorator = TraceDecoratorFactory(otel)

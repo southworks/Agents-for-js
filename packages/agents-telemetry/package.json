@@ -28,8 +28,7 @@
     }
   },
   "scripts": {
-    "postbuild": "npm run build:esm",
-    "build:esm": "tsc --project tsconfig.esm.json"
+    "build:esm": "tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
   },
   "dependencies": {
     "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1"
@@ -37,19 +36,18 @@
   "license": "MIT",
   "files": [
     "README.md",
-    "dist/src",
-    "src",
+    "dist",
     "package.json"
   ],
   "exports": {
     ".": {
       "import": {
-        "default": "./dist/src/esm/index.js",
-        "types": "./dist/src/esm/index.d.ts"
+        "default": "./dist/esm/src/esm/index.js",
+        "types": "./dist/esm/src/esm/index.d.ts"
       },
       "require": {
-        "default": "./dist/src/cjs/index.js",
-        "types": "./dist/src/cjs/index.d.ts"
+        "default": "./dist/cjs/src/cjs/index.js",
+        "types": "./dist/cjs/src/cjs/index.d.ts"
       }
     },
     "./package.json": "./package.json"

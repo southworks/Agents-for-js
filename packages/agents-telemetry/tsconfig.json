@@ -8,8 +8,8 @@
     "src/esm/**/*"
   ],
   "compilerOptions": {
+    "outDir": "dist/cjs",
     "rootDirs": [ "src/", "test/"],
-    "outDir": "dist",
     "paths": {
       "@microsoft/*": ["./packages/*"]
     }
