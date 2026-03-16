@@ -5,7 +5,7 @@
     "package.json"
   ],
   "exclude": [
-    "src/esm/**/*"
+    "src/**/*.mts"
   ],
   "compilerOptions": {
     "outDir": "dist/cjs",

@@ -42,12 +42,12 @@
   "exports": {
     ".": {
       "import": {
-        "default": "./dist/esm/src/esm/index.js",
-        "types": "./dist/esm/src/esm/index.d.ts"
+        "default": "./dist/esm/src/index.mjs",
+        "types": "./dist/esm/src/index.d.mts"
       },
       "require": {
-        "default": "./dist/cjs/src/cjs/index.js",
-        "types": "./dist/cjs/src/cjs/index.d.ts"
+        "default": "./dist/cjs/src/index.cjs",
+        "types": "./dist/cjs/src/index.d.cts"
       }
     },
     "./package.json": "./package.json"
