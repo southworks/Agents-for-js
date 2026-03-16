@@ -27,7 +27,7 @@ async function load (): Promise<typeof import('@microsoft/agents-opentelemetry-a
   try {
     return await import('@opentelemetry/api')
   } catch (error) {
-    // TODO: add agents-activity logger warning here about missing OpenTelemetry API and how to add it as a dependency
+    console.warn('[agents-telemetry] Missing OpenTelemetry API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api as a dependency.')
     return await import('@microsoft/agents-opentelemetry-api')
   }
 }
@@ -36,7 +36,7 @@ async function loadLogs (): Promise<OTelLogsModule> {
   try {
     return await import('@opentelemetry/api-logs') as OTelLogsModule
   } catch (error) {
-    // TODO: add agents-activity logger warning here about missing OpenTelemetry Logs API and how to add it as a dependency
+    console.warn('[agents-telemetry] Missing OpenTelemetry Logs API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api-logs as a dependency.')
     return await import('@microsoft/agents-opentelemetry-api-logs') as OTelLogsModule
   }
 }
