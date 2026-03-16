@@ -4,29 +4,30 @@
  */
 
 import createDebug, { Debugger } from 'debug'
-
-const loggerLevels = [
-  'info',
-  'warn',
-  'error',
-  'debug',
-] as const
-
-type LoggerLevels = typeof loggerLevels[number]
+import {
+  createOtelLogger,
+  emitOtelLoggerLog,
+  loggerLevels,
+  LoggerLevel,
+} from '@microsoft/agents-telemetry'
 
 /**
  * Logger class that provides colored logging functionality using the debug package.
  * Supports different log levels: info, warn, error, and debug.
  */
 export class Logger {
-  private loggers: { [K in LoggerLevels]: Debugger } = {} as any
+  private loggers: { [K in LoggerLevel]: Debugger } = {} as any
+  private readonly namespace: string
+  private readonly otelLogger
 
   /**
    * Creates a new Logger instance with the specified namespace.
    * @param namespace The namespace to use for the logger
    */
   constructor (namespace: string = '') {
+    this.namespace = namespace
     this.initializeLoggers(namespace)
+    this.otelLogger = createOtelLogger(namespace)
   }
 
   private initializeLoggers (namespace: string) {
@@ -37,7 +38,7 @@ export class Logger {
     }
   }
 
-  private getPlatformColor (level: LoggerLevels): string {
+  private getPlatformColor (level: LoggerLevel): string {
     const platform = typeof window !== 'undefined' ? 'browser' : 'node'
     const colors = {
       node: {
@@ -57,6 +58,14 @@ export class Logger {
     return colors[platform][level]
   }
 
+  private emitOtelLog (level: LoggerLevel, message: string, args: any[]) {
+    if (!this.otelLogger || !this.loggers[level].enabled) {
+      return
+    }
+
+    emitOtelLoggerLog(this.otelLogger, this.namespace, level, message, args)
+  }
+
   /**
    * Logs an informational message.
    * @param message The message to log
@@ -64,6 +73,7 @@ export class Logger {
    */
   info (message: string, ...args: any[]) {
     this.loggers.info(message, ...args)
+    this.emitOtelLog('info', message, args)
   }
 
   /**
@@ -73,6 +83,7 @@ export class Logger {
    */
   warn (message: string, ...args: any[]) {
     this.loggers.warn(message, ...args)
+    this.emitOtelLog('warn', message, args)
   }
 
   /**
@@ -82,6 +93,7 @@ export class Logger {
    */
   error (message: string, ...args: any[]) {
     this.loggers.error(message, ...args)
+    this.emitOtelLog('error', message, args)
   }
 
   /**
@@ -91,6 +103,7 @@ export class Logger {
    */
   debug (message: string, ...args: any[]) {
     this.loggers.debug(message, ...args)
+    this.emitOtelLog('debug', message, args)
   }
 }
 

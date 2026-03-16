@@ -30,6 +30,34 @@ const sdk = new NodeSDK({
 sdk.start()
 ```
 
+## Enabling Logs (OTLP)
+
+To export logs produced by the SDK logger wrapper (for example, `debug('agents:*')`) to an OTLP backend in a sample agent, add a minimal logs processor during startup:
+
+```ts
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { resourceFromAttributes } from '@opentelemetry/resources'
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions'
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc'
+import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs'
+
+const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4317'
+
+const sdk = new NodeSDK({
+  resource: resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: 'my-agent-service',
+    [ATTR_SERVICE_VERSION]: '1.0.0',
+  }),
+  logRecordProcessors: [
+    new BatchLogRecordProcessor(new OTLPLogExporter({ url: otlpEndpoint })),
+  ],
+})
+
+sdk.start()
+```
+
+Set `DEBUG=agents:*` (or your target namespaces) to enable emission from debug-based loggers.
+
 ### 2. Production Setup with OTLP Exporter
 
 For production, use an OTLP exporter to send traces to your observability backend (e.g., Azure Monitor, Jaeger, Grafana):

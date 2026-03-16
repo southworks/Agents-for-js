@@ -20,10 +20,14 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "peerDependencies": {
-    "@opentelemetry/api": "1"
+    "@opentelemetry/api": "1",
+    "@opentelemetry/api-logs": "^0.211.0"
   },
   "peerDependenciesMeta": {
     "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/api-logs": {
       "optional": true
     }
   },
@@ -31,7 +35,8 @@
     "build:esm": "tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
   },
   "dependencies": {
-    "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1"
+    "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1",
+    "@microsoft/agents-opentelemetry-api-logs": "npm:@opentelemetry/api-logs@0.211.0"
   },
   "license": "MIT",
   "files": [
@@ -42,12 +47,12 @@
   "exports": {
     ".": {
       "import": {
-        "default": "./dist/esm/src/index.mjs",
-        "types": "./dist/esm/src/index.d.mts"
+        "types": "./dist/esm/src/index.d.mts",
+        "default": "./dist/esm/src/index.mjs"
       },
       "require": {
-        "default": "./dist/cjs/src/index.cjs",
-        "types": "./dist/cjs/src/index.d.cts"
+        "types": "./dist/cjs/src/index.d.cts",
+        "default": "./dist/cjs/src/index.cjs"
       }
     },
     "./package.json": "./package.json"
