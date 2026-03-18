@@ -173,7 +173,7 @@ export class CloudAdapter extends BaseAdapter {
         token,
         headers
       )
-      Traces.CloudAdapterCreateConnectorClientWithIdentity.share.call(this, { scope })
+      Traces.CloudAdapterCreateConnectorClientWithIdentity.share(this, { scope })
     }
     return connectorClient
   }
@@ -379,13 +379,13 @@ export class CloudAdapter extends BaseAdapter {
       await this.runMiddleware(context, logic)
       const invokeResponse = this.processTurnResults(context)
       logger.debug('Activity Response (invoke/expect replies): ', invokeResponse)
-      Traces.CloudAdapterProcess.share.call(this, context)
+      Traces.CloudAdapterProcess.share(this, { context })
       return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body, true)
     }
 
     await this.runMiddleware(context, logic)
     const invokeResponse = this.processTurnResults(context)
-    Traces.CloudAdapterProcess.share.call(this, context)
+    Traces.CloudAdapterProcess.share(this, { context })
     return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
   }
 
@@ -497,7 +497,7 @@ export class CloudAdapter extends BaseAdapter {
     }
 
     await this.runMiddleware(context, logic)
-    Traces.CloudAdapterContinueConversation.share.call(this, context)
+    Traces.CloudAdapterContinueConversation.share(this, { context })
   }
 
   /**

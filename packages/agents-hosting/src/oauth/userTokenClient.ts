@@ -149,7 +149,7 @@ export class UserTokenClient {
     const [channelId] = Activity.parseChannelId(channelIdComposite)
     const params = { connectionName, channelId, userId, code }
     const response = await this.client.get('/api/usertoken/GetToken', { params })
-    Traces.UserTokenClientGetUserToken.share.call(this, response)
+    Traces.UserTokenClientGetUserToken.share(this, { response })
     if (response?.data) {
       return response.data as TokenResponse
     }
@@ -168,7 +168,7 @@ export class UserTokenClient {
     const [channelId] = Activity.parseChannelId(channelIdComposite)
     const params = { userId, connectionName, channelId }
     const response = await this.client.delete('/api/usertoken/SignOut', { params })
-    Traces.UserTokenClientSignOut.share.call(this, response)
+    Traces.UserTokenClientSignOut.share(this, { response })
     if (response.status !== 200) {
       throw new Error('Failed to sign out')
     }
@@ -194,7 +194,7 @@ export class UserTokenClient {
     const state = Buffer.from(JSON.stringify(tokenExchangeStateNormalized)).toString('base64')
     const params = { state }
     const response = await this.client.get('/api/botsignin/GetSignInResource', { params })
-    Traces.UserTokenClientGetSignInResource.share.call(this, response)
+    Traces.UserTokenClientGetSignInResource.share(this, { response })
     return response.data as SignInResource
   }
 
@@ -211,7 +211,7 @@ export class UserTokenClient {
     const [channelId] = Activity.parseChannelId(channelIdComposite)
     const params = { userId, connectionName, channelId }
     const response = await this.client.post('/api/usertoken/exchange', tokenExchangeRequest, { params })
-    Traces.UserTokenClientExchangeToken.share.call(this, response)
+    Traces.UserTokenClientExchangeToken.share(this, { response })
     if (response?.data) {
       return response.data as TokenResponse
     } else {
@@ -237,7 +237,7 @@ export class UserTokenClient {
     const state = Buffer.from(JSON.stringify({ conversation, relatesTo, connectionName, msAppId: this.msAppId })).toString('base64')
     const params = { userId, connectionName, channelId, state, code, finalRedirect, fwdUrl }
     const response = await this.client.get('/api/usertoken/GetTokenOrSignInResource', { params })
-    Traces.UserTokenClientGetTokenOrSignInResource.share.call(this, response)
+    Traces.UserTokenClientGetTokenOrSignInResource.share(this, { response })
     return response.data as TokenOrSinginResourceResponse
   }
 
@@ -253,7 +253,7 @@ export class UserTokenClient {
     const [channelId] = Activity.parseChannelId(channelIdComposite)
     const params = { userId, channelId, include }
     const response = await this.client.get('/api/usertoken/GetTokenStatus', { params })
-    Traces.UserTokenClientGetTokenStatus.share.call(this, response)
+    Traces.UserTokenClientGetTokenStatus.share(this, { response })
     return response.data as TokenStatus[]
   }
 
@@ -270,7 +270,7 @@ export class UserTokenClient {
     const [channelId] = Activity.parseChannelId(channelIdComposite)
     const params = { userId, connectionName, channelId }
     const response = await this.client.post('/api/usertoken/GetAadTokens', resourceUrls, { params })
-    Traces.UserTokenClientGetAadTokens.share.call(this, response)
+    Traces.UserTokenClientGetAadTokens.share(this, { response })
     return response.data as Record<string, TokenResponse>
   }
 

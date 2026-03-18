@@ -14,23 +14,26 @@ import type { AgenticAuthorization } from '../app/auth/handlers/agenticAuthoriza
 import type { AzureBotAuthorization } from '../app/auth/handlers/azureBotAuthorization'
 import type { UserTokenClient } from '../oauth'
 import { HostingMetrics } from './metrics'
+import { TracedStorage } from '../storage'
+import { RouteHandler } from '../app/routeHandler'
 
-const fallback = <T>(value: T | undefined | null) => value ?? 'unknown'
+const fallback = <T>(value: T | undefined | null | void) => value ?? 'unknown'
+
+interface SharedContext {
+  duration(): number
+}
 
 /**
  * CloudAdapter method decorators
  */
 
-interface ProcessDecoratorContext {
-  args: Parameters<CloudAdapter['process']>
-  data?: TurnContext
-  result?: ReturnType<CloudAdapter['process']>
-  duration: () => number
+interface ProcessScope {
+  context?: TurnContext
 }
 
-export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorContext>({
+export const CloudAdapterProcess = createTracedDecorator<CloudAdapter['process'], ProcessScope>({
   spanName: SpanNames.ADAPTER_PROCESS,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -39,41 +42,36 @@ export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorContext
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const { data, duration } = context
-    const type = fallback(data?.activity?.type)
-    const channelId = fallback(data?.activity?.channelId)
+  onEnd (span, decorator, context: SharedContext) {
+    const { scope } = decorator
+    const type = fallback(scope.context?.activity?.type)
+    const channelId = fallback(scope.context?.activity?.channelId)
 
     span.setAttribute('agents.activity.type', type)
     span.setAttribute('agents.activity.channel_id', channelId)
-    span.setAttribute('agents.activity.delivery_mode', fallback(data?.activity?.deliveryMode))
-    span.setAttribute('agents.activity.conversation_id', fallback(data?.activity?.conversation?.id))
-    span.setAttribute('agents.activity.is_agentic', data?.activity?.isAgenticRequest() ?? false)
+    span.setAttribute('agents.activity.delivery_mode', fallback(scope.context?.activity?.deliveryMode))
+    span.setAttribute('agents.activity.conversation_id', fallback(scope.context?.activity?.conversation?.id))
+    span.setAttribute('agents.activity.is_agentic', scope.context?.activity?.isAgenticRequest() ?? false)
 
     HostingMetrics.activitiesReceivedCounter.add(1, {
       'agents.activity.type': type,
       'agents.activity.channel_id': channelId
     })
-    HostingMetrics.adapterProcessDuration.record(duration(), {
+    HostingMetrics.adapterProcessDuration.record(context.duration(), {
       'agents.activity.type': type
     })
   }
 })
 
-interface SendActivitiesDecoratorContext {
-  args: Parameters<CloudAdapter['sendActivities']>
-  result?: ReturnType<CloudAdapter['sendActivities']>
-}
-
-export const CloudAdapterSendActivities = createTracedDecorator<SendActivitiesDecoratorContext>({
+export const CloudAdapterSendActivities = createTracedDecorator<CloudAdapter['sendActivities']>({
   spanName: SpanNames.ADAPTER_SEND_ACTIVITIES,
   onError (span, error) {
     span.addEvent('sendActivities.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, _activities] = context.args
+  onEnd (span, decorator) {
+    const [, _activities] = decorator.args
     const activities = _activities ?? []
 
     span.setAttribute('agents.activity.count', activities?.length ?? 0)
@@ -88,20 +86,15 @@ export const CloudAdapterSendActivities = createTracedDecorator<SendActivitiesDe
   }
 })
 
-interface UpdateActivityDecoratorContext {
-  args: Parameters<CloudAdapter['updateActivity']>
-  result?: ReturnType<CloudAdapter['updateActivity']>
-}
-
-export const CloudAdapterUpdateActivity = createTracedDecorator<UpdateActivityDecoratorContext>({
+export const CloudAdapterUpdateActivity = createTracedDecorator<CloudAdapter['updateActivity']>({
   spanName: SpanNames.ADAPTER_UPDATE_ACTIVITY,
   onError (span, error) {
     span.addEvent('updateActivity.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, activity] = context.args
+  onEnd (span, decorator) {
+    const [, activity] = decorator.args
 
     span.setAttribute('agents.activity.id', fallback(activity?.id))
     span.setAttribute('agents.activity.conversation_id', fallback(activity?.conversation?.id))
@@ -112,21 +105,15 @@ export const CloudAdapterUpdateActivity = createTracedDecorator<UpdateActivityDe
   }
 })
 
-interface DeleteActivityDecoratorContext {
-  args: Parameters<CloudAdapter['deleteActivity']>
-  result?: ReturnType<CloudAdapter['deleteActivity']>
-  durationMs?: { startTime: number }
-}
-
-export const CloudAdapterDeleteActivity = createTracedDecorator<DeleteActivityDecoratorContext>({
+export const CloudAdapterDeleteActivity = createTracedDecorator<CloudAdapter['deleteActivity']>({
   spanName: SpanNames.ADAPTER_DELETE_ACTIVITY,
   onError (span, error) {
     span.addEvent('deleteActivity.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, reference] = context.args
+  onEnd (span, decorator) {
+    const [, reference] = decorator.args
 
     span.setAttribute('agents.activity.id', fallback(reference?.activityId))
     span.setAttribute('agents.activity.conversation_id', fallback(reference?.conversation?.id))
@@ -137,23 +124,21 @@ export const CloudAdapterDeleteActivity = createTracedDecorator<DeleteActivityDe
   }
 })
 
-interface ContinueConversationDecoratorContext {
-  args: Parameters<CloudAdapter['continueConversation']>
-  data?: TurnContext
-  result?: ReturnType<CloudAdapter['continueConversation']>
+interface ContinueConversationScope {
+  context?: TurnContext
 }
 
-export const CloudAdapterContinueConversation = createTracedDecorator<ContinueConversationDecoratorContext>({
+export const CloudAdapterContinueConversation = createTracedDecorator<CloudAdapter['continueConversation'], ContinueConversationScope>({
   spanName: SpanNames.ADAPTER_CONTINUE_CONVERSATION,
   onError (span, error) {
     span.addEvent('continueConversation.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, reference] = context.args
-    const botAppId = fallback(context.data?.identity?.aud)
-    const isAgenticRequest = context.data?.activity?.isAgenticRequest() ?? false
+  onEnd (span, decorator) {
+    const [, reference] = decorator.args
+    const botAppId = fallback(decorator.scope.context?.identity?.aud)
+    const isAgenticRequest = decorator.scope.context?.activity?.isAgenticRequest() ?? false
     const conversationId = fallback(reference?.conversation?.id)
 
     span.setAttribute('agents.bot.app_id', botAppId)
@@ -162,20 +147,15 @@ export const CloudAdapterContinueConversation = createTracedDecorator<ContinueCo
   }
 })
 
-interface CreateConnectorClientDecoratorContext {
-  args: Parameters<CloudAdapter['createConnectorClient']>
-  result?: ReturnType<CloudAdapter['createConnectorClient']>
-}
-
-export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateConnectorClientDecoratorContext>({
+export const CloudAdapterCreateConnectorClient = createTracedDecorator<CloudAdapter['createConnectorClient']>({
   spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
   onError (span, error) {
     span.addEvent('createConnectorClient.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [_serviceUrl, _scope] = context.args
+  onEnd (span, decorator) {
+    const [_serviceUrl, _scope] = decorator.args
     const serviceUrl = fallback(_serviceUrl)
     const scope = fallback(_scope)
 
@@ -184,23 +164,21 @@ export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateCon
   }
 })
 
-interface CreateConnectorClientWithIdentityDecoratorContext {
-  args: Parameters<CloudAdapter['createConnectorClientWithIdentity']>
-  data?: { scope?: string }
-  result?: ReturnType<CloudAdapter['createConnectorClientWithIdentity']>
+interface CreateConnectorClientWithIdentityScope {
+  scope?: string
 }
 
-export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorator<CreateConnectorClientWithIdentityDecoratorContext>({
+export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorator<CloudAdapter['createConnectorClientWithIdentity'], CreateConnectorClientWithIdentityScope>({
   spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
   onError (span, error) {
     span.addEvent('createConnectorClientWithIdentity.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, activity] = context.args
+  onEnd (span, decorator) {
+    const [, activity] = decorator.args
     const isAgenticRequest = activity?.isAgenticRequest() ?? false
-    const scope = fallback(context.data?.scope)
+    const scope = fallback(decorator.scope.scope)
     const serviceUrl = fallback(activity?.serviceUrl)
 
     span.setAttribute('agents.service_url', serviceUrl)
@@ -212,34 +190,29 @@ export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorat
 /**
  * AgentApplication method decorators
  */
-interface AppRunDecoratorContext {
-  args: Parameters<AgentApplication<any>['runInternal']>
-  data: {
-    authorized?: boolean
-    route?: { matched?: boolean, isInvokeRoute?: boolean, isAgenticRoute?: boolean }
-    attachmentsCount?: number
-  }
-  result?: ReturnType<AgentApplication<any>['runInternal']>
-  duration: () => number
+interface AppRunDecoratorScope {
+  authorized?: boolean
+  route?: { matched?: boolean, isInvokeRoute?: boolean, isAgenticRoute?: boolean }
+  attachmentsCount?: number
 }
 
-export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>({
+export const AgentApplicationRun = createTracedDecorator<AgentApplication<any>['runInternal'], AppRunDecoratorScope>({
   spanName: SpanNames.AGENTS_APP_RUN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onChildSpan (spanName, span, context) {
-    switch (spanName) {
-      case SpanNames.AGENTS_APP_ROUTE_HANDLER:
-        span.setAttribute('agents.route.is_invoke', context.data?.route?.isInvokeRoute ?? false)
-        span.setAttribute('agents.route.is_agentic', context.data?.route?.isAgenticRoute ?? false)
-        break
-      case SpanNames.AGENTS_APP_DOWNLOAD_FILES:
-        span.setAttribute('agents.attachments.count', context.data?.attachmentsCount ?? 0)
-        break
-    }
-  },
+  // onChildSpan (spanName, span, context) {
+  //   switch (spanName) {
+  //     case SpanNames.AGENTS_APP_ROUTE_HANDLER:
+  //       span.setAttribute('agents.route.is_invoke', context.data?.route?.isInvokeRoute ?? false)
+  //       span.setAttribute('agents.route.is_agentic', context.data?.route?.isAgenticRoute ?? false)
+  //       break
+  //     case SpanNames.AGENTS_APP_DOWNLOAD_FILES:
+  //       span.setAttribute('agents.attachments.count', context.data?.attachmentsCount ?? 0)
+  //       break
+  //   }
+  // },
   onError (span, error) {
     const type = fallback(error?.constructor?.name)
     span.addEvent('appRun.failed', {
@@ -249,14 +222,14 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
       'error.type': type
     })
   },
-  onEnd (span, context) {
-    const { args: [turnContext], data, duration } = context
+  onEnd (span, decorator, context: SharedContext) {
+    const { args: [turnContext], scope } = decorator
     const activityType = fallback(turnContext.activity?.type)
     const activityId = fallback(turnContext.activity?.id)
     const channelId = fallback(turnContext.activity?.channelId)
     const conversationId = fallback(turnContext.activity?.conversation?.id)
-    const authorized = data?.authorized ?? false
-    const routeMatched = context.data?.route?.matched ?? false
+    const authorized = scope.authorized ?? false
+    const routeMatched = scope.route?.matched ?? false
     span.setAttribute('agents.activity.type', activityType)
     span.setAttribute('agents.activity.id', activityId)
     span.setAttribute('agents.route.authorized', authorized)
@@ -266,7 +239,7 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
       'activity.type': activityType,
       'conversation.id': conversationId
     })
-    HostingMetrics.turnDuration.record(duration(), {
+    HostingMetrics.turnDuration.record(context.duration(), {
       'activity.type': activityType,
       'channel.id': channelId,
       'conversation.id': conversationId
@@ -274,14 +247,22 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
   }
 })
 
+export const AgentApplicationRouteHandler = createTracedDecorator<RouteHandler<any>, AppRunDecoratorScope>({
+  spanName: SpanNames.AGENTS_APP_ROUTE_HANDLER,
+  onEnd (span, decorator) {
+    span.setAttribute('agents.route.is_invoke', decorator.scope.route?.isInvokeRoute ?? false)
+    span.setAttribute('agents.route.is_agentic', decorator.scope.route?.isAgenticRoute ?? false)
+  }
+})
+
 /**
  * ConnectorClient method decorators
  */
 
-function recordConnectorMetrics (_operation: string, context: Pick<ConnectorReplyToActivityDecoratorContext, 'data' | 'duration'>): void {
+function recordConnectorMetrics (_operation: string, scope: ConnectorReplyToActivityScope, context: SharedContext): void {
   const operation = fallback(_operation)
-  const httpMethod = fallback(context.data?.config?.method?.toUpperCase())
-  const httpStatusCode = context.data?.status ?? -1
+  const httpMethod = fallback(scope.response?.config?.method?.toUpperCase())
+  const httpStatusCode = scope.response?.status ?? -1
 
   HostingMetrics.connectorRequestsCounter.add(1, {
     operation,
@@ -295,16 +276,13 @@ function recordConnectorMetrics (_operation: string, context: Pick<ConnectorRepl
   })
 }
 
-interface ConnectorReplyToActivityDecoratorContext {
-  args: Parameters<ConnectorClient['replyToActivity']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['replyToActivity']>
-  duration: () => number
+interface ConnectorReplyToActivityScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorReplyToActivity = createTracedDecorator<ConnectorReplyToActivityDecoratorContext>({
+export const ConnectorReplyToActivity = createTracedDecorator<ConnectorClient['replyToActivity'], ConnectorReplyToActivityScope>({
   spanName: SpanNames.CONNECTOR_REPLY_TO_ACTIVITY,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -313,24 +291,21 @@ export const ConnectorReplyToActivity = createTracedDecorator<ConnectorReplyToAc
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [conversationId, activityId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [conversationId, activityId] = decorator.args
     span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
     span.setAttribute('agents.activity.id', fallback(activityId))
-    recordConnectorMetrics('replyToActivity', context)
+    recordConnectorMetrics('replyToActivity', decorator.scope, context)
   }
 })
 
-interface ConnectorSendToConversationDecoratorContext {
-  args: Parameters<ConnectorClient['sendToConversation']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['sendToConversation']>
-  duration: () => number
+interface ConnectorSendToConversationScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorSendToConversation = createTracedDecorator<ConnectorSendToConversationDecoratorContext>({
+export const ConnectorSendToConversation = createTracedDecorator<ConnectorClient['sendToConversation'], ConnectorSendToConversationScope>({
   spanName: SpanNames.CONNECTOR_SEND_TO_CONVERSATION,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -339,23 +314,20 @@ export const ConnectorSendToConversation = createTracedDecorator<ConnectorSendTo
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [conversationId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [conversationId] = decorator.args
     span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
-    recordConnectorMetrics('sendToConversation', context)
+    recordConnectorMetrics('sendToConversation', decorator.scope, context)
   }
 })
 
-interface ConnectorUpdateActivityDecoratorContext {
-  args: Parameters<ConnectorClient['updateActivity']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['updateActivity']>
-  duration: () => number
+interface ConnectorUpdateActivityScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorUpdateActivity = createTracedDecorator<ConnectorUpdateActivityDecoratorContext>({
+export const ConnectorUpdateActivity = createTracedDecorator<ConnectorClient['updateActivity'], ConnectorUpdateActivityScope>({
   spanName: SpanNames.CONNECTOR_UPDATE_ACTIVITY,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -364,24 +336,21 @@ export const ConnectorUpdateActivity = createTracedDecorator<ConnectorUpdateActi
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [conversationId, activityId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [conversationId, activityId] = decorator.args
     span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
     span.setAttribute('agents.activity.id', fallback(activityId))
-    recordConnectorMetrics('updateActivity', context)
+    recordConnectorMetrics('updateActivity', decorator.scope, context)
   }
 })
 
-interface ConnectorDeleteActivityDecoratorContext {
-  args: Parameters<ConnectorClient['deleteActivity']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['deleteActivity']>
-  duration: () => number
+interface ConnectorDeleteActivityScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorDeleteActivity = createTracedDecorator<ConnectorDeleteActivityDecoratorContext>({
+export const ConnectorDeleteActivity = createTracedDecorator<ConnectorClient['deleteActivity'], ConnectorDeleteActivityScope>({
   spanName: SpanNames.CONNECTOR_DELETE_ACTIVITY,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -390,24 +359,21 @@ export const ConnectorDeleteActivity = createTracedDecorator<ConnectorDeleteActi
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [conversationId, activityId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [conversationId, activityId] = decorator.args
     span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
     span.setAttribute('agents.activity.id', fallback(activityId))
-    recordConnectorMetrics('deleteActivity', context)
+    recordConnectorMetrics('deleteActivity', decorator.scope, context)
   }
 })
 
-interface ConnectorCreateConversationDecoratorContext {
-  args: Parameters<ConnectorClient['createConversation']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['createConversation']>
-  duration: () => number
+interface ConnectorCreateConversationScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorCreateConversation = createTracedDecorator<ConnectorCreateConversationDecoratorContext>({
+export const ConnectorCreateConversation = createTracedDecorator<ConnectorClient['createConversation'], ConnectorCreateConversationScope>({
   spanName: SpanNames.CONNECTOR_CREATE_CONVERSATION,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -416,21 +382,18 @@ export const ConnectorCreateConversation = createTracedDecorator<ConnectorCreate
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    recordConnectorMetrics('createConversation', context)
+  onEnd (span, decorator, context: SharedContext) {
+    recordConnectorMetrics('createConversation', decorator.scope, context)
   }
 })
 
-interface ConnectorGetConversationsDecoratorContext {
-  args: Parameters<ConnectorClient['getConversations']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['getConversations']>
-  duration: () => number
+interface ConnectorGetConversationsScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorGetConversations = createTracedDecorator<ConnectorGetConversationsDecoratorContext>({
+export const ConnectorGetConversations = createTracedDecorator<ConnectorClient['getConversations'], ConnectorGetConversationsScope>({
   spanName: SpanNames.CONNECTOR_GET_CONVERSATIONS,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -439,21 +402,18 @@ export const ConnectorGetConversations = createTracedDecorator<ConnectorGetConve
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    recordConnectorMetrics('getConversations', context)
+  onEnd (span, decorator, context: SharedContext) {
+    recordConnectorMetrics('getConversations', decorator.scope, context)
   }
 })
 
-interface ConnectorGetConversationMemberDecoratorContext {
-  args: Parameters<ConnectorClient['getConversationMember']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['getConversationMember']>
-  duration: () => number
+interface ConnectorGetConversationMemberScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorGetConversationMember = createTracedDecorator<ConnectorGetConversationMemberDecoratorContext>({
+export const ConnectorGetConversationMember = createTracedDecorator<ConnectorClient['getConversationMember'], ConnectorGetConversationMemberScope>({
   spanName: SpanNames.CONNECTOR_GET_CONVERSATION_MEMBERS,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -462,21 +422,18 @@ export const ConnectorGetConversationMember = createTracedDecorator<ConnectorGet
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    recordConnectorMetrics('getConversationMembers', context)
+  onEnd (span, decorator, context: SharedContext) {
+    recordConnectorMetrics('getConversationMembers', decorator.scope, context)
   }
 })
 
-interface ConnectorUploadAttachmentDecoratorContext {
-  args: Parameters<ConnectorClient['uploadAttachment']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['uploadAttachment']>
-  duration: () => number
+interface ConnectorUploadAttachmentScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorUploadAttachment = createTracedDecorator<ConnectorUploadAttachmentDecoratorContext>({
+export const ConnectorUploadAttachment = createTracedDecorator<ConnectorClient['uploadAttachment'], ConnectorUploadAttachmentScope>({
   spanName: SpanNames.CONNECTOR_UPLOAD_ATTACHMENT,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -485,23 +442,20 @@ export const ConnectorUploadAttachment = createTracedDecorator<ConnectorUploadAt
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [conversationId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [conversationId] = decorator.args
     span.setAttribute('agents.activity.conversation_id', fallback(conversationId))
-    recordConnectorMetrics('uploadAttachment', context)
+    recordConnectorMetrics('uploadAttachment', decorator.scope, context)
   }
 })
 
-interface ConnectorGetAttachmentInfoDecoratorContext {
-  args: Parameters<ConnectorClient['getAttachmentInfo']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['getAttachmentInfo']>
-  duration: () => number
+interface ConnectorGetAttachmentInfoScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorGetAttachmentInfo = createTracedDecorator<ConnectorGetAttachmentInfoDecoratorContext>({
+export const ConnectorGetAttachmentInfo = createTracedDecorator<ConnectorClient['getAttachmentInfo'], ConnectorGetAttachmentInfoScope>({
   spanName: SpanNames.CONNECTOR_GET_ATTACHMENT,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -510,23 +464,20 @@ export const ConnectorGetAttachmentInfo = createTracedDecorator<ConnectorGetAtta
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [attachmentId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [attachmentId] = decorator.args
     span.setAttribute('agents.attachment.id', fallback(attachmentId))
-    recordConnectorMetrics('getAttachmentInfo', context)
+    recordConnectorMetrics('getAttachmentInfo', decorator.scope, context)
   }
 })
 
-interface ConnectorGetAttachmentDecoratorContext {
-  args: Parameters<ConnectorClient['getAttachment']>
-  data?: AxiosResponse
-  result?: ReturnType<ConnectorClient['getAttachment']>
-  duration: () => number
+interface ConnectorGetAttachmentScope {
+  response?: AxiosResponse
 }
 
-export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachmentDecoratorContext>({
+export const ConnectorGetAttachment = createTracedDecorator<ConnectorClient['getAttachment'], ConnectorGetAttachmentScope>({
   spanName: SpanNames.CONNECTOR_GET_ATTACHMENT,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -535,10 +486,10 @@ export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachme
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [attachmentId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [attachmentId] = decorator.args
     span.setAttribute('agents.attachment.id', fallback(attachmentId))
-    recordConnectorMetrics('getAttachment', context)
+    recordConnectorMetrics('getAttachment', decorator.scope, context)
   }
 })
 
@@ -546,22 +497,15 @@ export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachme
  * AgentClient method decorators
  */
 
-interface AgentClientPostActivityData {
+interface AgentClientPostActivityScope {
   response: Response
   targetEndpoint: string
   targetClientId: string
 }
 
-interface AgentClientPostActivityDecoratorContext {
-  args: Parameters<AgentClient['postActivity']>
-  data?: AgentClientPostActivityData
-  result?: ReturnType<AgentClient['postActivity']>
-  duration: () => number
-}
-
-export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActivityDecoratorContext>({
+export const AgentClientPostActivity = createTracedDecorator<AgentClient['postActivity'], AgentClientPostActivityScope>({
   spanName: SpanNames.AGENT_CLIENT_POST_ACTIVITY,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -570,10 +514,11 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const targetEndpoint = fallback(context.data?.targetEndpoint)
-    const targetClientId = fallback(context.data?.targetClientId)
-    const httpStatusCode = context.data?.response?.status ?? -1
+  onEnd (span, decorator, context: SharedContext) {
+    const { scope } = decorator
+    const targetEndpoint = fallback(scope.targetEndpoint)
+    const targetClientId = fallback(scope.targetClientId)
+    const httpStatusCode = scope.response?.status ?? -1
 
     span.setAttribute('agents.target.endpoint', targetEndpoint)
     span.setAttribute('agents.target.client_id', targetClientId)
@@ -593,14 +538,9 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
  * Authentication method decorators
  */
 
-interface AuthTokenBase {
-  method: string
-  success: boolean
-}
-
-function recordAuthMetrics (context: Pick<AuthGetAccessTokenDecoratorContext, 'data' | 'duration'>): void {
-  const authMethod = fallback(context.data?.method)
-  const authSuccess = context.data?.success ?? false
+function recordAuthMetrics (scope: AuthGetAccessTokenScope, context: SharedContext): void {
+  const authMethod = fallback(scope.method)
+  const authSuccess = scope.success ?? false
 
   HostingMetrics.authTokenRequestsCounter.add(1, {
     'auth.method': authMethod,
@@ -612,16 +552,14 @@ function recordAuthMetrics (context: Pick<AuthGetAccessTokenDecoratorContext, 'd
   })
 }
 
-interface AuthGetAccessTokenDecoratorContext {
-  args: Parameters<MsalTokenProvider['getAccessToken']>
-  data?: AuthTokenBase
-  result?: ReturnType<MsalTokenProvider['getAccessToken']>
-  duration: () => number
+interface AuthGetAccessTokenScope {
+  method: string
+  success: boolean
 }
 
-export const AuthGetAccessToken = createTracedDecorator<AuthGetAccessTokenDecoratorContext>({
+export const AuthGetAccessToken = createTracedDecorator<MsalTokenProvider['getAccessToken'], AuthGetAccessTokenScope>({
   spanName: SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -630,28 +568,21 @@ export const AuthGetAccessToken = createTracedDecorator<AuthGetAccessTokenDecora
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, scope] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [, scope] = decorator.args
     span.setAttribute('auth.scopes', [fallback(scope)])
-    span.setAttribute('auth.method', fallback(context.data?.method))
-    recordAuthMetrics(context)
+    span.setAttribute('auth.method', fallback(decorator.scope.method))
+    recordAuthMetrics(decorator.scope, context)
   }
 })
 
-interface AuthAcquireTokenOnBehalfOfDecoratorData extends AuthTokenBase {
+interface AuthAcquireTokenOnBehalfOfScope extends AuthGetAccessTokenScope {
   scopes?: string[]
 }
 
-interface AuthAcquireTokenOnBehalfOfDecoratorContext {
-  args: Parameters<MsalTokenProvider['acquireTokenOnBehalfOf']>
-  data?: AuthAcquireTokenOnBehalfOfDecoratorData
-  result?: ReturnType<MsalTokenProvider['acquireTokenOnBehalfOf']>
-  duration: () => number
-}
-
-export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<AuthAcquireTokenOnBehalfOfDecoratorContext>({
+export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<MsalTokenProvider['acquireTokenOnBehalfOf'], AuthAcquireTokenOnBehalfOfScope>({
   spanName: SpanNames.AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -660,22 +591,15 @@ export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<AuthAcquireToken
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    span.setAttribute('auth.scopes', context.data?.scopes ?? [])
-    recordAuthMetrics(context)
+  onEnd (span, decorator, context: SharedContext) {
+    span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
+    recordAuthMetrics(decorator.scope, context)
   }
 })
 
-interface AuthGetAgenticInstanceTokenDecoratorContext {
-  args: Parameters<MsalTokenProvider['getAgenticInstanceToken']>
-  data?: AuthTokenBase
-  result?: ReturnType<MsalTokenProvider['getAgenticInstanceToken']>
-  duration: () => number
-}
-
-export const AuthGetAgenticInstanceToken = createTracedDecorator<AuthGetAgenticInstanceTokenDecoratorContext>({
+export const AuthGetAgenticInstanceToken = createTracedDecorator<MsalTokenProvider['getAgenticInstanceToken'], AuthGetAccessTokenScope>({
   spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -684,23 +608,16 @@ export const AuthGetAgenticInstanceToken = createTracedDecorator<AuthGetAgenticI
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, agentAppInstanceId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [, agentAppInstanceId] = decorator.args
     span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
-    recordAuthMetrics(context)
+    recordAuthMetrics(decorator.scope, context)
   }
 })
 
-interface AuthGetAgenticUserTokenDecoratorContext {
-  args: Parameters<MsalTokenProvider['getAgenticUserToken']>
-  data?: AuthTokenBase
-  result?: ReturnType<MsalTokenProvider['getAgenticUserToken']>
-  duration: () => number
-}
-
-export const AuthGetAgenticUserToken = createTracedDecorator<AuthGetAgenticUserTokenDecoratorContext>({
+export const AuthGetAgenticUserToken = createTracedDecorator<MsalTokenProvider['getAgenticUserToken'], AuthGetAccessTokenScope>({
   spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_USER_TOKEN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -709,12 +626,12 @@ export const AuthGetAgenticUserToken = createTracedDecorator<AuthGetAgenticUserT
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, agentAppInstanceId, agentUserId, scopes] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [, agentAppInstanceId, agentUserId, scopes] = decorator.args
     span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
     span.setAttribute('agentic.user_id', fallback(agentUserId))
     span.setAttribute('auth.scopes', scopes ?? [])
-    recordAuthMetrics(context)
+    recordAuthMetrics(decorator.scope, context)
   }
 })
 
@@ -722,16 +639,15 @@ export const AuthGetAgenticUserToken = createTracedDecorator<AuthGetAgenticUserT
  * Authorization method decorators
  */
 
-interface AuthorizationAgenticTokenDecoratorContext {
-  args: Parameters<AgenticAuthorization['token']>
-  data?: Partial<{ handlerId: string, connection: string, scopes: string[] }>
-  result?: ReturnType<AgenticAuthorization['token']>
-  duration: () => number
+interface AuthorizationAgenticTokenScope {
+  handlerId: string
+  connection?: string
+  scopes?: string[]
 }
 
-export const AuthorizationAgenticToken = createTracedDecorator<AuthorizationAgenticTokenDecoratorContext>({
+export const AuthorizationAgenticToken = createTracedDecorator<AgenticAuthorization['token'], AuthorizationAgenticTokenScope>({
   spanName: SpanNames.AUTHORIZATION_AGENTIC_TOKEN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -740,102 +656,75 @@ export const AuthorizationAgenticToken = createTracedDecorator<AuthorizationAgen
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    span.setAttribute('handler.id', fallback(context.data?.handlerId))
-    span.setAttribute('connection.name', fallback(context.data?.connection))
-    span.setAttribute('scopes', context.data?.scopes ?? [])
+  onEnd (span, decorator, context: SharedContext) {
+    span.setAttribute('handler.id', fallback(decorator.scope.handlerId))
+    span.setAttribute('connection.name', fallback(decorator.scope.connection))
+    span.setAttribute('scopes', decorator.scope.scopes ?? [])
   }
 })
 
-interface AuthorizationAzureBotTokenDecoratorData {
-  handlerId: string
-  connection?: string
-  scopes?: string[]
-}
-
-interface AuthorizationAzureBotTokenDecoratorContext {
-  args: Parameters<AzureBotAuthorization['token']>
-  result?: ReturnType<AzureBotAuthorization['token']>
-  data: AuthorizationAzureBotTokenDecoratorData
-  duration: () => number
-}
-
-export const AuthorizationAzureBotToken = createTracedDecorator<AuthorizationAzureBotTokenDecoratorContext>({
+export const AuthorizationAzureBotToken = createTracedDecorator<AzureBotAuthorization['token'], AuthorizationAgenticTokenScope>({
   spanName: SpanNames.AUTHORIZATION_AZURE_BOT_TOKEN,
-  onStart (span, context) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
   onError (span, error) {
     span.addEvent('azureBotAuthorization.token.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    span.setAttribute('handler.id', fallback(context.data?.handlerId))
-    span.setAttribute('connection.name', fallback(context.data?.connection))
-    if (context.data?.scopes) {
+  onEnd (span, decorator) {
+    span.setAttribute('handler.id', fallback(decorator.scope.handlerId))
+    span.setAttribute('connection.name', fallback(decorator.scope.connection))
+    if (decorator.scope.scopes) {
       span.setAttribute('flow', 'obo')
-      span.setAttribute('scopes', context.data.scopes ?? [])
+      span.setAttribute('scopes', decorator.scope.scopes ?? [])
     }
   }
 })
 
-interface AuthorizationAzureBotSigninDecoratorContext {
-  args: Parameters<AzureBotAuthorization['signin']>
-  data?: Partial<{ handlerId: string, connection: string, reason: string }>
-  result?: ReturnType<AzureBotAuthorization['signin']>
-  duration: () => number
+interface AuthorizationAzureBotSigninScope {
+  handlerId?: string
+  connection?: string
+  reason?: string
 }
 
-export const AuthorizationAzureBotSignin = createTracedDecorator<AuthorizationAzureBotSigninDecoratorContext>({
+export const AuthorizationAzureBotSignin = createTracedDecorator<AzureBotAuthorization['signin'], AuthorizationAzureBotSigninScope>({
   spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNIN,
-  onStart (span, context) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
   onError (span, error) {
     span.addEvent('azureBotAuthorization.signin.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const status = context.result as Awaited<typeof context.result>
-    span.setAttribute('handler.id', fallback(context.data?.handlerId))
+  onEnd (span, decorator) {
+    const status = decorator.result
+    span.setAttribute('handler.id', fallback(decorator.scope.handlerId))
     span.setAttribute('handler.status', fallback(status))
-    span.setAttribute('handler.status.reason', fallback(context.data?.reason))
-    span.setAttribute('connection.name', fallback(context.data?.connection))
+    span.setAttribute('handler.status.reason', fallback(decorator.scope.reason))
+    span.setAttribute('connection.name', fallback(decorator.scope.connection))
   }
 })
 
-interface AuthorizationAzureBotSignoutDecoratorContext {
-  args: Parameters<AzureBotAuthorization['signout']>
-  data?: Partial<{ handlerId: string, connection: string, channel: string }>
-  result?: ReturnType<AzureBotAuthorization['signout']>
-  duration: () => number
+interface AuthorizationAzureBotSignoutScope {
+  handlerId: string
+  connection: string
+  channel: string
 }
 
-export const AuthorizationAzureBotSignout = createTracedDecorator<AuthorizationAzureBotSignoutDecoratorContext>({
+export const AuthorizationAzureBotSignout = createTracedDecorator<AzureBotAuthorization['signout'], AuthorizationAzureBotSignoutScope>({
   spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNOUT,
-  onStart (span, context) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
   onError (span, error) {
     span.addEvent('azureBotAuthorization.signout.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    span.setAttribute('handler.id', fallback(context.data?.handlerId))
-    span.setAttribute('connection.name', fallback(context.data?.connection))
-    span.setAttribute('channel.id', fallback(context.data?.channel))
+  onEnd (span, decorator) {
+    span.setAttribute('handler.id', fallback(decorator.scope.handlerId))
+    span.setAttribute('connection.name', fallback(decorator.scope.connection))
+    span.setAttribute('channel.id', fallback(decorator.scope.channel))
   }
 })
 
-function recordUserTokenClientMetrics (operation: string, context: Pick<UserTokenClientGetUserTokenDecoratorContext, 'data' | 'duration'>): void {
-  const httpMethod = fallback(context.data?.config?.method?.toUpperCase())
-  const httpStatusCode = context.data?.status ?? -1
+function recordUserTokenClientMetrics (operation: string, scope: UserTokenClientGetUserTokenScope, context: SharedContext): void {
+  const httpMethod = fallback(scope.response?.config?.method?.toUpperCase())
+  const httpStatusCode = scope.response?.status ?? -1
 
   HostingMetrics.userTokenClientRequestsCounter.add(1, {
     operation: fallback(operation),
@@ -849,16 +738,13 @@ function recordUserTokenClientMetrics (operation: string, context: Pick<UserToke
   })
 }
 
-interface UserTokenClientGetUserTokenDecoratorContext {
-  args: Parameters<UserTokenClient['getUserToken']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['getUserToken']>
-  duration: () => number
+interface UserTokenClientGetUserTokenScope {
+  response?: AxiosResponse
 }
 
-export const UserTokenClientGetUserToken = createTracedDecorator<UserTokenClientGetUserTokenDecoratorContext>({
+export const UserTokenClientGetUserToken = createTracedDecorator<UserTokenClient['getUserToken'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_GET_USER_TOKEN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -867,25 +753,18 @@ export const UserTokenClientGetUserToken = createTracedDecorator<UserTokenClient
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [connectionName, channelId, userId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [connectionName, channelId, userId] = decorator.args
     span.setAttribute('auth.connection.name', fallback(connectionName))
     span.setAttribute('agents.activity.channel_id', fallback(channelId))
     span.setAttribute('user.id', fallback(userId))
-    recordUserTokenClientMetrics('getUserToken', context)
+    recordUserTokenClientMetrics('getUserToken', decorator.scope, context)
   }
 })
 
-interface UserTokenClientSignOutDecoratorContext {
-  args: Parameters<UserTokenClient['signOut']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['signOut']>
-  duration: () => number
-}
-
-export const UserTokenClientSignOut = createTracedDecorator<UserTokenClientSignOutDecoratorContext>({
+export const UserTokenClientSignOut = createTracedDecorator<UserTokenClient['signOut'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_SIGN_OUT,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -894,25 +773,18 @@ export const UserTokenClientSignOut = createTracedDecorator<UserTokenClientSignO
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [userId, connectionName, channelId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [userId, connectionName, channelId] = decorator.args
     span.setAttribute('user.id', fallback(userId))
     span.setAttribute('auth.connection.name', fallback(connectionName))
     span.setAttribute('agents.activity.channel_id', fallback(channelId))
-    recordUserTokenClientMetrics('signOut', context)
+    recordUserTokenClientMetrics('signOut', decorator.scope, context)
   }
 })
 
-interface UserTokenClientGetSignInResourceDecoratorContext {
-  args: Parameters<UserTokenClient['getSignInResource']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['getSignInResource']>
-  duration: () => number
-}
-
-export const UserTokenClientGetSignInResource = createTracedDecorator<UserTokenClientGetSignInResourceDecoratorContext>({
+export const UserTokenClientGetSignInResource = createTracedDecorator<UserTokenClient['getSignInResource'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -921,23 +793,16 @@ export const UserTokenClientGetSignInResource = createTracedDecorator<UserTokenC
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [, connectionName] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [, connectionName] = decorator.args
     span.setAttribute('auth.connection.name', fallback(connectionName))
-    recordUserTokenClientMetrics('getSignInResource', context)
+    recordUserTokenClientMetrics('getSignInResource', decorator.scope, context)
   }
 })
 
-interface UserTokenClientExchangeTokenDecoratorContext {
-  args: Parameters<UserTokenClient['exchangeTokenAsync']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['exchangeTokenAsync']>
-  duration: () => number
-}
-
-export const UserTokenClientExchangeToken = createTracedDecorator<UserTokenClientExchangeTokenDecoratorContext>({
+export const UserTokenClientExchangeToken = createTracedDecorator<UserTokenClient['exchangeTokenAsync'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_EXCHANGE_TOKEN,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -946,25 +811,18 @@ export const UserTokenClientExchangeToken = createTracedDecorator<UserTokenClien
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [userId, connectionName, channelId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [userId, connectionName, channelId] = decorator.args
     span.setAttribute('user.id', fallback(userId))
     span.setAttribute('auth.connection.name', fallback(connectionName))
     span.setAttribute('agents.activity.channel_id', fallback(channelId))
-    recordUserTokenClientMetrics('exchangeToken', context)
+    recordUserTokenClientMetrics('exchangeToken', decorator.scope, context)
   }
 })
 
-interface UserTokenClientGetTokenOrSignInResourceDecoratorContext {
-  args: Parameters<UserTokenClient['getTokenOrSignInResource']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['getTokenOrSignInResource']>
-  duration: () => number
-}
-
-export const UserTokenClientGetTokenOrSignInResource = createTracedDecorator<UserTokenClientGetTokenOrSignInResourceDecoratorContext>({
+export const UserTokenClientGetTokenOrSignInResource = createTracedDecorator<UserTokenClient['getTokenOrSignInResource'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGNIN_RESOURCE,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -973,25 +831,18 @@ export const UserTokenClientGetTokenOrSignInResource = createTracedDecorator<Use
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [userId, connectionName, channelId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [userId, connectionName, channelId] = decorator.args
     span.setAttribute('user.id', fallback(userId))
     span.setAttribute('auth.connection.name', fallback(connectionName))
     span.setAttribute('agents.activity.channel_id', fallback(channelId))
-    recordUserTokenClientMetrics('getTokenOrSignInResource', context)
+    recordUserTokenClientMetrics('getTokenOrSignInResource', decorator.scope, context)
   }
 })
 
-interface UserTokenClientGetTokenStatusDecoratorContext {
-  args: Parameters<UserTokenClient['getTokenStatus']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['getTokenStatus']>
-  duration: () => number
-}
-
-export const UserTokenClientGetTokenStatus = createTracedDecorator<UserTokenClientGetTokenStatusDecoratorContext>({
+export const UserTokenClientGetTokenStatus = createTracedDecorator<UserTokenClient['getTokenStatus'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_STATUS,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -1000,24 +851,17 @@ export const UserTokenClientGetTokenStatus = createTracedDecorator<UserTokenClie
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [userId, channelId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [userId, channelId] = decorator.args
     span.setAttribute('user.id', fallback(userId))
     span.setAttribute('agents.activity.channel_id', fallback(channelId))
-    recordUserTokenClientMetrics('getTokenStatus', context)
+    recordUserTokenClientMetrics('getTokenStatus', decorator.scope, context)
   }
 })
 
-interface UserTokenClientGetAadTokensDecoratorContext {
-  args: Parameters<UserTokenClient['getAadTokens']>
-  data?: AxiosResponse
-  result?: ReturnType<UserTokenClient['getAadTokens']>
-  duration: () => number
-}
-
-export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClientGetAadTokensDecoratorContext>({
+export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClient['getAadTokens'], UserTokenClientGetUserTokenScope>({
   spanName: SpanNames.USER_TOKEN_CLIENT_GET_AAD_TOKENS,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -1026,12 +870,12 @@ export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClient
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [userId, connectionName, channelId] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [userId, connectionName, channelId] = decorator.args
     span.setAttribute('user.id', fallback(userId))
     span.setAttribute('auth.connection.name', fallback(connectionName))
     span.setAttribute('agents.activity.channel_id', fallback(channelId))
-    recordUserTokenClientMetrics('getAadTokens', context)
+    recordUserTokenClientMetrics('getAadTokens', decorator.scope, context)
   }
 })
 
@@ -1039,20 +883,15 @@ export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClient
  * TurnContext method decorators
  */
 
-interface TurnContextSendActivityDecoratorContext {
-  args: Parameters<TurnContext['sendActivity']>
-  result?: ReturnType<TurnContext['sendActivity']>
-}
-
-export const TurnContextSendActivity = createTracedDecorator<TurnContextSendActivityDecoratorContext>({
+export const TurnContextSendActivity = createTracedDecorator<TurnContext['sendActivity']>({
   spanName: SpanNames.TURN_SEND_ACTIVITY,
   onError (span, error) {
     span.addEvent('sendActivity.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [activityOrText] = context.args
+  onEnd (span, decorator) {
+    const [activityOrText] = decorator.args
     const activity = typeof activityOrText === 'string'
       ? Activity.fromObject({ type: 'message', text: activityOrText })
       : activityOrText
@@ -1063,20 +902,15 @@ export const TurnContextSendActivity = createTracedDecorator<TurnContextSendActi
   }
 })
 
-interface TurnContextSendActivitiesDecoratorContext {
-  args: Parameters<TurnContext['sendActivities']>
-  result?: ReturnType<TurnContext['sendActivities']>
-}
-
-export const TurnContextSendActivities = createTracedDecorator<TurnContextSendActivitiesDecoratorContext>({
+export const TurnContextSendActivities = createTracedDecorator<TurnContext['sendActivities']>({
   spanName: SpanNames.TURN_SEND_ACTIVITIES,
   onError (span, error) {
     span.addEvent('sendActivities.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [activities] = context.args
+  onEnd (span, decorator) {
+    const [activities] = decorator.args
 
     span.setAttribute('activity.count', activities.length ?? 0)
 
@@ -1087,38 +921,28 @@ export const TurnContextSendActivities = createTracedDecorator<TurnContextSendAc
   }
 })
 
-interface TurnContextUpdateActivityDecoratorContext {
-  args: Parameters<TurnContext['updateActivity']>
-  result?: ReturnType<TurnContext['updateActivity']>
-}
-
-export const TurnContextUpdateActivity = createTracedDecorator<TurnContextUpdateActivityDecoratorContext>({
+export const TurnContextUpdateActivity = createTracedDecorator<TurnContext['updateActivity']>({
   spanName: SpanNames.TURN_UPDATE_ACTIVITY,
   onError (span, error) {
     span.addEvent('updateActivity.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [activity] = context.args
+  onEnd (span, decorator) {
+    const [activity] = decorator.args
     span.setAttribute('activity.id', fallback(activity?.id))
   }
 })
 
-interface TurnContextDeleteActivityDecoratorContext {
-  args: Parameters<TurnContext['deleteActivity']>
-  result?: ReturnType<TurnContext['deleteActivity']>
-}
-
-export const TurnContextDeleteActivity = createTracedDecorator<TurnContextDeleteActivityDecoratorContext>({
+export const TurnContextDeleteActivity = createTracedDecorator<TurnContext['deleteActivity']>({
   spanName: SpanNames.TURN_DELETE_ACTIVITY,
   onError (span, error) {
     span.addEvent('deleteActivity.failed', {
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [idOrReference] = context.args
+  onEnd (span, decorator) {
+    const [idOrReference] = decorator.args
     const activityId = typeof idOrReference === 'string'
       ? idOrReference
       : idOrReference.activityId
@@ -1131,15 +955,9 @@ export const TurnContextDeleteActivity = createTracedDecorator<TurnContextDelete
  * Storage method decorators
  */
 
-interface StorageDecoratorContext {
-  args: [keys: string[]]
-  result?: Promise<any>
-  duration: () => number
-}
-
-export const StorageRead = createTracedDecorator<StorageDecoratorContext>({
+export const StorageRead = createTracedDecorator<TracedStorage['read']>({
   spanName: SpanNames.STORAGE_READ,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -1148,8 +966,8 @@ export const StorageRead = createTracedDecorator<StorageDecoratorContext>({
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [keys] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [keys] = decorator.args
     span.setAttribute('storage.keys.count', keys?.length ?? 0)
     HostingMetrics.storageOperationDuration.record(context.duration(), {
       'agents.storage.operation': 'read'
@@ -1157,9 +975,9 @@ export const StorageRead = createTracedDecorator<StorageDecoratorContext>({
   }
 })
 
-export const StorageWrite = createTracedDecorator<StorageDecoratorContext>({
+export const StorageWrite = createTracedDecorator<TracedStorage['write']>({
   spanName: SpanNames.STORAGE_WRITE,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -1168,8 +986,8 @@ export const StorageWrite = createTracedDecorator<StorageDecoratorContext>({
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [changes] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [changes] = decorator.args
     span.setAttribute('storage.keys.count', changes ? Object.keys(changes).length : 0)
     HostingMetrics.storageOperationDuration.record(context.duration(), {
       'agents.storage.operation': 'write'
@@ -1177,9 +995,9 @@ export const StorageWrite = createTracedDecorator<StorageDecoratorContext>({
   }
 })
 
-export const StorageDelete = createTracedDecorator<StorageDecoratorContext>({
+export const StorageDelete = createTracedDecorator<TracedStorage['delete']>({
   spanName: SpanNames.STORAGE_DELETE,
-  onStart (span, context) {
+  onStart (span, decorator, context: SharedContext) {
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
@@ -1188,8 +1006,8 @@ export const StorageDelete = createTracedDecorator<StorageDecoratorContext>({
       'error.type': fallback(error?.constructor?.name)
     })
   },
-  onEnd (span, context) {
-    const [keys] = context.args
+  onEnd (span, decorator, context: SharedContext) {
+    const [keys] = decorator.args
     span.setAttribute('storage.keys.count', keys?.length ?? 0)
     HostingMetrics.storageOperationDuration.record(context.duration(), {
       'agents.storage.operation': 'delete'

@@ -100,7 +100,7 @@ export class MsalTokenProvider implements AuthProvider {
       authSuccess = true
       return token
     } finally {
-      Traces.AuthGetAccessToken.share.call(this, {
+      Traces.AuthGetAccessToken.share(this, {
         method: authMethod,
         success: authSuccess
       })
@@ -156,7 +156,7 @@ export class MsalTokenProvider implements AuthProvider {
       authSuccess = true
       return token.accessToken
     } finally {
-      Traces.AuthAcquireTokenOnBehalfOf.share.call(this, {
+      Traces.AuthAcquireTokenOnBehalfOf.share(this, {
         method: 'obo',
         success: authSuccess,
         scopes: actualScopes,
@@ -195,7 +195,7 @@ export class MsalTokenProvider implements AuthProvider {
       authSuccess = true
       return token.accessToken
     } finally {
-      Traces.AuthGetAgenticInstanceToken.share.call(this, {
+      Traces.AuthGetAgenticInstanceToken.share(this, {
         method: 'agentic_instance',
         success: authSuccess,
       })
@@ -321,7 +321,7 @@ export class MsalTokenProvider implements AuthProvider {
       authSuccess = true
       return token
     } finally {
-      Traces.AuthGetAgenticUserToken.share.call(this, {
+      Traces.AuthGetAgenticUserToken.share(this, {
         method: 'agentic_user',
         success: authSuccess,
       })

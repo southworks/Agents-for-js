@@ -2,228 +2,176 @@
 // Licensed under the MIT License.
 
 import { Span, SpanOptions, OTelAPI } from './types'
+import pkg from '../package.json'
 
 /*
  * Factory for creating method-specific traced decorators
  */
-interface TracedMethodConfig<TArgs extends DecoratorContextShape> {
+export interface TracedMethodConfig<TDecoratorContext> {
   // Span name (defaults to method name if not provided)
   spanName?: string
   // Base span options (kind, links, etc.)
   spanOptions?: SpanOptions
-  // Extract attributes from method arguments
-  // extractAttributes?: (...args: TArgs) => Attributes
-  // onShare?: (span: Span, data: Record<string, unknown>) => void
   // Called before the original method executes
-  onStart?: (span: Span, context: TArgs) => void
+  onStart?: (span: Span, decorator: TDecoratorContext, context: any) => void
   // Called after successful execution
-  onSuccess?: (span: Span, context: TArgs) => void
+  onSuccess?: (span: Span, decorator: TDecoratorContext, context: any) => void
   // Called on error
-  onError?: (span: Span, error: unknown, context: TArgs) => void
+  onError?: (span: Span, error: unknown, decorator: TDecoratorContext, context: any) => void
   // Called in finally block
-  onEnd?: (span: Span, context: TArgs) => void
-  // Optional callback to create child spans within the method execution
-  onChildSpan?: (spanName: string, span: Span, context: TArgs) => void
+  onEnd?: (span: Span, decorator: TDecoratorContext, context: any) => void
 }
 
-type DecoratorContextShape = {
-  args: unknown[]
-  data?: unknown
-  result?: unknown
+type TMethodShape = (...args: any[]) => any
+type TScopeShape = Record<string, any>
+
+export interface DecoratorContext<TMethod extends TMethodShape, TScope extends TScopeShape> {
+  class: ClassDecoratorContext['name'],
+  name: ClassMethodDecoratorContext['name'],
+  args: Parameters<TMethod>
+  scope: TScope
+  result: AttemptValue<ReturnType<TMethod>>
+  call(): ReturnType<TMethod>
 }
 
-type InternalContextShape<T extends DecoratorContextShape> = T & {
-  onChildSpan?: (spanName: string, span: Span, context: T) => void
-}
+function createDecorator<TMethod extends TMethodShape, TScope extends TScopeShape> (fn: (decorator: DecoratorContext<TMethod, TScope>) => ReturnType<TMethod>) {
+  const store = new WeakMap<object, TScope>()
 
-let otel: OTelAPI
+  function decorator (originalMethod: TMethod, context: ClassMethodDecoratorContext) {
+    if (context.kind !== 'method') {
+      throw new Error('TraceDecorator can only be applied to methods')
+    }
 
-export function createTracedDecorator<TContext extends DecoratorContextShape> (config: TracedMethodConfig<TContext> = {}) {
-  const tracer = otel.trace.getTracer(`tracer[${config.spanName ?? 'agents.telemetry'}]`, '1.0.0')
-  const invocationStacks = new WeakMap<object, Array<InternalContextShape<TContext>>>()
+    return function decoratorWrapperMethod (this: any, ...args: Parameters<TMethod>) {
+      const thisWrapper = this
+      store.set(thisWrapper, {} as TScope)
 
-  const sharedContext = {
-    args: [] as unknown[] as TContext['args'],
-    data: undefined,
-    result: undefined,
-    onChildSpan: config.onChildSpan
-  } as InternalContextShape<TContext>
-
-  const decorator = function <T extends (...args: TContext['args']) => TContext['result']>(
-    originalMethod: T,
-    context: ClassMethodDecoratorContext
-  ): T | void {
-    const methodName = String(context.name)
-
-    const wrappedMethod = function (this: any, ...args: TContext['args']): TContext['result'] {
-      const spanName = config.spanName ?? `${this.constructor.name}.${methodName}`
-      const thisArgObject = (typeof this === 'object' && this !== null) || typeof this === 'function'
-        ? this as object
-        : undefined
-
-      const invocationContext = {
+      const value: DecoratorContext<TMethod, TScope> = {
+        class: thisWrapper.constructor.name,
+        name: context.name,
         args,
-        data: undefined,
-        result: undefined,
-        onChildSpan: config.onChildSpan
-      } as InternalContextShape<TContext>
-
-      if (thisArgObject) {
-        const stack = invocationStacks.get(thisArgObject) ?? []
-        stack.push(invocationContext)
-        invocationStacks.set(thisArgObject, stack)
-      }
-
-      const span = tracer.startSpan(spanName, config.spanOptions ?? {})
-      const activeContext = otel.context.active()
-      const spanContext = activeContext ? otel.trace.setSpan(activeContext, span) : undefined
-      const runInSpanContext = <TResult>(fn: () => TResult): TResult => {
-        return spanContext ? (otel.context.with(spanContext, fn) ?? fn()) : fn()
-      }
-
-      const cleanupInvocationContext = () => {
-        if (!thisArgObject) {
-          return
-        }
-
-        const stack = invocationStacks.get(thisArgObject)
-        if (!stack) {
-          return
-        }
-
-        stack.pop()
-        if (stack.length === 0) {
-          invocationStacks.delete(thisArgObject)
-        }
-      }
-
-      return runInSpanContext(() => {
-        config.onStart?.(span, invocationContext)
-
-        const result = originalMethod.apply(this, args)
-
-        try {
-          if (isPromise(result)) {
-            return result
-              .then((res) => runInSpanContext(() => {
-                invocationContext.result = res
-                config.onSuccess?.(span, invocationContext)
-                span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
-                return res
-              }))
-              .catch((error: unknown) => runInSpanContext(() => {
-                config.onError?.(span, error, invocationContext)
-                recordError(span, error)
-                throw error
-              }))
-              .finally(() => runInSpanContext(() => {
-                config.onEnd?.(span, invocationContext)
-                span.end()
-                cleanupInvocationContext()
-              }))
+        scope: {} as TScope,
+        result: undefined as any,
+        call: () => attempt({
+          try: () => originalMethod.apply(thisWrapper, args),
+          then (result) {
+            value.scope = store.get(thisWrapper)!
+            value.result = result
           }
+        })
+      }
 
-          invocationContext.result = result
-          config.onSuccess?.(span, invocationContext)
-          span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
-          config.onEnd?.(span, invocationContext)
-          span.end()
-          cleanupInvocationContext()
-          return result
-        } catch (error) {
-          config.onError?.(span, error, invocationContext)
-          recordError(span, error)
-          config.onEnd?.(span, invocationContext)
-          span.end()
-          cleanupInvocationContext()
-          throw error
+      return attempt({
+        try: () => fn(value),
+        finally () {
+          store.delete(thisWrapper)
         }
       })
     }
-
-    return wrappedMethod as T
   }
 
-  decorator.share = function (this: unknown, data: TContext['data']) {
-    const thisArgObject = (typeof this === 'object' && this !== null) || typeof this === 'function'
-      ? this as object
-      : undefined
-    const activeInvocationContext = thisArgObject ? invocationStacks.get(thisArgObject)?.at(-1) : undefined
-    const targetContext = activeInvocationContext ?? sharedContext
-
-    if (isPlainObject(targetContext.data) && isPlainObject(data)) {
-      targetContext.data = { ...targetContext.data, ...data }
-    } else {
-      targetContext.data = data
+  decorator.share = function share (_this: any, scope: TScope) {
+    const context = _this ? store.get(_this) : undefined
+    if (!context) {
+      throw new Error('No active context scope found. Ensure that "share" is called within a decorated method.')
     }
+
+    Object.assign(context, scope)
   }
 
-  /**
-   * Creates a child span within the current active span context.
-   * If the parent decorator has an `onChildSpan` callback configured, it will be called
-   * with the span name, span, and shared context.
-   */
-  decorator.withChildSpan = async function <T> (
-    this: unknown,
-    spanName: string,
-    fn: (span: Span | undefined) => Promise<T>,
-    options?: SpanOptions
-  ): Promise<T | undefined> {
-    const span = tracer?.startSpan(spanName, options ?? {})
-    if (!span) {
-      return fn(undefined)
+  decorator.process = function process (_this: any, fn: TMethod) {
+    const context = _this ? store.get(_this) : undefined
+    if (!context) {
+      throw new Error('No active context scope found. Ensure that "process" is called within a decorated method.')
     }
 
-    const activeContext = otel.context.active()
-    const spanContext = activeContext ? otel.trace.setSpan(activeContext, span) : undefined
-    const runInSpanContext = <TResult>(callback: () => TResult): TResult => {
-      return spanContext ? (otel.context.with(spanContext, callback) ?? callback()) : callback()
-    }
-
-    const thisArgObject = (typeof this === 'object' && this !== null) || typeof this === 'function'
-      ? this as object
-      : undefined
-    const activeInvocationContext = thisArgObject ? invocationStacks.get(thisArgObject)?.at(-1) : undefined
-    const targetContext = activeInvocationContext ?? sharedContext
-
-    return runInSpanContext(async () => {
-      try {
-        // Call the onChildSpan callback if defined in the parent decorator
-        targetContext?.onChildSpan?.(spanName, span, targetContext)
-
-        const result = await fn(span)
-        span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
-        return result
-      } catch (error) {
-        recordError(span, error)
-        throw error
-      } finally {
-        span.end()
-      }
-    })
+    const decoratorInstance = decorator(fn, { kind: 'method', name: this.name } as ClassMethodDecoratorContext)
+    return decoratorInstance.apply(_this)
   }
 
   return decorator
 }
 
-function recordError (span: Span, error: unknown): void {
-  if (error instanceof Error) {
-    span.recordException(error)
-    span.setStatus({ code: otel!.SpanStatusCode.ERROR, message: error.message })
-  } else {
-    span.setStatus({ code: otel!.SpanStatusCode.ERROR, message: String(error) })
+export function DecoratorFactory (otel: OTelAPI) {
+  return {
+    trace<TMethod extends TMethodShape, TScope extends TScopeShape = {}>(config: TracedMethodConfig<DecoratorContext<TMethod, TScope>> = {}) {
+      const tracer = otel.trace.getTracer(pkg.name, pkg.version)
+      return createDecorator<TMethod, TScope>((decorator) => {
+        const result = tracer.startActiveSpan(config.spanName!, config.spanOptions ?? {}, (span) => {
+          const sharedContext = {}
+          config.onStart?.(span, decorator, sharedContext)
+          return attempt({
+            try () {
+              return decorator.call()
+            },
+            then () {
+              config.onSuccess?.(span, decorator, sharedContext)
+              span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
+            },
+            catch (error) {
+              config.onError?.(span, error, decorator, sharedContext)
+              if (error instanceof Error) {
+                span.recordException(error)
+                span.setStatus({ code: otel.SpanStatusCode.ERROR, message: error.message })
+              } else {
+                span.setStatus({ code: otel.SpanStatusCode.ERROR, message: String(error) })
+              }
+              throw error
+            },
+            finally () {
+              config.onEnd?.(span, decorator, sharedContext)
+              span.end()
+            }
+          })
+        })
+
+        return result
+      })
+    }
   }
 }
 
 function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
-  return typeof value === 'object' && value !== null && 'then' in value
+  return (
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    'then' in value &&
+    typeof value.then === 'function'
+  )
 }
 
-function isPlainObject (value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && value.constructor === Object
-}
+type AttemptValue<TResult> =
+  TResult extends Promise<infer U> ? U : TResult
 
-export function TraceDecoratorFactory (_otel: OTelAPI) {
-  otel = _otel
-  return createTracedDecorator
+function attempt<TResult> (options: {
+  try: () => TResult,
+  then?: (result: TResult) => TResult | void,
+  catch?: (error: unknown) => void,
+  finally?: () => void
+}): TResult {
+  let _isPromise = false
+  try {
+    const result = options.try()
+    if (isPromise(result)) {
+      _isPromise = true
+      return result
+        .then((res) => options.then?.(res) ?? res)
+        .catch((error) => {
+          options.catch?.(error)
+          throw error
+        })
+        .finally(options.finally) as any
+    }
+
+    return options.then?.(result) ?? result
+  } catch (error) {
+    if (!_isPromise) {
+      options.catch?.(error)
+    }
+    throw error
+  } finally {
+    if (!_isPromise) {
+      options.finally?.()
+    }
+  }
 }

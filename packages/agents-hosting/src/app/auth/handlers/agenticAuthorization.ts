@@ -130,7 +130,7 @@ export class AgenticAuthorization implements AuthorizationHandler {
       this._onFailure?.(context, `${reason}: ${(error as Error).message}`)
       return { token: undefined }
     } finally {
-      Traces.AuthorizationAgenticToken.share.call(this, {
+      Traces.AuthorizationAgenticToken.share(this, {
         handlerId: this.id,
         connection: connection?.connectionSettings?.connectionName ?? this._options.altBlueprintConnectionName,
         scopes

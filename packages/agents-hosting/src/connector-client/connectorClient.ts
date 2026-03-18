@@ -147,7 +147,7 @@ export class ConnectorClient {
       params: continuationToken ? { continuationToken } : undefined
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorGetConversations.share.call(this, response)
+    Traces.ConnectorGetConversations.share(this, { response })
     return response.data
   }
 
@@ -164,7 +164,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorGetConversationMember.share.call(this, response)
+    Traces.ConnectorGetConversationMember.share(this, { response })
     return response.data
   }
 
@@ -188,7 +188,7 @@ export class ConnectorClient {
       data: payload
     }
     const response: AxiosResponse = await this._axiosInstance(config)
-    Traces.ConnectorCreateConversation.share.call(this, response)
+    Traces.ConnectorCreateConversation.share(this, { response })
     return response.data
   }
 
@@ -221,7 +221,7 @@ export class ConnectorClient {
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorReplyToActivity.share.call(this, response)
+    Traces.ConnectorReplyToActivity.share(this, { response })
     logger.info('Reply to conversation/activity: ', response.data.id!, activityId)
     return response.data
   }
@@ -273,7 +273,7 @@ export class ConnectorClient {
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorSendToConversation.share.call(this, response)
+    Traces.ConnectorSendToConversation.share(this, { response })
     return response.data
   }
 
@@ -302,7 +302,7 @@ export class ConnectorClient {
       data: normalizeOutgoingActivity(body)
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorUpdateActivity.share.call(this, response)
+    Traces.ConnectorUpdateActivity.share(this, { response })
     return response.data
   }
 
@@ -328,7 +328,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorDeleteActivity.share.call(this, response)
+    Traces.ConnectorDeleteActivity.share(this, { response })
     return response.data
   }
 
@@ -355,7 +355,7 @@ export class ConnectorClient {
       data: body
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorUploadAttachment.share.call(this, response)
+    Traces.ConnectorUploadAttachment.share(this, { response })
     return response.data
   }
 
@@ -379,7 +379,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorGetAttachmentInfo.share.call(this, response)
+    Traces.ConnectorGetAttachmentInfo.share(this, { response })
     return response.data
   }
 
@@ -408,7 +408,7 @@ export class ConnectorClient {
       }
     }
     const response = await this._axiosInstance(config)
-    Traces.ConnectorGetAttachment.share.call(this, response)
+    Traces.ConnectorGetAttachment.share(this, { response })
     return response.data
   }
 }

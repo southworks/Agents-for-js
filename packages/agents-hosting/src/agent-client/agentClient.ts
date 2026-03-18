@@ -116,7 +116,7 @@ export class AgentClient {
       body: JSON.stringify(activityCopy)
     })
 
-    Traces.AgentClientPostActivity.share.call(this, {
+    Traces.AgentClientPostActivity.share(this, {
       response,
       targetEndpoint: this.agentClientConfig.endPoint,
       targetClientId: this.agentClientConfig.clientId
