@@ -213,6 +213,7 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a UserTokenClient instance.
    * @protected
    */
+  @Traces.CloudAdapterCreateUserTokenClient
   protected async createUserTokenClient (
     identity: JwtPayload,
     tokenServiceEndpoint: string = getTokenServiceEndpoint(),

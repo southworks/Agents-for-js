@@ -3,7 +3,6 @@
 
 import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
 import { AxiosResponse } from 'axios'
-import { Activity } from '@microsoft/agents-activity'
 import type { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
 import { AgentApplication } from '../app/agentApplication'
@@ -34,11 +33,6 @@ export const CloudAdapterProcess = createTracedDecorator<ProcessDecoratorContext
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('process.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const { data, duration } = context
     const type = fallback(data?.activity?.type)
@@ -67,11 +61,6 @@ interface SendActivitiesDecoratorContext {
 
 export const CloudAdapterSendActivities = createTracedDecorator<SendActivitiesDecoratorContext>({
   spanName: SpanNames.ADAPTER_SEND_ACTIVITIES,
-  onError (span, error) {
-    span.addEvent('send.activities.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [, _activities] = context.args
     const activities = _activities ?? []
@@ -80,6 +69,9 @@ export const CloudAdapterSendActivities = createTracedDecorator<SendActivitiesDe
     span.setAttribute('activity.conversation_id', fallback(activities[0]?.conversation?.id))
 
     for (const activity of activities) {
+      span.setAttribute('activity.type', fallback(activity.type))
+      span.setAttribute('activity.id', fallback(activity.id))
+
       HostingMetrics.activitiesSentCounter.add(1, {
         'activity.type': fallback(activity?.type),
         'activity.channel_id': fallback(activity?.channelId)
@@ -95,11 +87,6 @@ interface UpdateActivityDecoratorContext {
 
 export const CloudAdapterUpdateActivity = createTracedDecorator<UpdateActivityDecoratorContext>({
   spanName: SpanNames.ADAPTER_UPDATE_ACTIVITY,
-  onError (span, error) {
-    span.addEvent('update.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [, activity] = context.args
 
@@ -120,11 +107,6 @@ interface DeleteActivityDecoratorContext {
 
 export const CloudAdapterDeleteActivity = createTracedDecorator<DeleteActivityDecoratorContext>({
   spanName: SpanNames.ADAPTER_DELETE_ACTIVITY,
-  onError (span, error) {
-    span.addEvent('delete.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [, reference] = context.args
 
@@ -145,11 +127,6 @@ interface ContinueConversationDecoratorContext {
 
 export const CloudAdapterContinueConversation = createTracedDecorator<ContinueConversationDecoratorContext>({
   spanName: SpanNames.ADAPTER_CONTINUE_CONVERSATION,
-  onError (span, error) {
-    span.addEvent('continue.conversation.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [, reference] = context.args
     const botAppId = fallback(context.data?.identity?.aud)
@@ -169,11 +146,6 @@ interface CreateConnectorClientDecoratorContext {
 
 export const CloudAdapterCreateConnectorClient = createTracedDecorator<CreateConnectorClientDecoratorContext>({
   spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
-  onError (span, error) {
-    span.addEvent('create.connector.client.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [_serviceUrl, _scope] = context.args
     const serviceUrl = fallback(_serviceUrl)
@@ -192,11 +164,6 @@ interface CreateConnectorClientWithIdentityDecoratorContext {
 
 export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorator<CreateConnectorClientWithIdentityDecoratorContext>({
   spanName: SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT,
-  onError (span, error) {
-    span.addEvent('create.connector.client.with.identity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [, activity] = context.args
     const isAgenticRequest = activity?.isAgenticRequest() ?? false
@@ -206,6 +173,23 @@ export const CloudAdapterCreateConnectorClientWithIdentity = createTracedDecorat
     span.setAttribute('service_url', serviceUrl)
     span.setAttribute('auth.scope', scope)
     span.setAttribute('activity.is_agentic', isAgenticRequest)
+  }
+})
+
+interface CreateUserTokenClientDecoratorContext {
+  args: Parameters<CloudAdapter['createUserTokenClient']>
+  result?: ReturnType<CloudAdapter['createUserTokenClient']>
+}
+
+export const CloudAdapterCreateUserTokenClient = createTracedDecorator<CreateUserTokenClientDecoratorContext>({
+  spanName: SpanNames.ADAPTER_CREATE_USER_TOKEN_CLIENT,
+  onEnd (span, context) {
+    const [, _tokenserviceEndpoint, _scope] = context.args
+    const serviceEndpoint = fallback(_tokenserviceEndpoint)
+    const scope = fallback(_scope)
+
+    span.setAttribute('token.service.endpoint', serviceEndpoint)
+    span.setAttribute('auth.scope', scope)
   }
 })
 
@@ -241,12 +225,8 @@ export const AgentApplicationRun = createTracedDecorator<AppRunDecoratorContext>
     }
   },
   onError (span, error) {
-    const type = fallback(error?.constructor?.name)
-    span.addEvent('app.run.failed', {
-      'error.type': type
-    })
     HostingMetrics.turnsErrorsCounter.add(1, {
-      'error.type': type
+      'error.type': fallback(error?.constructor?.name)
     })
   },
   onEnd (span, context) {
@@ -308,11 +288,6 @@ export const ConnectorReplyToActivity = createTracedDecorator<ConnectorReplyToAc
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('reply.to.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [conversationId, activityId] = context.args
     span.setAttribute('activity.conversation_id', fallback(conversationId))
@@ -334,11 +309,6 @@ export const ConnectorSendToConversation = createTracedDecorator<ConnectorSendTo
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('send.to.conversation.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [conversationId] = context.args
     span.setAttribute('activity.conversation_id', fallback(conversationId))
@@ -358,11 +328,6 @@ export const ConnectorUpdateActivity = createTracedDecorator<ConnectorUpdateActi
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('update.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [conversationId, activityId] = context.args
@@ -385,11 +350,6 @@ export const ConnectorDeleteActivity = createTracedDecorator<ConnectorDeleteActi
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('delete.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [conversationId, activityId] = context.args
     span.setAttribute('activity.conversation_id', fallback(conversationId))
@@ -411,11 +371,6 @@ export const ConnectorCreateConversation = createTracedDecorator<ConnectorCreate
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('create.conversation.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     recordConnectorMetrics('create.conversation', context)
   }
@@ -433,11 +388,6 @@ export const ConnectorGetConversations = createTracedDecorator<ConnectorGetConve
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('get.conversations.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     recordConnectorMetrics('get.conversations', context)
@@ -457,11 +407,6 @@ export const ConnectorGetConversationMember = createTracedDecorator<ConnectorGet
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('get.conversation.member.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     recordConnectorMetrics('get.conversation.member', context)
   }
@@ -479,11 +424,6 @@ export const ConnectorUploadAttachment = createTracedDecorator<ConnectorUploadAt
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('upload.attachment.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [conversationId] = context.args
@@ -505,11 +445,6 @@ export const ConnectorGetAttachmentInfo = createTracedDecorator<ConnectorGetAtta
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('get.attachment.info.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [attachmentId] = context.args
     span.setAttribute('attachment.id', fallback(attachmentId))
@@ -529,11 +464,6 @@ export const ConnectorGetAttachment = createTracedDecorator<ConnectorGetAttachme
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('get.attachment.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [attachmentId] = context.args
@@ -565,11 +495,6 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('post.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const targetEndpoint = fallback(context.data?.targetEndpoint)
     const targetClientId = fallback(context.data?.targetClientId)
@@ -596,6 +521,7 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClientPostActi
 interface AuthTokenBase {
   method: string
   success: boolean
+  scopes?: string | string[]
 }
 
 function recordAuthMetrics (context: Pick<AuthGetAccessTokenDecoratorContext, 'data' | 'duration'>): void {
@@ -625,14 +551,8 @@ export const AuthGetAccessToken = createTracedDecorator<AuthGetAccessTokenDecora
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('get.access.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
-    const [, scope] = context.args
-    span.setAttribute('auth.scopes', [fallback(scope)])
+    span.setAttribute('auth.scope', fallback(context.data?.scopes))
     span.setAttribute('auth.method', fallback(context.data?.method))
     recordAuthMetrics(context)
   }
@@ -655,11 +575,6 @@ export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<AuthAcquireToken
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('acquire.token.on.behalf.of.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     span.setAttribute('auth.scopes', context.data?.scopes ?? [])
     recordAuthMetrics(context)
@@ -678,11 +593,6 @@ export const AuthGetAgenticInstanceToken = createTracedDecorator<AuthGetAgenticI
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('get.agentic.instance.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [, agentAppInstanceId] = context.args
@@ -703,11 +613,6 @@ export const AuthGetAgenticUserToken = createTracedDecorator<AuthGetAgenticUserT
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('get.agentic.user.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [, agentAppInstanceId, agentUserId, scopes] = context.args
@@ -735,11 +640,6 @@ export const AuthorizationAgenticToken = createTracedDecorator<AuthorizationAgen
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('agentic.authorization.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     span.setAttribute('auth.handler.id', fallback(context.data?.handlerId))
     span.setAttribute('auth.connection.name', fallback(context.data?.connection))
@@ -766,11 +666,6 @@ export const AuthorizationAzureBotToken = createTracedDecorator<AuthorizationAzu
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('azure.bot.authorization.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     span.setAttribute('auth.handler.id', fallback(context.data?.handlerId))
     span.setAttribute('auth.connection.name', fallback(context.data?.connection))
@@ -794,11 +689,6 @@ export const AuthorizationAzureBotSignin = createTracedDecorator<AuthorizationAz
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('azure.bot.authorization.signin.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const status = context.result as Awaited<typeof context.result>
     span.setAttribute('auth.handler.id', fallback(context.data?.handlerId))
@@ -820,11 +710,6 @@ export const AuthorizationAzureBotSignout = createTracedDecorator<AuthorizationA
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('azure.bot.authorization.signout.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     span.setAttribute('auth.handler.id', fallback(context.data?.handlerId))
@@ -862,11 +747,6 @@ export const UserTokenClientGetUserToken = createTracedDecorator<UserTokenClient
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('user.token.client.get.user.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [connectionName, channelId, userId] = context.args
     span.setAttribute('auth.connection.name', fallback(connectionName))
@@ -888,11 +768,6 @@ export const UserTokenClientSignOut = createTracedDecorator<UserTokenClientSignO
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('user.token.client.signOut.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [userId, connectionName, channelId] = context.args
@@ -916,11 +791,6 @@ export const UserTokenClientGetSignInResource = createTracedDecorator<UserTokenC
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('user.token.client.get.sign.in.resource.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [, connectionName] = context.args
     span.setAttribute('auth.connection.name', fallback(connectionName))
@@ -940,11 +810,6 @@ export const UserTokenClientExchangeToken = createTracedDecorator<UserTokenClien
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('user.token.client.exchange.token.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [userId, connectionName, channelId] = context.args
@@ -968,11 +833,6 @@ export const UserTokenClientGetTokenOrSignInResource = createTracedDecorator<Use
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('user.token.client.get.token.or.sign.in.resource.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [userId, connectionName, channelId] = context.args
     span.setAttribute('user.id', fallback(userId))
@@ -995,11 +855,6 @@ export const UserTokenClientGetTokenStatus = createTracedDecorator<UserTokenClie
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('user.token.client.get.token.status.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [userId, channelId] = context.args
     span.setAttribute('user.id', fallback(userId))
@@ -1021,11 +876,6 @@ export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClient
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('user.token.client.get.aad.tokens.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [userId, connectionName, channelId] = context.args
     span.setAttribute('user.id', fallback(userId))
@@ -1039,30 +889,6 @@ export const UserTokenClientGetAadTokens = createTracedDecorator<UserTokenClient
  * TurnContext method decorators
  */
 
-interface TurnContextSendActivityDecoratorContext {
-  args: Parameters<TurnContext['sendActivity']>
-  result?: ReturnType<TurnContext['sendActivity']>
-}
-
-export const TurnContextSendActivity = createTracedDecorator<TurnContextSendActivityDecoratorContext>({
-  spanName: SpanNames.TURN_SEND_ACTIVITY,
-  onError (span, error) {
-    span.addEvent('send.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
-  onEnd (span, context) {
-    const [activityOrText] = context.args
-    const activity = typeof activityOrText === 'string'
-      ? Activity.fromObject({ type: 'message', text: activityOrText })
-      : activityOrText
-
-    span.setAttribute('activity.type', fallback(activity.type))
-    span.setAttribute('activity.id', fallback(activity.id))
-    span.setAttribute('activity.count', 1)
-  }
-})
-
 interface TurnContextSendActivitiesDecoratorContext {
   args: Parameters<TurnContext['sendActivities']>
   result?: ReturnType<TurnContext['sendActivities']>
@@ -1070,11 +896,6 @@ interface TurnContextSendActivitiesDecoratorContext {
 
 export const TurnContextSendActivities = createTracedDecorator<TurnContextSendActivitiesDecoratorContext>({
   spanName: SpanNames.TURN_SEND_ACTIVITIES,
-  onError (span, error) {
-    span.addEvent('send.activities.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [activities] = context.args
 
@@ -1082,48 +903,9 @@ export const TurnContextSendActivities = createTracedDecorator<TurnContextSendAc
 
     for (const activity of activities) {
       span.setAttribute('activity.type', fallback(activity.type))
+      span.setAttribute('activity.delivery_mode', fallback(activity.deliveryMode))
       span.setAttribute('activity.id', fallback(activity.id))
     }
-  }
-})
-
-interface TurnContextUpdateActivityDecoratorContext {
-  args: Parameters<TurnContext['updateActivity']>
-  result?: ReturnType<TurnContext['updateActivity']>
-}
-
-export const TurnContextUpdateActivity = createTracedDecorator<TurnContextUpdateActivityDecoratorContext>({
-  spanName: SpanNames.TURN_UPDATE_ACTIVITY,
-  onError (span, error) {
-    span.addEvent('update.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
-  onEnd (span, context) {
-    const [activity] = context.args
-    span.setAttribute('activity.id', fallback(activity?.id))
-  }
-})
-
-interface TurnContextDeleteActivityDecoratorContext {
-  args: Parameters<TurnContext['deleteActivity']>
-  result?: ReturnType<TurnContext['deleteActivity']>
-}
-
-export const TurnContextDeleteActivity = createTracedDecorator<TurnContextDeleteActivityDecoratorContext>({
-  spanName: SpanNames.TURN_DELETE_ACTIVITY,
-  onError (span, error) {
-    span.addEvent('delete.activity.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
-  onEnd (span, context) {
-    const [idOrReference] = context.args
-    const activityId = typeof idOrReference === 'string'
-      ? idOrReference
-      : idOrReference.activityId
-
-    span.setAttribute('activity.id', fallback(activityId))
   }
 })
 
@@ -1143,11 +925,6 @@ export const StorageRead = createTracedDecorator<StorageDecoratorContext>({
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('storage.read.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [keys] = context.args
     span.setAttribute('storage.key.count', keys?.length ?? 0)
@@ -1163,11 +940,6 @@ export const StorageWrite = createTracedDecorator<StorageDecoratorContext>({
     const start = performance.now()
     context.duration = () => performance.now() - start
   },
-  onError (span, error) {
-    span.addEvent('storage.write.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
   onEnd (span, context) {
     const [changes] = context.args
     span.setAttribute('storage.key.count', changes ? Object.keys(changes).length : 0)
@@ -1182,11 +954,6 @@ export const StorageDelete = createTracedDecorator<StorageDecoratorContext>({
   onStart (span, context) {
     const start = performance.now()
     context.duration = () => performance.now() - start
-  },
-  onError (span, error) {
-    span.addEvent('storage.delete.failed', {
-      'error.type': fallback(error?.constructor?.name)
-    })
   },
   onEnd (span, context) {
     const [keys] = context.args

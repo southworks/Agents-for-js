@@ -113,7 +113,7 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
               }))
               .catch((error: unknown) => runInSpanContext(() => {
                 config.onError?.(span, error, invocationContext)
-                recordError(span, error)
+                recordError(spanName, span, error)
                 throw error
               }))
               .finally(() => runInSpanContext(() => {
@@ -132,7 +132,7 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
           return result
         } catch (error) {
           config.onError?.(span, error, invocationContext)
-          recordError(span, error)
+          recordError(spanName, span, error)
           config.onEnd?.(span, invocationContext)
           span.end()
           cleanupInvocationContext()
@@ -195,7 +195,7 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
         span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
         return result
       } catch (error) {
-        recordError(span, error)
+        recordError(spanName, span, error)
         throw error
       } finally {
         span.end()
@@ -206,7 +206,11 @@ export function createTracedDecorator<TContext extends DecoratorContextShape> (c
   return decorator
 }
 
-function recordError (span: Span, error: unknown): void {
+function recordError (spanName: string, span: Span, error: unknown): void {
+  span.addEvent(`${spanName}_failed`, {
+    'error.type': error instanceof Error ? (error.name ?? 'unknown') : 'unknown',
+    'error.message': error instanceof Error ? (error.message ?? 'unknown') : String(error)
+  })
   if (error instanceof Error) {
     span.recordException(error)
     span.setStatus({ code: otel!.SpanStatusCode.ERROR, message: error.message })
