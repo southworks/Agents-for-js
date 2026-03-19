@@ -569,6 +569,10 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public async run (turnContext:TurnContext): Promise<void> {
+    if (turnContext.activity.type === ActivityTypes.Typing) {
+      return
+    }
+
     await this.runInternal(turnContext)
   }
 
@@ -605,10 +609,6 @@ export class AgentApplication<TState extends TurnState> {
    */
   @Traces.AgentApplicationRun
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
-    if (turnContext.activity.type === ActivityTypes.Typing) {
-      return false
-    }
-
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
       try {
@@ -673,9 +673,7 @@ export class AgentApplication<TState extends TurnState> {
           return false
         }
 
-        await Traces.AgentApplicationRouteHandler.process(this, async function routeHandler () {
-          await route.handler(context, state)
-        })
+        await Traces.AgentApplicationRouteHandler.process(() => route.handler(context, state))
 
         if (this._afterTurn.length > 0) {
           // await Traces.AgentApplicationRun.withChildSpan.call(this, SpanNames.AGENTS_APP_AFTER_TURN, async () => {

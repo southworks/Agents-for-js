@@ -79,14 +79,8 @@ function createDecorator<TMethod extends TMethodShape, TScope extends TScopeShap
     Object.assign(context, scope)
   }
 
-  decorator.process = function process (_this: any, fn: TMethod) {
-    const context = _this ? store.get(_this) : undefined
-    if (!context) {
-      throw new Error('No active context scope found. Ensure that "process" is called within a decorated method.')
-    }
-
-    const decoratorInstance = decorator(fn, { kind: 'method', name: this.name } as ClassMethodDecoratorContext)
-    return decoratorInstance.apply(_this)
+  decorator.process = function process (fn: TMethod) {
+    return decorator(fn, { kind: 'method', name: this.name } as ClassMethodDecoratorContext).apply(this)
   }
 
   return decorator
