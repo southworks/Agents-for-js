@@ -109,13 +109,24 @@ export function DecoratorFactory (otel: OTelAPI) {
               span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
             },
             catch (error) {
-              config.onError?.(span, error, decorator, sharedContext)
+              let type = ''
+              let message = ''
+
               if (error instanceof Error) {
+                type = error.name
+                message = error.message
                 span.recordException(error)
-                span.setStatus({ code: otel.SpanStatusCode.ERROR, message: error.message })
               } else {
-                span.setStatus({ code: otel.SpanStatusCode.ERROR, message: String(error) })
+                type = typeof error
+                message = String(error)
               }
+
+              config.onError?.(span, error, decorator, sharedContext)
+              span.setStatus({ code: otel.SpanStatusCode.ERROR, message })
+              span.addEvent(`${config.spanName}_failed`, {
+                'error.type': type,
+                'error.message': message
+              })
               throw error
             },
             finally () {

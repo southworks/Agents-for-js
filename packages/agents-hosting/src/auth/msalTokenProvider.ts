@@ -102,7 +102,8 @@ export class MsalTokenProvider implements AuthProvider {
     } finally {
       Traces.AuthGetAccessToken.share(this, {
         method: authMethod,
-        success: authSuccess
+        success: authSuccess,
+        scopes: actualScope
       })
     }
   }
@@ -197,7 +198,7 @@ export class MsalTokenProvider implements AuthProvider {
     } finally {
       Traces.AuthGetAgenticInstanceToken.share(this, {
         method: 'agentic_instance',
-        success: authSuccess,
+        success: authSuccess
       })
     }
   }
@@ -324,6 +325,7 @@ export class MsalTokenProvider implements AuthProvider {
       Traces.AuthGetAgenticUserToken.share(this, {
         method: 'agentic_user',
         success: authSuccess,
+        scopes
       })
     }
   }

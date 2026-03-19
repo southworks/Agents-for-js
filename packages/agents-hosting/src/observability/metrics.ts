@@ -38,7 +38,7 @@ export class HostingMetrics {
     description: 'Total number of inter-agent calls'
   })
 
-  public static turnsTotalCounter = this.meter.createCounter(MetricNames.TURNS_TOTAL, {
+  public static turnsTotalCounter = this.meter.createCounter(MetricNames.TURNS_COUNT, {
     unit: 'turn',
     description: 'Total turns processed'
   })

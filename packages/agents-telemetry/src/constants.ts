@@ -4,42 +4,43 @@
 export const SpanNames = {
   // CloudAdapter / BaseAdapter
   ADAPTER_PROCESS: 'agents.adapter.process',
-  ADAPTER_SEND_ACTIVITIES: 'agents.adapter.sendActivities',
-  ADAPTER_UPDATE_ACTIVITY: 'agents.adapter.updateActivity',
-  ADAPTER_DELETE_ACTIVITY: 'agents.adapter.deleteActivity',
-  ADAPTER_CONTINUE_CONVERSATION: 'agents.adapter.continueConversation',
-  ADAPTER_CREATE_CONNECTOR_CLIENT: 'agents.adapter.createConnectorClient',
-  ADAPTER_TURN: 'agents.adapter.turn',
+  ADAPTER_SEND_ACTIVITIES: 'agents.adapter.send_activities',
+  ADAPTER_UPDATE_ACTIVITY: 'agents.adapter.update_activity',
+  ADAPTER_DELETE_ACTIVITY: 'agents.adapter.delete_activity',
+  ADAPTER_CONTINUE_CONVERSATION: 'agents.adapter.continue_conversation',
+  ADAPTER_CREATE_CONNECTOR_CLIENT: 'agents.adapter.create_connector_client',
+  ADAPTER_CREATE_USER_TOKEN_CLIENT: 'agents.adapter.create_user_token_client',
+  // ADAPTER_TURN: 'agents.adapter.turn',
 
   // ActivityHandler
-  HANDLER_RUN: 'agents.handler.run',
-  HANDLER_ON_TURN: 'agents.handler.onTurn',
-  HANDLER_ON_MESSAGE: 'agents.handler.onMessage',
-  HANDLER_ON_INVOKE: 'agents.handler.onInvoke',
-  HANDLER_ON_CONVERSATION_UPDATE: 'agents.handler.onConversationUpdate',
+  // HANDLER_RUN: 'agents.handler.run',
+  // HANDLER_ON_TURN: 'agents.handler.on.turn',
+  // HANDLER_ON_MESSAGE: 'agents.handler.on.message',
+  // HANDLER_ON_INVOKE: 'agents.handler.on.invoke',
+  // HANDLER_ON_CONVERSATION_UPDATE: 'agents.handler.on.conversation.update',
 
   // AgentApplication
   AGENTS_APP_RUN: 'agents.app.run',
-  AGENTS_APP_ROUTE_HANDLER: 'agents.app.routeHandler',
-  AGENTS_APP_BEFORE_TURN: 'agents.app.beforeTurn',
-  AGENTS_APP_AFTER_TURN: 'agents.app.afterTurn',
-  AGENTS_APP_DOWNLOAD_FILES: 'agents.app.downloadFiles',
+  AGENTS_APP_ROUTE_HANDLER: 'agents.app.route_handler',
+  AGENTS_APP_BEFORE_TURN: 'agents.app.before_turn',
+  AGENTS_APP_AFTER_TURN: 'agents.app.after_turn',
+  AGENTS_APP_DOWNLOAD_FILES: 'agents.app.download_files',
 
   // Dialogs
-  DIALOG_BEGIN: 'agents.dialog.begin',
-  DIALOG_CONTINUE: 'agents.dialog.continue',
-  DIALOG_RESUME: 'agents.dialog.resume',
+  // DIALOG_BEGIN: 'agents.dialog.begin',
+  // DIALOG_CONTINUE: 'agents.dialog.continue',
+  // DIALOG_RESUME: 'agents.dialog.resume',
 
   // ConnectorClient
-  CONNECTOR_SEND_TO_CONVERSATION: 'agents.connector.sendToConversation',
-  CONNECTOR_REPLY_TO_ACTIVITY: 'agents.connector.replyToActivity',
-  CONNECTOR_UPDATE_ACTIVITY: 'agents.connector.updateActivity',
-  CONNECTOR_DELETE_ACTIVITY: 'agents.connector.deleteActivity',
-  CONNECTOR_CREATE_CONVERSATION: 'agents.connector.createConversation',
-  CONNECTOR_GET_CONVERSATIONS: 'agents.connector.getConversations',
-  CONNECTOR_GET_CONVERSATION_MEMBERS: 'agents.connector.getConversationMembers',
-  CONNECTOR_UPLOAD_ATTACHMENT: 'agents.connector.uploadAttachment',
-  CONNECTOR_GET_ATTACHMENT: 'agents.connector.getAttachment',
+  CONNECTOR_SEND_TO_CONVERSATION: 'agents.connector.send_to_conversation',
+  CONNECTOR_REPLY_TO_ACTIVITY: 'agents.connector.reply_to_activity',
+  CONNECTOR_UPDATE_ACTIVITY: 'agents.connector.update_activity',
+  CONNECTOR_DELETE_ACTIVITY: 'agents.connector.delete_activity',
+  CONNECTOR_CREATE_CONVERSATION: 'agents.connector.create_conversation',
+  CONNECTOR_GET_CONVERSATIONS: 'agents.connector.get_conversations',
+  CONNECTOR_GET_CONVERSATION_MEMBERS: 'agents.connector.get_conversation_members',
+  CONNECTOR_UPLOAD_ATTACHMENT: 'agents.connector.upload_attachment',
+  CONNECTOR_GET_ATTACHMENT: 'agents.connector.get_attachment',
 
   // Storage
   STORAGE_READ: 'agents.storage.read',
@@ -47,72 +48,69 @@ export const SpanNames = {
   STORAGE_DELETE: 'agents.storage.delete',
 
   // CopilotStudio Client
-  COPILOT_CONNECT: 'agents.copilot.connect',
-  COPILOT_SEND_ACTIVITY: 'agents.copilot.sendActivity',
-  COPILOT_RECEIVE_ACTIVITY: 'agents.copilot.receiveActivity',
+  // COPILOT_CONNECT: 'agents.copilot.connect',
+  // COPILOT_SEND_ACTIVITY: 'agents.copilot.send.activity',
+  // COPILOT_RECEIVE_ACTIVITY: 'agents.copilot.receive.activity',
 
   // AgentClient
-  AGENT_CLIENT_POST_ACTIVITY: 'agents.agentClient.postActivity',
+  AGENT_CLIENT_POST_ACTIVITY: 'agents.agent_client.post_activity',
 
   // Authentication
-  AUTHENTICATION_GET_ACCESS_TOKEN: 'agents.authentication.getAccessToken',
-  AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF: 'agents.authentication.acquireTokenOnBehalfOf',
-  AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN: 'agents.authentication.getAgenticInstanceToken',
-  AUTHENTICATION_GET_AGENTIC_USER_TOKEN: 'agents.authentication.getAgenticUserToken',
+  AUTHENTICATION_GET_ACCESS_TOKEN: 'agents.authentication.get_access_token',
+  AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF: 'agents.authentication.acquire_token_on_behalf_of',
+  AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN: 'agents.authentication.get_agentic_instance_token',
+  AUTHENTICATION_GET_AGENTIC_USER_TOKEN: 'agents.authentication.get_agentic_user_token',
 
   // Authorization
-  AUTHORIZATION_MANAGER_PROCESS: 'agents.authorization.manager.process',
-  AUTHORIZATION_AGENTIC_TOKEN: 'agents.authorization.agentic.token',
-  AUTHORIZATION_AZURE_BOT_TOKEN: 'agents.authorization.azureBot.token',
-  AUTHORIZATION_AZURE_BOT_SIGNIN: 'agents.authorization.azureBot.signin',
-  AUTHORIZATION_AZURE_BOT_SIGNOUT: 'agents.authorization.azureBot.signout',
+  // AUTHORIZATION_MANAGER_PROCESS: 'agents.authorization.manager.process',
+  AUTHORIZATION_AGENTIC_TOKEN: 'agents.authorization.agentic_token',
+  AUTHORIZATION_AZURE_BOT_TOKEN: 'agents.authorization.azure_bot_token',
+  AUTHORIZATION_AZURE_BOT_SIGNIN: 'agents.authorization.azure_bot_signin',
+  AUTHORIZATION_AZURE_BOT_SIGNOUT: 'agents.authorization.azure_bot_signout',
 
   // UserTokenClient
-  USER_TOKEN_CLIENT_GET_USER_TOKEN: 'agents.userTokenClient.getUserToken',
-  USER_TOKEN_CLIENT_SIGN_OUT: 'agents.userTokenClient.signOut',
-  USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE: 'agents.userTokenClient.getSignInResource',
-  USER_TOKEN_CLIENT_EXCHANGE_TOKEN: 'agents.userTokenClient.exchangeToken',
-  USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGNIN_RESOURCE: 'agents.userTokenClient.getTokenOrSignInResource',
-  USER_TOKEN_CLIENT_GET_TOKEN_STATUS: 'agents.userTokenClient.getTokenStatus',
-  USER_TOKEN_CLIENT_GET_AAD_TOKENS: 'agents.userTokenClient.getAadTokens',
+  USER_TOKEN_CLIENT_GET_USER_TOKEN: 'agents.user_token_client.get_user_token',
+  USER_TOKEN_CLIENT_SIGN_OUT: 'agents.user_token_client.sign_out',
+  USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE: 'agents.user_token_client.get_sign_in_resource',
+  USER_TOKEN_CLIENT_EXCHANGE_TOKEN: 'agents.user_token_client.exchange_token',
+  USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGNIN_RESOURCE: 'agents.user_token_client.get_token_or_sign_in_resource',
+  USER_TOKEN_CLIENT_GET_TOKEN_STATUS: 'agents.user_token_client.get_token_status',
+  USER_TOKEN_CLIENT_GET_AAD_TOKENS: 'agents.user_token_client.get_aad_tokens',
 
   // TurnContext
-  TURN_SEND_ACTIVITY: 'agents.turn.sendActivity',
-  TURN_SEND_ACTIVITIES: 'agents.turn.sendActivities',
-  TURN_UPDATE_ACTIVITY: 'agents.turn.updateActivity',
-  TURN_DELETE_ACTIVITY: 'agents.turn.deleteActivity',
+  TURN_SEND_ACTIVITIES: 'agents.turn.send_activities',
 } as const
 
-export const SpanKind = {
-  /** Default value. Indicates that the span is used internally. */
-  INTERNAL: 0,
-  /**
-   * Indicates that the span covers server-side handling of an RPC or other
-   * remote request.
-   */
-  SERVER: 1,
-  /**
-   * Indicates that the span covers the client-side wrapper around an RPC or
-   * other remote request.
-   */
-  CLIENT: 2,
-  /**
-   * Indicates that the span describes producer sending a message to a
-   * broker. Unlike client and server, there is no direct critical path latency
-   * relationship between producer and consumer spans.
-   */
-  PRODUCER: 3,
-  /**
-   * Indicates that the span describes consumer receiving a message from a
-   * broker. Unlike client and server, there is no direct critical path latency
-   * relationship between producer and consumer spans.
-   */
-  CONSUMER: 4
-} as const
+// export const SpanKind = {
+//   /** Default value. Indicates that the span is used internally. */
+//   INTERNAL: 0,
+//   /**
+//    * Indicates that the span covers server-side handling of an RPC or other
+//    * remote request.
+//    */
+//   SERVER: 1,
+//   /**
+//    * Indicates that the span covers the client-side wrapper around an RPC or
+//    * other remote request.
+//    */
+//   CLIENT: 2,
+//   /**
+//    * Indicates that the span describes producer sending a message to a
+//    * broker. Unlike client and server, there is no direct critical path latency
+//    * relationship between producer and consumer spans.
+//    */
+//   PRODUCER: 3,
+//   /**
+//    * Indicates that the span describes consumer receiving a message from a
+//    * broker. Unlike client and server, there is no direct critical path latency
+//    * relationship between producer and consumer spans.
+//    */
+//   CONSUMER: 4
+// } as const
 
 export const MetricNames = {
   // CloudAdapter
-  ADAPTER_PROCESSED_ACTIVITIES: 'agents.adapter.processed.activities',
+  // ADAPTER_PROCESSED_ACTIVITIES: 'agents.adapter.processed.activities',
   ADAPTER_PROCESS_DURATION: 'agents.adapter.process.duration',
 
   // Hosting activity counters
@@ -122,30 +120,30 @@ export const MetricNames = {
   ACTIVITIES_DELETED: 'agents.activities.deleted',
 
   // Connector metrics
-  CONNECTOR_REQUESTS: 'agents.connector.requests',
+  CONNECTOR_REQUESTS: 'agents.connector.request.count',
   CONNECTOR_REQUEST_DURATION: 'agents.connector.request.duration',
 
   // AgentClient metrics
-  AGENT_CLIENT_REQUESTS: 'agents.agentClient.requests',
-  AGENT_CLIENT_REQUEST_DURATION: 'agents.agentClient.request.duration',
+  AGENT_CLIENT_REQUESTS: 'agents.agent_client.request.count',
+  AGENT_CLIENT_REQUEST_DURATION: 'agents.agent_client.request.duration',
 
   // Turn metrics
-  TURNS_TOTAL: 'agents.turns.total',
-  TURNS_ERRORS: 'agents.turns.errors',
+  TURNS_COUNT: 'agents.turn.count',
+  TURNS_ERRORS: 'agents.turn.error.count',
   TURN_DURATION: 'agents.turn.duration',
 
   // Storage metrics
   STORAGE_OPERATION_DURATION: 'agents.storage.operation.duration',
 
   // Authentication metrics
-  AUTH_TOKEN_REQUESTS: 'agents.auth.token_requests',
+  AUTH_TOKEN_REQUESTS: 'agents.auth.token.request.count',
   AUTH_TOKEN_DURATION: 'agents.auth.token.duration',
 
   // Authorization metrics
-  AUTHORIZATION_REQUESTS: 'agents.authorization.requests',
-  AUTHORIZATION_DURATION: 'agents.authorization.duration',
+  // AUTHORIZATION_REQUESTS: 'agents.authorization.request.count',
+  // AUTHORIZATION_DURATION: 'agents.authorization.duration',
 
   // UserTokenClient metrics
-  USER_TOKEN_CLIENT_REQUESTS: 'agents.userTokenClient.requests',
-  USER_TOKEN_CLIENT_REQUEST_DURATION: 'agents.userTokenClient.request.duration'
+  USER_TOKEN_CLIENT_REQUESTS: 'agents.user_token_client.request.count',
+  USER_TOKEN_CLIENT_REQUEST_DURATION: 'agents.user_token_client.request.duration'
 } as const
