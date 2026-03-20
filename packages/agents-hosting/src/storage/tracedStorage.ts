@@ -2,7 +2,8 @@
 // Licensed under the MIT License.
 
 import { Storage, StoreItem } from './storage'
-import * as Traces from '../observability/decorators'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from '../observability/metrics'
 
 /**
  * A wrapper that adds OpenTelemetry tracing to any Storage implementation.
@@ -40,9 +41,16 @@ export class TracedStorage implements Storage {
    * @param keys - The keys of the items to read.
    * @returns A promise that resolves to the store items.
    */
-  @Traces.StorageRead
   async read (keys: string[]): Promise<StoreItem> {
-    return this.storage.read(keys)
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_READ, async (span) => {
+      span.setAttribute('storage.key.count', keys.length)
+      return this.storage.read(keys)
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'read'
+      })
+    })
   }
 
   /**
@@ -51,9 +59,16 @@ export class TracedStorage implements Storage {
    * @param changes - The items to write to storage, indexed by key.
    * @returns A promise that resolves when the write operation is complete.
    */
-  @Traces.StorageWrite
   async write (changes: StoreItem): Promise<void> {
-    return this.storage.write(changes)
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+      span.setAttribute('storage.key.count', Object.keys(changes).length)
+      return this.storage.write(changes)
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'write'
+      })
+    })
   }
 
   /**
@@ -62,8 +77,15 @@ export class TracedStorage implements Storage {
    * @param keys - The keys of the items to delete.
    * @returns A promise that resolves when the delete operation is complete.
    */
-  @Traces.StorageDelete
   async delete (keys: string[]): Promise<void> {
-    return this.storage.delete(keys)
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_DELETE, async (span) => {
+      span.setAttribute('storage.key.count', keys.length)
+      return this.storage.delete(keys)
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'delete'
+      })
+    })
   }
 }

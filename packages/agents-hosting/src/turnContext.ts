@@ -8,7 +8,7 @@ import { AttachmentInfo } from './connector-client/attachmentInfo'
 import { AttachmentData } from './connector-client/attachmentData'
 import { StreamingResponse } from './app/streaming/streamingResponse'
 import { JwtPayload } from 'jsonwebtoken'
-import * as Traces from './observability/decorators'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
 
 /**
  * Defines a handler for processing and sending activities.
@@ -166,52 +166,59 @@ export class TurnContext {
    * emits them through the middleware chain before sending them to
    * the adapter.
    */
-  @Traces.TurnContextSendActivities
   async sendActivities (activities: Activity[]): Promise<ResourceResponse[]> {
-    let sentNonTraceActivity = false
-    const ref = this.activity.getConversationReference()
-    const output = activities.map((activity) => {
-      const newActivity = Activity.fromObject(activity)
-      const result = newActivity.applyConversationReference(ref)
-      if (!result.type) {
-        result.type = ActivityTypes.Message
-      }
-      if (result.type === ActivityTypes.InvokeResponse) {
-        this.turnState.set(INVOKE_RESPONSE_KEY, result)
-      }
-      if (result.type !== ActivityTypes.Trace) {
-        sentNonTraceActivity = true
-      }
-      if (result.id) {
-        delete result.id
-      }
-      return result
-    })
-    return await this.emit(this._onSendActivities, output, async () => {
-      if (this.activity.deliveryMode === DeliveryModes.ExpectReplies) {
-        const responses: ResourceResponse[] = []
-        output.forEach((a) => {
-          this.bufferedReplyActivities.push(a)
-          if (a.type === ActivityTypes.InvokeResponse) {
-            this.turnState.set(INVOKE_RESPONSE_KEY, a)
-          }
-          responses.push({ id: '' })
+    return trace(SpanNames.TURN_SEND_ACTIVITIES, async (span) => {
+      span.setAttribute('activity.count', activities.length)
+      let sentNonTraceActivity = false
+      const ref = this.activity.getConversationReference()
+      const output = activities.map((activity) => {
+        span.setAttributes({
+          'activity.type': activity.type,
+          'activity.delivery_mode': activity.deliveryMode,
+          'activity.id': activity.id
         })
-        if (sentNonTraceActivity) {
-          this.responded = true
+        const newActivity = Activity.fromObject(activity)
+        const result = newActivity.applyConversationReference(ref)
+        if (!result.type) {
+          result.type = ActivityTypes.Message
         }
-        return responses
-      } else {
-        const responses = await this.adapter.sendActivities(this, output)
-        for (let index = 0; index < responses?.length; index++) {
-          const activity = output[index]
-          activity.id = responses[index].id
+        if (result.type === ActivityTypes.InvokeResponse) {
+          this.turnState.set(INVOKE_RESPONSE_KEY, result)
         }
-        if (sentNonTraceActivity) {
-          this.responded = true
+        if (result.type !== ActivityTypes.Trace) {
+          sentNonTraceActivity = true
         }
-        return responses
-      }
+        if (result.id) {
+          delete result.id
+        }
+        return result
+      })
+      return await this.emit(this._onSendActivities, output, async () => {
+        if (this.activity.deliveryMode === DeliveryModes.ExpectReplies) {
+          const responses: ResourceResponse[] = []
+          output.forEach((a) => {
+            this.bufferedReplyActivities.push(a)
+            if (a.type === ActivityTypes.InvokeResponse) {
+              this.turnState.set(INVOKE_RESPONSE_KEY, a)
+            }
+            responses.push({ id: '' })
+          })
+          if (sentNonTraceActivity) {
+            this.responded = true
+          }
+          return responses
+        } else {
+          const responses = await this.adapter.sendActivities(this, output)
+          for (let index = 0; index < responses?.length; index++) {
+            const activity = output[index]
+            activity.id = responses[index].id
+          }
+          if (sentNonTraceActivity) {
+            this.responded = true
+          }
+          return responses
+        }
+      })
     })
   }
 
