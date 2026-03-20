@@ -5,7 +5,6 @@ import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
 import { AxiosResponse } from 'axios'
 import type { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
-import { AgentApplication } from '../app/agentApplication'
 import { ConnectorClient } from '../connector-client/connectorClient'
 import type { AgentClient } from '../agent-client/agentClient'
 import type { MsalTokenProvider } from '../auth/msalTokenProvider'
@@ -14,7 +13,6 @@ import type { AzureBotAuthorization } from '../app/auth/handlers/azureBotAuthori
 import type { UserTokenClient } from '../oauth'
 import { HostingMetrics } from './metrics'
 import { TracedStorage } from '../storage'
-import { RouteHandler } from '../app/routeHandler'
 
 const fallback = <T>(value: T | undefined | null | void) => value ?? 'unknown'
 
@@ -163,70 +161,6 @@ export const CloudAdapterCreateUserTokenClient = createTracedDecorator<CloudAdap
 
     span.setAttribute('token.service.endpoint', serviceEndpoint)
     span.setAttribute('auth.scope', scope)
-  }
-})
-
-/**
- * AgentApplication method decorators
- */
-interface AppRunDecoratorScope {
-  authorized?: boolean
-  route?: { matched?: boolean, isInvokeRoute?: boolean, isAgenticRoute?: boolean }
-  attachmentsCount?: number
-}
-
-export const AgentApplicationRun = createTracedDecorator<AgentApplication<any>['runInternal'], AppRunDecoratorScope>({
-  spanName: SpanNames.AGENTS_APP_RUN,
-  onStart (span, decorator, context: SharedContext) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  // onChildSpan (spanName, span, context) {
-  //   switch (spanName) {
-  //     case SpanNames.AGENTS_APP_ROUTE_HANDLER:
-  //       span.setAttribute('agents.route.is_invoke', context.data?.route?.isInvokeRoute ?? false)
-  //       span.setAttribute('agents.route.is_agentic', context.data?.route?.isAgenticRoute ?? false)
-  //       break
-  //     case SpanNames.AGENTS_APP_DOWNLOAD_FILES:
-  //       span.setAttribute('agents.attachments.count', context.data?.attachmentsCount ?? 0)
-  //       break
-  //   }
-  // },
-  onError (span, error) {
-    HostingMetrics.turnsErrorsCounter.add(1, {
-      'error.type': fallback(error?.constructor?.name)
-    })
-  },
-  onEnd (span, decorator, context: SharedContext) {
-    const { args: [turnContext], scope } = decorator
-    const activityType = fallback(turnContext.activity?.type)
-    const activityId = fallback(turnContext.activity?.id)
-    const channelId = fallback(turnContext.activity?.channelId)
-    const conversationId = fallback(turnContext.activity?.conversation?.id)
-    const authorized = scope.authorized ?? false
-    const routeMatched = scope.route?.matched ?? false
-    span.setAttribute('activity.type', activityType)
-    span.setAttribute('activity.id', activityId)
-    span.setAttribute('route.authorized', authorized)
-    span.setAttribute('route.matched', routeMatched)
-
-    HostingMetrics.turnsTotalCounter.add(1, {
-      'activity.type': activityType,
-      'activity.conversation_id': conversationId
-    })
-    HostingMetrics.turnDuration.record(context.duration(), {
-      'activity.type': activityType,
-      'activity.channel_id': channelId,
-      'activity.conversation_id': conversationId
-    })
-  }
-})
-
-export const AgentApplicationRouteHandler = createTracedDecorator<RouteHandler<any>, AppRunDecoratorScope>({
-  spanName: SpanNames.AGENTS_APP_ROUTE_HANDLER,
-  onEnd (span, decorator) {
-    span.setAttribute('route.is_invoke', decorator.scope.route?.isInvokeRoute ?? false)
-    span.setAttribute('route.is_agentic', decorator.scope.route?.isAgenticRoute ?? false)
   }
 })
 
