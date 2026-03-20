@@ -12,13 +12,16 @@
     "email": "agentssdk@microsoft.com",
     "url": "https://aka.ms/Agents"
   },
-  "description": "OpenTelemetry instrumentation for Microsoft Agents SDK",
+  "description": "Telemetry instrumentation for Microsoft Agents SDK",
   "keywords": [
     "Agents",
-    "OpenTelemetry"
+    "Telemetry",
+    "OpenTelemetry",
+    "OTel"
   ],
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build:esm": "tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
+  },
   "peerDependencies": {
     "@opentelemetry/api": "1",
     "@opentelemetry/api-logs": "^0.211.0"
@@ -30,9 +33,6 @@
     "@opentelemetry/api-logs": {
       "optional": true
     }
-  },
-  "scripts": {
-    "build:esm": "tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
   },
   "dependencies": {
     "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1",

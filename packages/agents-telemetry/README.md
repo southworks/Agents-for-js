@@ -2,15 +2,26 @@
 
 ## Overview
 
-The `@microsoft/agents-telemetry` package provides OpenTelemetry instrumentation for the Microsoft Agents SDK. It enables distributed tracing across your agent applications, allowing you to monitor and debug agent interactions, message processing, and connector operations.
+The `@microsoft/agents-telemetry` package provides OpenTelemetry instrumentation primitives used across the Microsoft Agents SDK. It enables distributed tracing, structured log emission, and stable metric naming across your agent applications so you can monitor agent interactions, connector calls, storage operations, authentication flows, and turn processing.
 
-### Peer Dependency
+The package currently provides:
 
-This package requires `@opentelemetry/api` as a peer dependency. Install it in your agent:
+- `createTracedDecorator` for decorator-based span creation around class methods
+- `createLogger` for emitting OpenTelemetry log records with namespace and level metadata
+- `SpanNames` and `MetricNames` constants for consistent observability naming across the SDK
+- `otel`, which exposes the OpenTelemetry API instance loaded by the package
+
+This package supports both ESM and CommonJS consumers and requires Node.js 20 or later.
+
+### Peer Dependencies
+
+For full integration with your application's OpenTelemetry SDK, install the OpenTelemetry API packages in your agent:
 
 ```sh
-npm install @opentelemetry/api
+npm install @opentelemetry/api @opentelemetry/api-logs
 ```
+
+Both peer dependencies are optional. If either package is missing, `@microsoft/agents-telemetry` falls back to bundled compatible APIs and logs a warning. That fallback keeps instrumentation calls safe, but installing the official OpenTelemetry APIs is the recommended configuration.
 
 ## Enabling Tracing
 
@@ -30,9 +41,13 @@ const sdk = new NodeSDK({
 sdk.start()
 ```
 
+Once your SDK is configured, components that use `createTracedDecorator` will emit spans through the global OpenTelemetry tracer provider.
+
+If you also want to export metrics referenced by `MetricNames`, configure a metric reader/exporter in your OpenTelemetry SDK as well.
+
 ## Enabling Logs (OTLP)
 
-To export logs produced by the SDK logger wrapper (for example, `debug('agents:*')`) to an OTLP backend in a sample agent, add a minimal logs processor during startup:
+To export logs produced by `createLogger` to an OTLP backend, add a logs processor during startup:
 
 ```ts
 import { NodeSDK } from '@opentelemetry/sdk-node'
@@ -56,11 +71,23 @@ const sdk = new NodeSDK({
 sdk.start()
 ```
 
-Set `DEBUG=agents:*` (or your target namespaces) to enable emission from debug-based loggers.
+Then create and use a logger from this package:
+
+```ts
+import { createLogger } from '@microsoft/agents-telemetry'
+
+const info = createLogger('agents:sample', 'info')
+const error = createLogger('agents:sample', 'error')
+
+info('agent started', { port: 3978 })
+error('request failed', new Error('Connection lost'))
+```
+
+Each emitted record includes `log.namespace` and `log.level` attributes. Additional arguments are serialized into the log body.
 
 ### 2. Production Setup with OTLP Exporter
 
-For production, use an OTLP exporter to send traces to your observability backend (e.g., Azure Monitor, Jaeger, Grafana):
+For production, use an OTLP exporter to send traces to your observability backend, such as Azure Monitor, Jaeger, or Grafana:
 
 ```ts
 import { NodeSDK } from '@opentelemetry/sdk-node'
@@ -76,76 +103,119 @@ const sdk = new NodeSDK({
 sdk.start()
 ```
 
-## Using recordSpan
+## Using createTracedDecorator
 
-The `recordSpan` utility wraps any async operation in an OpenTelemetry span with automatic error handling:
+The `createTracedDecorator` utility wraps a class method in an OpenTelemetry span and gives you lifecycle hooks for enriching the span with attributes and error details:
 
 ```ts
-import { recordSpan, SpanNames } from '@microsoft/agents-telemetry'
+import { createTracedDecorator, SpanNames } from '@microsoft/agents-telemetry'
 
-const result = await recordSpan({
-  name: 'my-custom-operation',
-  attributes: {
-    'operation.type': 'database',
-    'db.name': 'users',
+const TraceMessage = createTracedDecorator<MessageService['handleMessage'], { conversationId?: string }>({
+  spanName: SpanNames.AGENTS_APP_ROUTE_HANDLER,
+  onStart (span, decorator) {
+    span.setAttribute('code.function', String(decorator.name))
+    span.setAttribute('message.arg_count', decorator.args.length)
   },
-  fn: async (span) => {
-    // Your operation here
-    span.setAttribute('result.count', 42)
-    return await fetchData()
+  onEnd (span, decorator) {
+    span.setAttribute('conversation.id', decorator.scope.conversationId ?? 'unknown')
   },
+})
+
+class MessageService {
+  @TraceMessage
+  async handleMessage (conversationId: string, text: string) {
+    TraceMessage.share(this, { conversationId })
+    return { accepted: true, text }
+  }
+}
+```
+
+If you are tracing a function call path that is not using decorator syntax, you can still apply the same traced wrapper with `process(...)`:
+
+```ts
+await TraceMessage.process(async () => {
+  return await service.handleMessage('conversation-123', 'hello')
 })
 ```
 
 ### Features
 
 - **Automatic span lifecycle**: Spans are automatically started and ended
-- **Error recording**: Exceptions are recorded on the span with stack traces
-- **Status tracking**: Span status is set to ERROR on failures
-- **No-op fallback**: If telemetry is not initialized, operations run with a no-op span (zero overhead)
+- **Lifecycle hooks**: `onStart`, `onSuccess`, `onError`, and `onEnd` let you enrich spans at each stage
+- **Shared decorator scope**: `decorator.share(...)` allows method code to pass context into lifecycle hooks
+- **Error recording**: Exceptions are recorded on the span and failures set span status to `ERROR`
+- **Fallback OpenTelemetry APIs**: If the official API packages are not installed, the package falls back to bundled compatible APIs
 
 ## Span Names
 
-The package exports predefined span names for consistent tracing across the SDK:
+The package exports predefined span names and metric names for consistent observability across the SDK:
 
 ```ts
-import { SpanNames } from '@microsoft/agents-telemetry'
+import { SpanNames, MetricNames } from '@microsoft/agents-telemetry'
 
 // Available span names:
 SpanNames.ADAPTER_PROCESS          // 'agents.adapter.process'
-SpanNames.ADAPTER_SEND_ACTIVITIES  // 'agents.adapter.sendActivities'
-SpanNames.HANDLER_RUN              // 'agents.handler.run'
-SpanNames.HANDLER_ON_MESSAGE       // 'agents.handler.onMessage'
-SpanNames.DIALOG_BEGIN             // 'agents.dialog.begin'
+SpanNames.ADAPTER_SEND_ACTIVITIES  // 'agents.adapter.send_activities'
+SpanNames.AGENTS_APP_RUN           // 'agents.app.run'
+SpanNames.AGENTS_APP_ROUTE_HANDLER // 'agents.app.route_handler'
 SpanNames.STORAGE_READ             // 'agents.storage.read'
-SpanNames.CONNECTOR_REPLY_TO_ACTIVITY // 'agents.connector.replyToActivity'
+SpanNames.CONNECTOR_REPLY_TO_ACTIVITY // 'agents.connector.reply_to_activity'
+SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN // 'agents.authentication.get_access_token'
+
+// Available metric names:
+MetricNames.ACTIVITIES_RECEIVED        // 'agents.activities.received'
+MetricNames.CONNECTOR_REQUEST_DURATION // 'agents.connector.request.duration'
+MetricNames.TURN_DURATION              // 'agents.turn.duration'
+MetricNames.AUTH_TOKEN_REQUESTS        // 'agents.auth.token.request.count'
 // ... and more
 ```
 
 ## API Reference
 
-### `initTelemetry(options?)`
+### `otel`
 
-Initializes the telemetry system.
+Exposes the OpenTelemetry API module loaded by this package. Use it when you need access to the same tracer, meter, or context API instance used by `@microsoft/agents-telemetry`.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `options.serviceName` | `string` | Service name for the tracer (default: `'microsoft-agents'`) |
+### `createTracedDecorator(config?)`
 
-### `getOtel()`
-
-Returns the initialized OpenTelemetry modules or `null` if not initialized.
-
-### `recordSpan<T>(options)`
-
-Wraps an operation in a span.
+Creates a method decorator that wraps execution in an OpenTelemetry span.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `options.name` | `string` | Span name |
-| `options.attributes` | `Record<string, string \| number \| boolean>` | Initial span attributes |
-| `options.options` | `SpanOptions` | OpenTelemetry span options |
-| `options.fn` | `(span: Span) => Promise<T> \| T` | Function to execute within the span |
+| `config.spanName` | `string` | Span name to create. If omitted, the method name is used. |
+| `config.spanOptions` | `SpanOptions` | Base OpenTelemetry span options. |
+| `config.onStart` | `(span, decorator, context) => void` | Called before the original method executes. |
+| `config.onSuccess` | `(span, decorator, context) => void` | Called after successful execution. |
+| `config.onError` | `(span, error, decorator, context) => void` | Called when the wrapped method throws. |
+| `config.onEnd` | `(span, decorator, context) => void` | Called in the `finally` path before the span ends. |
+
+The returned decorator also exposes:
+
+- `share(this, scope)` to pass contextual values from the decorated method into later lifecycle hooks
+- `process(fn)` to run a function through the same traced wrapper without decorator syntax
+
+### `createLogger(namespace, level?)`
+
+Creates a function that emits OpenTelemetry log records.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `namespace` | `string` | Logger namespace written to `log.namespace`. |
+| `level` | `'debug' \| 'info' \| 'warn' \| 'error'` | Optional severity level. Defaults to `debug`. |
+
+The returned logger accepts `(message: string, ...args: unknown[])` and serializes additional arguments into the emitted log body.
+
+### `SpanNames`
+
+Provides stable span name constants used by Agents SDK components, including adapter, application, connector, storage, authentication, authorization, user token client, and turn-processing operations.
+
+### `MetricNames`
+
+Provides stable metric name constants for counters and histograms used by Agents SDK components, including activity counts, request counts, turn counts, and duration metrics.
+
+### `TracedMethodConfig<T>`
+
+The configuration type used by `createTracedDecorator`. Exported for advanced typing scenarios when you want to build reusable tracing helpers. It includes the lifecycle hooks shown above and is parameterized by the decorator context for the traced method.
 
 ## License
 

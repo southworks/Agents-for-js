@@ -10,14 +10,6 @@ export const SpanNames = {
   ADAPTER_CONTINUE_CONVERSATION: 'agents.adapter.continue_conversation',
   ADAPTER_CREATE_CONNECTOR_CLIENT: 'agents.adapter.create_connector_client',
   ADAPTER_CREATE_USER_TOKEN_CLIENT: 'agents.adapter.create_user_token_client',
-  // ADAPTER_TURN: 'agents.adapter.turn',
-
-  // ActivityHandler
-  // HANDLER_RUN: 'agents.handler.run',
-  // HANDLER_ON_TURN: 'agents.handler.on.turn',
-  // HANDLER_ON_MESSAGE: 'agents.handler.on.message',
-  // HANDLER_ON_INVOKE: 'agents.handler.on.invoke',
-  // HANDLER_ON_CONVERSATION_UPDATE: 'agents.handler.on.conversation.update',
 
   // AgentApplication
   AGENTS_APP_RUN: 'agents.app.run',
@@ -25,11 +17,6 @@ export const SpanNames = {
   AGENTS_APP_BEFORE_TURN: 'agents.app.before_turn',
   AGENTS_APP_AFTER_TURN: 'agents.app.after_turn',
   AGENTS_APP_DOWNLOAD_FILES: 'agents.app.download_files',
-
-  // Dialogs
-  // DIALOG_BEGIN: 'agents.dialog.begin',
-  // DIALOG_CONTINUE: 'agents.dialog.continue',
-  // DIALOG_RESUME: 'agents.dialog.resume',
 
   // ConnectorClient
   CONNECTOR_SEND_TO_CONVERSATION: 'agents.connector.send_to_conversation',
@@ -47,11 +34,6 @@ export const SpanNames = {
   STORAGE_WRITE: 'agents.storage.write',
   STORAGE_DELETE: 'agents.storage.delete',
 
-  // CopilotStudio Client
-  // COPILOT_CONNECT: 'agents.copilot.connect',
-  // COPILOT_SEND_ACTIVITY: 'agents.copilot.send.activity',
-  // COPILOT_RECEIVE_ACTIVITY: 'agents.copilot.receive.activity',
-
   // AgentClient
   AGENT_CLIENT_POST_ACTIVITY: 'agents.agent_client.post_activity',
 
@@ -62,7 +44,6 @@ export const SpanNames = {
   AUTHENTICATION_GET_AGENTIC_USER_TOKEN: 'agents.authentication.get_agentic_user_token',
 
   // Authorization
-  // AUTHORIZATION_MANAGER_PROCESS: 'agents.authorization.manager.process',
   AUTHORIZATION_AGENTIC_TOKEN: 'agents.authorization.agentic_token',
   AUTHORIZATION_AZURE_BOT_TOKEN: 'agents.authorization.azure_bot_token',
   AUTHORIZATION_AZURE_BOT_SIGNIN: 'agents.authorization.azure_bot_signin',
@@ -81,36 +62,8 @@ export const SpanNames = {
   TURN_SEND_ACTIVITIES: 'agents.turn.send_activities',
 } as const
 
-// export const SpanKind = {
-//   /** Default value. Indicates that the span is used internally. */
-//   INTERNAL: 0,
-//   /**
-//    * Indicates that the span covers server-side handling of an RPC or other
-//    * remote request.
-//    */
-//   SERVER: 1,
-//   /**
-//    * Indicates that the span covers the client-side wrapper around an RPC or
-//    * other remote request.
-//    */
-//   CLIENT: 2,
-//   /**
-//    * Indicates that the span describes producer sending a message to a
-//    * broker. Unlike client and server, there is no direct critical path latency
-//    * relationship between producer and consumer spans.
-//    */
-//   PRODUCER: 3,
-//   /**
-//    * Indicates that the span describes consumer receiving a message from a
-//    * broker. Unlike client and server, there is no direct critical path latency
-//    * relationship between producer and consumer spans.
-//    */
-//   CONSUMER: 4
-// } as const
-
 export const MetricNames = {
   // CloudAdapter
-  // ADAPTER_PROCESSED_ACTIVITIES: 'agents.adapter.processed.activities',
   ADAPTER_PROCESS_DURATION: 'agents.adapter.process.duration',
 
   // Hosting activity counters
@@ -138,10 +91,6 @@ export const MetricNames = {
   // Authentication metrics
   AUTH_TOKEN_REQUESTS: 'agents.auth.token.request.count',
   AUTH_TOKEN_DURATION: 'agents.auth.token.duration',
-
-  // Authorization metrics
-  // AUTHORIZATION_REQUESTS: 'agents.authorization.request.count',
-  // AUTHORIZATION_DURATION: 'agents.authorization.duration',
 
   // UserTokenClient metrics
   USER_TOKEN_CLIENT_REQUESTS: 'agents.user_token_client.request.count',
