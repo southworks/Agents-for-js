@@ -28,7 +28,6 @@ import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefini
 import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
-import * as Traces from './observability/decorators'
 import { SpanNames, trace } from '@microsoft/agents-telemetry'
 import { HostingMetrics } from './observability/metrics'
 const logger = debug('agents:cloud-adapter')

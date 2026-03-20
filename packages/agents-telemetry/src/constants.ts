@@ -25,9 +25,10 @@ export const SpanNames = {
   CONNECTOR_DELETE_ACTIVITY: 'agents.connector.delete_activity',
   CONNECTOR_CREATE_CONVERSATION: 'agents.connector.create_conversation',
   CONNECTOR_GET_CONVERSATIONS: 'agents.connector.get_conversations',
-  CONNECTOR_GET_CONVERSATION_MEMBERS: 'agents.connector.get_conversation_members',
+  CONNECTOR_GET_CONVERSATION_MEMBER: 'agents.connector.get_conversation_member',
   CONNECTOR_UPLOAD_ATTACHMENT: 'agents.connector.upload_attachment',
   CONNECTOR_GET_ATTACHMENT: 'agents.connector.get_attachment',
+  CONNECTOR_GET_ATTACHMENT_INFO: 'agents.connector.get_attachment_info',
 
   // Storage
   STORAGE_READ: 'agents.storage.read',
