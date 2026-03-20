@@ -29,6 +29,8 @@ import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
 import * as Traces from './observability/decorators'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from './observability/metrics'
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -95,22 +97,28 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a ConnectorClient instance.
    * @protected
    */
-  @Traces.CloudAdapterCreateConnectorClient
   protected async createConnectorClient (
     serviceUrl: string,
     scope: string,
     identity: JwtPayload,
     headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
-    // get the correct token provider
-    const tokenProvider = this.connectionManager.getTokenProvider(identity, serviceUrl)
+    return trace(SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT, async (span) => {
+      span.setAttributes({
+        service_url: serviceUrl,
+        'auth.scope': scope
+      })
 
-    const token = await tokenProvider.getAccessToken(scope)
-    return ConnectorClient.createClientWithToken(
-      serviceUrl,
-      token,
-      headers
-    )
+      // get the correct token provider
+      const tokenProvider = this.connectionManager.getTokenProvider(identity, serviceUrl)
+
+      const token = await tokenProvider.getAccessToken(scope)
+      return ConnectorClient.createClientWithToken(
+        serviceUrl,
+        token,
+        headers
+      )
+    })
   }
 
   /**
@@ -122,60 +130,67 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a ConnectorClient instance.
    * @protected
    */
-  @Traces.CloudAdapterCreateConnectorClientWithIdentity
   protected async createConnectorClientWithIdentity (
     identity: JwtPayload,
     activity: Activity,
     headers?: HeaderPropagationCollection) {
-    if (!identity?.aud) {
-      // anonymous
-      return ConnectorClient.createClientWithToken(
-        activity.serviceUrl!,
-        null!,
-        headers
-      )
-    }
-
-    let connectorClient
-    const tokenProvider = this.connectionManager.getTokenProviderFromActivity(identity, activity)
-    if (activity.isAgenticRequest()) {
-      logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
-      const agenticInstanceId = activity.getAgenticInstanceId()
-      const agenticUserId = activity.getAgenticUser()
-
-      if (activity.recipient?.role?.toLowerCase() === RoleTypes.AgenticIdentity.toLowerCase() && agenticInstanceId) {
-        // get agentic instance token
-        const token = await tokenProvider.getAgenticInstanceToken(activity.getAgenticTenantId() ?? '', agenticInstanceId)
-        connectorClient = ConnectorClient.createClientWithToken(
+    return trace(SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT, async (span) => {
+      if (!identity?.aud) {
+        // anonymous
+        return ConnectorClient.createClientWithToken(
           activity.serviceUrl!,
-          token,
+          null!,
           headers
         )
-      } else if (activity.recipient?.role?.toLowerCase() === RoleTypes.AgenticUser.toLowerCase() && agenticInstanceId && agenticUserId) {
-        const scope = tokenProvider.connectionSettings?.scope ?? ApxProductionScope
-        const token = await tokenProvider.getAgenticUserToken(activity.getAgenticTenantId() ?? '', agenticInstanceId, agenticUserId, [scope])
-
-        connectorClient = ConnectorClient.createClientWithToken(
-          activity.serviceUrl!,
-          token,
-          headers
-        )
-      } else {
-        throw new Error('Could not create connector client for agentic user')
       }
-    } else {
-      // ABS tokens will not have an azp/appid so use the botframework scope.
-      // Otherwise use the appId.  This will happen when communicating back to another agent.
-      const scope = identity.azp ?? identity.appid ?? 'https://api.botframework.com'
-      const token = await tokenProvider.getAccessToken(scope)
-      connectorClient = ConnectorClient.createClientWithToken(
-        activity.serviceUrl!,
-        token,
-        headers
-      )
-      Traces.CloudAdapterCreateConnectorClientWithIdentity.share(this, { scope })
-    }
-    return connectorClient
+
+      let connectorClient
+      const tokenProvider = this.connectionManager.getTokenProviderFromActivity(identity, activity)
+      const isAgentic = activity.isAgenticRequest()
+      let scope
+      if (isAgentic) {
+        logger.debug('Activity is from an agentic source, using special scope', activity.recipient)
+        const agenticInstanceId = activity.getAgenticInstanceId()
+        const agenticUserId = activity.getAgenticUser()
+
+        if (activity.recipient?.role?.toLowerCase() === RoleTypes.AgenticIdentity.toLowerCase() && agenticInstanceId) {
+          // get agentic instance token
+          const token = await tokenProvider.getAgenticInstanceToken(activity.getAgenticTenantId() ?? '', agenticInstanceId)
+          connectorClient = ConnectorClient.createClientWithToken(
+            activity.serviceUrl!,
+            token,
+            headers
+          )
+        } else if (activity.recipient?.role?.toLowerCase() === RoleTypes.AgenticUser.toLowerCase() && agenticInstanceId && agenticUserId) {
+          scope = tokenProvider.connectionSettings?.scope ?? ApxProductionScope
+          const token = await tokenProvider.getAgenticUserToken(activity.getAgenticTenantId() ?? '', agenticInstanceId, agenticUserId, [scope])
+
+          connectorClient = ConnectorClient.createClientWithToken(
+            activity.serviceUrl!,
+            token,
+            headers
+          )
+        } else {
+          throw new Error('Could not create connector client for agentic user')
+        }
+      } else {
+        // ABS tokens will not have an azp/appid so use the botframework scope.
+        // Otherwise use the appId.  This will happen when communicating back to another agent.
+        scope = identity.azp ?? identity.appid ?? 'https://api.botframework.com'
+        const token = await tokenProvider.getAccessToken(scope)
+        connectorClient = ConnectorClient.createClientWithToken(
+          activity.serviceUrl!,
+          token,
+          headers
+        )
+      }
+      span.setAttributes({
+        service_url: activity.serviceUrl,
+        'auth.scope': scope,
+        'activity.is_agentic': isAgentic
+      })
+      return connectorClient
+    })
   }
 
   /**
@@ -213,7 +228,6 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise that resolves to a UserTokenClient instance.
    * @protected
    */
-  @Traces.CloudAdapterCreateUserTokenClient
   protected async createUserTokenClient (
     identity: JwtPayload,
     tokenServiceEndpoint: string = getTokenServiceEndpoint(),
@@ -221,25 +235,31 @@ export class CloudAdapter extends BaseAdapter {
     audience: string = 'https://api.botframework.com',
     headers?: HeaderPropagationCollection
   ): Promise<UserTokenClient> {
-    if (!identity?.aud) {
-      // anonymous
+    return trace(SpanNames.ADAPTER_CREATE_USER_TOKEN_CLIENT, async (span) => {
+      span.setAttributes({
+        'token.service.endpoint': tokenServiceEndpoint,
+        'auth.scope': scope
+      })
+      if (!identity?.aud) {
+        // anonymous
+        return UserTokenClient.createClientWithScope(
+          tokenServiceEndpoint,
+          null!,
+          scope,
+          headers
+        )
+      }
+
+      // get the correct token provider
+      const tokenProvider = this.connectionManager.getTokenProvider(identity, tokenServiceEndpoint)
+
       return UserTokenClient.createClientWithScope(
         tokenServiceEndpoint,
-        null!,
+        tokenProvider,
         scope,
         headers
       )
-    }
-
-    // get the correct token provider
-    const tokenProvider = this.connectionManager.getTokenProvider(identity, tokenServiceEndpoint)
-
-    return UserTokenClient.createClientWithScope(
-      tokenServiceEndpoint,
-      tokenProvider,
-      scope,
-      headers
-    )
+    })
   }
 
   /**
@@ -273,49 +293,64 @@ export class CloudAdapter extends BaseAdapter {
    * @param activities - The activities to send.
    * @returns A promise representing the array of ResourceResponses for the sent activities.
    */
-  @Traces.CloudAdapterSendActivities
   async sendActivities (context: TurnContext, activities: Activity[]): Promise<ResourceResponse[]> {
-    if (!context) {
-      throw ExceptionHelper.generateException(TypeError, Errors.ContextParameterRequired)
-    }
+    return trace(SpanNames.ADAPTER_SEND_ACTIVITIES, async (span) => {
+      if (!context) {
+        throw ExceptionHelper.generateException(TypeError, Errors.ContextParameterRequired)
+      }
 
-    if (!activities) {
-      throw ExceptionHelper.generateException(TypeError, Errors.ActivitiesParameterRequired)
-    }
+      if (!activities) {
+        throw ExceptionHelper.generateException(TypeError, Errors.ActivitiesParameterRequired)
+      }
 
-    if (activities.length === 0) {
-      throw ExceptionHelper.generateException(Error, Errors.EmptyActivitiesArray)
-    }
+      if (activities.length === 0) {
+        throw ExceptionHelper.generateException(Error, Errors.EmptyActivitiesArray)
+      }
 
-    const responses: ResourceResponse[] = []
-    for (const activity of activities) {
-      delete activity.id
-      let response: ResourceResponse = { id: '' }
+      span.setAttributes({
+        'activity.count': activities?.length,
+        'activity.conversation_id': activities[0]?.conversation?.id
+      })
 
-      if (activity.type === ActivityTypes.InvokeResponse) {
-        context.turnState.set(INVOKE_RESPONSE_KEY, activity)
-      } else if (activity.type === ActivityTypes.Trace && activity.channelId !== Channels.Emulator) {
-        // no-op
-      } else {
-        if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id) {
-          throw ExceptionHelper.generateException(Error, Errors.InvalidActivityObject)
-        }
+      const responses: ResourceResponse[] = []
+      for (const activity of activities) {
+        span.setAttributes({
+          'activity.type': activity.type,
+          'activity.id': activity.id
+        })
+        HostingMetrics.activitiesSentCounter.add(1, {
+          'activity.type': activity.type,
+          'activity.channel_id': activity.channelId
+        })
 
-        if (activity.replyToId) {
-          response = await context.turnState.get(this.ConnectorClientKey).replyToActivity(activity.conversation.id, activity.replyToId, activity)
+        delete activity.id
+        let response: ResourceResponse = { id: '' }
+
+        if (activity.type === ActivityTypes.InvokeResponse) {
+          context.turnState.set(INVOKE_RESPONSE_KEY, activity)
+        } else if (activity.type === ActivityTypes.Trace && activity.channelId !== Channels.Emulator) {
+          // no-op
         } else {
-          response = await context.turnState.get(this.ConnectorClientKey).sendToConversation(activity.conversation.id, activity)
+          if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id) {
+            throw ExceptionHelper.generateException(Error, Errors.InvalidActivityObject)
+          }
+
+          if (activity.replyToId) {
+            response = await context.turnState.get(this.ConnectorClientKey).replyToActivity(activity.conversation.id, activity.replyToId, activity)
+          } else {
+            response = await context.turnState.get(this.ConnectorClientKey).sendToConversation(activity.conversation.id, activity)
+          }
         }
+
+        if (!response) {
+          response = { id: activity.id ?? '' }
+        }
+
+        responses.push(response)
       }
 
-      if (!response) {
-        response = { id: activity.id ?? '' }
-      }
-
-      responses.push(response)
-    }
-
-    return responses
+      return responses
+    })
   }
 
   /**
@@ -325,69 +360,91 @@ export class CloudAdapter extends BaseAdapter {
    * @param logic - The logic to execute.
    * @param headerPropagation - Optional function to handle header propagation.
    */
-  @Traces.CloudAdapterProcess
   public async process (
     request: Request,
     res: Response,
     logic: (context: TurnContext) => Promise<void>,
     headerPropagation?: HeaderPropagationDefinition): Promise<void> {
-    const headers = new HeaderPropagation(request.headers)
-    if (headerPropagation && typeof headerPropagation === 'function') {
-      headerPropagation(headers)
-      logger.debug('Headers to propagate: ', headers)
-    }
-
-    const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
-      res.status(status)
-      if (isInvokeResponseOrExpectReplies) {
-        res.setHeader('content-type', 'application/json')
+    const start = performance.now()
+    let tracedActivity: Activity
+    return trace(SpanNames.ADAPTER_PROCESS, async (span) => {
+      const headers = new HeaderPropagation(request.headers)
+      if (headerPropagation && typeof headerPropagation === 'function') {
+        headerPropagation(headers)
+        logger.debug('Headers to propagate: ', headers)
       }
-      if (body) {
-        res.send(body)
+
+      const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
+        res.status(status)
+        if (isInvokeResponseOrExpectReplies) {
+          res.setHeader('content-type', 'application/json')
+        }
+        if (body) {
+          res.send(body)
+        }
+        res.end()
       }
-      res.end()
-    }
-    if (!request.body) {
-      throw new TypeError('`request.body` parameter required, make sure express.json() is used as middleware')
-    }
-    const incoming = normalizeIncomingActivity(request.body!)
-    const activity = Activity.fromObject(incoming)
-    logger.info(`--> Processing incoming activity, type:${activity.type} channel:${activity.channelId}`)
+      if (!request.body) {
+        throw new TypeError('`request.body` parameter required, make sure express.json() is used as middleware')
+      }
+      const incoming = normalizeIncomingActivity(request.body!)
+      const activity = Activity.fromObject(incoming)
+      logger.info(`--> Processing incoming activity, type:${activity.type} channel:${activity.channelId}`)
 
-    if (!this.isValidChannelActivity(activity)) {
-      return end(StatusCodes.BAD_REQUEST)
-    }
+      const isAgentic = activity.isAgenticRequest()
 
-    logger.debug('Received activity: ', activity)
+      tracedActivity = activity
+      span.setAttributes({
+        'activity.type': tracedActivity.type,
+        'activity.channel_id': tracedActivity.channelId,
+        'activity.delivery_mode': tracedActivity.deliveryMode,
+        'activity.conversation_id': tracedActivity.conversation?.id,
+        'activity.is_agentic': isAgentic
+      })
 
-    const context = new TurnContext(this, activity, request.user!)
-    // if Delivery Mode == ExpectReplies, we don't need a connector client.
-    if (this.resolveIfConnectorClientIsNeeded(activity)) {
-      const connectorClient = await this.createConnectorClientWithIdentity(request.user!, activity, headers)
-      this.setConnectorClient(context, connectorClient)
-    }
+      HostingMetrics.activitiesReceivedCounter.add(1, {
+        'activity.type': tracedActivity.type,
+        'activity.channel_id': tracedActivity.channelId
+      })
 
-    if (!activity.isAgenticRequest()) {
-      const userTokenClient = await this.createUserTokenClient(request.user!, undefined, undefined, undefined, headers)
-      this.setUserTokenClient(context, userTokenClient)
-    }
+      if (!this.isValidChannelActivity(activity)) {
+        return end(StatusCodes.BAD_REQUEST)
+      }
 
-    if (
-      activity?.type === ActivityTypes.InvokeResponse ||
-        activity?.type === ActivityTypes.Invoke ||
-        activity?.deliveryMode === DeliveryModes.ExpectReplies
-    ) {
+      logger.debug('Received activity: ', activity)
+
+      const context = new TurnContext(this, activity, request.user!)
+      // if Delivery Mode == ExpectReplies, we don't need a connector client.
+      if (this.resolveIfConnectorClientIsNeeded(activity)) {
+        const connectorClient = await this.createConnectorClientWithIdentity(request.user!, activity, headers)
+        this.setConnectorClient(context, connectorClient)
+      }
+
+      if (!isAgentic) {
+        const userTokenClient = await this.createUserTokenClient(request.user!, undefined, undefined, undefined, headers)
+        this.setUserTokenClient(context, userTokenClient)
+      }
+
+      if (
+        activity?.type === ActivityTypes.InvokeResponse ||
+          activity?.type === ActivityTypes.Invoke ||
+          activity?.deliveryMode === DeliveryModes.ExpectReplies
+      ) {
+        await this.runMiddleware(context, logic)
+        const invokeResponse = this.processTurnResults(context)
+        logger.debug('Activity Response (invoke/expect replies): ', invokeResponse)
+        return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body, true)
+      }
+
       await this.runMiddleware(context, logic)
       const invokeResponse = this.processTurnResults(context)
-      logger.debug('Activity Response (invoke/expect replies): ', invokeResponse)
-      Traces.CloudAdapterProcess.share(this, { context })
-      return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body, true)
-    }
-
-    await this.runMiddleware(context, logic)
-    const invokeResponse = this.processTurnResults(context)
-    Traces.CloudAdapterProcess.share(this, { context })
-    return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
+      return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
+    }).finally(() => {
+      const duration = performance.now() - start
+      HostingMetrics.adapterProcessDuration.record(duration, {
+        'activity.type': tracedActivity.type
+      })
+    })
   }
 
   private isValidChannelActivity (activity: Activity): Boolean {
@@ -415,27 +472,37 @@ export class CloudAdapter extends BaseAdapter {
    * @param activity - The activity to update.
    * @returns A promise representing the ResourceResponse for the updated activity.
    */
-  @Traces.CloudAdapterUpdateActivity
   async updateActivity (context: TurnContext, activity: Activity): Promise<ResourceResponse | void> {
-    if (!context) {
-      throw new TypeError('`context` parameter required')
-    }
+    return trace(SpanNames.ADAPTER_UPDATE_ACTIVITY, async (span) => {
+      if (!context) {
+        throw new TypeError('`context` parameter required')
+      }
 
-    if (!activity) {
-      throw new TypeError('`activity` parameter required')
-    }
+      if (!activity) {
+        throw new TypeError('`activity` parameter required')
+      }
 
-    if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id || !activity.id) {
-      throw ExceptionHelper.generateException(Error, Errors.InvalidActivityObject)
-    }
+      span.setAttributes({
+        'activity.id': activity.id,
+        'activity.conversation_id': activity.conversation?.id
+      })
 
-    const response = await context.turnState.get(this.ConnectorClientKey).updateActivity(
-      activity.conversation.id,
-      activity.id,
-      activity
-    )
+      HostingMetrics.activitiesUpdatedCounter.add(1, {
+        'activity.channel_id': activity.channelId
+      })
 
-    return response.id ? { id: response.id } : undefined
+      if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id || !activity.id) {
+        throw ExceptionHelper.generateException(Error, Errors.InvalidActivityObject)
+      }
+
+      const response = await context.turnState.get(this.ConnectorClientKey).updateActivity(
+        activity.conversation.id,
+        activity.id,
+        activity
+      )
+
+      return response.id ? { id: response.id } : undefined
+    })
   }
 
   /**
@@ -444,17 +511,27 @@ export class CloudAdapter extends BaseAdapter {
    * @param reference - The conversation reference of the activity to delete.
    * @returns A promise representing the completion of the delete operation.
    */
-  @Traces.CloudAdapterDeleteActivity
   async deleteActivity (context: TurnContext, reference: Partial<ConversationReference>): Promise<void> {
-    if (!context) {
-      throw new TypeError('`context` parameter required')
-    }
+    return trace(SpanNames.ADAPTER_DELETE_ACTIVITY, async (span) => {
+      if (!context) {
+        throw new TypeError('`context` parameter required')
+      }
 
-    if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id || !reference.activityId) {
-      throw ExceptionHelper.generateException(Error, Errors.InvalidConversationReference)
-    }
+      if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id || !reference.activityId) {
+        throw ExceptionHelper.generateException(Error, Errors.InvalidConversationReference)
+      }
 
-    await context.turnState.get(this.ConnectorClientKey).deleteActivity(reference.conversation.id, reference.activityId)
+      span.setAttributes({
+        'activity.id': reference.activityId,
+        'activity.conversation_id': reference.conversation?.id
+      })
+
+      HostingMetrics.activitiesDeletedCounter.add(1, {
+        'activity.channel_id': reference.channelId
+      })
+
+      await context.turnState.get(this.ConnectorClientKey).deleteActivity(reference.conversation.id, reference.activityId)
+    })
   }
 
   /**
@@ -466,39 +543,48 @@ export class CloudAdapter extends BaseAdapter {
    * @param isResponse - No longer used.
    * @returns A promise representing the completion of the continue operation.
    */
-  @Traces.CloudAdapterContinueConversation
   async continueConversation (
     botAppIdOrIdentity: string | JwtPayload,
     reference: ConversationReference,
     logic: (revocableContext: TurnContext) => Promise<void>,
     isResponse: Boolean = false): Promise<void> {
-    if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id) {
-      throw ExceptionHelper.generateException(Error, Errors.ContinueConversationInvalidReference)
-    }
+    return trace(SpanNames.ADAPTER_CONTINUE_CONVERSATION, async (span) => {
+      if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id) {
+        throw ExceptionHelper.generateException(Error, Errors.ContinueConversationInvalidReference)
+      }
 
-    if (!botAppIdOrIdentity) {
-      throw new TypeError('continueConversation: botAppIdOrIdentity is required')
-    }
-    const botAppId = typeof botAppIdOrIdentity === 'string' ? botAppIdOrIdentity : botAppIdOrIdentity.aud as string
+      if (!botAppIdOrIdentity) {
+        throw new TypeError('continueConversation: botAppIdOrIdentity is required')
+      }
+      const botAppId = typeof botAppIdOrIdentity === 'string' ? botAppIdOrIdentity : botAppIdOrIdentity.aud as string
 
-    // Only having the botId will only work against ABS or Agentic.  Proactive to other agents will
-    // not work with just botId.  Use a JwtPayload with property aud (which is botId) and appid populated.
-    const identity =
-        typeof botAppIdOrIdentity !== 'string'
-          ? botAppIdOrIdentity
-          : CloudAdapter.createIdentity(botAppId)
+      // Only having the botId will only work against ABS or Agentic.  Proactive to other agents will
+      // not work with just botId.  Use a JwtPayload with property aud (which is botId) and appid populated.
+      const identity =
+          typeof botAppIdOrIdentity !== 'string'
+            ? botAppIdOrIdentity
+            : CloudAdapter.createIdentity(botAppId)
 
-    const context = new TurnContext(this, Activity.getContinuationActivity(reference), identity)
-    const connectorClient = await this.createConnectorClientWithIdentity(identity, context.activity)
-    this.setConnectorClient(context, connectorClient)
+      const context = new TurnContext(this, Activity.getContinuationActivity(reference), identity)
 
-    if (!context.activity.isAgenticRequest()) {
-      const userTokenClient = await this.createUserTokenClient(identity)
-      this.setUserTokenClient(context, userTokenClient)
-    }
+      const connectorClient = await this.createConnectorClientWithIdentity(identity, context.activity)
+      this.setConnectorClient(context, connectorClient)
 
-    await this.runMiddleware(context, logic)
-    Traces.CloudAdapterContinueConversation.share(this, { context })
+      const isAgentic = context.activity.isAgenticRequest()
+
+      span.setAttributes({
+        'bot.app_id': botAppId,
+        'activity.conversation_id': reference.conversation?.id,
+        'activity.is_agentic': isAgentic
+      })
+
+      if (!isAgentic) {
+        const userTokenClient = await this.createUserTokenClient(identity)
+        this.setUserTokenClient(context, userTokenClient)
+      }
+
+      await this.runMiddleware(context, logic)
+    })
   }
 
   /**
