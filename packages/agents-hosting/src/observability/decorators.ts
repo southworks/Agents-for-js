@@ -7,9 +7,6 @@ import type { TurnContext } from '../turnContext'
 import { CloudAdapter } from '../cloudAdapter'
 import { ConnectorClient } from '../connector-client/connectorClient'
 import type { AgentClient } from '../agent-client/agentClient'
-import type { MsalTokenProvider } from '../auth/msalTokenProvider'
-import type { AgenticAuthorization } from '../app/auth/handlers/agenticAuthorization'
-import type { AzureBotAuthorization } from '../app/auth/handlers/azureBotAuthorization'
 import type { UserTokenClient } from '../oauth'
 import { HostingMetrics } from './metrics'
 import { TracedStorage } from '../storage'
@@ -392,150 +389,150 @@ export const AgentClientPostActivity = createTracedDecorator<AgentClient['postAc
  * Authentication method decorators
  */
 
-function recordAuthMetrics (scope: AuthGetAccessTokenScope, context: SharedContext): void {
-  const authMethod = fallback(scope.method)
-  const authSuccess = scope.success ?? false
+// function recordAuthMetrics (scope: AuthGetAccessTokenScope, context: SharedContext): void {
+//   const authMethod = fallback(scope.method)
+//   const authSuccess = scope.success ?? false
 
-  HostingMetrics.authTokenRequestsCounter.add(1, {
-    'auth.method': authMethod,
-    'auth.success': authSuccess
-  })
+//   HostingMetrics.authTokenRequestsCounter.add(1, {
+//     'auth.method': authMethod,
+//     'auth.success': authSuccess
+//   })
 
-  HostingMetrics.authTokenDuration.record(context.duration(), {
-    'auth.method': authMethod
-  })
-}
+//   HostingMetrics.authTokenDuration.record(context.duration(), {
+//     'auth.method': authMethod
+//   })
+// }
 
-interface AuthGetAccessTokenScope {
-  method: string
-  success: boolean
-  scopes?: string | string[]
-}
+// interface AuthGetAccessTokenScope {
+//   method: string
+//   success: boolean
+//   scopes?: string | string[]
+// }
 
-export const AuthGetAccessToken = createTracedDecorator<MsalTokenProvider['getAccessToken'], AuthGetAccessTokenScope>({
-  spanName: SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN,
-  onStart (span, decorator, context: SharedContext) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  onEnd (span, decorator, context: SharedContext) {
-    const [, scope] = decorator.args
-    span.setAttribute('auth.scope', fallback(scope))
-    span.setAttribute('auth.method', fallback(decorator.scope.method))
-    recordAuthMetrics(decorator.scope, context)
-  }
-})
+// export const AuthGetAccessToken = createTracedDecorator<MsalTokenProvider['getAccessToken'], AuthGetAccessTokenScope>({
+//   spanName: SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN,
+//   onStart (span, decorator, context: SharedContext) {
+//     const start = performance.now()
+//     context.duration = () => performance.now() - start
+//   },
+//   onEnd (span, decorator, context: SharedContext) {
+//     const [, scope] = decorator.args
+//     span.setAttribute('auth.scope', fallback(scope))
+//     span.setAttribute('auth.method', fallback(decorator.scope.method))
+//     recordAuthMetrics(decorator.scope, context)
+//   }
+// })
 
-interface AuthAcquireTokenOnBehalfOfScope extends AuthGetAccessTokenScope {
-  scopes?: string[]
-}
+// interface AuthAcquireTokenOnBehalfOfScope extends AuthGetAccessTokenScope {
+//   scopes?: string[]
+// }
 
-export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<MsalTokenProvider['acquireTokenOnBehalfOf'], AuthAcquireTokenOnBehalfOfScope>({
-  spanName: SpanNames.AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF,
-  onStart (span, decorator, context: SharedContext) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  onEnd (span, decorator, context: SharedContext) {
-    span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
-    recordAuthMetrics(decorator.scope, context)
-  }
-})
+// export const AuthAcquireTokenOnBehalfOf = createTracedDecorator<MsalTokenProvider['acquireTokenOnBehalfOf'], AuthAcquireTokenOnBehalfOfScope>({
+//   spanName: SpanNames.AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF,
+//   onStart (span, decorator, context: SharedContext) {
+//     const start = performance.now()
+//     context.duration = () => performance.now() - start
+//   },
+//   onEnd (span, decorator, context: SharedContext) {
+//     span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
+//     recordAuthMetrics(decorator.scope, context)
+//   }
+// })
 
-export const AuthGetAgenticInstanceToken = createTracedDecorator<MsalTokenProvider['getAgenticInstanceToken'], AuthGetAccessTokenScope>({
-  spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN,
-  onStart (span, decorator, context: SharedContext) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  onEnd (span, decorator, context: SharedContext) {
-    const [, agentAppInstanceId] = decorator.args
-    span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
-    recordAuthMetrics(decorator.scope, context)
-  }
-})
+// export const AuthGetAgenticInstanceToken = createTracedDecorator<MsalTokenProvider['getAgenticInstanceToken'], AuthGetAccessTokenScope>({
+//   spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN,
+//   onStart (span, decorator, context: SharedContext) {
+//     const start = performance.now()
+//     context.duration = () => performance.now() - start
+//   },
+//   onEnd (span, decorator, context: SharedContext) {
+//     const [, agentAppInstanceId] = decorator.args
+//     span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
+//     recordAuthMetrics(decorator.scope, context)
+//   }
+// })
 
-export const AuthGetAgenticUserToken = createTracedDecorator<MsalTokenProvider['getAgenticUserToken'], AuthGetAccessTokenScope>({
-  spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_USER_TOKEN,
-  onStart (span, decorator, context: SharedContext) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  onEnd (span, decorator, context: SharedContext) {
-    const [, agentAppInstanceId, agentUserId, scopes] = decorator.args
-    span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
-    span.setAttribute('agentic.user_id', fallback(agentUserId))
-    span.setAttribute('auth.scopes', scopes ?? [])
-    recordAuthMetrics(decorator.scope, context)
-  }
-})
+// export const AuthGetAgenticUserToken = createTracedDecorator<MsalTokenProvider['getAgenticUserToken'], AuthGetAccessTokenScope>({
+//   spanName: SpanNames.AUTHENTICATION_GET_AGENTIC_USER_TOKEN,
+//   onStart (span, decorator, context: SharedContext) {
+//     const start = performance.now()
+//     context.duration = () => performance.now() - start
+//   },
+//   onEnd (span, decorator, context: SharedContext) {
+//     const [, agentAppInstanceId, agentUserId, scopes] = decorator.args
+//     span.setAttribute('agentic.instance_id', fallback(agentAppInstanceId))
+//     span.setAttribute('agentic.user_id', fallback(agentUserId))
+//     span.setAttribute('auth.scopes', scopes ?? [])
+//     recordAuthMetrics(decorator.scope, context)
+//   }
+// })
 
 /**
  * Authorization method decorators
  */
 
-interface AuthorizationAgenticTokenScope {
-  handlerId: string
-  connection?: string
-  scopes?: string[]
-}
+// interface AuthorizationAgenticTokenScope {
+//   handlerId: string
+//   connection?: string
+//   scopes?: string[]
+// }
 
-export const AuthorizationAgenticToken = createTracedDecorator<AgenticAuthorization['token'], AuthorizationAgenticTokenScope>({
-  spanName: SpanNames.AUTHORIZATION_AGENTIC_TOKEN,
-  onStart (span, decorator, context: SharedContext) {
-    const start = performance.now()
-    context.duration = () => performance.now() - start
-  },
-  onEnd (span, decorator, context: SharedContext) {
-    span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
-    span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
-    span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
-  }
-})
+// export const AuthorizationAgenticToken = createTracedDecorator<AgenticAuthorization['token'], AuthorizationAgenticTokenScope>({
+//   spanName: SpanNames.AUTHORIZATION_AGENTIC_TOKEN,
+//   onStart (span, decorator, context: SharedContext) {
+//     const start = performance.now()
+//     context.duration = () => performance.now() - start
+//   },
+//   onEnd (span, decorator, context: SharedContext) {
+//     span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
+//     span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
+//     span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
+//   }
+// })
 
-export const AuthorizationAzureBotToken = createTracedDecorator<AzureBotAuthorization['token'], AuthorizationAgenticTokenScope>({
-  spanName: SpanNames.AUTHORIZATION_AZURE_BOT_TOKEN,
-  onEnd (span, decorator) {
-    span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
-    span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
-    if (decorator.scope.scopes) {
-      span.setAttribute('auth.flow', 'obo')
-      span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
-    }
-  }
-})
+// export const AuthorizationAzureBotToken = createTracedDecorator<AzureBotAuthorization['token'], AuthorizationAgenticTokenScope>({
+//   spanName: SpanNames.AUTHORIZATION_AZURE_BOT_TOKEN,
+//   onEnd (span, decorator) {
+//     span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
+//     span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
+//     if (decorator.scope.scopes) {
+//       span.setAttribute('auth.flow', 'obo')
+//       span.setAttribute('auth.scopes', decorator.scope.scopes ?? [])
+//     }
+//   }
+// })
 
-interface AuthorizationAzureBotSigninScope {
-  handlerId?: string
-  connection?: string
-  reason?: string
-}
+// interface AuthorizationAzureBotSigninScope {
+//   handlerId?: string
+//   connection?: string
+//   reason?: string
+// }
 
-export const AuthorizationAzureBotSignin = createTracedDecorator<AzureBotAuthorization['signin'], AuthorizationAzureBotSigninScope>({
-  spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNIN,
-  onEnd (span, decorator) {
-    const status = decorator.result
-    span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
-    span.setAttribute('auth.handler.status', fallback(status))
-    span.setAttribute('auth.handler.status.reason', fallback(decorator.scope.reason))
-    span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
-  }
-})
+// export const AuthorizationAzureBotSignin = createTracedDecorator<AzureBotAuthorization['signin'], AuthorizationAzureBotSigninScope>({
+//   spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNIN,
+//   onEnd (span, decorator) {
+//     const status = decorator.result
+//     span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
+//     span.setAttribute('auth.handler.status', fallback(status))
+//     span.setAttribute('auth.handler.status.reason', fallback(decorator.scope.reason))
+//     span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
+//   }
+// })
 
-interface AuthorizationAzureBotSignoutScope {
-  handlerId: string
-  connection: string
-  channel: string
-}
+// interface AuthorizationAzureBotSignoutScope {
+//   handlerId: string
+//   connection: string
+//   channel: string
+// }
 
-export const AuthorizationAzureBotSignout = createTracedDecorator<AzureBotAuthorization['signout'], AuthorizationAzureBotSignoutScope>({
-  spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNOUT,
-  onEnd (span, decorator) {
-    span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
-    span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
-    span.setAttribute('activity.channel_id', fallback(decorator.scope.channel))
-  }
-})
+// export const AuthorizationAzureBotSignout = createTracedDecorator<AzureBotAuthorization['signout'], AuthorizationAzureBotSignoutScope>({
+//   spanName: SpanNames.AUTHORIZATION_AZURE_BOT_SIGNOUT,
+//   onEnd (span, decorator) {
+//     span.setAttribute('auth.handler.id', fallback(decorator.scope.handlerId))
+//     span.setAttribute('auth.connection.name', fallback(decorator.scope.connection))
+//     span.setAttribute('activity.channel_id', fallback(decorator.scope.channel))
+//   }
+// })
 
 function recordUserTokenClientMetrics (operation: string, scope: UserTokenClientGetUserTokenScope, context: SharedContext): void {
   const httpMethod = fallback(scope.response?.config?.method?.toUpperCase())
