@@ -24,6 +24,45 @@ export interface TracedMethodConfig<TDecoratorContext> {
   onEnd?: (span: Span, decorator: TDecoratorContext, context: any) => void
 }
 
+export function traceFactory2 (otel: OTel) {
+  return function trace<TReturn> (name: string, fn: (span: Span) => TReturn): TReturn {
+    const tracer = otel.trace.getTracer(pkg.name, pkg.version)
+    return tracer.startActiveSpan(name, (span) => {
+      return attempt({
+        try () {
+          return fn(span)
+        },
+        then () {
+          span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
+        },
+        catch (error) {
+          let type
+          let message
+
+          if (error instanceof Error) {
+            type = error.name
+            message = error.message
+            span.recordException(error)
+          } else {
+            type = typeof error
+            message = String(error)
+          }
+
+          span.setStatus({ code: otel.SpanStatusCode.ERROR, message })
+          span.addEvent(`${name}_failed`, {
+            'error.type': type,
+            'error.message': message
+          })
+          throw error
+        },
+        finally () {
+          span.end()
+        }
+      })
+    })
+  }
+}
+
 export function traceFactory (otel: OTel) {
   return function trace<TMethod extends TMethodShape, TScope extends TScopeShape = {}> (config: TracedMethodConfig<DecoratorContext<TMethod, TScope>> = {}) {
     const tracer = otel.trace.getTracer(pkg.name, pkg.version)

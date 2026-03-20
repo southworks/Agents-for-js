@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { OTel, OTelLogs } from "./types";
-import { traceFactory } from './trace'
+import { traceFactory, traceFactory2 } from './trace'
 import { loggerFactory } from './logging'
 
 export * from './constants'
@@ -13,6 +13,8 @@ export * from './logging'
  */
 export const otel = load()
 const otelLogs = loadLogs()
+
+export const trace = traceFactory2(otel)
 
 export const createTracedDecorator = traceFactory(otel)
 export const createLogger = loggerFactory(otelLogs)
