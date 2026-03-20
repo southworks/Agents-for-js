@@ -21,7 +21,8 @@ import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, UserAuthorization, AuthorizationManager } from './auth'
 import { JwtPayload } from 'jsonwebtoken'
-import * as Traces from '../observability/decorators'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from '../observability'
 
 const logger = debug('agents:app')
 
@@ -573,7 +574,8 @@ export class AgentApplication<TState extends TurnState> {
       return
     }
 
-    await this.runInternal(turnContext)
+    logger.info('Running application with activity:', turnContext.activity.id!)
+    await this.startLongRunningCall(turnContext, this.runInternal.bind(this))
   }
 
   /**
@@ -607,10 +609,9 @@ export class AgentApplication<TState extends TurnState> {
    * ```
    *
    */
-  @Traces.AgentApplicationRun
-  public async runInternal (turnContext: TurnContext): Promise<boolean> {
-    logger.info('Running application with activity:', turnContext.activity.id!)
-    return await this.startLongRunningCall(turnContext, async (context) => {
+  public async runInternal (context: TurnContext): Promise<boolean> {
+    const start = performance.now()
+    return trace(SpanNames.AGENTS_APP_RUN, async (span) => {
       try {
         if (this._options.startTypingTimer) {
           this.startTypingTimer(context)
@@ -631,11 +632,15 @@ export class AgentApplication<TState extends TurnState> {
         const { authorized } = await this._authorizationManager?.process(context, async activity => {
           // The incoming activity may come from the storage, so we need to restore the auth handlers.
           // Since the current route may not have auth handlers.
-          const route = await this.getRoute(new TurnContext(context.adapter, activity, turnContext.identity))
+          const route = await this.getRoute(new TurnContext(context.adapter, activity, context.identity))
           return route?.authHandlers ?? []
         }) ?? { authorized: true } // Default to authorized if no auth manager
 
-        Traces.AgentApplicationRun.share(this, { authorized })
+        span.setAttributes({
+          'route.authorized': authorized,
+          'activity.type': context.activity.type,
+          'activity.id': context.activity.id,
+        })
 
         if (!authorized) {
           await state.save(context, storage)
@@ -644,9 +649,7 @@ export class AgentApplication<TState extends TurnState> {
 
         const route = await this.getRoute(context)
 
-        Traces.AgentApplicationRun.share(this, {
-          route: route ? { matched: !!route, isInvokeRoute: route.isInvokeRoute, isAgenticRoute: route.isAgenticRoute } : undefined
-        })
+        span.setAttributes({ 'route.matched': route !== undefined })
 
         if (!route) {
           logger.debug('No matching route found for activity:', context.activity)
@@ -654,31 +657,37 @@ export class AgentApplication<TState extends TurnState> {
         }
 
         if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
-          Traces.AgentApplicationRun.share(this, { attachmentsCount: context.activity.attachments?.length ?? 0 })
-          // await Traces.AgentApplicationRun.withChildSpan.call(this, SpanNames.AGENTS_APP_DOWNLOAD_FILES, async () => {
-          for (let i = 0; i < this._options.fileDownloaders!.length; i++) {
-            await this._options.fileDownloaders![i].downloadAndStoreFiles(context, state)
-          }
-          // })
+          await trace(SpanNames.AGENTS_APP_DOWNLOAD_FILES, async (span) => {
+            span.setAttributes({ 'agents.attachments.count': context.activity.attachments?.length ?? 0 })
+            for (let i = 0; i < this._options.fileDownloaders!.length; i++) {
+              await this._options.fileDownloaders![i].downloadAndStoreFiles(context, state)
+            }
+          })
         }
 
         let continueExecution = true
         if (this._beforeTurn.length > 0) {
-          // await Traces.AgentApplicationRun.withChildSpan.call(this, SpanNames.AGENTS_APP_BEFORE_TURN, async () => {
-          continueExecution = await this.callEventHandlers(context, state, this._beforeTurn)
-          // })
+          await trace(SpanNames.AGENTS_APP_BEFORE_TURN, async () => {
+            continueExecution = await this.callEventHandlers(context, state, this._beforeTurn)
+          })
         }
         if (!continueExecution) {
           await state.save(context, storage)
           return false
         }
 
-        await Traces.AgentApplicationRouteHandler.process(() => route.handler(context, state))
+        await trace(SpanNames.AGENTS_APP_ROUTE_HANDLER, async (span) => {
+          span.setAttributes({
+            'route.is_invoke': route?.isInvokeRoute,
+            'route.is_agentic': route?.isAgenticRoute
+          })
+          await route.handler(context, state)
+        })
 
         if (this._afterTurn.length > 0) {
-          // await Traces.AgentApplicationRun.withChildSpan.call(this, SpanNames.AGENTS_APP_AFTER_TURN, async () => {
-          continueExecution = await this.callEventHandlers(context, state, this._afterTurn)
-          // })
+          await trace(SpanNames.AGENTS_APP_AFTER_TURN, async () => {
+            continueExecution = await this.callEventHandlers(context, state, this._afterTurn)
+          })
         }
         if (continueExecution) {
           await state.save(context, storage)
@@ -691,6 +700,21 @@ export class AgentApplication<TState extends TurnState> {
       } finally {
         this.stopTypingTimer()
       }
+    }).catch((error) => {
+      HostingMetrics.turnsErrorsCounter.add(1, {
+        'error.type': error?.constructor?.name
+      })
+      throw error
+    }).finally(() => {
+      HostingMetrics.turnsTotalCounter.add(1, {
+        'activity.type': context.activity.type,
+        'activity.conversation_id': context.activity.conversation?.id
+      })
+      HostingMetrics.turnDuration.record(performance.now() - start, {
+        'activity.type': context.activity.type,
+        'activity.channel_id': context.activity.channelId,
+        'activity.conversation_id': context.activity.conversation?.id
+      })
     })
   }
 
