@@ -12,12 +12,18 @@ The M365 Agents SDK provides built-in OpenTelemetry instrumentation to help deve
 - [Traces (Spans)](#javascript-spans)
   - [CloudAdapter Spans](#cloudadapter-spans)
   - [AgentApplication Spans](#agentapplication-spans)
+  - [TurnContext Spans](#turncontext-spans)
   - [ConnectorClient Spans](#connectorclient-spans)
   - [AgentClient Spans](#agentclient-spans)
+  - [Storage Spans](#storage-spans)
+  - [Authentication Spans](#authentication-spans)
+  - [Authorization Spans](#authorization-spans)
+  - [UserTokenClient Spans](#usertokenclient-spans)
 - [Metrics](#javascript-metrics)
   - [Activity Counters](#activity-counters)
-  - [Duration Histograms](#duration-histograms)
   - [Request Counters](#request-counters)
+  - [Turn Counters](#turn-counters)
+  - [Duration Histograms](#duration-histograms)
 
 ### C# Telemetry
 - [Coming Soon](#c-telemetry)
@@ -79,95 +85,81 @@ Main processing span for incoming activities.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.type` | string | The type of activity (message, conversationUpdate, etc.) |
-| `agents.activity.channel_id` | string | The channel the activity originated from (msteams, webchat, etc.) |
-| `agents.activity.delivery_mode` | string | The delivery mode of the activity |
-| `agents.activity.conversation_id` | string | The conversation identifier |
-| `agents.activity.is_agentic` | boolean | Whether this is an agentic (agent-to-agent) request |
-
-**Events:**
-- `process.failed` - Emitted when processing fails, includes `error.type` attribute
+| `activity.type` | string | The type of activity (message, conversationUpdate, etc.) |
+| `activity.channel_id` | string | The channel the activity originated from (msteams, webchat, etc.) |
+| `activity.delivery_mode` | string | The delivery mode of the activity |
+| `activity.conversation_id` | string | The conversation identifier |
+| `activity.is_agentic` | boolean | Whether this is an agentic (agent-to-agent) request |
 
 ---
 
-#### agents.adapter.sendActivities
+#### agents.adapter.send_activities
 
 Span for sending one or more activities to a conversation.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.count` | number | Number of activities being sent |
-| `agents.activity.conversation_id` | string | The target conversation identifier |
-
-**Events:**
-- `sendActivities.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.count` | number | Number of activities being sent |
+| `activity.conversation_id` | string | The target conversation identifier |
+| `activity.type` | string | The type of each activity (set per activity) |
+| `activity.id` | string | The activity identifier (set per activity) |
 
 ---
 
-#### agents.adapter.updateActivity
+#### agents.adapter.update_activity
 
 Span for updating an existing activity.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.id` | string | The ID of the activity being updated |
-| `agents.activity.conversation_id` | string | The conversation identifier |
-
-**Events:**
-- `updateActivity.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.id` | string | The ID of the activity being updated |
+| `activity.conversation_id` | string | The conversation identifier |
 
 ---
 
-#### agents.adapter.deleteActivity
+#### agents.adapter.delete_activity
 
 Span for deleting an activity from a conversation.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.id` | string | The ID of the activity being deleted |
-| `agents.activity.conversation_id` | string | The conversation identifier |
-
-**Events:**
-- `deleteActivity.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.id` | string | The ID of the activity being deleted |
+| `activity.conversation_id` | string | The conversation identifier |
 
 ---
 
-#### agents.adapter.continueConversation
+#### agents.adapter.continue_conversation
 
 Span for continuing a conversation proactively.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.bot.app_id` | string | The bot's application ID |
-| `agents.activity.conversation_id` | string | The conversation identifier |
-| `agents.is_agentic` | boolean | Whether this is an agentic request |
-
-**Events:**
-- `continueConversation.failed` - Emitted on failure, includes `error.type` attribute
+| `bot.app_id` | string | The bot's application ID |
+| `activity.conversation_id` | string | The conversation identifier |
+| `activity.is_agentic` | boolean | Whether this is an agentic request |
 
 ---
 
-#### agents.adapter.createConnectorClient
+#### agents.adapter.create_connector_client
 
 Span for creating a connector client instance.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.service_url` | string | The Bot Framework service URL |
-| `agents.auth.scope` | string | The authentication scope |
-| `agents.is_agentic` | boolean | Whether this is for an agentic request (when using identity variant) |
-
-**Events:**
-- `createConnectorClient.failed` - Emitted on failure, includes `error.type` attribute
-- `createConnectorClientWithIdentity.failed` - Emitted on identity variant failure
+| `service_url` | string | The Bot Framework service URL |
+| `auth.scope` | string | The authentication scope |
+| `activity.is_agentic` | boolean | Whether this is for an agentic request (when using identity variant) |
 
 ---
 
-#### agents.adapter.runMiddleware
+#### agents.adapter.create_user_token_client
 
-Span for executing the middleware pipeline.
+Span for creating a user token client instance.
 
-*Currently defined but attributes vary based on middleware configuration.*
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `token.service.endpoint` | string | The token service endpoint URL |
+| `auth.scope` | string | The authentication scope |
 
 ---
 
@@ -181,48 +173,47 @@ Main execution span for the AgentApplication.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.type` | string | The type of activity being processed |
-| `agents.activity.id` | string | The activity identifier |
-| `agents.route.authorized` | boolean | Whether the request was authorized |
-| `agents.route.matched` | boolean | Whether a route handler matched the activity |
+| `route.authorized` | boolean | Whether the request was authorized |
+| `activity.type` | string | The type of activity being processed |
+| `activity.id` | string | The activity identifier |
+| `route.matched` | boolean | Whether a route handler matched the activity |
 
 **Child Spans:**
-- `agents.app.routeHandler` - Includes `agents.route.is_invoke` and `agents.route.is_agentic` attributes
-- `agents.app.downloadFiles` - Includes `agents.attachments.count` attribute
-
-**Events:**
-- `appRun.failed` - Emitted on failure, includes `error.type` attribute
+- `agents.app.route_handler` - Includes `route.is_invoke` and `route.is_agentic` attributes
+- `agents.app.download_files` - Includes `agents.attachments.count` attribute
+- `agents.app.before_turn` - Before-turn handlers execution
+- `agents.app.after_turn` - After-turn handlers execution
 
 ---
 
-#### agents.app.routeHandler
+#### agents.app.route_handler
 
 Child span for executing a matched route handler.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.route.is_invoke` | boolean | Whether this is an invoke activity route |
-| `agents.route.is_agentic` | boolean | Whether this is an agentic route |
+| `route.is_invoke` | boolean | Whether this is an invoke activity route |
+| `route.is_agentic` | boolean | Whether this is an agentic route |
 
 ---
 
-#### agents.app.beforeTurn
+#### agents.app.before_turn
 
 Span for before-turn handlers execution.
 
-*Attributes depend on handler implementation.*
+*No specific attributes. Wraps the execution of registered before-turn event handlers.*
 
 ---
 
-#### agents.app.afterTurn
+#### agents.app.after_turn
 
 Span for after-turn handlers execution.
 
-*Attributes depend on handler implementation.*
+*No specific attributes. Wraps the execution of registered after-turn event handlers.*
 
 ---
 
-#### agents.app.downloadFiles
+#### agents.app.download_files
 
 Span for downloading file attachments.
 
@@ -232,122 +223,122 @@ Span for downloading file attachments.
 
 ---
 
+### TurnContext Spans
+
+The TurnContext manages the current turn of conversation.
+
+#### agents.turn.send_activities
+
+Span for sending activities through the turn context.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `activity.count` | number | Number of activities being sent |
+| `activity.type` | string | The type of each activity (set per activity) |
+| `activity.delivery_mode` | string | The delivery mode of each activity (set per activity) |
+| `activity.id` | string | The activity identifier (set per activity) |
+
+---
+
 ### ConnectorClient Spans
 
 The ConnectorClient handles HTTP communication with the Bot Framework Connector service.
 
-#### agents.connector.replyToActivity
+#### agents.connector.reply_to_activity
 
 Span for replying to a specific activity.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.conversation_id` | string | The conversation identifier |
-| `agents.activity.id` | string | The activity being replied to |
-
-**Events:**
-- `replyToActivity.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.conversation_id` | string | The conversation identifier |
+| `activity.id` | string | The activity being replied to |
 
 ---
 
-#### agents.connector.sendToConversation
+#### agents.connector.send_to_conversation
 
 Span for sending an activity to a conversation.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.conversation_id` | string | The target conversation identifier |
-
-**Events:**
-- `sendToConversation.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.conversation_id` | string | The target conversation identifier |
 
 ---
 
-#### agents.connector.updateActivity
+#### agents.connector.update_activity
 
 Span for updating an activity via the connector.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.conversation_id` | string | The conversation identifier |
-| `agents.activity.id` | string | The activity being updated |
-
-**Events:**
-- `updateActivity.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.conversation_id` | string | The conversation identifier |
+| `activity.id` | string | The activity being updated |
 
 ---
 
-#### agents.connector.deleteActivity
+#### agents.connector.delete_activity
 
 Span for deleting an activity via the connector.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.conversation_id` | string | The conversation identifier |
-| `agents.activity.id` | string | The activity being deleted |
-
-**Events:**
-- `deleteActivity.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.conversation_id` | string | The conversation identifier |
+| `activity.id` | string | The activity being deleted |
 
 ---
 
-#### agents.connector.createConversation
+#### agents.connector.create_conversation
 
 Span for creating a new conversation.
 
-*Attributes recorded via metrics (operation, http.method, http.status_code).*
-
-**Events:**
-- `createConversation.failed` - Emitted on failure, includes `error.type` attribute
+*No span-level attributes. Metrics are recorded with operation, http.method, and http.status_code.*
 
 ---
 
-#### agents.connector.getConversations
+#### agents.connector.get_conversations
 
 Span for retrieving conversations.
 
-*Attributes recorded via metrics (operation, http.method, http.status_code).*
-
-**Events:**
-- `getConversations.failed` - Emitted on failure, includes `error.type` attribute
+*No span-level attributes. Metrics are recorded with operation, http.method, and http.status_code.*
 
 ---
 
-#### agents.connector.getConversationMembers
+#### agents.connector.get_conversation_member
 
-Span for retrieving conversation members.
+Span for retrieving a conversation member.
 
-*Attributes recorded via metrics (operation, http.method, http.status_code).*
-
-**Events:**
-- `getConversationMember.failed` - Emitted on failure, includes `error.type` attribute
+*No span-level attributes. Metrics are recorded with operation, http.method, and http.status_code.*
 
 ---
 
-#### agents.connector.uploadAttachment
+#### agents.connector.upload_attachment
 
 Span for uploading an attachment.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.conversation_id` | string | The conversation identifier |
-
-**Events:**
-- `uploadAttachment.failed` - Emitted on failure, includes `error.type` attribute
+| `activity.conversation_id` | string | The conversation identifier |
 
 ---
 
-#### agents.connector.getAttachment
+#### agents.connector.get_attachment_info
 
-Span for retrieving attachment content or info.
+Span for retrieving attachment information.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.attachment.id` | string | The attachment identifier |
+| `attachment.id` | string | The attachment identifier |
 
-**Events:**
-- `getAttachment.failed` - Emitted on failure, includes `error.type` attribute
-- `getAttachmentInfo.failed` - Emitted on info retrieval failure
+---
+
+#### agents.connector.get_attachment
+
+Span for retrieving attachment content.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `attachment.id` | string | The attachment identifier |
+| `view.id` | string | The view identifier |
 
 ---
 
@@ -355,18 +346,230 @@ Span for retrieving attachment content or info.
 
 The AgentClient handles agent-to-agent communication.
 
-#### agents.agentClient.postActivity
+#### agents.agent_client.post_activity
 
 Span for posting an activity to another agent.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.target.endpoint` | string | The target agent's endpoint URL |
-| `agents.target.client_id` | string | The target agent's client ID |
-| `http.status_code` | number | HTTP response status code |
+| `target.endpoint` | string | The target agent's endpoint URL |
+| `target.client_id` | string | The target agent's client ID |
+| `http.status_code` | string | HTTP response status code |
 
-**Events:**
-- `postActivity.failed` - Emitted on failure, includes `error.type` attribute
+---
+
+### Storage Spans
+
+Storage spans are emitted when using `TracedStorage` to wrap a storage implementation. By default, internal storage operations are not traced to reduce noise.
+
+#### agents.storage.read
+
+Span for reading items from storage.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `storage.key.count` | number | Number of keys being read |
+
+---
+
+#### agents.storage.write
+
+Span for writing items to storage.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `storage.key.count` | number | Number of keys being written |
+
+---
+
+#### agents.storage.delete
+
+Span for deleting items from storage.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `storage.key.count` | number | Number of keys being deleted |
+
+---
+
+### Authentication Spans
+
+Authentication spans cover token acquisition operations via the MSAL token provider.
+
+#### agents.authentication.get_access_token
+
+Span for acquiring an access token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.scope` | string | The authentication scope requested |
+| `auth.method` | string | The authentication method used (secret, certificate, managed_identity, wid, fic) |
+
+---
+
+#### agents.authentication.acquire_token_on_behalf_of
+
+Span for acquiring a token using the on-behalf-of flow.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.scopes` | string[] | The authentication scopes requested |
+
+---
+
+#### agents.authentication.get_agentic_instance_token
+
+Span for acquiring an agentic instance token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `agentic.instance_id` | string | The agentic application instance ID |
+
+---
+
+#### agents.authentication.get_agentic_user_token
+
+Span for acquiring an agentic user token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `agentic.instance_id` | string | The agentic application instance ID |
+| `agentic.user_id` | string | The agentic user ID |
+| `auth.scopes` | string[] | The authentication scopes requested |
+
+---
+
+### Authorization Spans
+
+Authorization spans cover the authorization handlers used by AgentApplication.
+
+#### agents.authorization.agentic_token
+
+Span for retrieving an agentic authorization token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.handler.id` | string | The authorization handler identifier |
+| `auth.connection.name` | string | The connection name used |
+| `auth.scopes` | string[] | The authentication scopes requested |
+
+---
+
+#### agents.authorization.azure_bot_token
+
+Span for retrieving an Azure Bot Service authorization token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.handler.id` | string | The authorization handler identifier |
+| `auth.connection.name` | string | The connection name used |
+| `auth.flow` | string | The authentication flow (e.g., "obo") |
+| `auth.scopes` | string[] | The authentication scopes (when OBO flow is used) |
+
+---
+
+#### agents.authorization.azure_bot_signout
+
+Span for signing out a user via Azure Bot Service.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.handler.id` | string | The authorization handler identifier |
+| `auth.connection.name` | string | The connection name used |
+| `activity.channel_id` | string | The channel identifier |
+
+---
+
+#### agents.authorization.azure_bot_signin
+
+Span for the Azure Bot Service sign-in flow.
+
+*Attributes depend on the sign-in stage and flow.*
+
+---
+
+### UserTokenClient Spans
+
+The UserTokenClient handles user token operations against the Bot Framework Token Service.
+
+#### agents.user_token_client.get_user_token
+
+Span for getting a user token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.connection.name` | string | The connection name |
+| `activity.channel_id` | string | The channel identifier |
+| `user.id` | string | The user identifier |
+
+---
+
+#### agents.user_token_client.sign_out
+
+Span for signing out a user.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `user.id` | string | The user identifier |
+| `auth.connection.name` | string | The connection name |
+| `activity.channel_id` | string | The channel identifier |
+
+---
+
+#### agents.user_token_client.get_sign_in_resource
+
+Span for getting a sign-in resource.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.connection.name` | string | The connection name |
+
+---
+
+#### agents.user_token_client.exchange_token
+
+Span for exchanging a token.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `user.id` | string | The user identifier |
+| `auth.connection.name` | string | The connection name |
+| `activity.channel_id` | string | The channel identifier |
+
+---
+
+#### agents.user_token_client.get_token_or_sign_in_resource
+
+Span for getting a token or sign-in resource.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `user.id` | string | The user identifier |
+| `auth.connection.name` | string | The connection name |
+| `activity.channel_id` | string | The channel identifier |
+
+---
+
+#### agents.user_token_client.get_token_status
+
+Span for getting the token status.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `user.id` | string | The user identifier |
+| `activity.channel_id` | string | The channel identifier |
+
+---
+
+#### agents.user_token_client.get_aad_tokens
+
+Span for getting AAD tokens.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `user.id` | string | The user identifier |
+| `auth.connection.name` | string | The connection name |
+| `activity.channel_id` | string | The channel identifier |
 
 ---
 
@@ -380,51 +583,51 @@ Counters track the total number of activities processed.
 
 #### agents.activities.received
 
-**Type:** Counter  
-**Unit:** activities  
+**Type:** Counter
+**Unit:** activities
 **Description:** Total number of activities received by the adapter.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.type` | string | Type of activity received |
-| `agents.activity.channel_id` | string | Channel the activity came from |
+| `activity.type` | string | Type of activity received |
+| `activity.channel_id` | string | Channel the activity came from |
 
 ---
 
 #### agents.activities.sent
 
-**Type:** Counter  
-**Unit:** activities  
+**Type:** Counter
+**Unit:** activities
 **Description:** Total number of outbound activities sent by the adapter.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.type` | string | Type of activity sent |
-| `agents.activity.channel_id` | string | Target channel |
+| `activity.type` | string | Type of activity sent |
+| `activity.channel_id` | string | Target channel |
 
 ---
 
 #### agents.activities.updated
 
-**Type:** Counter  
-**Unit:** activities  
+**Type:** Counter
+**Unit:** activities
 **Description:** Total number of activities updated by the adapter.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.channel_id` | string | Channel where activity was updated |
+| `activity.channel_id` | string | Channel where activity was updated |
 
 ---
 
 #### agents.activities.deleted
 
-**Type:** Counter  
-**Unit:** activities  
+**Type:** Counter
+**Unit:** activities
 **Description:** Total number of activities deleted by the adapter.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.channel_id` | string | Channel where activity was deleted |
+| `activity.channel_id` | string | Channel where activity was deleted |
 
 ---
 
@@ -432,30 +635,86 @@ Counters track the total number of activities processed.
 
 Counters for outbound requests.
 
-#### agents.connector.requests
+#### agents.connector.request.count
 
-**Type:** Counter  
-**Unit:** request  
+**Type:** Counter
+**Unit:** request
 **Description:** Total number of outbound connector HTTP requests.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `operation` | string | Connector operation name (replyToActivity, sendToConversation, etc.) |
-| `http.method` | string | HTTP method used (POST, GET, DELETE, etc.) |
-| `http.status_code` | number | HTTP response status code |
+| `operation` | string | Connector operation name (reply.to.activity, send.to.conversation, etc.) |
+| `http.method` | string | HTTP method used (POST, GET, DELETE, PUT) |
+| `http.status_code` | string | HTTP response status code |
 
 ---
 
-#### agents.agentClient.requests
+#### agents.agent_client.request.count
 
-**Type:** Counter  
-**Unit:** request  
+**Type:** Counter
+**Unit:** request
 **Description:** Total number of inter-agent calls.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.target.endpoint` | string | Target agent endpoint |
-| `http.status_code` | number | HTTP response status code |
+| `target.endpoint` | string | Target agent endpoint |
+| `http.status_code` | string | HTTP response status code |
+
+---
+
+#### agents.auth.token.request.count
+
+**Type:** Counter
+**Unit:** request
+**Description:** Total number of token acquisition attempts.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.method` | string | Authentication method used (secret, certificate, managed_identity, obo, agentic_instance, agentic_user, etc.) |
+| `auth.success` | boolean | Whether the token acquisition succeeded |
+
+---
+
+#### agents.user_token_client.request.count
+
+**Type:** Counter
+**Unit:** request
+**Description:** Total number of user token client HTTP requests.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `operation` | string | Operation name (get.user.token, sign.out, exchange.token, etc.) |
+| `http.method` | string | HTTP method used |
+| `http.status_code` | string | HTTP response status code |
+
+---
+
+### Turn Counters
+
+Counters for turn processing.
+
+#### agents.turn.count
+
+**Type:** Counter
+**Unit:** turn
+**Description:** Total turns processed.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `activity.type` | string | Type of activity processed |
+| `activity.conversation_id` | string | The conversation identifier |
+
+---
+
+#### agents.turn.error.count
+
+**Type:** Counter
+**Unit:** turn
+**Description:** Total turns that resulted in an error.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `error.type` | string | Exception/error class name |
 
 ---
 
@@ -465,38 +724,89 @@ Histograms track the distribution of operation durations.
 
 #### agents.adapter.process.duration
 
-**Type:** Histogram  
-**Unit:** milliseconds  
+**Type:** Histogram
+**Unit:** ms
 **Description:** Duration of the adapter process method in milliseconds.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.type` | string | Type of activity processed |
+| `activity.type` | string | Type of activity processed |
 
 ---
 
 #### agents.connector.request.duration
 
-**Type:** Histogram  
-**Unit:** milliseconds  
+**Type:** Histogram
+**Unit:** ms
 **Description:** Duration of outbound connector HTTP requests in milliseconds.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `operation` | string | Connector operation name |
-| `http.status_code` | number | HTTP response status code |
+| `http.status_code` | string | HTTP response status code |
 
 ---
 
-#### agents.agentClient.request.duration
+#### agents.agent_client.request.duration
 
-**Type:** Histogram  
-**Unit:** milliseconds  
+**Type:** Histogram
+**Unit:** ms
 **Description:** Duration of inter-agent call latency in milliseconds.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.target.endpoint` | string | Target agent endpoint |
+| `target.endpoint` | string | Target agent endpoint |
+
+---
+
+#### agents.turn.duration
+
+**Type:** Histogram
+**Unit:** ms
+**Description:** Duration of end-to-end turn processing in milliseconds.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `activity.type` | string | Type of activity processed |
+| `activity.channel_id` | string | The channel identifier |
+| `activity.conversation_id` | string | The conversation identifier |
+
+---
+
+#### agents.storage.operation.duration
+
+**Type:** Histogram
+**Unit:** ms
+**Description:** Duration of storage operations in milliseconds.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `storage.operation` | string | Storage operation type (read, write, delete) |
+
+---
+
+#### agents.auth.token.duration
+
+**Type:** Histogram
+**Unit:** ms
+**Description:** Duration of token acquisition latency in milliseconds.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `auth.method` | string | Authentication method used |
+
+---
+
+#### agents.user_token_client.request.duration
+
+**Type:** Histogram
+**Unit:** ms
+**Description:** Duration of user token client HTTP requests in milliseconds.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `operation` | string | Operation name |
+| `http.status_code` | string | HTTP response status code |
 
 ---
 
@@ -508,43 +818,32 @@ All span names are available as constants in the `@microsoft/agents-telemetry` p
 import { SpanNames } from '@microsoft/agents-telemetry';
 
 // CloudAdapter
-SpanNames.ADAPTER_PROCESS              // 'agents.adapter.process'
-SpanNames.ADAPTER_SEND_ACTIVITIES      // 'agents.adapter.sendActivities'
-SpanNames.ADAPTER_UPDATE_ACTIVITY      // 'agents.adapter.updateActivity'
-SpanNames.ADAPTER_DELETE_ACTIVITY      // 'agents.adapter.deleteActivity'
-SpanNames.ADAPTER_CONTINUE_CONVERSATION // 'agents.adapter.continueConversation'
-SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT // 'agents.adapter.createConnectorClient'
-SpanNames.ADAPTER_RUN_MIDDLEWARE       // 'agents.adapter.runMiddleware'
-
-// ActivityHandler
-SpanNames.HANDLER_RUN                  // 'agents.handler.run'
-SpanNames.HANDLER_ON_TURN              // 'agents.handler.onTurn'
-SpanNames.HANDLER_ON_MESSAGE           // 'agents.handler.onMessage'
-SpanNames.HANDLER_ON_INVOKE            // 'agents.handler.onInvoke'
-SpanNames.HANDLER_ON_CONVERSATION_UPDATE // 'agents.handler.onConversationUpdate'
+SpanNames.ADAPTER_PROCESS                  // 'agents.adapter.process'
+SpanNames.ADAPTER_SEND_ACTIVITIES          // 'agents.adapter.send_activities'
+SpanNames.ADAPTER_UPDATE_ACTIVITY          // 'agents.adapter.update_activity'
+SpanNames.ADAPTER_DELETE_ACTIVITY          // 'agents.adapter.delete_activity'
+SpanNames.ADAPTER_CONTINUE_CONVERSATION    // 'agents.adapter.continue_conversation'
+SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT  // 'agents.adapter.create_connector_client'
+SpanNames.ADAPTER_CREATE_USER_TOKEN_CLIENT // 'agents.adapter.create_user_token_client'
 
 // AgentApplication
 SpanNames.AGENTS_APP_RUN               // 'agents.app.run'
-SpanNames.AGENTS_APP_ROUTE_HANDLER     // 'agents.app.routeHandler'
-SpanNames.AGENTS_APP_BEFORE_TURN       // 'agents.app.beforeTurn'
-SpanNames.AGENTS_APP_AFTER_TURN        // 'agents.app.afterTurn'
-SpanNames.AGENTS_APP_DOWNLOAD_FILES    // 'agents.app.downloadFiles'
-
-// Dialogs
-SpanNames.DIALOG_BEGIN                 // 'agents.dialog.begin'
-SpanNames.DIALOG_CONTINUE              // 'agents.dialog.continue'
-SpanNames.DIALOG_RESUME                // 'agents.dialog.resume'
+SpanNames.AGENTS_APP_ROUTE_HANDLER     // 'agents.app.route_handler'
+SpanNames.AGENTS_APP_BEFORE_TURN       // 'agents.app.before_turn'
+SpanNames.AGENTS_APP_AFTER_TURN        // 'agents.app.after_turn'
+SpanNames.AGENTS_APP_DOWNLOAD_FILES    // 'agents.app.download_files'
 
 // ConnectorClient
-SpanNames.CONNECTOR_SEND_TO_CONVERSATION   // 'agents.connector.sendToConversation'
-SpanNames.CONNECTOR_REPLY_TO_ACTIVITY      // 'agents.connector.replyToActivity'
-SpanNames.CONNECTOR_UPDATE_ACTIVITY        // 'agents.connector.updateActivity'
-SpanNames.CONNECTOR_DELETE_ACTIVITY        // 'agents.connector.deleteActivity'
-SpanNames.CONNECTOR_CREATE_CONVERSATION    // 'agents.connector.createConversation'
-SpanNames.CONNECTOR_GET_CONVERSATIONS      // 'agents.connector.getConversations'
-SpanNames.CONNECTOR_GET_CONVERSATION_MEMBERS // 'agents.connector.getConversationMembers'
-SpanNames.CONNECTOR_UPLOAD_ATTACHMENT      // 'agents.connector.uploadAttachment'
-SpanNames.CONNECTOR_GET_ATTACHMENT         // 'agents.connector.getAttachment'
+SpanNames.CONNECTOR_SEND_TO_CONVERSATION   // 'agents.connector.send_to_conversation'
+SpanNames.CONNECTOR_REPLY_TO_ACTIVITY      // 'agents.connector.reply_to_activity'
+SpanNames.CONNECTOR_UPDATE_ACTIVITY        // 'agents.connector.update_activity'
+SpanNames.CONNECTOR_DELETE_ACTIVITY        // 'agents.connector.delete_activity'
+SpanNames.CONNECTOR_CREATE_CONVERSATION    // 'agents.connector.create_conversation'
+SpanNames.CONNECTOR_GET_CONVERSATIONS      // 'agents.connector.get_conversations'
+SpanNames.CONNECTOR_GET_CONVERSATION_MEMBER // 'agents.connector.get_conversation_member'
+SpanNames.CONNECTOR_UPLOAD_ATTACHMENT      // 'agents.connector.upload_attachment'
+SpanNames.CONNECTOR_GET_ATTACHMENT         // 'agents.connector.get_attachment'
+SpanNames.CONNECTOR_GET_ATTACHMENT_INFO    // 'agents.connector.get_attachment_info'
 
 // Storage
 SpanNames.STORAGE_READ                 // 'agents.storage.read'
@@ -557,7 +856,31 @@ SpanNames.COPILOT_SEND_ACTIVITY        // 'agents.copilot.sendActivity'
 SpanNames.COPILOT_RECEIVE_ACTIVITY     // 'agents.copilot.receiveActivity'
 
 // AgentClient
-SpanNames.AGENT_CLIENT_POST_ACTIVITY   // 'agents.agentClient.postActivity'
+SpanNames.AGENT_CLIENT_POST_ACTIVITY   // 'agents.agent_client.post_activity'
+
+// Authentication
+SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN            // 'agents.authentication.get_access_token'
+SpanNames.AUTHENTICATION_ACQUIRE_TOKEN_ON_BEHALF_OF  // 'agents.authentication.acquire_token_on_behalf_of'
+SpanNames.AUTHENTICATION_GET_AGENTIC_INSTANCE_TOKEN  // 'agents.authentication.get_agentic_instance_token'
+SpanNames.AUTHENTICATION_GET_AGENTIC_USER_TOKEN      // 'agents.authentication.get_agentic_user_token'
+
+// Authorization
+SpanNames.AUTHORIZATION_AGENTIC_TOKEN      // 'agents.authorization.agentic_token'
+SpanNames.AUTHORIZATION_AZURE_BOT_TOKEN    // 'agents.authorization.azure_bot_token'
+SpanNames.AUTHORIZATION_AZURE_BOT_SIGNIN   // 'agents.authorization.azure_bot_signin'
+SpanNames.AUTHORIZATION_AZURE_BOT_SIGNOUT  // 'agents.authorization.azure_bot_signout'
+
+// UserTokenClient
+SpanNames.USER_TOKEN_CLIENT_GET_USER_TOKEN              // 'agents.user_token_client.get_user_token'
+SpanNames.USER_TOKEN_CLIENT_SIGN_OUT                    // 'agents.user_token_client.sign_out'
+SpanNames.USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE        // 'agents.user_token_client.get_sign_in_resource'
+SpanNames.USER_TOKEN_CLIENT_EXCHANGE_TOKEN               // 'agents.user_token_client.exchange_token'
+SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGNIN_RESOURCE // 'agents.user_token_client.get_token_or_sign_in_resource'
+SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_STATUS             // 'agents.user_token_client.get_token_status'
+SpanNames.USER_TOKEN_CLIENT_GET_AAD_TOKENS               // 'agents.user_token_client.get_aad_tokens'
+
+// TurnContext
+SpanNames.TURN_SEND_ACTIVITIES         // 'agents.turn.send_activities'
 ```
 
 ---
@@ -570,7 +893,6 @@ All metric names are available as constants:
 import { MetricNames } from '@microsoft/agents-telemetry';
 
 // CloudAdapter
-MetricNames.ADAPTER_PROCESSED_ACTIVITIES  // 'agents.adapter.processed.activities'
 MetricNames.ADAPTER_PROCESS_DURATION      // 'agents.adapter.process.duration'
 
 // Activity counters
@@ -580,12 +902,28 @@ MetricNames.ACTIVITIES_UPDATED            // 'agents.activities.updated'
 MetricNames.ACTIVITIES_DELETED            // 'agents.activities.deleted'
 
 // Connector metrics
-MetricNames.CONNECTOR_REQUESTS            // 'agents.connector.requests'
+MetricNames.CONNECTOR_REQUESTS            // 'agents.connector.request.count'
 MetricNames.CONNECTOR_REQUEST_DURATION    // 'agents.connector.request.duration'
 
 // AgentClient metrics
-MetricNames.AGENT_CLIENT_REQUESTS         // 'agents.agentClient.requests'
-MetricNames.AGENT_CLIENT_REQUEST_DURATION // 'agents.agentClient.request.duration'
+MetricNames.AGENT_CLIENT_REQUESTS         // 'agents.agent_client.request.count'
+MetricNames.AGENT_CLIENT_REQUEST_DURATION // 'agents.agent_client.request.duration'
+
+// Turn metrics
+MetricNames.TURNS_COUNT                   // 'agents.turn.count'
+MetricNames.TURNS_ERRORS                  // 'agents.turn.error.count'
+MetricNames.TURN_DURATION                 // 'agents.turn.duration'
+
+// Storage metrics
+MetricNames.STORAGE_OPERATION_DURATION    // 'agents.storage.operation.duration'
+
+// Authentication metrics
+MetricNames.AUTH_TOKEN_REQUESTS           // 'agents.auth.token.request.count'
+MetricNames.AUTH_TOKEN_DURATION           // 'agents.auth.token.duration'
+
+// UserTokenClient metrics
+MetricNames.USER_TOKEN_CLIENT_REQUESTS          // 'agents.user_token_client.request.count'
+MetricNames.USER_TOKEN_CLIENT_REQUEST_DURATION  // 'agents.user_token_client.request.duration'
 ```
 
 ---
@@ -626,13 +964,21 @@ These attributes appear across multiple spans and follow OpenTelemetry semantic 
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `agents.activity.type` | string | Bot Framework activity type (message, conversationUpdate, invoke, etc.) |
-| `agents.activity.id` | string | Unique identifier for the activity |
-| `agents.activity.channel_id` | string | Channel identifier (msteams, webchat, directline, etc.) |
-| `agents.activity.conversation_id` | string | Unique identifier for the conversation |
+| `activity.type` | string | Bot Framework activity type (message, conversationUpdate, invoke, etc.) |
+| `activity.id` | string | Unique identifier for the activity |
+| `activity.channel_id` | string | Channel identifier (msteams, webchat, directline, etc.) |
+| `activity.conversation_id` | string | Unique identifier for the conversation |
+| `activity.is_agentic` | boolean | Whether this is an agentic (agent-to-agent) request |
+| `activity.delivery_mode` | string | The delivery mode of the activity |
+| `auth.scope` | string | Authentication scope for token requests |
+| `auth.scopes` | string[] | Authentication scopes for multi-scope requests |
+| `auth.method` | string | Authentication method used (secret, certificate, managed_identity, etc.) |
+| `auth.connection.name` | string | The OAuth connection name |
+| `auth.handler.id` | string | The authorization handler identifier |
 | `error.type` | string | Exception/error class name when an error occurs |
 | `http.method` | string | HTTP method for outbound requests |
-| `http.status_code` | number | HTTP response status code |
+| `http.status_code` | string | HTTP response status code |
+| `user.id` | string | The user identifier |
 
 ---
 
