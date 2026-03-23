@@ -10,7 +10,9 @@ import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-
 import { ExecuteTurnRequest } from './executeTurnRequest'
 import { debug } from '@microsoft/agents-activity/logger'
 import { version } from '../package.json'
+import { SpanNames, managedSpan } from '@microsoft/agents-telemetry'
 import os from 'os'
+import { CopilotStudioClientMetrics } from './observability'
 
 const logger = debug('copilot-studio:client')
 
@@ -57,85 +59,103 @@ export class CopilotStudioClient {
    * @returns An async generator yielding the Agent's Activities.
    */
   private async * postRequestAsync (url: string, body?: any, method: string = 'POST'): AsyncGenerator<Activity> {
-    logger.debug(`>>> SEND TO ${url}`)
-
-    const streamMap = new Map<string, { text: string, sequence: number }[]>()
-
-    const eventSource: EventSourceClient = createEventSource({
-      url,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'User-Agent': CopilotStudioClient.getProductInfo(),
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream'
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      method,
-      fetch: async (url, init) => {
-        const response = await fetch(url, init)
-        this.processResponseHeaders(response.headers)
-        return response
+    const managed = managedSpan(SpanNames.COPILOT_POST_REQUEST, {
+      attributes: {
+        'copilot.post_request.url': url,
+        'copilot.post_request.method': method
       }
     })
-
     try {
-      for await (const { data, event } of eventSource) {
-        if (data && event === 'activity') {
-          try {
-            const activity = Activity.fromJson(data)
+      logger.debug(`>>> SEND TO ${url}`)
 
-            // check to see if this activity is part of the streamed response, in which case we need to accumulate the text
-            const streamingEntity = activity.entities?.find(e => e.type === 'streaminfo' && e.streamType === 'streaming')
-            switch (activity.type) {
-              case ActivityTypes.Message:
-                if (!this.conversationId.trim()) { // Did not get it from the header.
-                  this.conversationId = activity.conversation?.id ?? ''
-                  logger.debug(`Conversation ID: ${this.conversationId}`)
-                }
-                yield activity
-                break
-              case ActivityTypes.Typing:
-                logger.debug(`Activity type: ${activity.type}`)
-                // Accumulate the text as it comes in from the stream.
-                // This also accounts for the "old style" of streaming where the stream info is in channelData.
-                if (streamingEntity || activity.channelData?.streamType === 'streaming') {
-                  const text = activity.text ?? ''
-                  const id = (streamingEntity?.streamId ?? activity.channelData?.streamId)
-                  const sequence = (streamingEntity?.streamSequence ?? activity.channelData?.streamSequence)
-                  // Accumulate the text chunks based on stream ID and sequence number.
-                  if (id && sequence) {
-                    if (streamMap.has(id)) {
-                      const existing = streamMap.get(id)!
-                      existing.push({ text, sequence })
-                      streamMap.set(id, existing)
-                    } else {
-                      streamMap.set(id, [{ text, sequence }])
-                    }
-                    activity.text = streamMap.get(id)?.sort((a, b) => a.sequence - b.sequence).map(item => item.text).join('') || ''
+      const streamMap = new Map<string, { text: string, sequence: number }[]>()
+
+      const eventSource: EventSourceClient = createEventSource({
+        url,
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'User-Agent': CopilotStudioClient.getProductInfo(),
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream'
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        method,
+        fetch: async (url, init) => {
+          const response = await fetch(url, init)
+          this.processResponseHeaders(response.headers)
+          return response
+        }
+      })
+
+      try {
+        for await (const { data, event } of eventSource) {
+          if (data && event === 'activity') {
+            try {
+              const activity = Activity.fromJson(data)
+
+              managed.span.setAttributes({
+                'copilot.post_request.activity.type': activity.type,
+                'copilot.post_request.activity.conversation.id': activity.conversation?.id
+              })
+
+              // check to see if this activity is part of the streamed response, in which case we need to accumulate the text
+              const streamingEntity = activity.entities?.find(e => e.type === 'streaminfo' && e.streamType === 'streaming')
+              switch (activity.type) {
+                case ActivityTypes.Message:
+                  if (!this.conversationId.trim()) { // Did not get it from the header.
+                    this.conversationId = activity.conversation?.id ?? ''
+                    logger.debug(`Conversation ID: ${this.conversationId}`)
                   }
-                }
-                yield activity
-                break
-              default:
-                logger.debug(`Activity type: ${activity.type}`)
-                yield activity
-                break
+                  yield activity
+                  break
+                case ActivityTypes.Typing:
+                  logger.debug(`Activity type: ${activity.type}`)
+                  // Accumulate the text as it comes in from the stream.
+                  // This also accounts for the "old style" of streaming where the stream info is in channelData.
+                  if (streamingEntity || activity.channelData?.streamType === 'streaming') {
+                    const text = activity.text ?? ''
+                    const id = (streamingEntity?.streamId ?? activity.channelData?.streamId)
+                    const sequence = (streamingEntity?.streamSequence ?? activity.channelData?.streamSequence)
+                    // Accumulate the text chunks based on stream ID and sequence number.
+                    if (id && sequence) {
+                      if (streamMap.has(id)) {
+                        const existing = streamMap.get(id)!
+                        existing.push({ text, sequence })
+                        streamMap.set(id, existing)
+                      } else {
+                        streamMap.set(id, [{ text, sequence }])
+                      }
+                      activity.text = streamMap.get(id)?.sort((a, b) => a.sequence - b.sequence).map(item => item.text).join('') || ''
+                    }
+                  }
+                  yield activity
+                  break
+                default:
+                  logger.debug(`Activity type: ${activity.type}`)
+                  yield activity
+                  break
+              }
+            } catch (error) {
+              logger.error('Failed to parse activity:', error)
             }
-          } catch (error) {
-            logger.error('Failed to parse activity:', error)
+          } else if (event === 'end') {
+            logger.debug('Stream complete')
+            break
           }
-        } else if (event === 'end') {
-          logger.debug('Stream complete')
-          break
-        }
 
-        if (eventSource.readyState === 'closed') {
-          logger.debug('Connection closed')
-          break
+          if (eventSource.readyState === 'closed') {
+            logger.debug('Connection closed')
+            break
+          }
         }
+      } finally {
+        eventSource.close()
       }
+    } catch (error) {
+      managed.endWithError(error instanceof Error ? error : String(error))
+      throw error
     } finally {
-      eventSource.close()
+      managed.end()
     }
   }
 
@@ -188,12 +208,31 @@ export class CopilotStudioClient {
    * @returns An async generator yielding the Agent's Activities.
    */
   public async * startConversationStreaming (emitStartConversationEvent: boolean = true): AsyncGenerator<Activity> {
-    const uriStart: string = getCopilotStudioConnectionUrl(this.settings)
-    const body = { emitStartConversationEvent }
+    const start = performance.now()
+    const managed = managedSpan(SpanNames.COPILOT_START_CONVERSATION, {
+      attributes: { 'copilot.emit_start_event': emitStartConversationEvent },
+      onEnd: () => {
+        const duration = performance.now() - start
+        CopilotStudioClientMetrics.conversationsStartedCounter.add(1)
+        CopilotStudioClientMetrics.requestDuration.record(duration, {
+          operation: 'startConversationStreaming'
+        })
+      }
+    })
+    try {
+      const uriStart: string = getCopilotStudioConnectionUrl(this.settings)
+      const body = { emitStartConversationEvent }
 
-    logger.info('Starting conversation ...')
+      logger.info('Starting conversation ...')
 
-    yield * this.postRequestAsync(uriStart, body, 'POST')
+      yield * this.postRequestAsync(uriStart, body, 'POST')
+      managed.end()
+    } catch (error) {
+      managed.endWithError(error instanceof Error ? error : String(error))
+      throw error
+    } finally {
+      managed.end()
+    }
   }
 
   /**
@@ -203,12 +242,37 @@ export class CopilotStudioClient {
    * @returns An async generator yielding the Agent's Activities.
    */
   public async * sendActivityStreaming (activity: Activity, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
-    const localConversationId = activity.conversation?.id ?? conversationId
-    const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)
-    const qbody: ExecuteTurnRequest = new ExecuteTurnRequest(activity)
+    const start = performance.now()
+    const managed = managedSpan(SpanNames.COPILOT_SEND_ACTIVITY, {
+      attributes: {
+        'copilot.activity.type': activity.type,
+        'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
+      },
+      onEnd: () => {
+        const duration = performance.now() - start
+        CopilotStudioClientMetrics.activitiesSentCounter.add(1, {
+          'copilot.activity.type': activity.type,
+          'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
+        })
+        CopilotStudioClientMetrics.streamDuration.record(duration, {
+          operation: 'sendActivityStreaming'
+        })
+      }
+    })
+    try {
+      const localConversationId = activity.conversation?.id ?? conversationId
+      const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)
+      const qbody: ExecuteTurnRequest = new ExecuteTurnRequest(activity)
 
-    logger.info('Sending activity...', activity)
-    yield * this.postRequestAsync(uriExecute, qbody, 'POST')
+      logger.info('Sending activity...', activity)
+      yield * this.postRequestAsync(uriExecute, qbody, 'POST')
+      managed.end()
+    } catch (error) {
+      managed.endWithError(error instanceof Error ? error : String(error))
+      throw error
+    } finally {
+      managed.end()
+    }
   }
 
   /**

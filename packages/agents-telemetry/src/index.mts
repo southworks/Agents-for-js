@@ -2,13 +2,13 @@
 // Licensed under the MIT License.
 
 import { OTel, OTelLogs } from "./types.js";
-import { traceFactory, traceFactory2 } from './trace.js'
+import { traceFactory, traceFactory2, startManagedSpan } from './trace.js'
 import { loggerFactory } from './logging.js'
 
 export * from './constants.js'
 export * from './logging.js'
 
-export type { TracedMethodConfig } from './trace.js'
+export type { TracedMethodConfig, ManagedSpanOptions, ManagedSpanResult } from './trace.js'
 
 /**
  * Will contain the OpenTelemetry API if it's available, otherwise will contain a fallback implementation that allows agents-telemetry to function without OpenTelemetry support.
@@ -17,6 +17,7 @@ export const otel = await load()
 const otelLogs = await loadLogs()
 
 export const trace = traceFactory2(otel)
+export const managedSpan = startManagedSpan(otel)
 
 export const createTracedDecorator = traceFactory(otel)
 export const createLogger = loggerFactory(otelLogs)

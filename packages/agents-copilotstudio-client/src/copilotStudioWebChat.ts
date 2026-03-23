@@ -10,6 +10,7 @@ import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
 import { debug } from '@microsoft/agents-activity/logger'
+import { SpanNames, managedSpan } from '@microsoft/agents-telemetry'
 
 const logger = debug('copilot-studio:webchat')
 
@@ -228,6 +229,12 @@ export class CopilotStudioWebChat {
     let activitySubscriber: Subscriber<Partial<Activity>> | undefined
     let conversation: ConversationAccount | undefined
 
+    const managed = managedSpan(SpanNames.COPILOT_CREATE_CONNECTION, {
+      attributes: {
+        'copilot.webchat.show_typing': settings?.showTyping ?? 'unknown'
+      }
+    })
+
     const connectionStatus$ = new BehaviorSubject(0)
     const activity$ = createObservable<Partial<Activity>>(async (subscriber) => {
       activitySubscriber = subscriber
@@ -249,6 +256,10 @@ export class CopilotStudioWebChat {
           }
 
           notifyActivity(activity)
+          managed.span.addEvent('Activity received from Copilot Studio', {
+            'copilot.webchat.activity.type': activity.type,
+            'copilot.webchat.activity.conversation_id': activity.conversation?.id ?? 'unknown'
+          })
         }
         // If no activities received from bot, we should still acknowledge.
         await handleAcknowledgementOnce()
@@ -304,6 +315,10 @@ export class CopilotStudioWebChat {
             })
 
             notifyActivity(newActivity)
+            managed.span.addEvent('Activity sent to WebChat', {
+              'copilot.webchat.activity.type': newActivity.type,
+              'copilot.webchat.activity.conversation_id': newActivity.conversation?.id ?? 'unknown'
+            })
             notifyTyping()
 
             // Notify WebChat immediately that the message was sent
@@ -312,6 +327,10 @@ export class CopilotStudioWebChat {
             // Stream the agent's response, but don't block the UI
             for await (const responseActivity of client.sendActivityStreaming(newActivity)) {
               notifyActivity(responseActivity)
+              managed.span.addEvent('Activity received from Copilot Studio', {
+                'copilot.webchat.activity.type': responseActivity.type,
+                'copilot.webchat.activity.conversation_id': responseActivity.conversation?.id ?? 'unknown'
+              })
               logger.info('<-- Activity received correctly from Copilot Studio.')
             }
 
@@ -330,6 +349,8 @@ export class CopilotStudioWebChat {
           activitySubscriber.complete()
           activitySubscriber = undefined
         }
+        // End the connection span
+        managed.end()
       },
     }
   }

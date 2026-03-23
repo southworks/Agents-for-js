@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { Span, SpanOptions, OTel } from './types'
+import { Span, SpanOptions, OTel, SpanStatusCode } from './types'
 import pkg from '../package.json'
 import { createDecorator, DecoratorContext, TMethodShape, TScopeShape } from './utils/decorator'
 import { attempt } from './utils/attempt'
@@ -108,5 +108,97 @@ export function traceFactory (otel: OTel) {
 
       return result
     })
+  }
+}
+
+/**
+ * Options for creating a managed span.
+ */
+export interface ManagedSpanOptions {
+  /** Initial attributes to set on the span. */
+  attributes?: Record<string, string | number | boolean>
+  /** Callback invoked when the span ends (on both success and error), before `span.end()`. Use this to record metrics. */
+  onEnd?: (span: Span) => void
+}
+
+/**
+ * A manually controlled span for long-lived operations.
+ */
+export interface ManagedSpanResult {
+  /** The underlying OpenTelemetry span. */
+  span: Span
+  /** Set additional attributes on the span after creation. */
+  setAttributes: (attrs: Record<string, string | number | boolean>) => void
+  /** End the span with OK status. Safe to call multiple times (subsequent calls are no-ops). */
+  end: () => void
+  /** End the span with ERROR status. Safe to call multiple times (subsequent calls are no-ops). */
+  endWithError: (error: Error | string) => void
+  /** Add an event to the span. Can be called multiple times. */
+  addEvent: (name: string, attributes?: Record<string, string | number | boolean>) => void
+}
+
+/**
+ * Starts a managed span that can be controlled manually.
+ * Unlike `trace`, this does not automatically end the span.
+ * You must call `end()` or `endWithError()` when the operation completes.
+ *
+ * Use this for long-lived operations like WebSocket connections, streaming responses,
+ * or async generators where `yield` cannot appear inside a callback.
+ *
+ * @example
+ * ```ts
+ * async function* streamData(): AsyncGenerator<Item> {
+ *   const managed = managedSpan('stream.session', {
+ *     attributes: { 'stream.url': url },
+ *     onEnd: () => {
+ *       durationHistogram.record(performance.now() - start)
+ *     }
+ *   });
+ *   try {
+ *     yield* innerStream();
+ *     managed.end();
+ *   } catch (error) {
+ *     managed.endWithError(error instanceof Error ? error : String(error));
+ *     throw error;
+ *   }
+ * }
+ * ```
+ */
+export function startManagedSpan (otel: OTel) {
+  return function managedSpan (name: string, options?: ManagedSpanOptions): ManagedSpanResult {
+    const tracer = otel.trace.getTracer(pkg.name, pkg.version)
+    const span = tracer.startSpan(name, options?.attributes ? { attributes: options.attributes } : undefined)
+    let ended = false
+
+    return {
+      span,
+      setAttributes (attrs: Record<string, string | number | boolean>) {
+        for (const [key, value] of Object.entries(attrs)) {
+          span.setAttribute(key, value)
+        }
+      },
+      end () {
+        if (ended) return
+        ended = true
+        span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
+        options?.onEnd?.(span)
+        span.end()
+      },
+      endWithError (error: Error | string) {
+        if (ended) return
+        ended = true
+        if (error instanceof Error) {
+          span.recordException(error)
+          span.setStatus({ code: otel.SpanStatusCode.ERROR, message: error.message })
+        } else {
+          span.setStatus({ code: otel.SpanStatusCode.ERROR, message: error })
+        }
+        options?.onEnd?.(span)
+        span.end()
+      },
+      addEvent (name: string, attributes?: Record<string, string | number | boolean>) {
+        span.addEvent(name, attributes)
+      }
+    }
   }
 }
