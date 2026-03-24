@@ -4,9 +4,9 @@
 import { OTel, OTelLogs } from "./types";
 import { traceFactory, traceFactory2 } from './trace'
 import { loggerFactory } from './logging'
+import { logger } from "./utils/logger";
 
-export * from './constants'
-export * from './logging'
+export {SpanNames, MetricNames} from './constants'
 
 /**
  * Will contain the OpenTelemetry API if it's available, otherwise will contain a fallback implementation that allows agents-telemetry to function without OpenTelemetry support.
@@ -27,7 +27,7 @@ function load(): OTel {
   try {
     return require('@opentelemetry/api')
   } catch (error) {
-    console.warn('[agents-telemetry] Missing OpenTelemetry API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api as a dependency.')
+    logger.warn('Missing OpenTelemetry API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api as a dependency.')
     return require('@microsoft/agents-opentelemetry-api')
   }
 }
@@ -36,7 +36,7 @@ function loadLogs(): OTelLogs {
   try {
     return require('@opentelemetry/api-logs')
   } catch (error) {
-    console.warn('[agents-telemetry] Missing OpenTelemetry Logs API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api-logs as a dependency.')
+    logger.warn('Missing OpenTelemetry Logs API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api-logs as a dependency.')
     return require('@microsoft/agents-opentelemetry-api-logs')
   }
 }

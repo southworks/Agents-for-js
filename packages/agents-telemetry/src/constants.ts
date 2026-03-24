@@ -1,6 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+export const AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES'
+
+export const SpanCategories = {
+  STORAGE: ['STORAGE_'],
+  AUTHORIZATION: ['AUTHORIZATION_', 'USER_TOKEN_CLIENT_'],
+  AUTHENTICATION: ['AUTHENTICATION_'],
+} as const
+
 export const SpanNames = {
   // CloudAdapter / BaseAdapter
   ADAPTER_PROCESS: 'agents.adapter.process',

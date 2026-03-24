@@ -25,7 +25,6 @@ export function loggerFactory (otelLogs: OTelLogs) {
     const debug = loggerLevels[3]
 
     return function logger (message: string, ...args: unknown[]) {
-      console.log(namespace, level, message, ...args)
       const attributes = {
         'log.namespace': namespace,
         'log.level': level ?? debug,

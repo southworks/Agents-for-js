@@ -8,6 +8,7 @@ The package currently provides:
 
 - `createTracedDecorator` for decorator-based span creation around class methods
 - `createLogger` for emitting OpenTelemetry log records with namespace and level metadata
+- `SpanCategories`, with all categories enabled by default, for explicit span-group configuration
 - `SpanNames` and `MetricNames` constants for consistent observability naming across the SDK
 - `otel`, which exposes the OpenTelemetry API instance loaded by the package
 
@@ -138,6 +139,28 @@ await TraceMessage.process(async () => {
 })
 ```
 
+## Disabling Span Categories
+
+All span categories are enabled by default through `SpanCategories`.
+
+If you want to disable one or more categories without changing code, set `AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES` in your environment. The value accepts comma and whitespace separators, and category names are trimmed before evaluation.
+
+```env
+AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES=STORAGE,AUTHORIZATION
+
+# or
+
+AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES=STORAGE AUTHORIZATION
+```
+
+Valid category names are:
+
+- `STORAGE`
+- `AUTHENTICATION`
+- `AUTHORIZATION`
+
+When a span category is disabled, the trace helper still executes your callback with an active non-recording span so your code path and span API calls remain safe, but no telemetry is emitted for that span.
+
 ### Features
 
 - **Automatic span lifecycle**: Spans are automatically started and ended
@@ -208,6 +231,10 @@ The returned logger accepts `(message: string, ...args: unknown[])` and serializ
 ### `SpanNames`
 
 Provides stable span name constants used by Agents SDK components, including adapter, application, connector, storage, authentication, authorization, user token client, and turn-processing operations.
+
+### `SpanCategories`
+
+Provides the explicit list of supported span categories. All categories are enabled by default.
 
 ### `MetricNames`
 
