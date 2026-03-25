@@ -1,17 +1,19 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { Span, SpanOptions, OTel } from './types'
+import { Span, SpanOptions, OTel, SpanName } from './types'
 import pkg from '../package.json'
 import { createDecorator, DecoratorContext, TMethodShape, TScopeShape } from './utils/decorator'
 import { attempt } from './utils/attempt'
+import { SpanNames } from './constants'
+import { isSpanDisabled } from './category'
 
 /*
  * Factory for creating method-specific traced decorators
  */
 export interface TracedMethodConfig<TDecoratorContext> {
   // Span name (defaults to method name if not provided)
-  spanName?: string
+  spanName?: SpanName
   // Base span options (kind, links, etc.)
   spanOptions?: SpanOptions
   // Called before the original method executes
@@ -25,7 +27,17 @@ export interface TracedMethodConfig<TDecoratorContext> {
 }
 
 export function traceFactory2 (otel: OTel) {
-  return function trace<TReturn> (name: string, fn: (span: Span) => TReturn): TReturn {
+  const validSpanNames = new Set(Object.values(SpanNames))
+  return function trace<TReturn> (name: SpanName, fn: (span: Span) => TReturn): TReturn {
+    if (!validSpanNames.has(name)) {
+      throw new Error(`Unrecognized span name "${name}". See SpanNames constants.`)
+    }
+
+    if (isSpanDisabled(name)) {
+      const noopSpan = otel.trace.wrapSpanContext(otel.INVALID_SPAN_CONTEXT)
+      return fn(noopSpan)
+    }
+
     const tracer = otel.trace.getTracer(pkg.name, pkg.version)
     return tracer.startActiveSpan(name, (span) => {
       return attempt({

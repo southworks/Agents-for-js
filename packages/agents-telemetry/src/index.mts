@@ -4,11 +4,9 @@
 import { OTel, OTelLogs } from "./types.js";
 import { traceFactory, traceFactory2 } from './trace.js'
 import { loggerFactory } from './logging.js'
+import { logger } from "./utils/logger.js";
 
-export * from './constants.js'
-export * from './logging.js'
-
-export type { TracedMethodConfig } from './trace.js'
+export {SpanNames, MetricNames} from './constants.js'
 
 /**
  * Will contain the OpenTelemetry API if it's available, otherwise will contain a fallback implementation that allows agents-telemetry to function without OpenTelemetry support.
@@ -21,7 +19,6 @@ export const trace = traceFactory2(otel)
 export const createTracedDecorator = traceFactory(otel)
 export const createLogger = loggerFactory(otelLogs)
 
-
 /**
  * Attempts to load the OpenTelemetry API. First tries to load the official '@opentelemetry/api' package, and if that fails (e.g., because it's not installed), it falls back to a bundled version provided by '@microsoft/agents-opentelemetry-api'. This allows agents-telemetry to operate in environments where OpenTelemetry is not present, while still enabling full functionality when it is.
  * @returns The OpenTelemetry API if available, otherwise a fallback implementation.
@@ -31,7 +28,7 @@ async function load(): Promise<OTel> {
     return await import('@opentelemetry/api')
   } catch (error) {
     // TODO: falling back dep, add version reference
-    console.warn('[agents-telemetry] Missing OpenTelemetry API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api as a dependency.')
+    logger.warn('Missing OpenTelemetry API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api as a dependency.')
     return await import('@microsoft/agents-opentelemetry-api')
   }
 }
@@ -41,7 +38,7 @@ async function loadLogs(): Promise<OTelLogs> {
     return await import('@opentelemetry/api-logs')
   } catch (error) {
     // TODO: falling back dep, add version reference
-    console.warn('[agents-telemetry] Missing OpenTelemetry Logs API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api-logs as a dependency.')
+    logger.warn('Missing OpenTelemetry Logs API. Falling back to bundled version. To enable full functionality, install @opentelemetry/api-logs as a dependency.')
     return await import('@microsoft/agents-opentelemetry-api-logs')
   }
 }
