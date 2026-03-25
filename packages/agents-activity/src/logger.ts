@@ -6,14 +6,14 @@
 import createDebug from 'debug'
 import { createLogger } from '@microsoft/agents-telemetry'
 
-export const loggerLevels = [
+const loggerLevels = [
   'info',
   'warn',
   'error',
   'debug',
 ] as const
 
-export type LoggerLevel = typeof loggerLevels[number]
+type LoggerLevel = typeof loggerLevels[number]
 
 type Loggers = Record<LoggerLevel, (message: string, ...args: any[]) => void>
 
@@ -43,7 +43,7 @@ export class Logger {
         }
 
         debug(message, ...args)
-        telemetry(message, args)
+        telemetry(message, ...args)
       }
     }
   }

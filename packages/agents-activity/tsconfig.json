@@ -1,10 +1,5 @@
 {
   "extends": "../../tsconfig.json",
-  "references": [
-    {
-      "path": "../agents-telemetry"
-    }
-  ],
   "compilerOptions": {
     "rootDirs": [ "src/", "test/"],
     "outDir": "dist",

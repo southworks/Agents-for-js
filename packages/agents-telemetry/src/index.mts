@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { OTel, OTelLogs } from "./types.js";
+import { OTel, OTelLogs } from './types.js'
 import { traceFactory } from './trace.js'
 import { loggerFactory } from './logging.js'
-import { logger } from "./utils/logger.js";
+import { logger } from  './utils/logger.js'
 
 export {SpanNames, MetricNames} from './constants.js'
 

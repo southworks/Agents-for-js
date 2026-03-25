@@ -1,4 +1,5 @@
-# @microsoft/agents-telemetry### Production Setup with OTLP Exporter
+# @microsoft/agents-telemetry
+
 ## Overview
 
 The `@microsoft/agents-telemetry` package provides OpenTelemetry instrumentation primitives used across the Microsoft Agents SDK. It enables distributed tracing, structured log emission, and stable metric naming across your agent applications so you can monitor agent interactions, connector calls, storage operations, authentication flows, and turn processing.
@@ -69,20 +70,6 @@ const sdk = new NodeSDK({
 
 sdk.start()
 ```
-
-Then create and use a logger from this package:
-
-```ts
-import { createLogger } from '@microsoft/agents-telemetry'
-
-const info = createLogger('agents:sample', 'info')
-const error = createLogger('agents:sample', 'error')
-
-info('agent started', { port: 3978 })
-error('request failed', new Error('Connection lost'))
-```
-
-Each emitted record includes `log.namespace` and `log.level` attributes. Additional arguments are serialized into the log body.
 
 ### Production Setup with OTLP Exporter
 
@@ -174,7 +161,7 @@ SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN // 'agents.authentication.get_access_t
 MetricNames.ACTIVITIES_RECEIVED        // 'agents.activities.received'
 MetricNames.CONNECTOR_REQUEST_DURATION // 'agents.connector.request.duration'
 MetricNames.TURN_DURATION              // 'agents.turn.duration'
-MetricNames.AUTH_TOKEN_REQUESTS        // 'agents.auth.token.request.count'
+MetricNames.AUTH_TOKEN_REQUEST_COUNT   // 'agents.auth.token.request.count'
 // ... and more
 ```
 
@@ -197,17 +184,6 @@ Return value:
 
 - Returns whatever `fn` returns.
 - Supports both sync and async callbacks.
-
-### `createLogger(namespace, level?)`
-
-Creates a function that emits OpenTelemetry log records.
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `namespace` | `string` | Logger namespace written to `log.namespace`. |
-| `level` | `'debug' \| 'info' \| 'warn' \| 'error'` | Optional severity level. Defaults to `debug`. |
-
-The returned logger accepts `(message: string, ...args: unknown[])` and serializes additional arguments into the emitted log body.
 
 ### `SpanNames`
 
