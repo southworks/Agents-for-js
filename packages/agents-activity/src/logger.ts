@@ -3,7 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import createDebug, { Debugger } from 'debug'
+import createDebug from 'debug'
+import { createLogger } from '@microsoft/agents-telemetry'
 
 const loggerLevels = [
   'info',
@@ -12,14 +13,16 @@ const loggerLevels = [
   'debug',
 ] as const
 
-type LoggerLevels = typeof loggerLevels[number]
+type LoggerLevel = typeof loggerLevels[number]
+
+type Loggers = Record<LoggerLevel, (message: string, ...args: any[]) => void>
 
 /**
  * Logger class that provides colored logging functionality using the debug package.
  * Supports different log levels: info, warn, error, and debug.
  */
 export class Logger {
-  private loggers: { [K in LoggerLevels]: Debugger } = {} as any
+  private loggers: Loggers = {} as any
 
   /**
    * Creates a new Logger instance with the specified namespace.
@@ -31,13 +34,21 @@ export class Logger {
 
   private initializeLoggers (namespace: string) {
     for (const level of loggerLevels) {
-      const logger = createDebug(`${namespace}:${level}`)
-      logger.color = this.getPlatformColor(level)
-      this.loggers[level] = logger
+      const telemetry = createLogger(namespace, level)
+      const debug = createDebug(`${namespace}:${level}`)
+      debug.color = this.getPlatformColor(level)
+      this.loggers[level] = (message, ...args) => {
+        if (!debug.enabled) {
+          return
+        }
+
+        debug(message, ...args)
+        telemetry(message, ...args)
+      }
     }
   }
 
-  private getPlatformColor (level: LoggerLevels): string {
+  private getPlatformColor (level: LoggerLevel): string {
     const platform = typeof window !== 'undefined' ? 'browser' : 'node'
     const colors = {
       node: {
