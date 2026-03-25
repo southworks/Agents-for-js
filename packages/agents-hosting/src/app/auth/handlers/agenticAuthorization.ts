@@ -5,6 +5,7 @@
 
 import { debug } from '@microsoft/agents-activity'
 import { TurnContext } from '../../../turnContext'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
 import { AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus, AuthorizationHandlerTokenOptions } from '../types'
 import { TokenResponse } from '../../../oauth'
 import { AuthProvider } from '../../../auth'
@@ -97,39 +98,44 @@ export class AgenticAuthorization implements AuthorizationHandler {
    * @inheritdoc
    */
   async token (context: TurnContext, options?: AuthorizationHandlerTokenOptions): Promise<TokenResponse> {
-    try {
+    return trace(SpanNames.AUTHORIZATION_AGENTIC_TOKEN, async (span) => {
+      let connection: AuthProvider | undefined
       const scopes = options?.scopes || this._options.scopes!
 
-      const tokenResponse = this.getContext(context, scopes)
-      if (tokenResponse.token) {
-        logger.debug(this.prefix('Using cached Agentic user token'))
-        return tokenResponse
+      try {
+        const tokenResponse = this.getContext(context, scopes)
+        if (tokenResponse.token) {
+          logger.debug(this.prefix('Using cached Agentic user token'))
+          return tokenResponse
+        }
+
+        if (this._options.altBlueprintConnectionName?.trim()) {
+          connection = this.settings.connections.getConnection(this._options.altBlueprintConnectionName)
+        } else {
+          connection = this.settings.connections.getTokenProvider(context.identity, context.activity.serviceUrl ?? '')
+        }
+
+        const token = await connection.getAgenticUserToken(
+          context.activity.getAgenticTenantId() ?? '',
+          context.activity.getAgenticInstanceId() ?? '',
+          context.activity.getAgenticUser() ?? '',
+          scopes
+        )
+
+        this.setContext(context, scopes, { token })
+        this._onSuccess?.(context)
+        return { token }
+      } catch (error) {
+        const reason = 'Error retrieving Agentic user token'
+        logger.error(this.prefix(reason), error)
+        this._onFailure?.(context, `${reason}: ${(error as Error).message}`)
+        return { token: undefined }
+      } finally {
+        span.setAttribute('auth.handler.id', this.id)
+        span.setAttribute('auth.connection.name', connection?.connectionSettings?.connectionName ?? this._options.altBlueprintConnectionName ?? 'unknown')
+        span.setAttribute('auth.scopes', scopes ?? [])
       }
-
-      let connection: AuthProvider
-
-      if (this._options.altBlueprintConnectionName?.trim()) {
-        connection = this.settings.connections.getConnection(this._options.altBlueprintConnectionName)
-      } else {
-        connection = this.settings.connections.getTokenProvider(context.identity, context.activity.serviceUrl ?? '')
-      }
-
-      const token = await connection.getAgenticUserToken(
-        context.activity.getAgenticTenantId() ?? '',
-        context.activity.getAgenticInstanceId() ?? '',
-        context.activity.getAgenticUser() ?? '',
-        scopes
-      )
-
-      this.setContext(context, scopes, { token })
-      this._onSuccess?.(context)
-      return { token }
-    } catch (error) {
-      const reason = 'Error retrieving Agentic user token'
-      logger.error(this.prefix(reason), error)
-      this._onFailure?.(context, `${reason}: ${(error as Error).message}`)
-      return { token: undefined }
-    }
+    })
   }
 
   /**

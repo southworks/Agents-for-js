@@ -3,6 +3,8 @@
  * Licensed under the MIT License.
  */
 
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from '../observability'
 import { Storage, StoreItem } from './storage'
 import { debug } from '@microsoft/agents-activity/logger'
 
@@ -61,20 +63,28 @@ export class MemoryStorage implements Storage {
    * @throws Will throw an error if keys are not provided or the array is empty
    */
   async read (keys: string[]): Promise<StoreItem> {
-    if (!keys || keys.length === 0) {
-      throw new ReferenceError('Keys are required when reading.')
-    }
-
-    const data: StoreItem = {}
-    for (const key of keys) {
-      logger.debug(`Reading key: ${key}`)
-      const item = this.memory[key]
-      if (item) {
-        data[key] = JSON.parse(item)
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_READ, async (span) => {
+      span.setAttribute('storage.key.count', keys.length)
+      if (!keys || keys.length === 0) {
+        throw new ReferenceError('Keys are required when reading.')
       }
-    }
 
-    return data
+      const data: StoreItem = {}
+      for (const key of keys) {
+        logger.debug(`Reading key: ${key}`)
+        const item = this.memory[key]
+        if (item) {
+          data[key] = JSON.parse(item)
+        }
+      }
+
+      return data
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'read'
+      })
+    })
   }
 
   /**
@@ -91,24 +101,32 @@ export class MemoryStorage implements Storage {
    * always be written regardless of the current state.
    */
   async write (changes: StoreItem): Promise<void> {
-    if (!changes || changes.length === 0) {
-      throw new ReferenceError('Changes are required when writing.')
-    }
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+      span.setAttribute('storage.key.count', Object.keys(changes).length)
+      if (!changes || Object.keys(changes).length === 0) {
+        throw new ReferenceError('Changes are required when writing.')
+      }
 
-    for (const [key, newItem] of Object.entries(changes)) {
-      logger.debug(`Writing key: ${key}`)
-      const oldItemStr = this.memory[key]
-      if (!oldItemStr || newItem.eTag === '*' || !newItem.eTag) {
-        this.saveItem(key, newItem)
-      } else {
-        const oldItem = JSON.parse(oldItemStr)
-        if (newItem.eTag === oldItem.eTag) {
+      for (const [key, newItem] of Object.entries(changes)) {
+        logger.debug(`Writing key: ${key}`)
+        const oldItemStr = this.memory[key]
+        if (!oldItemStr || newItem.eTag === '*' || !newItem.eTag) {
           this.saveItem(key, newItem)
         } else {
-          throw new Error(`Storage: error writing "${key}" due to eTag conflict.`)
+          const oldItem = JSON.parse(oldItemStr)
+          if (newItem.eTag === oldItem.eTag) {
+            this.saveItem(key, newItem)
+          } else {
+            throw new Error(`Storage: error writing "${key}" due to eTag conflict.`)
+          }
         }
       }
-    }
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'write'
+      })
+    })
   }
 
   /**
@@ -118,10 +136,18 @@ export class MemoryStorage implements Storage {
    * @returns A promise that resolves when the delete operation is complete
    */
   async delete (keys: string[]): Promise<void> {
-    logger.debug(`Deleting keys: ${keys.join(', ')}`)
-    for (const key of keys) {
-      delete this.memory[key]
-    }
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_DELETE, async (span) => {
+      span.setAttribute('storage.key.count', keys.length)
+      logger.debug(`Deleting keys: ${keys.join(', ')}`)
+      for (const key of keys) {
+        delete this.memory[key]
+      }
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'delete'
+      })
+    })
   }
 
   /**
