@@ -5,6 +5,9 @@
         "path": "packages/agents-activity"
       },
       {
+        "path": "packages/agents-telemetry"
+      },
+      {
         "path": "packages/agents-hosting"
       },
       {

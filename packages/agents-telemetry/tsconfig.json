@@ -1,13 +1,15 @@
 {
   "extends": "../../tsconfig.json",
-  "references": [
-    {
-      "path": "../agents-telemetry"
-    }
+  "include": [
+    "src/**/*",
+    "package.json"
+  ],
+  "exclude": [
+    "src/**/*.mts"
   ],
   "compilerOptions": {
+    "outDir": "dist/cjs",
     "rootDirs": [ "src/", "test/"],
-    "outDir": "dist",
     "paths": {
       "@microsoft/*": ["./packages/*"]
     }
