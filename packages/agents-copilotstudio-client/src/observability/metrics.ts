@@ -29,12 +29,12 @@ export class CopilotStudioClientMetrics {
     description: 'Total number of webchat connections created with Copilot Studio'
   })
 
-  public static requestsTotalCounter = this.meter.createCounter(MetricNames.CSC_REQUESTS_TOTAL, {
+  public static requestsCounter = this.meter.createCounter(MetricNames.CSC_REQUEST_COUNT, {
     unit: 'requests',
     description: 'Total number of HTTP/SSE requests made to Copilot Studio'
   })
 
-  public static requestsErrorsCounter = this.meter.createCounter(MetricNames.CSC_REQUESTS_ERRORS, {
+  public static requestsErrorCounter = this.meter.createCounter(MetricNames.CSC_REQUEST_ERRORS, {
     unit: 'requests',
     description: 'Total number of failed requests to Copilot Studio'
   })

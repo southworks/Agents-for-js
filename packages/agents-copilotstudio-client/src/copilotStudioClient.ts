@@ -63,6 +63,11 @@ export class CopilotStudioClient {
       attributes: {
         'copilot.post_request.url': url,
         'copilot.post_request.method': method
+      },
+      onEnd: () => {
+        CopilotStudioClientMetrics.requestsCounter.add(1, {
+          operation: 'postRequestAsync'
+        })
       }
     })
     try {
@@ -70,6 +75,7 @@ export class CopilotStudioClient {
 
       const streamMap = new Map<string, { text: string, sequence: number }[]>()
 
+      const startStreaming = performance.now()
       const eventSource: EventSourceClient = createEventSource({
         url,
         headers: {
@@ -95,7 +101,11 @@ export class CopilotStudioClient {
 
               managed.span.setAttributes({
                 'copilot.post_request.activity.type': activity.type,
-                'copilot.post_request.activity.conversation.id': activity.conversation?.id
+                'copilot.post_request.activity.conversation_id': activity.conversation?.id
+              })
+              CopilotStudioClientMetrics.activitiesReceivedCounter.add(1, {
+                'copilot.activity.type': activity.type,
+                'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
               })
 
               // check to see if this activity is part of the streamed response, in which case we need to accumulate the text
@@ -142,7 +152,6 @@ export class CopilotStudioClient {
             logger.debug('Stream complete')
             break
           }
-
           if (eventSource.readyState === 'closed') {
             logger.debug('Connection closed')
             break
@@ -150,9 +159,15 @@ export class CopilotStudioClient {
         }
       } finally {
         eventSource.close()
+        const duration = performance.now() - startStreaming
+        CopilotStudioClientMetrics.streamDuration.record(duration)
       }
     } catch (error) {
       managed.endWithError(error instanceof Error ? error : String(error))
+      CopilotStudioClientMetrics.requestsErrorCounter.add(1, {
+        operation: 'postRequestAsync',
+        'error.type': error instanceof Error ? error.name : typeof error,
+      })
       throw error
     } finally {
       managed.end()
@@ -210,14 +225,7 @@ export class CopilotStudioClient {
   public async * startConversationStreaming (emitStartConversationEvent: boolean = true): AsyncGenerator<Activity> {
     const start = performance.now()
     const managed = managedSpan(SpanNames.COPILOT_START_CONVERSATION, {
-      attributes: { 'copilot.emit_start_event': emitStartConversationEvent },
-      onEnd: () => {
-        const duration = performance.now() - start
-        CopilotStudioClientMetrics.conversationsStartedCounter.add(1)
-        CopilotStudioClientMetrics.requestDuration.record(duration, {
-          operation: 'startConversationStreaming'
-        })
-      }
+      attributes: { 'copilot.emit_start_event': emitStartConversationEvent }
     })
     try {
       const uriStart: string = getCopilotStudioConnectionUrl(this.settings)
@@ -232,6 +240,11 @@ export class CopilotStudioClient {
       throw error
     } finally {
       managed.end()
+      const duration = performance.now() - start
+      CopilotStudioClientMetrics.conversationsStartedCounter.add(1)
+      CopilotStudioClientMetrics.requestDuration.record(duration, {
+        operation: 'startConversationStreaming'
+      })
     }
   }
 
@@ -247,16 +260,6 @@ export class CopilotStudioClient {
       attributes: {
         'copilot.activity.type': activity.type,
         'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
-      },
-      onEnd: () => {
-        const duration = performance.now() - start
-        CopilotStudioClientMetrics.activitiesSentCounter.add(1, {
-          'copilot.activity.type': activity.type,
-          'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
-        })
-        CopilotStudioClientMetrics.streamDuration.record(duration, {
-          operation: 'sendActivityStreaming'
-        })
       }
     })
     try {
@@ -266,12 +269,19 @@ export class CopilotStudioClient {
 
       logger.info('Sending activity...', activity)
       yield * this.postRequestAsync(uriExecute, qbody, 'POST')
-      managed.end()
     } catch (error) {
       managed.endWithError(error instanceof Error ? error : String(error))
       throw error
     } finally {
       managed.end()
+      const duration = performance.now() - start
+      CopilotStudioClientMetrics.activitiesSentCounter.add(1, {
+        'copilot.activity.type': activity.type,
+        'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
+      })
+      CopilotStudioClientMetrics.requestDuration.record(duration, {
+        operation: 'sendActivityStreaming'
+      })
     }
   }
 

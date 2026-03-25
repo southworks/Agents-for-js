@@ -112,9 +112,9 @@ export const MetricNames = {
   CSC_ACTIVITIES_RECEIVED: 'agents.copilotClient.activities.received',
   CSC_ACTIVITIES_SENT: 'agents.copilotClient.activities.sent',
   CSC_CONVERSATIONS_STARTED: 'agents.copilotClient.conversations.started',
-  CSC_WEBCHAT_CONNECTIONS: 'agents.copilotClient.webchat.connections',
-  CSC_REQUESTS_TOTAL: 'agents.copilotClient.requests.total',
-  CSC_REQUESTS_ERRORS: 'agents.copilotClient.requests.errors',
+  CSC_WEBCHAT_CONNECTIONS: 'agents.copilotClient.webchat.connection.count',
+  CSC_REQUEST_COUNT: 'agents.copilotClient.request.count',
+  CSC_REQUEST_ERRORS: 'agents.copilotClient.request.error.count',
   CSC_STREAM_DURATION: 'agents.copilotClient.stream.duration',
   CSC_REQUEST_DURATION: 'agents.copilotClient.request.duration',
 } as const
