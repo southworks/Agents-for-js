@@ -65,7 +65,7 @@ export class MemoryStorage implements Storage {
   async read (keys: string[]): Promise<StoreItem> {
     const start = performance.now()
     return trace(SpanNames.STORAGE_READ, async (span) => {
-      span.setAttribute('storage.key.count', keys.length)
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
       if (!keys || keys.length === 0) {
         throw new ReferenceError('Keys are required when reading.')
       }
@@ -103,10 +103,10 @@ export class MemoryStorage implements Storage {
   async write (changes: StoreItem): Promise<void> {
     const start = performance.now()
     return trace(SpanNames.STORAGE_WRITE, async (span) => {
-      span.setAttribute('storage.key.count', Object.keys(changes).length)
       if (!changes || Object.keys(changes).length === 0) {
         throw new ReferenceError('Changes are required when writing.')
       }
+      span.setAttribute('storage.key.count', Object.keys(changes).length)
 
       for (const [key, newItem] of Object.entries(changes)) {
         logger.debug(`Writing key: ${key}`)
@@ -138,7 +138,7 @@ export class MemoryStorage implements Storage {
   async delete (keys: string[]): Promise<void> {
     const start = performance.now()
     return trace(SpanNames.STORAGE_DELETE, async (span) => {
-      span.setAttribute('storage.key.count', keys.length)
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
       logger.debug(`Deleting keys: ${keys.join(', ')}`)
       for (const key of keys) {
         delete this.memory[key]

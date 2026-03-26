@@ -155,7 +155,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('get.conversations', 'GET', httpCode, duration)
+      this.recordConnectorMetrics('get.conversations', 'GET', duration, httpCode)
     })
   }
 
@@ -178,7 +178,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('get.conversation_member', 'GET', httpCode, duration)
+      this.recordConnectorMetrics('get.conversation_member', 'GET', duration, httpCode)
     })
   }
 
@@ -208,7 +208,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('create.conversation', 'POST', httpCode, duration)
+      this.recordConnectorMetrics('create.conversation', 'POST', duration, httpCode)
     })
   }
 
@@ -253,7 +253,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('reply.to.activity', 'POST', httpCode, duration)
+      this.recordConnectorMetrics('reply.to.activity', 'POST', duration, httpCode)
     })
   }
 
@@ -312,7 +312,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('send.to.conversation', 'POST', httpCode, duration)
+      this.recordConnectorMetrics('send.to.conversation', 'POST', duration, httpCode)
     })
   }
 
@@ -351,7 +351,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('update.activity', 'PUT', httpCode, duration)
+      this.recordConnectorMetrics('update.activity', 'PUT', duration, httpCode)
     })
   }
 
@@ -388,7 +388,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('delete.activity', 'DELETE', httpCode, duration)
+      this.recordConnectorMetrics('delete.activity', 'DELETE', duration, httpCode)
     })
   }
 
@@ -423,7 +423,7 @@ export class ConnectorClient {
     }).finally(() => {
       // The operation name is not added in the trace because this method is not directly exposed and is used by other methods which have their own metrics.
       const duration = performance.now() - start
-      this.recordConnectorMetrics('upload.attachment', 'POST', httpCode, duration)
+      this.recordConnectorMetrics('upload.attachment', 'POST', duration, httpCode)
     })
   }
 
@@ -454,7 +454,7 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('get.attachment.info', 'GET', httpCode, duration)
+      this.recordConnectorMetrics('get.attachment.info', 'GET', duration, httpCode)
     })
   }
 
@@ -491,20 +491,20 @@ export class ConnectorClient {
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordConnectorMetrics('get.attachment', 'GET', httpCode, duration)
+      this.recordConnectorMetrics('get.attachment', 'GET', duration, httpCode)
     })
   }
 
-  private recordConnectorMetrics (operation: string, httpMethod: string, httpCode: string, duration: number): void {
+  private recordConnectorMetrics (operation: string, httpMethod: string, duration: number, httpCode?: string): void {
     HostingMetrics.connectorRequestsCounter.add(1, {
       operation,
       'http.method': httpMethod,
-      'http.status_code': httpCode
+      'http.status_code': httpCode ?? 'unknown'
     })
 
     HostingMetrics.connectorRequestDuration.record(duration, {
       operation,
-      'http.status_code': httpCode
+      'http.status_code': httpCode ?? 'unknown'
     })
   }
 }

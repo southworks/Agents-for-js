@@ -71,7 +71,7 @@ export class AgentClient {
    */
   public async postActivity (activity: Activity, authConfig: AuthConfiguration, conversationState: ConversationState, context: TurnContext): Promise<string> {
     const start = performance.now()
-    let httpCode: string
+    let httpCode: string = 'unknown'
     return trace(SpanNames.AGENT_CLIENT_POST_ACTIVITY, async (span) => {
       span.setAttributes({
         'target.endpoint': this.agentClientConfig.endPoint,

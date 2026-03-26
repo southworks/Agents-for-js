@@ -95,7 +95,7 @@ export class FileStorage implements Storage {
   read (keys: string[]) : Promise<StoreItem> {
     const start = performance.now()
     return (trace(SpanNames.STORAGE_READ, async (span) => {
-      span.setAttribute('storage.key.count', keys.length)
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
       return new Promise<StoreItem>((resolve, reject) => {
         if (!keys || keys.length === 0) {
           reject(new ReferenceError('Keys are required when reading.'))
@@ -136,8 +136,8 @@ export class FileStorage implements Storage {
   write (changes: StoreItem) : Promise<void> {
     const start = performance.now()
     return trace(SpanNames.STORAGE_WRITE, async (span) => {
-      span.setAttribute('storage.key.count', Object.keys(changes).length)
       const keys = Object.keys(changes)
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
       for (const key of keys) {
         this._stateFile[key] = changes[key]
       }
@@ -166,7 +166,7 @@ export class FileStorage implements Storage {
   delete (keys: string[]) : Promise<void> {
     const start = performance.now()
     return (trace(SpanNames.STORAGE_DELETE, async (span) => {
-      span.setAttribute('storage.key.count', keys.length)
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
       return new Promise<void>((resolve, reject) => {
         if (!keys || keys.length === 0) {
           reject(new ReferenceError('Keys are required when deleting.'))

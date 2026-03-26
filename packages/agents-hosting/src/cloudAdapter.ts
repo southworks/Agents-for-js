@@ -186,7 +186,7 @@ export class CloudAdapter extends BaseAdapter {
       }
       span.setAttributes({
         service_url: activity.serviceUrl,
-        'auth.scope': scope,
+        'auth.scope': scope ?? 'unknown',
         'activity.is_agentic': isAgentic
       })
       return connectorClient

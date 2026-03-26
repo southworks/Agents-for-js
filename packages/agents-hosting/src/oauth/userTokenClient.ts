@@ -165,7 +165,7 @@ export class UserTokenClient {
       return { token: undefined }
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('get.user.token', 'GET', httpCode, duration)
+      this.recordUserTokenClientMetrics('get.user.token', 'GET', duration, httpCode)
     })
   }
 
@@ -194,7 +194,7 @@ export class UserTokenClient {
       }
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('sign.out', 'DELETE', httpCode, duration)
+      this.recordUserTokenClientMetrics('sign.out', 'DELETE', duration, httpCode)
     })
   }
 
@@ -225,7 +225,7 @@ export class UserTokenClient {
       return response.data as SignInResource
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('get.sign.in.resource', 'GET', httpCode, duration)
+      this.recordUserTokenClientMetrics('get.sign.in.resource', 'GET', duration, httpCode)
     })
   }
 
@@ -257,7 +257,7 @@ export class UserTokenClient {
       }
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('exchange.token', 'POST', httpCode, duration)
+      this.recordUserTokenClientMetrics('exchange.token', 'POST', duration, httpCode)
     })
   }
 
@@ -290,7 +290,7 @@ export class UserTokenClient {
       return response.data as TokenOrSinginResourceResponse
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('get.token.or.sign.in.resource', 'GET', httpCode, duration)
+      this.recordUserTokenClientMetrics('get.token.or.sign.in.resource', 'GET', duration, httpCode)
     })
   }
 
@@ -316,7 +316,7 @@ export class UserTokenClient {
       return response.data as TokenStatus[]
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('get.token.status', 'GET', httpCode, duration)
+      this.recordUserTokenClientMetrics('get.token.status', 'GET', duration, httpCode)
     })
   }
 
@@ -344,7 +344,7 @@ export class UserTokenClient {
       return response.data as Record<string, TokenResponse>
     }).finally(() => {
       const duration = performance.now() - start
-      this.recordUserTokenClientMetrics('get.aad.tokens', 'POST', httpCode, duration)
+      this.recordUserTokenClientMetrics('get.aad.tokens', 'POST', duration, httpCode)
     })
   }
 
@@ -352,17 +352,17 @@ export class UserTokenClient {
     this.client.defaults.headers.common.Authorization = `Bearer ${token}`
   }
 
-  private recordUserTokenClientMetrics (operation: string, httpMethod: string, httpCode: string, duration: number): void {
+  private recordUserTokenClientMetrics (operation: string, httpMethod: string, duration: number, httpCode?: string): void {
     HostingMetrics.userTokenClientRequestsCounter.add(1, {
       operation,
       'http.method': httpMethod,
-      'http.status_code': httpCode
+      'http.status_code': httpCode ?? 'unknown'
     })
 
     HostingMetrics.userTokenClientRequestDuration.record(duration, {
       operation,
       'http.method': httpMethod,
-      'http.status_code': httpCode
+      'http.status_code': httpCode ?? 'unknown'
     })
   }
 }
