@@ -75,6 +75,7 @@ export const SpanNames = {
   COPILOT_SEND_ACTIVITY: 'agents.copilot.send_activity',
   COPILOT_POST_REQUEST: 'agents.copilot.post_request',
   COPILOT_CREATE_CONNECTION: 'agents.copilot.webchat.create_connection',
+  COPILOT_EXECUTE_STREAMING: 'agents.copilot.execute_streaming',
 } as const
 
 export const MetricNames = {
@@ -120,4 +121,5 @@ export const MetricNames = {
   CSC_REQUEST_ERRORS: 'agents.copilot_client.request.error.count',
   CSC_STREAM_DURATION: 'agents.copilot_client.stream.duration',
   CSC_REQUEST_DURATION: 'agents.copilot_client.request.duration',
+  CSC_EXECUTE_STREAMING: 'agents.copilot_client.execute_streaming.count',
 } as const

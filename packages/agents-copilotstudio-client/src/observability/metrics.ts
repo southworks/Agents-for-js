@@ -37,6 +37,11 @@ export const CopilotStudioClientMetrics = {
     description: 'Total number of failed requests to Copilot Studio'
   }),
 
+  executeStreamingCounter: meter.createCounter(MetricNames.CSC_EXECUTE_STREAMING, {
+    unit: 'operations',
+    description: 'Total number of execute streaming operations'
+  }),
+
   // Duration Histograms
   streamDuration: meter.createHistogram(MetricNames.CSC_STREAM_DURATION, {
     unit: 'ms',

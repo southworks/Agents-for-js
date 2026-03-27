@@ -104,7 +104,11 @@ export interface ManagedSpanResult {
  * ```
  */
 export function startManagedSpan (otel: OTel) {
+  const validSpanNames = new Set(Object.values(SpanNames))
   return function managedSpan (name: string, options?: ManagedSpanOptions): ManagedSpanResult {
+    if (!validSpanNames.has(name as SpanName)) {
+      throw new Error(`Unrecognized span name "${name}". See SpanNames constants.`)
+    }
     const tracer = otel.trace.getTracer(pkg.name, pkg.version)
     const span = tracer.startSpan(name, options?.attributes ? { attributes: options.attributes } : undefined)
     let ended = false
@@ -119,21 +123,28 @@ export function startManagedSpan (otel: OTel) {
       end () {
         if (ended) return
         ended = true
-        span.setStatus({ code: otel.SpanStatusCode.OK ?? 1 })
+        span.setStatus({ code: otel.SpanStatusCode.OK })
         options?.onEnd?.(span)
         span.end()
       },
       endWithError (error: Error | string) {
         if (ended) return
         ended = true
+        let message
         if (error instanceof Error) {
+          message = error.message
           span.recordException(error)
-          span.setStatus({ code: otel.SpanStatusCode.ERROR, message: error.message })
         } else {
-          span.setStatus({ code: otel.SpanStatusCode.ERROR, message: error })
+          message = String(error)
+          span.recordException({ name: String(typeof error), message })
         }
-        options?.onEnd?.(span)
-        span.end()
+        span.setStatus({ code: otel.SpanStatusCode.ERROR, message })
+
+        try {
+          options?.onEnd?.(span)
+        } finally {
+          span.end()
+        }
       },
       addEvent (name: string, attributes?: Record<string, string | number | boolean>) {
         span.addEvent(name, attributes)

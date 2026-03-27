@@ -74,6 +74,7 @@ export class CopilotStudioClient {
    * @returns An async generator yielding the Agent's Activities.
    */
   private async * postRequestAsync (url: string, body?: any, method: string = 'POST'): AsyncGenerator<Activity> {
+    let caughtError: unknown = null
     const managed = managedSpan(SpanNames.COPILOT_POST_REQUEST, {
       attributes: {
         'copilot.post_request.url': url,
@@ -113,14 +114,15 @@ export class CopilotStudioClient {
       })
 
       try {
+        let index = 0
         for await (const { data, event } of eventSource) {
           if (data && event === 'activity') {
             try {
               const activity = Activity.fromJson(data)
 
               managed.span.setAttributes({
-                'copilot.post_request.activity.type': activity.type,
-                'copilot.post_request.activity.conversation_id': activity.conversation?.id
+                [`copilot.post_request.activity.${index}.type`]: activity.type,
+                [`copilot.post_request.activity.${index}.conversation_id`]: activity.conversation?.id
               })
               CopilotStudioClientMetrics.activitiesReceivedCounter.add(1, {
                 'copilot.activity.type': activity.type,
@@ -175,6 +177,7 @@ export class CopilotStudioClient {
             logger.debug('Connection closed')
             break
           }
+          index++
         }
       } finally {
         eventSource.close()
@@ -182,14 +185,18 @@ export class CopilotStudioClient {
         CopilotStudioClientMetrics.streamDuration.record(duration)
       }
     } catch (error) {
-      managed.endWithError(error instanceof Error ? error : String(error))
-      CopilotStudioClientMetrics.requestsErrorCounter.add(1, {
-        operation: 'postRequestAsync',
-        'error.type': error instanceof Error ? error.name : typeof error,
-      })
+      caughtError = error
       throw error
     } finally {
-      managed.end()
+      if (caughtError) {
+        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
+        CopilotStudioClientMetrics.requestsErrorCounter.add(1, {
+          operation: 'postRequestAsync',
+          'error.type': caughtError instanceof Error ? caughtError.name : typeof caughtError,
+        })
+      } else {
+        managed.end()
+      }
     }
   }
 
@@ -237,6 +244,7 @@ export class CopilotStudioClient {
     requestOrFlag?: StartRequest | boolean
   ): AsyncGenerator<Activity> {
     const start = performance.now()
+    let caughtError: unknown = null
     const managed = managedSpan(SpanNames.COPILOT_START_CONVERSATION)
     try {
       // Normalize input to StartRequest
@@ -269,10 +277,14 @@ export class CopilotStudioClient {
 
       yield * this.postRequestAsync(uriStart, body, 'POST')
     } catch (error) {
-      managed.endWithError(error instanceof Error ? error : String(error))
+      caughtError = error
       throw error
     } finally {
-      managed.end()
+      if (caughtError) {
+        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
+      } else {
+        managed.end()
+      }
       const duration = performance.now() - start
       CopilotStudioClientMetrics.conversationsStartedCounter.add(1)
       CopilotStudioClientMetrics.requestDuration.record(duration, {
@@ -289,6 +301,7 @@ export class CopilotStudioClient {
    */
   public async * sendActivityStreaming (activity: Activity, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
     const start = performance.now()
+    let caughtError: unknown = null
     const managed = managedSpan(SpanNames.COPILOT_SEND_ACTIVITY, {
       attributes: {
         'copilot.activity.type': activity.type,
@@ -303,10 +316,14 @@ export class CopilotStudioClient {
       logger.info('Sending activity...', activity)
       yield * this.postRequestAsync(uriExecute, qbody, 'POST')
     } catch (error) {
-      managed.endWithError(error instanceof Error ? error : String(error))
+      caughtError = error
       throw error
     } finally {
-      managed.end()
+      if (caughtError) {
+        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
+      } else {
+        managed.end()
+      }
       const duration = performance.now() - start
       CopilotStudioClientMetrics.activitiesSentCounter.add(1, {
         'copilot.activity.type': activity.type
@@ -329,21 +346,47 @@ export class CopilotStudioClient {
     activity: Activity,
     conversationId: string
   ): AsyncGenerator<Activity> {
-    if (!conversationId || !conversationId.trim()) {
-      throw new Error('conversationId is required for executeStreaming')
-    }
-
-    const uriExecute = getCopilotStudioConnectionUrl(this.settings, conversationId)
-    const request: ExecuteTurnRequest = new ExecuteTurnRequest(activity, conversationId)
-
-    logger.info('Executing turn with conversation ID:', conversationId)
-    this.logDiagnostic('Execute turn request:', {
-      conversationId,
-      activityType: activity.type,
-      activityText: activity.text
+    const start = performance.now()
+    let caughtError: unknown = null
+    const managed = managedSpan(SpanNames.COPILOT_EXECUTE_STREAMING, {
+      attributes: {
+        'copilot.activity.type': activity.type,
+        'copilot.activity.conversation_id': conversationId
+      }
     })
+    try {
+      if (!conversationId || !conversationId.trim()) {
+        throw new Error('conversationId is required for executeStreaming')
+      }
 
-    yield * this.postRequestAsync(uriExecute, request, 'POST')
+      const uriExecute = getCopilotStudioConnectionUrl(this.settings, conversationId)
+      const request: ExecuteTurnRequest = new ExecuteTurnRequest(activity, conversationId)
+
+      logger.info('Executing turn with conversation ID:', conversationId)
+      this.logDiagnostic('Execute turn request:', {
+        conversationId,
+        activityType: activity.type,
+        activityText: activity.text
+      })
+
+      yield * this.postRequestAsync(uriExecute, request, 'POST')
+    } catch (error) {
+      caughtError = error
+      throw error
+    } finally {
+      if (caughtError) {
+        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
+      } else {
+        managed.end()
+      }
+      const duration = performance.now() - start
+      CopilotStudioClientMetrics.executeStreamingCounter.add(1, {
+        'copilot.activity.type': activity.type
+      })
+      CopilotStudioClientMetrics.requestDuration.record(duration, {
+        operation: 'executeStreaming'
+      })
+    }
   }
 
   /**
