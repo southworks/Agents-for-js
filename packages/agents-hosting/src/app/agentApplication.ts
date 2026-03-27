@@ -85,7 +85,6 @@ export class AgentApplication<TState extends TurnState> {
   private readonly _adapter?: CloudAdapter
   private readonly _authorizationManager?: AuthorizationManager
   private readonly _authorization?: Authorization
-  private readonly _deprecatedActiveTypingTimers = new Set<TypingTimerState>()
   protected readonly _extensions: AgentExtension<TState>[] = []
   private readonly _adaptiveCards: AdaptiveCardsActions<TState>
 
@@ -769,12 +768,10 @@ export class AgentApplication<TState extends TurnState> {
           state.timer = undefined
         }
 
-        this._deprecatedActiveTypingTimers.delete(state)
         turnState.delete(TYPING_TIMER_STATE_KEY)
       }
     }
 
-    this._deprecatedActiveTypingTimers.add(state)
     turnState.set(TYPING_TIMER_STATE_KEY, state)
 
     context.onSendActivities(async (context, activities, next) => {
@@ -872,7 +869,6 @@ export class AgentApplication<TState extends TurnState> {
   public stopTypingTimer (context?: TurnContext): void {
     if (!context) {
       logger.warn('Application.stopTypingTimer() without a context is deprecated. Pass the current TurnContext instead.')
-      Array.from(this._deprecatedActiveTypingTimers).forEach(state => state.stop())
       return
     }
 
