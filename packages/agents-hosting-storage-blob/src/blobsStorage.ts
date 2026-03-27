@@ -13,6 +13,8 @@ import { Errors } from './errorHelper'
 import { sanitizeBlobKey } from './blobsTranscriptStore'
 import { ignoreError, isStatusCodeError } from './ignoreError'
 import { debug } from '@microsoft/agents-activity/logger'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { BlobsStorageMetrics } from './observability/metrics'
 
 const logger = debug('agents:blob-storage')
 
@@ -99,34 +101,42 @@ export class BlobsStorage implements Storage {
    * @throws Will throw if keys parameter is invalid or if there's an error reading from storage
    */
   async read (keys: string[]): Promise<StoreItems> {
-    z.object({ keys: z.array(z.string()) }).parse({ keys })
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_READ, async (span) => {
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      z.object({ keys: z.array(z.string()) }).parse({ keys })
 
-    await this._initialize()
+      await this._initialize()
 
-    const results = await Promise.all(keys.map(async (key) => {
-      const result = { key, value: undefined }
+      const results = await Promise.all(keys.map(async (key) => {
+        const result = { key, value: undefined }
 
-      const blob = await ignoreError(
-        this._containerClient.getBlobClient(sanitizeBlobKey(key)).download(),
-        isStatusCodeError(404)
-      )
+        const blob = await ignoreError(
+          this._containerClient.getBlobClient(sanitizeBlobKey(key)).download(),
+          isStatusCodeError(404)
+        )
 
-      if (!blob) {
+        if (!blob) {
+          return result
+        }
+
+        const { etag: eTag, readableStreamBody } = blob
+        if (!readableStreamBody) {
+          return result
+        }
+
+        const parsed = (await StreamConsumers.json(readableStreamBody)) as any
+        result.value = { ...parsed, eTag }
+        logger.debug(`Read blob: ${key}, eTag: ${eTag}`)
         return result
-      }
+      }))
 
-      const { etag: eTag, readableStreamBody } = blob
-      if (!readableStreamBody) {
-        return result
-      }
-
-      const parsed = (await StreamConsumers.json(readableStreamBody)) as any
-      result.value = { ...parsed, eTag }
-      logger.debug(`Read blob: ${key}, eTag: ${eTag}`)
-      return result
-    }))
-
-    return results.reduce((acc, { key, value }) => (value ? { ...acc, [key]: value } : acc), {})
+      return results.reduce((acc, { key, value }) => (value ? { ...acc, [key]: value } : acc), {})
+    }).finally(() => {
+      BlobsStorageMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'read'
+      })
+    })
   }
 
   /**
@@ -137,29 +147,37 @@ export class BlobsStorage implements Storage {
    * @throws Will throw if there's a validation error, eTag conflict, or other storage error
    */
   async write (changes: StoreItems): Promise<void> {
-    z.record(z.unknown()).parse(changes)
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+      z.record(z.unknown()).parse(changes)
+      span.setAttribute('storage.key.count', Object.keys(changes).length)
 
-    await this._initialize()
+      await this._initialize()
 
-    await Promise.all(
-      Object.entries(changes).map(async ([key, { eTag = '', ...change }]) => {
-        try {
-          const blob = this._containerClient.getBlockBlobClient(sanitizeBlobKey(key))
-          const serialized = JSON.stringify(change)
-          logger.debug(`Writing blob: ${key}, eTag: ${eTag}, size: ${serialized.length}`)
-          return await blob.upload(serialized, serialized.length, {
-            conditions: typeof eTag === 'string' && eTag !== '*' ? { ifMatch: eTag } : {},
-            blobHTTPHeaders: { blobContentType: 'application/json' },
-          })
-        } catch (err: any) {
-          if (err.statusCode === 412) {
-            throw ExceptionHelper.generateException(Error, Errors.ETagConflict)
-          } else {
-            throw err
+      await Promise.all(
+        Object.entries(changes).map(async ([key, { eTag = '', ...change }]) => {
+          try {
+            const blob = this._containerClient.getBlockBlobClient(sanitizeBlobKey(key))
+            const serialized = JSON.stringify(change)
+            logger.debug(`Writing blob: ${key}, eTag: ${eTag}, size: ${serialized.length}`)
+            return await blob.upload(serialized, serialized.length, {
+              conditions: typeof eTag === 'string' && eTag !== '*' ? { ifMatch: eTag } : {},
+              blobHTTPHeaders: { blobContentType: 'application/json' },
+            })
+          } catch (err: any) {
+            if (err.statusCode === 412) {
+              throw ExceptionHelper.generateException(Error, Errors.ETagConflict)
+            } else {
+              throw err
+            }
           }
-        }
+        })
+      )
+    }).finally(() => {
+      BlobsStorageMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'write'
       })
-    )
+    })
   }
 
   /**
@@ -170,12 +188,20 @@ export class BlobsStorage implements Storage {
    * @throws Will throw if keys parameter is invalid
    */
   async delete (keys: string[]): Promise<void> {
-    z.object({ keys: z.array(z.string()) }).parse({ keys })
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_DELETE, async (span) => {
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      z.object({ keys: z.array(z.string()) }).parse({ keys })
 
-    await this._initialize()
+      await this._initialize()
 
-    await Promise.all(
-      keys.map((key) => ignoreError(this._containerClient.deleteBlob(sanitizeBlobKey(key)), isStatusCodeError(404)))
-    )
+      await Promise.all(
+        keys.map((key) => ignoreError(this._containerClient.deleteBlob(sanitizeBlobKey(key)), isStatusCodeError(404)))
+      )
+    }).finally(() => {
+      BlobsStorageMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'delete'
+      })
+    })
   }
 }
