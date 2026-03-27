@@ -67,7 +67,7 @@
   "overrides": {
     "adaptivecards-templating": {
       "adaptive-expressions": {
-        "fast-xml-parser": "^5.3.6"
+        "fast-xml-parser": "^5.5.7"
       }
     }
   },
