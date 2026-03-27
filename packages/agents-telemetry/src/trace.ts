@@ -39,13 +39,10 @@ export function traceFactory (otel: OTel) {
           } else {
             type = typeof error
             message = String(error)
+            span.recordException({ name: String(type), message })
           }
 
           span.setStatus({ code: otel.SpanStatusCode.ERROR, message })
-          span.addEvent(`${name}_failed`, {
-            'error.type': type,
-            'error.message': message
-          })
           throw error
         },
         finally () {
