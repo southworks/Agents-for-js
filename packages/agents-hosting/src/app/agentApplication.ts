@@ -708,12 +708,11 @@ export class AgentApplication<TState extends TurnState> {
       }).finally(() => {
         HostingMetrics.turnsTotalCounter.add(1, {
           'activity.type': context.activity.type,
-          'activity.conversation_id': context.activity.conversation?.id
+          'activity.channel_id': context.activity.channelId
         })
         HostingMetrics.turnDuration.record(performance.now() - start, {
           'activity.type': context.activity.type,
-          'activity.channel_id': context.activity.channelId,
-          'activity.conversation_id': context.activity.conversation?.id
+          'activity.channel_id': context.activity.channelId
         })
       })
     })

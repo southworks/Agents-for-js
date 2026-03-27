@@ -432,7 +432,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     const { tokenResponse, signInResource } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._options.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, code ?? '')
 
     if (!tokenResponse && active && code) {
-      reason.message = `Invalid code entered (${code}). Restarting sign-in flow`
+      reason.message = 'Invalid code entered. Restarting sign-in flow'
       logger.warn(this.prefix(reason.message), activity)
       await context.sendActivity(MessageFactory.text(this.messages.invalidCode(code)))
       return AuthorizationHandlerStatus.REJECTED

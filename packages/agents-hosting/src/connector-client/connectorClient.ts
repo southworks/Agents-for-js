@@ -496,15 +496,14 @@ export class ConnectorClient {
   }
 
   private recordConnectorMetrics (operation: string, httpMethod: string, duration: number, httpCode?: string): void {
-    HostingMetrics.connectorRequestsCounter.add(1, {
+    const attributes = {
       operation,
       'http.method': httpMethod,
       'http.status_code': httpCode ?? 'unknown'
-    })
+    }
 
-    HostingMetrics.connectorRequestDuration.record(duration, {
-      operation,
-      'http.status_code': httpCode ?? 'unknown'
-    })
+    HostingMetrics.connectorRequestsCounter.add(1, attributes)
+
+    HostingMetrics.connectorRequestDuration.record(duration, attributes)
   }
 }
