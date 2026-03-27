@@ -1,5 +1,6 @@
 import { strict as assert } from 'assert'
-import { describe, it, beforeEach } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
+import * as sinon from 'sinon'
 
 import { AgentApplication } from './../../../src/app'
 import { TestAdapter } from '../testStubs'
@@ -12,6 +13,15 @@ import { RouteRank } from './../../../src/app/routeRank'
 import { CloudAdapter } from '../../../src/cloudAdapter'
 import { createStubInstance, SinonStub } from 'sinon'
 import { ConsoleTranscriptLogger } from '../../../src/transcript/consoleTranscriptLogger'
+
+class RecordingTestAdapter extends TestAdapter {
+  public readonly sentActivities: Activity[] = []
+
+  async sendActivities (context: TurnContext, activities: Activity[]): Promise<any[]> {
+    this.sentActivities.push(...activities.map(activity => Activity.fromObject(activity)))
+    return await super.sendActivities(context, activities)
+  }
+}
 
 const createTestActivity = () => Activity.fromObject({
   type: 'message',
@@ -244,6 +254,119 @@ describe('Application', () => {
     const logger = new ConsoleTranscriptLogger()
 
     assert.throws(() => new AgentApplication({ transcriptLogger: logger }))
+  })
+
+  describe('typing timer', () => {
+    let clock: sinon.SinonFakeTimers
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers()
+    })
+
+    afterEach(() => {
+      clock.restore()
+      sinon.restore()
+    })
+
+    it('should start a separate typing timer for each turn context', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const firstContext = new TurnContext(adapter, createTestActivity())
+      const secondContext = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(firstContext)
+      app.startTypingTimer(secondContext)
+
+      await clock.tickAsync(1000)
+
+      const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
+
+      assert.equal(typingActivities.length, 2)
+    })
+
+    it('should send the first typing indicator immediately', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(0)
+
+      const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
+
+      assert.equal(typingActivities.length, 1)
+    })
+
+    it('should not start the timer for non-message activities', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const invokeActivity = Activity.fromObject({
+        type: ActivityTypes.Invoke,
+        name: 'testInvoke',
+        from: { id: 'test', name: 'test' },
+        conversation: { id: 'test' },
+        recipient: { id: 'test' },
+        channelId: 'test',
+        serviceUrl: 'test'
+      })
+      const context = new TurnContext(adapter, invokeActivity)
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(0)
+      await clock.tickAsync(5000)
+
+      const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
+
+      assert.equal(typingActivities.length, 0)
+    })
+
+    it('should stop the timer when context is provided', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+      app.stopTypingTimer(context)
+
+      await clock.tickAsync(1000)
+
+      const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
+
+      assert.equal(typingActivities.length, 0)
+    })
+
+    it('should keep the timer running when stopTypingTimer is called without context', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+      app.stopTypingTimer()
+
+      await clock.tickAsync(1000)
+
+      const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
+
+      assert.equal(typingActivities.length, 1)
+    })
+
+    it('should stop future typing sends after a real message is sent', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(0)
+      await context.sendActivity('done')
+      await clock.tickAsync(5000)
+
+      const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
+
+      assert.equal(typingActivities.length, 1)
+    })
   })
 })
 
