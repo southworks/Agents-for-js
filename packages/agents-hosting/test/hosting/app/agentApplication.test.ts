@@ -23,6 +23,20 @@ class RecordingTestAdapter extends TestAdapter {
   }
 }
 
+class DelayedFailingTypingAdapter extends RecordingTestAdapter {
+  async sendActivities (context: TurnContext, activities: Activity[]): Promise<any[]> {
+    this.sentActivities.push(...activities.map(activity => Activity.fromObject(activity)))
+
+    if (activities.every(activity => activity.type === ActivityTypes.Typing)) {
+      return await new Promise((resolve, reject) => {
+        setTimeout(() => reject(new Error('typing failed')), 10)
+      })
+    }
+
+    return activities.map(activity => ({ id: activity.id }))
+  }
+}
+
 const createTestActivity = () => Activity.fromObject({
   type: 'message',
   from: {
@@ -337,7 +351,7 @@ describe('Application', () => {
       assert.equal(typingActivities.length, 0)
     })
 
-    it('should keep the timer running when stopTypingTimer is called without context', async () => {
+    it('should stop active timers when stopTypingTimer is called without context', async () => {
       const adapter = new RecordingTestAdapter()
       const app = new AgentApplication({ startTypingTimer: true })
       const context = new TurnContext(adapter, createTestActivity())
@@ -345,11 +359,11 @@ describe('Application', () => {
       app.startTypingTimer(context)
       app.stopTypingTimer()
 
-      await clock.tickAsync(1000)
+      await clock.tickAsync(5000)
 
       const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
 
-      assert.equal(typingActivities.length, 1)
+      assert.equal(typingActivities.length, 0)
     })
 
     it('should stop future typing sends after a real message is sent', async () => {
@@ -366,6 +380,27 @@ describe('Application', () => {
       const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
 
       assert.equal(typingActivities.length, 1)
+    })
+
+    it('should not block a real response if the last typing send fails', async () => {
+      const adapter = new DelayedFailingTypingAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(0)
+
+      const sendPromise = context.sendActivity('done')
+
+      await clock.tickAsync(10)
+
+      await assert.doesNotReject(sendPromise)
+
+      const messageActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Message)
+
+      assert.equal(messageActivities.length, 1)
+      assert.equal(messageActivities[0].text, 'done')
     })
   })
 })
