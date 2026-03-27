@@ -248,7 +248,7 @@ export class ConnectorClient {
         data: normalizeOutgoingActivity(body)
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      httpCode = response.status ? response.status.toString() : ''
       logger.info('Reply to conversation/activity: ', response.data.id!, activityId)
       return response.data
     }).finally(() => {
@@ -308,7 +308,7 @@ export class ConnectorClient {
         data: normalizeOutgoingActivity(body)
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      httpCode = response.status ? response.status.toString() : ''
       return response.data
     }).finally(() => {
       const duration = performance.now() - start
