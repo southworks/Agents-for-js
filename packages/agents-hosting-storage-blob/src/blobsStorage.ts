@@ -14,7 +14,7 @@ import { sanitizeBlobKey } from './blobsTranscriptStore'
 import { ignoreError, isStatusCodeError } from './ignoreError'
 import { debug } from '@microsoft/agents-activity/logger'
 import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { BlobsStorageMetrics } from './observability/metrics'
+import { BlobsStorageMetrics } from './observability'
 
 const logger = debug('agents:blob-storage')
 
