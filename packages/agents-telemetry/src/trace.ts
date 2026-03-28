@@ -105,10 +105,22 @@ export interface ManagedSpanResult {
  */
 export function startManagedSpan (otel: OTel) {
   const validSpanNames = new Set(Object.values(SpanNames))
-  return function managedSpan (name: string, options?: ManagedSpanOptions): ManagedSpanResult {
-    if (!validSpanNames.has(name as SpanName)) {
+  return function managedSpan (name: SpanName, options?: ManagedSpanOptions): ManagedSpanResult {
+    if (!validSpanNames.has(name)) {
       throw new Error(`Unrecognized span name "${name}". See SpanNames constants.`)
     }
+
+    if (isSpanDisabled(name)) {
+      const noopSpan = otel.trace.wrapSpanContext(otel.INVALID_SPAN_CONTEXT)
+      return {
+        span: noopSpan,
+        setAttributes: () => {},
+        end: () => {},
+        endWithError: () => {},
+        addEvent: () => {}
+      }
+    }
+
     const tracer = otel.trace.getTracer(pkg.name, pkg.version)
     const span = tracer.startSpan(name, options?.attributes ? { attributes: options.attributes } : undefined)
     let ended = false
@@ -124,8 +136,11 @@ export function startManagedSpan (otel: OTel) {
         if (ended) return
         ended = true
         span.setStatus({ code: otel.SpanStatusCode.OK })
-        options?.onEnd?.(span)
-        span.end()
+        try {
+          options?.onEnd?.(span)
+        } finally {
+          span.end()
+        }
       },
       endWithError (error: Error | string) {
         if (ended) return

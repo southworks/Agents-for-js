@@ -71,11 +71,11 @@ export const SpanNames = {
   TURN_SEND_ACTIVITIES: 'agents.turn.send_activities',
 
   // Copilot Studio Client
-  COPILOT_START_CONVERSATION: 'agents.copilot.start_conversation',
-  COPILOT_SEND_ACTIVITY: 'agents.copilot.send_activity',
-  COPILOT_POST_REQUEST: 'agents.copilot.post_request',
-  COPILOT_CREATE_CONNECTION: 'agents.copilot.webchat.create_connection',
-  COPILOT_EXECUTE_STREAMING: 'agents.copilot.execute_streaming',
+  COPILOT_START_CONVERSATION: 'agents.copilot_client.start_conversation',
+  COPILOT_SEND_ACTIVITY: 'agents.copilot_client.send_activity',
+  COPILOT_POST_REQUEST: 'agents.copilot_client.post_request',
+  COPILOT_CREATE_CONNECTION: 'agents.copilot_client.webchat.create_connection',
+  COPILOT_EXECUTE_STREAMING: 'agents.copilot_client.execute_streaming',
 } as const
 
 export const MetricNames = {
