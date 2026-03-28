@@ -9,7 +9,7 @@ import { Storage, StoreItems } from '@microsoft/agents-hosting'
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
 import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { CosmosStorageMetrics } from './observability/metrics'
+import { CosmosStorageMetrics } from './observability'
 
 /**
  * A utility class to ensure that a specific asynchronous task is executed only once for a given key.
