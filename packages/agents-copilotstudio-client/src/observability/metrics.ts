@@ -42,6 +42,16 @@ export const CopilotStudioClientMetrics = {
     description: 'Total number of execute streaming operations'
   }),
 
+  subscribeAsyncCounter: meter.createCounter(MetricNames.CSC_SUBSCRIBE_ASYNC, {
+    unit: 'operations',
+    description: 'Total number of subscribeAsync operations'
+  }),
+
+  subscribeEventCounter: meter.createCounter(MetricNames.CSC_SUBSCRIBE_EVENT, {
+    unit: 'events',
+    description: 'Total number of events received via subscribeAsync'
+  }),
+
   // Duration Histograms
   streamDuration: meter.createHistogram(MetricNames.CSC_STREAM_DURATION, {
     unit: 'ms',

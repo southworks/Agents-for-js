@@ -6,7 +6,17 @@ import { SpanName } from './types'
 import { logger } from './utils/logger'
 
 const disabledSpans = (() => {
-  const rawValue = (process.env[AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES] ?? '').trim().toUpperCase()
+  let rawValue: string
+  if (typeof window === 'undefined') {
+    rawValue = (process.env[AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES] ?? '').trim().toUpperCase()
+  } else {
+    try {
+      rawValue = (window.localStorage.getItem(AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES) ?? '').trim().toUpperCase()
+    } catch {
+      rawValue = ''
+    }
+  }
+
   if (!rawValue) {
     return []
   }

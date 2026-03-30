@@ -530,60 +530,97 @@ export class CopilotStudioClient {
     conversationId: string,
     lastReceivedEventId?: string
   ): AsyncGenerator<SubscribeEvent> {
-    if (!conversationId || !conversationId.trim()) {
-      throw new Error('conversationId is required for subscribeAsync')
-    }
-
-    const url = getCopilotStudioSubscribeUrl(this.settings, conversationId)
-
-    logger.info('Subscribing to conversation:', conversationId)
-    this.logDiagnostic('Subscribe request:', { conversationId, lastReceivedEventId, url })
-
-    const eventSource: EventSourceClient = createEventSource({
-      url,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'User-Agent': UserAgentHelper.getProductInfo(),
-        Accept: 'text/event-stream',
-        ...(lastReceivedEventId && { 'Last-Event-ID': lastReceivedEventId })
+    let caughtError: unknown = null
+    const managed = managedSpan(SpanNames.COPILOT_SUBSCRIBE_ASYNC, {
+      attributes: {
+        'copilot.conversation_id': conversationId,
+        'copilot.last_received_event_id': lastReceivedEventId ?? 'unknown'
       },
-      method: 'GET',
-      fetch: async (url, init) => {
-        const response = await fetch(url, init)
-        this.processResponseHeaders(response.headers)
-        return response
+      onEnd: () => {
+        CopilotStudioClientMetrics.subscribeAsyncCounter.add(1, {
+          operation: 'subscribeAsync',
+          'copilot.conversation_id': conversationId,
+          'copilot.last_received_event_id': lastReceivedEventId ?? 'unknown'
+        })
       }
     })
-
     try {
-      for await (const { data, event, id } of eventSource) {
-        if (data && event === 'activity') {
-          try {
-            const activity = Activity.fromJson(data)
-            const subscribeEvent: SubscribeEvent = {
-              activity,
-              eventId: id
-            }
-
-            logger.debug(`Received activity via subscription, event ID: ${id}`)
-            this.logDiagnostic('Subscribe event received:', { eventId: id, activityType: activity.type })
-
-            yield subscribeEvent
-          } catch (error) {
-            logger.error('Failed to parse activity in subscription:', error)
-          }
-        } else if (event === 'end') {
-          logger.debug('Subscription stream complete')
-          break
-        }
-
-        if (eventSource.readyState === 'closed') {
-          logger.debug('Subscription connection closed')
-          break
-        }
+      if (!conversationId || !conversationId.trim()) {
+        throw new Error('conversationId is required for subscribeAsync')
       }
+
+      const url = getCopilotStudioSubscribeUrl(this.settings, conversationId)
+
+      logger.info('Subscribing to conversation:', conversationId)
+      this.logDiagnostic('Subscribe request:', { conversationId, lastReceivedEventId, url })
+
+      const startStreaming = performance.now()
+      const eventSource: EventSourceClient = createEventSource({
+        url,
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'User-Agent': UserAgentHelper.getProductInfo(),
+          Accept: 'text/event-stream',
+          ...(lastReceivedEventId && { 'Last-Event-ID': lastReceivedEventId })
+        },
+        method: 'GET',
+        fetch: async (url, init) => {
+          const response = await fetch(url, init)
+          this.processResponseHeaders(response.headers)
+          return response
+        }
+      })
+
+      try {
+        let index = 0
+        for await (const { data, event, id } of eventSource) {
+          if (data && event === 'activity') {
+            try {
+              const activity = Activity.fromJson(data)
+              const subscribeEvent: SubscribeEvent = {
+                activity,
+                eventId: id
+              }
+              managed.span.setAttributes({
+                [`copilot.subscribe_async.event.${index}.id`]: subscribeEvent.eventId,
+                [`copilot.subscribe_async.activity.${index}.type`]: activity.type
+              })
+              CopilotStudioClientMetrics.subscribeEventCounter.add(1, {
+                'copilot.subscribe_async.event.id': subscribeEvent.eventId,
+              })
+
+              logger.debug(`Received activity via subscription, event ID: ${id}`)
+              this.logDiagnostic('Subscribe event received:', { eventId: id, activityType: activity.type })
+
+              yield subscribeEvent
+            } catch (error) {
+              logger.error('Failed to parse activity in subscription:', error)
+            }
+          } else if (event === 'end') {
+            logger.debug('Subscription stream complete')
+            break
+          }
+
+          if (eventSource.readyState === 'closed') {
+            logger.debug('Subscription connection closed')
+            break
+          }
+          index++
+        }
+      } finally {
+        eventSource.close()
+        const duration = performance.now() - startStreaming
+        CopilotStudioClientMetrics.streamDuration.record(duration)
+      }
+    } catch (error) {
+      caughtError = error
+      throw error
     } finally {
-      eventSource.close()
+      if (caughtError) {
+        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
+      } else {
+        managed.end()
+      }
     }
   }
 }
