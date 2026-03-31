@@ -9,11 +9,11 @@
 
 import { traceFactory } from './trace'
 import { loggerFactory } from './logging'
-import { loadTelemetryDependencies  } from "./utils/load";
+import { loadTelemetryDependencies } from './utils/load'
 
 export { SpanNames, MetricNames } from './constants'
 
-const [_otel, logs] = loadTelemetryDependencies (
+const [_otel, logs] = loadTelemetryDependencies(
   [() => require('@opentelemetry/api'), () => require('@microsoft/agents-opentelemetry-api')],
   [() => require('@opentelemetry/api-logs'), () => require('@microsoft/agents-opentelemetry-api-logs')]
 )
