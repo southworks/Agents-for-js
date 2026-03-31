@@ -20,7 +20,8 @@
     "OTel"
   ],
   "scripts": {
-    "build:esm": "tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
+    "clean:esm": "node -e \"require('node:fs').rmSync('dist/esm', { recursive: true, force: true })\"",
+    "build:esm": "npm run clean:esm && tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
   },
   "peerDependencies": {
     "@opentelemetry/api": "1",

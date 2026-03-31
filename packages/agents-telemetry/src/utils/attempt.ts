@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
+export function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
   return (
     (typeof value === 'object' || typeof value === 'function') &&
     value !== null &&
