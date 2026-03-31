@@ -1,14 +1,25 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
+/**
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
 
+/**
+ * Environment variable or configuration setting name for disabling spans by category in the Agents SDK telemetry. The value should be comma-separated or whitespace-separated list of span categories to disable. See `SpanCategories` for available categories.
+ */
 export const AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES'
 
+/**
+ * Categories of spans used for telemetry in the Agents SDK. Spans can be disabled by category using the `AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES` environment variable or configuration setting.
+ */
 export const SpanCategories = {
   STORAGE: ['STORAGE_'],
   AUTHORIZATION: ['AUTHORIZATION_', 'USER_TOKEN_CLIENT_'],
   AUTHENTICATION: ['AUTHENTICATION_'],
 } as const
 
+/**
+ * Span names used for telemetry in the Agents SDK.
+ */
 export const SpanNames = {
   // CloudAdapter / BaseAdapter
   ADAPTER_PROCESS: 'agents.adapter.process',
@@ -71,6 +82,9 @@ export const SpanNames = {
   TURN_SEND_ACTIVITIES: 'agents.turn.send_activities',
 } as const
 
+/**
+ * Metric names used for telemetry in the Agents SDK.
+ */
 export const MetricNames = {
   // CloudAdapter
   ADAPTER_PROCESS_DURATION: 'agents.adapter.process.duration',

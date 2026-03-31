@@ -7,7 +7,7 @@ import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, No
 import axios from 'axios'
 import { AuthConfiguration, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
 import { AuthProvider } from './authProvider'
-import { debug } from '@microsoft/agents-activity/logger'
+import { debug } from '@microsoft/agents-telemetry'
 import { v4 } from 'uuid'
 import { MemoryCache } from './MemoryCache'
 import jwt from 'jsonwebtoken'

@@ -35,6 +35,7 @@
     }
   },
   "dependencies": {
+    "debug": "^4.4.3",
     "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1",
     "@microsoft/agents-opentelemetry-api-logs": "npm:@opentelemetry/api-logs@0.211.0"
   },

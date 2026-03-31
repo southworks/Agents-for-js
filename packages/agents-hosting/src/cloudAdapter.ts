@@ -17,7 +17,7 @@ import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationRefe
 import { Errors } from './errorHelper'
 import { ResourceResponse } from './connector-client/resourceResponse'
 import * as uuid from 'uuid'
-import { debug } from '@microsoft/agents-activity/logger'
+import { debug } from '@microsoft/agents-telemetry'
 import { StatusCodes } from './statusCodes'
 import { InvokeResponse } from './invoke/invokeResponse'
 import { AttachmentData } from './connector-client/attachmentData'

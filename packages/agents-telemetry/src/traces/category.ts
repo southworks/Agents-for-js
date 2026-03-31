@@ -1,9 +1,13 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
+/**
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
 
 import { AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES, SpanCategories, SpanNames } from './constants'
-import { SpanName } from './types'
-import { logger } from './utils/logger'
+import { createDebugLogger } from '../loggers/debug'
+import { SpanName } from '../types'
+
+const logger = createDebugLogger('agents-telemetry')
 
 const disabledSpans = (() => {
   const rawValue = (process.env[AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES] ?? '').trim().toUpperCase()
@@ -47,6 +51,11 @@ const disabledSpans = (() => {
   return result
 })()
 
+/**
+ * Determines if a span is disabled based on its name and the `AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES` environment variable or configuration setting.
+ * @param name The name of the span to check.
+ * @returns A boolean indicating whether the span is disabled.
+ */
 export function isSpanDisabled (name: SpanName): boolean {
   if (disabledSpans.length === 0) {
     return false

@@ -3,7 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { Activity, debug } from '@microsoft/agents-activity'
+import { Activity } from '@microsoft/agents-activity'
+import { debug } from '@microsoft/agents-telemetry'
 import { AgentApplication } from '../agentApplication'
 import { AgenticAuthorization, AzureBotAuthorization } from './handlers'
 import { TurnContext } from '../../turnContext'
