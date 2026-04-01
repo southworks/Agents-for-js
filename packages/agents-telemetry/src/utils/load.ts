@@ -14,8 +14,9 @@ type LoadPair<TResult> = readonly [LoadFactory<TResult>, LoadFactory<TResult>]
  * environments where OpenTelemetry is not present, while still enabling full functionality when it is.
  * @param _otel The primary and fallback loaders for the OpenTelemetry API.
  * @param _logs The primary and fallback loaders for the OpenTelemetry Logs API.
- * @returns A tuple containing the loaded OpenTelemetry API and Logs API. If any loader is async, the tuple is
- * returned as a Promise with both values resolved.
+ * @returns A tuple containing the loaded OpenTelemetry API and Logs API. When both loader pairs are async, the
+ * tuple is returned as a Promise with both values resolved. When both loader pairs are sync, the tuple is returned
+ * synchronously.
  */
 export function loadTelemetryDependencies <TOtel, TLogs> (_otel: LoadPair<Promise<TOtel>>, _logs: LoadPair<Promise<TLogs>>): Promise<[TOtel, TLogs]>
 export function loadTelemetryDependencies <TOtel, TLogs> (_otel: LoadPair<TOtel>, _logs: LoadPair<TLogs>): [TOtel, TLogs]

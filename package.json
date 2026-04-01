@@ -19,7 +19,7 @@
   "type": "module",
   "scripts": {
     "play": "agentsplayground",
-    "lint": "eslint --ext .ts,.cts,.mts",
+    "lint": "eslint . --ext .js,.cjs,.mjs,.ts,.cts,.mts",
     "lint:deps": "knip",
     "lint:deps:ci": "knip --reporter github-actions",
     "compat": "node compat.mjs",
