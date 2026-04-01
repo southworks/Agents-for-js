@@ -428,7 +428,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     }
     const payload = jwt.decode(token) as JwtPayload
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud]
-    return audiences.some(aud => typeof aud === 'string' && aud.startsWith('api://'))
+    const appid = payload.azp ?? payload.appid
+    return audiences.some(aud => aud?.includes(appid))
   }
 
   /**
