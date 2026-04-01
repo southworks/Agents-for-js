@@ -24,18 +24,22 @@ export function attempt<TResult> (options: {
       return result
         .then((res) => options.then?.(res) ?? res)
         .catch((error) => {
-          options.catch?.(error)
-          throw error
+          if (options.catch) {
+            return options.catch(error)
+          } else {
+            throw error
+          }
         })
         .finally(options.finally) as any
     }
 
     return options.then?.(result) ?? result
   } catch (error) {
-    if (!_isPromise) {
-      options.catch?.(error)
+    if (options.catch) {
+      return options.catch(error) as TResult
+    } else {
+      throw error
     }
-    throw error
   } finally {
     if (!_isPromise) {
       options.finally?.()
