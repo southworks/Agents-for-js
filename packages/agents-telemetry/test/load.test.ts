@@ -3,21 +3,27 @@
 
 import assert from 'assert'
 import sinon from 'sinon'
-import { describe, it, beforeEach } from 'node:test'
+import { afterEach, beforeEach, describe, it } from 'node:test'
 import { loadTelemetryDependencies } from '../src/utils/load'
+import { logger } from '../src/utils/logger'
 
-const logger = require('../src/utils/logger').logger
-const warnStub = sinon.spy(logger, 'warn')
-const errorStub = sinon.spy(logger, 'error')
 const primaryOtel = { api: 'otel' }
 const primaryLogs = { api: 'logs' }
 const fallbackOtel = { api: 'otel-fallback' }
 const fallbackLogs = { api: 'logs-fallback' }
 
 describe('loadTelemetryDependencies', () => {
+  let warnStub: sinon.SinonSpy
+  let errorStub: sinon.SinonSpy
+
   beforeEach(() => {
-    warnStub.resetHistory()
-    errorStub.resetHistory()
+    warnStub = sinon.spy(logger, 'warn')
+    errorStub = sinon.spy(logger, 'error')
+  })
+
+  afterEach(() => {
+    warnStub.restore()
+    errorStub.restore()
   })
 
   it('returns primary otel and logs if both succeed', () => {

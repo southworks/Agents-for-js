@@ -3,9 +3,12 @@
 
 import assert from 'assert'
 import sinon from 'sinon'
+import { createRequire } from 'node:module'
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import { traceFactory } from '../src/trace'
 import { SpanNames } from '../src/constants'
+
+const cjsRequire = createRequire(__filename)
 
 describe('traceFactory', () => {
   let otel: any
@@ -63,10 +66,10 @@ describe('traceFactory', () => {
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'STORAGE'
 
     // Clear module caches so category re-evaluates disabled spans
-    delete require.cache[require.resolve('../src/category')]
-    delete require.cache[require.resolve('../src/trace')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/category')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/trace')]
 
-    const { traceFactory: factory } = require('../src/trace')
+    const { traceFactory: factory } = cjsRequire('../src/trace')
     const localTrace = factory(otel) as ReturnType<typeof traceFactory>
 
     const noopSpan = { noop: true }
@@ -82,9 +85,13 @@ describe('traceFactory', () => {
     assert.ok(otel.trace.getTracer.notCalled)
 
     // Restore env and module caches
-    process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = originalEnv ?? ''
-    delete require.cache[require.resolve('../src/category')]
-    delete require.cache[require.resolve('../src/trace')]
+    if (originalEnv === undefined) {
+      delete process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES
+    } else {
+      process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = originalEnv
+    }
+    delete cjsRequire.cache[cjsRequire.resolve('../src/category')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/trace')]
   })
 
   it('records exception and sets ERROR status on throw', () => {

@@ -3,52 +3,59 @@
 
 import assert from 'assert'
 import sinon from 'sinon'
+import { createRequire } from 'node:module'
 import { beforeEach, afterEach, describe, it } from 'node:test'
 import { SpanNames } from '../src/constants'
 
+const cjsRequire = createRequire(__filename)
+
 describe('isSpanDisabled', () => {
-  let originalEnv = process.env
+  let originalDisabledCategories: string | undefined
   let warnStub: sinon.SinonStub<unknown[], unknown> | sinon.SinonStub<any[], any>
   let debugStub: sinon.SinonStub<any[], any> | sinon.SinonStub<unknown[], unknown>
 
   beforeEach(() => {
-    // Store original environment variables
-    originalEnv = { ...process.env }
-    // Reset environment variables before each test
+    // Store original environment variable
+    originalDisabledCategories = process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES
+    // Reset environment variable before each test
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = ''
     // Clear the require cache for category and logger
-    delete require.cache[require.resolve('../src/category')]
-    delete require.cache[require.resolve('../src/utils/logger')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/category')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/utils/logger')]
     // Stub logger methods
-    const logger = require('../src/utils/logger').logger
+    const logger = cjsRequire('../src/utils/logger').logger
     debugStub = sinon.stub(logger, 'debug')
     warnStub = sinon.stub(logger, 'warn')
   })
 
   afterEach(() => {
-    // Restore original environment variables
-    process.env = originalEnv
+    // Restore original environment variable
+    if (originalDisabledCategories === undefined) {
+      delete process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES
+    } else {
+      process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = originalDisabledCategories
+    }
     debugStub.restore()
     warnStub.restore()
-    delete require.cache[require.resolve('../src/category')]
-    delete require.cache[require.resolve('../src/utils/logger')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/category')]
+    delete cjsRequire.cache[cjsRequire.resolve('../src/utils/logger')]
   })
 
   it('returns false if no env var set', () => {
-    const { isSpanDisabled } = require('../src/category')
+    const { isSpanDisabled } = cjsRequire('../src/category')
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_READ), false)
   })
 
   it('returns false if category is invalid', () => {
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'INVALID'
-    const { isSpanDisabled } = require('../src/category')
+    const { isSpanDisabled } = cjsRequire('../src/category')
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_READ), false)
     assert.ok(warnStub.calledOnce)
   })
 
   it('disables all spans in a valid category', () => {
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'STORAGE'
-    const { isSpanDisabled } = require('../src/category')
+    const { isSpanDisabled } = cjsRequire('../src/category')
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_READ), true)
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_WRITE), true)
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_DELETE), true)
@@ -58,7 +65,7 @@ describe('isSpanDisabled', () => {
 
   it('handles multiple categories (comma/space separated)', () => {
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'STORAGE,AUTHENTICATION'
-    const { isSpanDisabled } = require('../src/category')
+    const { isSpanDisabled } = cjsRequire('../src/category')
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_READ), true)
     assert.strictEqual(isSpanDisabled(SpanNames.AUTHENTICATION_GET_ACCESS_TOKEN), true)
     assert.strictEqual(isSpanDisabled(SpanNames.AGENTS_APP_RUN), false)
@@ -66,13 +73,13 @@ describe('isSpanDisabled', () => {
 
   it('is case-insensitive and trims whitespace', () => {
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = '  storage  '
-    const { isSpanDisabled } = require('../src/category')
+    const { isSpanDisabled } = cjsRequire('../src/category')
     assert.strictEqual(isSpanDisabled(SpanNames.STORAGE_READ), true)
   })
 
   it('does not duplicate disabled spans for overlapping prefixes', () => {
     process.env.AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES = 'AUTHORIZATION'
-    const { isSpanDisabled } = require('../src/category')
+    const { isSpanDisabled } = cjsRequire('../src/category')
     // Both AUTHORIZATION_ and USER_TOKEN_CLIENT_ prefixes
     assert.strictEqual(isSpanDisabled(SpanNames.AUTHORIZATION_AGENTIC_TOKEN), true)
     assert.strictEqual(isSpanDisabled(SpanNames.USER_TOKEN_CLIENT_GET_USER_TOKEN), true)
