@@ -71,7 +71,7 @@ export interface ManagedSpanResult {
   /** End the span with OK status. Safe to call multiple times (subsequent calls are no-ops). */
   end: () => void
   /** End the span with ERROR status. Safe to call multiple times (subsequent calls are no-ops). */
-  endWithError: (error: Error | string) => void
+  endWithError: (error: unknown) => void
   /** Add an event to the span. Can be called multiple times. */
   addEvent: (name: string, attributes?: Record<string, string | number | boolean>) => void
 }
@@ -97,7 +97,7 @@ export interface ManagedSpanResult {
  *     yield* innerStream();
  *     managed.end();
  *   } catch (error) {
- *     managed.endWithError(error instanceof Error ? error : String(error));
+ *     managed.endWithError(error);
  *     throw error;
  *   }
  * }
@@ -142,7 +142,7 @@ export function startManagedSpan (otel: OTel) {
           span.end()
         }
       },
-      endWithError (error: Error | string) {
+      endWithError (error) {
         if (ended) return
         ended = true
         let message
