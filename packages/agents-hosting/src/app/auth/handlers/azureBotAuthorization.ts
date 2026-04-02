@@ -284,11 +284,8 @@ export class AzureBotAuthorization implements AuthorizationHandler {
       const userTokenClient = await this.getUserTokenClient(context)
       // Using getTokenOrSignInResource instead of getUserToken to avoid HTTP 404 errors.
       const { tokenResponse } = await userTokenClient.getTokenOrSignInResource(activity.from?.id!, this._options.name!, activity.channelId!, activity.getConversationReference(), activity.relatesTo!, '')
-      console.log('token 1:', token)
       return tokenResponse?.token
     }
-
-    console.log('token 2:', token)
 
     return token
   }
