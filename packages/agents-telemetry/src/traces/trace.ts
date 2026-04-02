@@ -3,10 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import pkg from '../../package.json'
-import { Span, OTel, SpanName } from '../types'
-import { attempt } from '../utils/attempt'
-import { isSpanDisabled } from './category'
+import type { Span, OTel, SpanName } from '../types.js'
+import { attempt } from '../utils/attempt.js'
+import { isSpanDisabled } from './category.js'
+
+const packageName = '@microsoft/agents-telemetry'
 
 /**
  * Creates a span tracer that wraps the provided function with OpenTelemetry span creation and error handling.
@@ -17,7 +18,7 @@ export function createSpanTracer<TReturn> (otel: OTel, name: SpanName, fn: (span
     return fn(noopSpan)
   }
 
-  const tracer = otel.trace.getTracer(pkg.name, pkg.version)
+  const tracer = otel.trace.getTracer(packageName)
   return tracer.startActiveSpan(name, (span) => {
     return attempt({
       try () {

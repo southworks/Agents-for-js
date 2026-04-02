@@ -9,7 +9,7 @@ import { createDebugLogger } from './loggers/debug.js'
 
 export { SpanNames, MetricNames } from './traces/constants.js'
 
-const logger = createDebugLogger('agents-telemetry')
+const logger = createDebugLogger('agents:telemetry')
 
 /**
  * Will contain the OpenTelemetry API if it's available, otherwise will contain a fallback implementation that allows agents-telemetry to function without OpenTelemetry support.
@@ -23,7 +23,7 @@ export const { trace, debug } = factory(otel, otelLogs)
  * Attempts to load the OpenTelemetry API. First tries to load the official '@opentelemetry/api' package, and if that fails (e.g., because it's not installed), it falls back to a bundled version provided by '@microsoft/agents-opentelemetry-api'. This allows agents-telemetry to operate in environments where OpenTelemetry is not present, while still enabling full functionality when it is.
  * @returns The OpenTelemetry API if available, otherwise a fallback implementation.
  */
-async function load(): Promise<OTel> {
+async function load (): Promise<OTel> {
   try {
     return await import('@opentelemetry/api')
   } catch {
@@ -37,7 +37,7 @@ async function load(): Promise<OTel> {
   }
 }
 
-async function loadLogs(): Promise<OTelLogs> {
+async function loadLogs (): Promise<OTelLogs> {
   try {
     return await import('@opentelemetry/api-logs')
   } catch {

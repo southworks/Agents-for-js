@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { SpanNames } from './traces/constants'
+import { SpanNames } from './traces/constants.js'
 
 export type * from '@microsoft/agents-opentelemetry-api'
 export type * from '@microsoft/agents-opentelemetry-api-logs'

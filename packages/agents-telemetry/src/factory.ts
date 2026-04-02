@@ -3,12 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import { Logger } from './loggers/base'
-import { createDebugLogger, link } from './loggers/debug'
-import { createOTelLogger } from './loggers/otel'
-import { OTel, OTelLogs, Span, SpanName } from './types'
-import { SpanNames } from './traces/constants'
-import { createSpanTracer } from './traces/trace'
+import type { Logger } from './loggers/base.js'
+import { createDebugLogger, link } from './loggers/debug.js'
+import { createOTelLogger } from './loggers/otel.js'
+import type { OTel, OTelLogs, Span, SpanName } from './types.js'
+import { SpanNames } from './traces/constants.js'
+import { createSpanTracer } from './traces/trace.js'
 
 interface Factory {
   /**

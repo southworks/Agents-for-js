@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { OTelLogs } from '../types'
-import { Logger, LoggerLevel } from './base'
+import type { OTelLogs } from '../types.js'
+import type { Logger, LoggerLevel } from './base.js'
 
 /**
  * Creates an OpenTelemetry logger that implements the Logger interface for the Agents SDK. The logger will emit logs with the appropriate severity level and namespace attributes.

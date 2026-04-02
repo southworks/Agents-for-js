@@ -3,14 +3,15 @@
  * Licensed under the MIT License.
  */
 
-import { AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES, SpanCategories, SpanNames } from './constants'
-import { createDebugLogger } from '../loggers/debug'
-import { SpanName } from '../types'
+import { AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES, SpanCategories, SpanNames } from './constants.js'
+import { createDebugLogger } from '../loggers/debug.js'
+import type { SpanName } from '../types.js'
+import { isBrowser } from '../utils/platform.js'
 
-const logger = createDebugLogger('agents-telemetry')
+const logger = createDebugLogger('agents:telemetry')
 
 const disabledSpans = (() => {
-  const rawValue = (process.env[AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES] ?? '').trim().toUpperCase()
+  const rawValue = (isBrowser ? '' : process.env[AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES] ?? '').trim().toUpperCase()
   if (!rawValue) {
     return []
   }

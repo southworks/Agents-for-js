@@ -4,8 +4,9 @@
  */
 
 import createDebug from 'debug'
-import { isBrowser } from '../utils/platform'
-import { LoggerLevel, Logger as BaseLogger, levels } from './base'
+import { isBrowser } from '../utils/platform.js'
+import { levels } from './base.js'
+import type { LoggerLevel, Logger as BaseLogger } from './base.js'
 
 type Logger = Record<LoggerLevel, createDebug.Debugger>
 
