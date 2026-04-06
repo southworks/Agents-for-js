@@ -1,7 +1,9 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
+/**
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
 
-import { SpanNames } from './constants'
+import { SpanNames } from './traces/constants.js'
 
 export type * from '@microsoft/agents-opentelemetry-api'
 export type * from '@microsoft/agents-opentelemetry-api-logs'

@@ -3,13 +3,15 @@
 
 import axios, { AxiosInstance } from 'axios'
 import { Activity, ConversationReference } from '@microsoft/agents-activity'
-import { debug } from '@microsoft/agents-activity/logger'
+import { debug } from '@microsoft/agents-telemetry'
 import { normalizeTokenExchangeState } from '../activityWireCompat'
 import { AadResourceUrls, SignInResource, TokenExchangeRequest, TokenOrSinginResourceResponse, TokenResponse, TokenStatus } from './userTokenClient.types'
 import { getProductInfo } from '../getProductInfo'
 import { AuthProvider } from '../auth'
 import { HeaderPropagation, HeaderPropagationCollection } from '../headerPropagation'
 import { getTokenServiceEndpoint } from './customUserTokenAPI'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from '../observability/metrics'
 
 const logger = debug('agents:user-token-client')
 
@@ -144,13 +146,27 @@ export class UserTokenClient {
    * @returns A promise that resolves to the user token.
    */
   async getUserToken (connectionName: string, channelIdComposite: string, userId: string, code?: string) : Promise<TokenResponse> {
-    const [channelId] = Activity.parseChannelId(channelIdComposite)
-    const params = { connectionName, channelId, userId, code }
-    const response = await this.client.get('/api/usertoken/GetToken', { params })
-    if (response?.data) {
-      return response.data as TokenResponse
-    }
-    return { token: undefined }
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_GET_USER_TOKEN, async (span) => {
+      const [channelId] = Activity.parseChannelId(channelIdComposite)
+      const params = { connectionName, channelId, userId, code }
+      span.setAttributes({
+        'auth.connection.name': connectionName,
+        'activity.channel_id': channelId,
+        'user.id': userId
+      })
+      const response = await this.client.get('/api/usertoken/GetToken', { params })
+      httpCode = response.status.toString()
+
+      if (response?.data) {
+        return response.data as TokenResponse
+      }
+      return { token: undefined }
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('get.user.token', 'GET', duration, httpCode)
+    })
   }
 
   /**
@@ -161,12 +177,25 @@ export class UserTokenClient {
    * @returns A promise that resolves when the sign-out operation is complete.
    */
   async signOut (userId: string, connectionName: string, channelIdComposite: string) : Promise<void> {
-    const [channelId] = Activity.parseChannelId(channelIdComposite)
-    const params = { userId, connectionName, channelId }
-    const response = await this.client.delete('/api/usertoken/SignOut', { params })
-    if (response.status !== 200) {
-      throw new Error('Failed to sign out')
-    }
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_SIGN_OUT, async (span) => {
+      const [channelId] = Activity.parseChannelId(channelIdComposite)
+      span.setAttributes({
+        'user.id': userId,
+        'auth.connection.name': connectionName,
+        'activity.channel_id': channelId
+      })
+      const params = { userId, connectionName, channelId }
+      const response = await this.client.delete('/api/usertoken/SignOut', { params })
+      httpCode = response.status.toString()
+      if (response.status !== 200) {
+        throw new Error('Failed to sign out')
+      }
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('sign.out', 'DELETE', duration, httpCode)
+    })
   }
 
   /**
@@ -178,17 +207,26 @@ export class UserTokenClient {
    * @returns A promise that resolves to the signing resource.
    */
   async getSignInResource (msAppId: string, connectionName: string, conversation: ConversationReference, relatesTo?: ConversationReference) : Promise<SignInResource> {
-    const tokenExchangeState = {
-      connectionName,
-      conversation,
-      relatesTo,
-      msAppId
-    }
-    const tokenExchangeStateNormalized = normalizeTokenExchangeState(tokenExchangeState)
-    const state = Buffer.from(JSON.stringify(tokenExchangeStateNormalized)).toString('base64')
-    const params = { state }
-    const response = await this.client.get('/api/botsignin/GetSignInResource', { params })
-    return response.data as SignInResource
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_GET_SIGN_IN_RESOURCE, async (span) => {
+      span.setAttribute('auth.connection.name', connectionName)
+      const tokenExchangeState = {
+        connectionName,
+        conversation,
+        relatesTo,
+        msAppId
+      }
+      const tokenExchangeStateNormalized = normalizeTokenExchangeState(tokenExchangeState)
+      const state = Buffer.from(JSON.stringify(tokenExchangeStateNormalized)).toString('base64')
+      const params = { state }
+      const response = await this.client.get('/api/botsignin/GetSignInResource', { params })
+      httpCode = response.status.toString()
+      return response.data as SignInResource
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('get.sign.in.resource', 'GET', duration, httpCode)
+    })
   }
 
   /**
@@ -200,14 +238,27 @@ export class UserTokenClient {
    * @returns A promise that resolves to the exchanged token.
    */
   async exchangeTokenAsync (userId: string, connectionName: string, channelIdComposite: string, tokenExchangeRequest: TokenExchangeRequest) : Promise<TokenResponse> {
-    const [channelId] = Activity.parseChannelId(channelIdComposite)
-    const params = { userId, connectionName, channelId }
-    const response = await this.client.post('/api/usertoken/exchange', tokenExchangeRequest, { params })
-    if (response?.data) {
-      return response.data as TokenResponse
-    } else {
-      return { token: undefined }
-    }
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_EXCHANGE_TOKEN, async (span) => {
+      const [channelId] = Activity.parseChannelId(channelIdComposite)
+      span.setAttributes({
+        'user.id': userId,
+        'auth.connection.name': connectionName,
+        'activity.channel_id': channelId
+      })
+      const params = { userId, connectionName, channelId }
+      const response = await this.client.post('/api/usertoken/exchange', tokenExchangeRequest, { params })
+      httpCode = response.status.toString()
+      if (response?.data) {
+        return response.data as TokenResponse
+      } else {
+        return { token: undefined }
+      }
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('exchange.token', 'POST', duration, httpCode)
+    })
   }
 
   /**
@@ -223,11 +274,24 @@ export class UserTokenClient {
    * @returns A promise that resolves to the token or sign-in resource response.
    */
   async getTokenOrSignInResource (userId: string, connectionName: string, channelIdComposite: string, conversation: ConversationReference, relatesTo: ConversationReference, code: string, finalRedirect: string = '', fwdUrl: string = '') : Promise<TokenOrSinginResourceResponse> {
-    const [channelId] = Activity.parseChannelId(channelIdComposite)
-    const state = Buffer.from(JSON.stringify({ conversation, relatesTo, connectionName, msAppId: this.msAppId })).toString('base64')
-    const params = { userId, connectionName, channelId, state, code, finalRedirect, fwdUrl }
-    const response = await this.client.get('/api/usertoken/GetTokenOrSignInResource', { params })
-    return response.data as TokenOrSinginResourceResponse
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_OR_SIGN_IN_RESOURCE, async (span) => {
+      const [channelId] = Activity.parseChannelId(channelIdComposite)
+      const state = Buffer.from(JSON.stringify({ conversation, relatesTo, connectionName, msAppId: this.msAppId })).toString('base64')
+      span.setAttributes({
+        'user.id': userId,
+        'auth.connection.name': connectionName,
+        'activity.channel_id': channelId
+      })
+      const params = { userId, connectionName, channelId, state, code, finalRedirect, fwdUrl }
+      const response = await this.client.get('/api/usertoken/GetTokenOrSignInResource', { params })
+      httpCode = response.status.toString()
+      return response.data as TokenOrSinginResourceResponse
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('get.token.or.sign.in.resource', 'GET', duration, httpCode)
+    })
   }
 
   /**
@@ -238,10 +302,22 @@ export class UserTokenClient {
    * @returns A promise that resolves to the token status.
    */
   async getTokenStatus (userId: string, channelIdComposite: string, include: string = null!): Promise<TokenStatus[]> {
-    const [channelId] = Activity.parseChannelId(channelIdComposite)
-    const params = { userId, channelId, include }
-    const response = await this.client.get('/api/usertoken/GetTokenStatus', { params })
-    return response.data as TokenStatus[]
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_GET_TOKEN_STATUS, async (span) => {
+      const [channelId] = Activity.parseChannelId(channelIdComposite)
+      span.setAttributes({
+        'user.id': userId,
+        'activity.channel_id': channelId
+      })
+      const params = { userId, channelId, include }
+      const response = await this.client.get('/api/usertoken/GetTokenStatus', { params })
+      httpCode = response.status.toString()
+      return response.data as TokenStatus[]
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('get.token.status', 'GET', duration, httpCode)
+    })
   }
 
   /**
@@ -253,13 +329,40 @@ export class UserTokenClient {
    * @returns A promise that resolves to the AAD tokens.
    */
   async getAadTokens (userId: string, connectionName: string, channelIdComposite: string, resourceUrls: AadResourceUrls) : Promise<Record<string, TokenResponse>> {
-    const [channelId] = Activity.parseChannelId(channelIdComposite)
-    const params = { userId, connectionName, channelId }
-    const response = await this.client.post('/api/usertoken/GetAadTokens', resourceUrls, { params })
-    return response.data as Record<string, TokenResponse>
+    const start = performance.now()
+    let httpCode: string
+    return trace(SpanNames.USER_TOKEN_CLIENT_GET_AAD_TOKENS, async (span) => {
+      const [channelId] = Activity.parseChannelId(channelIdComposite)
+      span.setAttributes({
+        'user.id': userId,
+        'auth.connection.name': connectionName,
+        'activity.channel_id': channelId
+      })
+      const params = { userId, connectionName, channelId }
+      const response = await this.client.post('/api/usertoken/GetAadTokens', resourceUrls, { params })
+      httpCode = response.status.toString()
+      return response.data as Record<string, TokenResponse>
+    }).finally(() => {
+      const duration = performance.now() - start
+      this.recordUserTokenClientMetrics('get.aad.tokens', 'POST', duration, httpCode)
+    })
   }
 
   public updateAuthToken (token: string): void {
     this.client.defaults.headers.common.Authorization = `Bearer ${token}`
+  }
+
+  private recordUserTokenClientMetrics (operation: string, httpMethod: string, duration: number, httpCode?: string): void {
+    HostingMetrics.userTokenClientRequestsCounter.add(1, {
+      operation,
+      'http.method': httpMethod,
+      'http.status_code': httpCode ?? 'unknown'
+    })
+
+    HostingMetrics.userTokenClientRequestDuration.record(duration, {
+      operation,
+      'http.method': httpMethod,
+      'http.status_code': httpCode ?? 'unknown'
+    })
   }
 }

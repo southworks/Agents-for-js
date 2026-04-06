@@ -19,9 +19,13 @@
     "OpenTelemetry",
     "OTel"
   ],
+  "main": "./dist/cjs/src/index.cjs",
+  "module": "./dist/esm/src/index.mjs",
+  "types": "./dist/esm/src/index.d.mts",
+  "browser": "./dist/esm/src/index.mjs",
   "scripts": {
     "clean:esm": "node -e \"require('node:fs').rmSync('dist/esm', { recursive: true, force: true })\"",
-    "build:esm": "npm run clean:esm && tsc --project tsconfig.esm.json && node scripts/build.esm.mjs"
+    "build:esm": "tsc --project tsconfig.esm.json && node scripts/esm.mjs"
   },
   "peerDependencies": {
     "@opentelemetry/api": "1",
@@ -36,6 +40,7 @@
     }
   },
   "dependencies": {
+    "debug": "^4.4.3",
     "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1",
     "@microsoft/agents-opentelemetry-api-logs": "npm:@opentelemetry/api-logs@0.211.0"
   },
@@ -49,12 +54,14 @@
     ".": {
       "import": {
         "types": "./dist/esm/src/index.d.mts",
+        "browser": "./dist/esm/src/index.mjs",
         "default": "./dist/esm/src/index.mjs"
       },
       "require": {
         "types": "./dist/cjs/src/index.d.cts",
         "default": "./dist/cjs/src/index.cjs"
-      }
+      },
+      "default": "./dist/esm/src/index.mjs"
     },
     "./package.json": "./package.json"
   },

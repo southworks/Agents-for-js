@@ -1,5 +1,7 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
+/**
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
 
 /**
  * ES module entrypoint for agents-telemetry. This file exists alongside index.cts so the package can ship
@@ -7,12 +9,12 @@
  * while the CommonJS entrypoint keeps a synchronous require()-based implementation for CJS runtimes.
  */
 
-import { traceFactory, startManagedSpan } from './trace.js'
-import { loggerFactory } from './logging.js'
+import { factory } from './factory.js'
+import { startManagedSpan } from './traces/trace.js'
 import { loadTelemetryDependencies } from './utils/load.js'
 
-export {SpanNames, MetricNames} from './constants.js'
-export type { ManagedSpanOptions, ManagedSpanResult } from './trace.js'
+export { SpanNames, MetricNames } from './traces/constants.js'
+export type { ManagedSpanOptions, ManagedSpanResult } from './traces/trace.js'
 
 const [_otel, logs] = await loadTelemetryDependencies(
   [() => import('@opentelemetry/api'), () => import('@microsoft/agents-opentelemetry-api')],
@@ -21,6 +23,4 @@ const [_otel, logs] = await loadTelemetryDependencies(
 
 export const otel = _otel
 export const managedSpan = startManagedSpan(otel)
-
-export const trace = traceFactory(_otel)
-export const createLogger = loggerFactory(logs)
+export const { trace, debug } = factory(otel, logs)

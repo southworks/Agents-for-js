@@ -5,7 +5,7 @@
 
 import { Activity, ActivityTypes, ConversationReference } from '@microsoft/agents-activity'
 import { ResourceResponse } from '../connector-client'
-import { debug } from '@microsoft/agents-activity/logger'
+import { debug } from '@microsoft/agents-telemetry'
 import { TurnContext } from '../turnContext'
 import { AdaptiveCardsActions } from './adaptiveCards'
 import { AgentApplicationOptions } from './agentApplicationOptions'
@@ -21,6 +21,8 @@ import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, UserAuthorization, AuthorizationManager } from './auth'
 import { JwtPayload } from 'jsonwebtoken'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from '../observability'
 
 const logger = debug('agents:app')
 
@@ -568,6 +570,9 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public async run (turnContext:TurnContext): Promise<void> {
+    if (turnContext.activity.type === ActivityTypes.Typing) {
+      return
+    }
     await this.runInternal(turnContext)
   }
 
@@ -603,72 +608,113 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
-    if (turnContext.activity.type === ActivityTypes.Typing) {
-      return false
-    }
-
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
-      try {
-        if (this._options.startTypingTimer) {
-          this.startTypingTimer(context)
-        }
-
-        if (this._options.removeRecipientMention && context.activity.type === ActivityTypes.Message) {
-          context.activity.removeRecipientMention()
-        }
-
-        if (this._options.normalizeMentions && context.activity.type === ActivityTypes.Message) {
-          context.activity.normalizeMentions()
-        }
-
-        const { storage, turnStateFactory } = this._options
-        const state = turnStateFactory()
-        await state.load(context, storage)
-
-        const { authorized } = await this._authorizationManager?.process(context, async activity => {
-          // The incoming activity may come from the storage, so we need to restore the auth handlers.
-          // Since the current route may not have auth handlers.
-          const route = await this.getRoute(new TurnContext(context.adapter, activity, turnContext.identity))
-          return route?.authHandlers ?? []
-        }) ?? { authorized: true } // Default to authorized if no auth manager
-
-        if (!authorized) {
-          await state.save(context, storage)
-          return false
-        }
-
-        const route = await this.getRoute(context)
-
-        if (!route) {
-          logger.debug('No matching route found for activity:', context.activity)
-          return false
-        }
-
-        if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
-          for (let i = 0; i < this._options.fileDownloaders.length; i++) {
-            await this._options.fileDownloaders[i].downloadAndStoreFiles(context, state)
+      const start = performance.now()
+      return trace(SpanNames.AGENTS_APP_RUN, async (span) => {
+        try {
+          if (this._options.startTypingTimer) {
+            this.startTypingTimer(context)
           }
+
+          if (this._options.removeRecipientMention && context.activity.type === ActivityTypes.Message) {
+            context.activity.removeRecipientMention()
+          }
+
+          if (this._options.normalizeMentions && context.activity.type === ActivityTypes.Message) {
+            context.activity.normalizeMentions()
+          }
+
+          const { storage, turnStateFactory } = this._options
+          const state = turnStateFactory()
+          await state.load(context, storage)
+
+          const { authorized } = await this._authorizationManager?.process(context, async activity => {
+            // The incoming activity may come from the storage, so we need to restore the auth handlers.
+            // Since the current route may not have auth handlers.
+            const route = await this.getRoute(new TurnContext(context.adapter, activity, turnContext.identity))
+            return route?.authHandlers ?? []
+          }) ?? { authorized: true } // Default to authorized if no auth manager
+
+          span.setAttributes({
+            'route.authorized': authorized,
+            'activity.type': context.activity.type,
+            'activity.id': context.activity.id,
+          })
+
+          if (!authorized) {
+            await state.save(context, storage)
+            return false
+          }
+
+          const route = await this.getRoute(context)
+
+          span.setAttributes({ 'route.matched': route !== undefined })
+
+          if (!route) {
+            logger.debug('No matching route found for activity:', context.activity)
+            return false
+          }
+
+          if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
+            await trace(SpanNames.AGENTS_APP_DOWNLOAD_FILES, async (span) => {
+              span.setAttributes({ 'agents.attachments.count': context.activity.attachments?.length ?? 0 })
+              for (let i = 0; i < this._options.fileDownloaders!.length; i++) {
+                await this._options.fileDownloaders![i].downloadAndStoreFiles(context, state)
+              }
+            })
+          }
+
+          let continueExecution = true
+          if (this._beforeTurn.length > 0) {
+            await trace(SpanNames.AGENTS_APP_BEFORE_TURN, async () => {
+              continueExecution = await this.callEventHandlers(context, state, this._beforeTurn)
+            })
+          }
+          if (!continueExecution) {
+            await state.save(context, storage)
+            return false
+          }
+
+          await trace(SpanNames.AGENTS_APP_ROUTE_HANDLER, async (span) => {
+            span.setAttributes({
+              'route.is_invoke': route.isInvokeRoute,
+              'route.is_agentic': route.isAgenticRoute
+            })
+            await route.handler(context, state)
+          })
+
+          if (this._afterTurn.length > 0) {
+            await trace(SpanNames.AGENTS_APP_AFTER_TURN, async () => {
+              continueExecution = await this.callEventHandlers(context, state, this._afterTurn)
+            })
+          }
+          if (continueExecution) {
+            await state.save(context, storage)
+          }
+
+          return true
+        } catch (err: any) {
+          logger.error(err)
+          throw err
+        } finally {
+          this.stopTypingTimer()
         }
-
-        if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
-          await state.save(context, storage)
-          return false
-        }
-
-        await route.handler(context, state)
-
-        if (await this.callEventHandlers(context, state, this._afterTurn)) {
-          await state.save(context, storage)
-        }
-
-        return true
-      } catch (err: any) {
-        logger.error(err)
-        throw err
-      } finally {
-        this.stopTypingTimer()
-      }
+      }).catch((error) => {
+        HostingMetrics.turnsErrorsCounter.add(1, {
+          'error.type': error?.constructor?.name
+        })
+        throw error
+      }).finally(() => {
+        HostingMetrics.turnsTotalCounter.add(1, {
+          'activity.type': context.activity.type,
+          'activity.channel_id': context.activity.channelId
+        })
+        HostingMetrics.turnDuration.record(performance.now() - start, {
+          'activity.type': context.activity.type,
+          'activity.channel_id': context.activity.channelId
+        })
+      })
     })
   }
 
