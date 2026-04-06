@@ -7,11 +7,12 @@
  * while the CommonJS entrypoint keeps a synchronous require()-based implementation for CJS runtimes.
  */
 
-import { traceFactory } from './trace.js'
+import { traceFactory, startManagedSpan } from './trace.js'
 import { loggerFactory } from './logging.js'
 import { loadTelemetryDependencies } from './utils/load.js'
 
-export { SpanNames, MetricNames } from './constants.js'
+export {SpanNames, MetricNames} from './constants.js'
+export type { ManagedSpanOptions, ManagedSpanResult } from './trace.js'
 
 const [_otel, logs] = await loadTelemetryDependencies(
   [() => import('@opentelemetry/api'), () => import('@microsoft/agents-opentelemetry-api')],
@@ -19,7 +20,7 @@ const [_otel, logs] = await loadTelemetryDependencies(
 )
 
 export const otel = _otel
+export const managedSpan = startManagedSpan(otel)
 
 export const trace = traceFactory(_otel)
-
 export const createLogger = loggerFactory(logs)
