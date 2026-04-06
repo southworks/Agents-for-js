@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { attempt, isPromise } from './attempt'
-import { logger } from './logger'
+import { createDebugLogger } from '../loggers/debug.js'
+import { attempt, isPromise } from './attempt.js'
+
+const logger = createDebugLogger('agents:telemetry')
 
 type LoadFactory<TResult> = () => TResult
 type LoadPair<TResult> = readonly [LoadFactory<TResult>, LoadFactory<TResult>]

@@ -9,9 +9,9 @@
  * entrypoint uses async import() fallback loading that is only valid in an ES module.
  */
 
-import { startManagedSpan } from './traces/trace'
-import { loadTelemetryDependencies } from './utils/load'
-import { factory } from './factory'
+import { startManagedSpan } from './traces/trace.js'
+import { loadTelemetryDependencies } from './utils/load.js'
+import { factory } from './factory.js'
 
 export { SpanNames, MetricNames } from './traces/constants.js'
 export type { ManagedSpanOptions, ManagedSpanResult } from './traces/trace.js'
