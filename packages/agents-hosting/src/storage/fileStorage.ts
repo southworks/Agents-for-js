@@ -6,6 +6,8 @@
 import path from 'path'
 import fs from 'fs'
 import { Storage, StoreItem } from './storage'
+import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { HostingMetrics } from '../observability'
 
 /**
  * A file-based storage implementation that persists data to the local filesystem.
@@ -91,19 +93,27 @@ export class FileStorage implements Storage {
    *
    */
   read (keys: string[]) : Promise<StoreItem> {
-    return new Promise((resolve, reject) => {
-      if (!keys || keys.length === 0) {
-        reject(new ReferenceError('Keys are required when reading.'))
-      } else {
-        const data: StoreItem = {}
-        for (const key of keys) {
-          const item = this._stateFile[key]
-          if (item) {
-            data[key] = item
+    const start = performance.now()
+    return (trace(SpanNames.STORAGE_READ, async (span) => {
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      return new Promise<StoreItem>((resolve, reject) => {
+        if (!keys || keys.length === 0) {
+          reject(new ReferenceError('Keys are required when reading.'))
+        } else {
+          const data: StoreItem = {}
+          for (const key of keys) {
+            const item = this._stateFile[key]
+            if (item) {
+              data[key] = item
+            }
           }
+          resolve(data)
         }
-        resolve(data)
-      }
+      })
+    }) as Promise<StoreItem>).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'read'
+      })
     })
   }
 
@@ -124,12 +134,19 @@ export class FileStorage implements Storage {
    *
    */
   write (changes: StoreItem) : Promise<void> {
-    const keys = Object.keys(changes)
-    for (const key of keys) {
-      this._stateFile[key] = changes[key]
-    }
-    fs.writeFileSync(this._folder + '/state.json', JSON.stringify(this._stateFile, null, 2))
-    return Promise.resolve()
+    const start = performance.now()
+    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+      const keys = Object.keys(changes)
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      for (const key of keys) {
+        this._stateFile[key] = changes[key]
+      }
+      fs.writeFileSync(this._folder + '/state.json', JSON.stringify(this._stateFile, null, 2))
+    }).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'write'
+      })
+    })
   }
 
   /**
@@ -147,16 +164,24 @@ export class FileStorage implements Storage {
    *
    */
   delete (keys: string[]) : Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!keys || keys.length === 0) {
-        reject(new ReferenceError('Keys are required when deleting.'))
-      } else {
-        for (const key of keys) {
-          delete this._stateFile[key]
+    const start = performance.now()
+    return (trace(SpanNames.STORAGE_DELETE, async (span) => {
+      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      return new Promise<void>((resolve, reject) => {
+        if (!keys || keys.length === 0) {
+          reject(new ReferenceError('Keys are required when deleting.'))
+        } else {
+          for (const key of keys) {
+            delete this._stateFile[key]
+          }
+          fs.writeFileSync(this._folder + '/state.json', JSON.stringify(this._stateFile, null, 2))
+          resolve(undefined)
         }
-        fs.writeFileSync(this._folder + '/state.json', JSON.stringify(this._stateFile, null, 2))
-      }
-      resolve()
+      })
+    }) as Promise<void>).finally(() => {
+      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
+        'storage.operation': 'delete'
+      })
     })
   }
 }
