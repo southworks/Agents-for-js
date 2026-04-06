@@ -80,6 +80,14 @@ export const SpanNames = {
 
   // TurnContext
   TURN_SEND_ACTIVITIES: 'agents.turn.send_activities',
+
+  // Copilot Studio Client
+  COPILOT_START_CONVERSATION: 'agents.copilot_client.start_conversation',
+  COPILOT_SEND_ACTIVITY: 'agents.copilot_client.send_activity',
+  COPILOT_POST_REQUEST: 'agents.copilot_client.post_request',
+  COPILOT_CREATE_CONNECTION: 'agents.copilot_client.webchat.create_connection',
+  COPILOT_EXECUTE_STREAMING: 'agents.copilot_client.execute_streaming',
+  COPILOT_SUBSCRIBE_ASYNC: 'agents.copilot_client.subscribe_async',
 } as const
 
 /**
@@ -118,4 +126,17 @@ export const MetricNames = {
   // UserTokenClient metrics
   USER_TOKEN_CLIENT_REQUESTS: 'agents.user_token_client.request.count',
   USER_TOKEN_CLIENT_REQUEST_DURATION: 'agents.user_token_client.request.duration',
+
+  // Copilot Studio Client
+  CSC_ACTIVITIES_RECEIVED: 'agents.copilot_client.activities.received',
+  CSC_ACTIVITIES_SENT: 'agents.copilot_client.activities.sent',
+  CSC_CONVERSATIONS_STARTED: 'agents.copilot_client.conversations.started',
+  CSC_WEBCHAT_CONNECTIONS: 'agents.copilot_client.webchat.connection.count',
+  CSC_REQUEST_COUNT: 'agents.copilot_client.request.count',
+  CSC_REQUEST_ERRORS: 'agents.copilot_client.request.error.count',
+  CSC_STREAM_DURATION: 'agents.copilot_client.stream.duration',
+  CSC_REQUEST_DURATION: 'agents.copilot_client.request.duration',
+  CSC_EXECUTE_STREAMING: 'agents.copilot_client.execute_streaming.count',
+  CSC_SUBSCRIBE_ASYNC: 'agents.copilot_client.subscribe_async.count',
+  CSC_SUBSCRIBE_EVENT: 'agents.copilot_client.subscribe_event.count',
 } as const
