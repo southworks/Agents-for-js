@@ -35,10 +35,15 @@
     "postbuild": "npm run build:esm && npm run build:browser"
   },
   "license": "MIT",
-  "workspaces": [
-    "packages/*",
-    "test-agents/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "test-agents/*"
+    ],
+    "nohoist": [
+      "test-agents/otelAgent"
+    ]
+  },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.57.7",
     "@microsoft/m365agentsplayground": "^0.2.23",
