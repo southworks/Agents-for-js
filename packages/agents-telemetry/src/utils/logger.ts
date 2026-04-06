@@ -4,7 +4,13 @@
 import { name as packageName } from '../../package.json'
 
 // TODO: replace this with DEBUG library instead.
-const debug = process.env.DEBUG
+let debug: string
+if (typeof window === 'undefined') {
+  debug = process.env.DEBUG ?? ''
+} else {
+  debug = window.localStorage.getItem('debug') || window.localStorage.getItem('DEBUG') || ''
+}
+
 const isAgentsTelemetry = debug?.includes('agents:telemetry') || debug?.includes('agents:telemetry:*')
 const isError = debug?.includes('agents:telemetry:error') || isAgentsTelemetry
 const isDebug = debug?.includes('agents:telemetry:debug') || isAgentsTelemetry

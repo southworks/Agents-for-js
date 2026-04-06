@@ -1,12 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { OTel, OTelLogs } from "./types";
-import { traceFactory } from './trace'
+import { OTel, OTelLogs } from './types'
+import { traceFactory, startManagedSpan } from './trace'
 import { loggerFactory } from './logging'
-import { logger } from "./utils/logger";
+import { logger } from './utils/logger'
 
 export {SpanNames, MetricNames} from './constants'
+export type { ManagedSpanOptions, ManagedSpanResult } from './trace'
+
 
 /**
  * Will contain the OpenTelemetry API if it's available, otherwise will contain a fallback implementation that allows agents-telemetry to function without OpenTelemetry support.
@@ -15,6 +17,8 @@ export const otel = load()
 const otelLogs = loadLogs()
 
 export const trace = traceFactory(otel)
+
+export const managedSpan = startManagedSpan(otel)
 
 export const createLogger = loggerFactory(otelLogs)
 
