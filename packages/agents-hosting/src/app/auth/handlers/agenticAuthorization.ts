@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { debug } from '@microsoft/agents-activity'
+import { debug } from '@microsoft/agents-telemetry'
 import { TurnContext } from '../../../turnContext'
 import { SpanNames, trace } from '@microsoft/agents-telemetry'
 import { AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus, AuthorizationHandlerTokenOptions } from '../types'

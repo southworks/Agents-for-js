@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { debug } from '@microsoft/agents-activity/logger'
+import { debug } from '@microsoft/agents-telemetry'
 import { AuthorizationHandlerStatus, AuthorizationHandler, ActiveAuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerTokenOptions } from '../types'
 import { MessageFactory } from '../../../messageFactory'
 import { CardFactory } from '../../../cards'

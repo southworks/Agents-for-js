@@ -5,7 +5,7 @@
 
 import { Activity, ActivityTypes, ConversationReference } from '@microsoft/agents-activity'
 import { ResourceResponse } from '../connector-client'
-import { debug } from '@microsoft/agents-activity/logger'
+import { debug } from '@microsoft/agents-telemetry'
 import { TurnContext } from '../turnContext'
 import { AdaptiveCardsActions } from './adaptiveCards'
 import { AgentApplicationOptions } from './agentApplicationOptions'
