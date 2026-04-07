@@ -64,7 +64,7 @@ class OTelAgent extends AgentApplication<TurnState> {
         span.setAttribute('conversation.id', ctx.activity.conversation?.id ?? 'unknown')
         span.setAttribute('channel.id', ctx.activity.channelId ?? 'unknown')
         span.setAttribute('message.text.length', ctx.activity.text?.length ?? 0)
-        span.setAttribute('user.id', ctx.activity.from?.id ?? '')
+        span.setAttribute('user.id', ctx.activity.from?.id ?? 'unknown')
 
         span.addEvent(
           'message.received',
@@ -108,7 +108,8 @@ class OTelAgent extends AgentApplication<TurnState> {
         AgentTelemetry.messageProcessingDuration.record(processedMs,
           {
             'conversation.id': ctx.activity.conversation?.id ?? 'unknown',
-            'channel.id': ctx.activity.channelId ?? 'unknown'
+            'channel.id': ctx.activity.channelId ?? 'unknown',
+            status: 'success'
           })
         AgentTelemetry.routeExecutedCounter.add(1,
           {

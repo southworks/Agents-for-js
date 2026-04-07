@@ -23,18 +23,16 @@ import {
 } from '@opentelemetry/semantic-conventions'
 import { SpanExporter } from '@opentelemetry/sdk-trace-base'
 
-const otlpEndpoint = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] || ''
+const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || ''
 let traceExporter: SpanExporter
 let metricExporter: PushMetricExporter
 let logExporter: LogRecordExporter
 
 // Use OTLP gRPC Exporter if endpoint is provided, otherwise use Console Exporter.
 if (otlpEndpoint.trim() !== '') {
-  traceExporter = new OTLPTraceExporter({
-    url: otlpEndpoint,
-  })
-  metricExporter = new OTLPMetricExporter({ url: otlpEndpoint })
-  logExporter = new OTLPLogExporter({ url: otlpEndpoint })
+  traceExporter = new OTLPTraceExporter()
+  metricExporter = new OTLPMetricExporter()
+  logExporter = new OTLPLogExporter()
 } else {
   traceExporter = new ConsoleSpanExporter()
   metricExporter = new ConsoleMetricExporter()
@@ -69,11 +67,14 @@ const sdk = new NodeSDK({
 
 sdk.start()
 
-process.on('SIGTERM', () => {
+const shutdownHandler = () => {
   sdk.shutdown()
     .then(() => console.log('OTel SDK shut down successfully'))
     .catch((error) => {
       console.error('Error shutting down OTel SDK', error)
       process.exitCode = 1
     })
-})
+}
+
+process.on('SIGTERM', shutdownHandler)
+process.on('SIGINT', shutdownHandler)

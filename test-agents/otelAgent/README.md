@@ -11,8 +11,7 @@ The sample helps you:
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/en) version 20 or higher
-- (optional)[Docker](https://www.docker.com/get-started/) (to run the Aspire Dashboard container)
-
+- (optional) [Docker](https://www.docker.com/get-started/) (to run the Aspire Dashboard container)
 ## (Optional) Setting up the Aspire Dashboard
 
 The [.NET Aspire Dashboard](https://learn.microsoft.com/dotnet/aspire/fundamentals/dashboard/standalone) is a lightweight, standalone dashboard for viewing OpenTelemetry data. Run it locally with Docker:
