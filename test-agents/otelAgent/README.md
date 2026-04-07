@@ -50,6 +50,7 @@ For more details, see:
 
    ```bash
    OTEL_METRICS_EXPORT_INTERVAL=5000
+   OTEL_LOGS_EXPORT_INTERVAL=5000
    ```
 
 1. Configuring the authentication connection in the Agent settings
