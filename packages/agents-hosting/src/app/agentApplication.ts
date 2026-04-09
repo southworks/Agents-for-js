@@ -8,7 +8,7 @@ import { ResourceResponse } from '../connector-client'
 import { debug } from '@microsoft/agents-activity/logger'
 import { TurnContext } from '../turnContext'
 import { AdaptiveCardsActions } from './adaptiveCards'
-import { AgentApplicationOptions } from './agentApplicationOptions'
+import { AgentApplicationOptions, TypingTimingOptions } from './agentApplicationOptions'
 import { ConversationUpdateEvents } from './conversationUpdateEvents'
 import { AgentExtension } from './extensions'
 import { RouteHandler } from './routeHandler'
@@ -29,13 +29,19 @@ const logger = debug('agents:app')
 
 // Resend typing every 4 seconds to stay ahead of the ~5 second timeout seen in
 // Web Chat and Microsoft 365. Teams may keep typing indicators visible longer.
-const TYPING_TIMER_DELAY = 4000
+const DEFAULT_TYPING_INITIAL_DELAY = 0
+const DEFAULT_TYPING_INTERVAL = 4000
 const TYPING_TIMER_STATE_KEY = Symbol('typingTimerState')
 
 type TypingTimerState = {
   timer?: NodeJS.Timeout
   lastSend: Promise<unknown>
   stop: () => void
+}
+
+type StreamInfoEntity = {
+  type?: string
+  streamType?: string
 }
 
 /**
@@ -124,6 +130,7 @@ export class AgentApplication<TState extends TurnState> {
       ...options,
       turnStateFactory: options?.turnStateFactory || (() => new TurnState() as TState),
       startTypingTimer: options?.startTypingTimer !== undefined ? options.startTypingTimer : false,
+      typing: options?.typing || undefined,
       longRunningMessages: options?.longRunningMessages !== undefined ? options.longRunningMessages : false,
       removeRecipientMention: options?.removeRecipientMention !== undefined ? options.removeRecipientMention : true,
       transcriptLogger: options?.transcriptLogger || undefined,
@@ -808,6 +815,7 @@ export class AgentApplication<TState extends TurnState> {
    */
   public startTypingTimer (context: TurnContext): void {
     const turnState = context.turnState
+    const typingOptions = this.getTypingTimingOptions(context)
     // Timer state is stored on the current turn so concurrent turns stay isolated.
     const currentState = () => turnState.get<TypingTimerState>(TYPING_TIMER_STATE_KEY)
 
@@ -831,7 +839,7 @@ export class AgentApplication<TState extends TurnState> {
 
     context.onSendActivities(async (context, activities, next) => {
       // Any real response or stream start ends the typing loop for this turn.
-      if (activities.some(activity => activity.type === ActivityTypes.Message || activity.channelData?.streamType)) {
+      if (activities.some(activity => activity.type === ActivityTypes.Message || this.getStreamType(activity) !== undefined)) {
         state.stop()
         // Wait for any in-flight typing send to finish before sending the real response.
         await state.lastSend.catch((err: any) => {
@@ -844,7 +852,7 @@ export class AgentApplication<TState extends TurnState> {
 
     const onTimeout = async () => {
       try {
-        state.lastSend = context.sendActivity(Activity.fromObject({ type: ActivityTypes.Typing }))
+        state.lastSend = this.sendTypingActivity(context)
         await state.lastSend
       } catch (err: any) {
         logger.error(err)
@@ -855,11 +863,33 @@ export class AgentApplication<TState extends TurnState> {
 
       // Only reschedule if this turn still owns the active timer state.
       if (currentState() === state) {
-        state.timer = setTimeout(onTimeout, TYPING_TIMER_DELAY)
+        state.timer = setTimeout(onTimeout, typingOptions.intervalMs)
       }
     }
 
-    state.timer = setTimeout(onTimeout, 0) // Send initial typing indicator immediately
+    state.timer = setTimeout(onTimeout, typingOptions.initialDelayMs)
+  }
+
+  private getTypingTimingOptions (context: TurnContext): Required<TypingTimingOptions> {
+    const channelId = context.activity.channelId || context.activity.channelIdChannel || ''
+    const channelOptions = channelId ? this._options.typing?.channelStrategies?.[channelId] : undefined
+
+    return {
+      initialDelayMs: channelOptions?.initialDelayMs ?? this._options.typing?.initialDelayMs ?? DEFAULT_TYPING_INITIAL_DELAY,
+      intervalMs: channelOptions?.intervalMs ?? this._options.typing?.intervalMs ?? DEFAULT_TYPING_INTERVAL
+    }
+  }
+
+  private getStreamType (activity: Activity): string | undefined {
+    const streamingEntity = activity.entities?.find((entity) => (entity as StreamInfoEntity).type === 'streaminfo') as StreamInfoEntity | undefined
+    return streamingEntity?.streamType ?? activity.channelData?.streamType
+  }
+
+  private async sendTypingActivity (context: TurnContext): Promise<ResourceResponse[] | undefined> {
+    const conversationReference = context.activity.getConversationReference()
+    const typingActivity = Activity.fromObject({ type: ActivityTypes.Typing }).applyConversationReference(conversationReference)
+
+    return await context.adapter.sendActivities(context, [typingActivity])
   }
 
   /**

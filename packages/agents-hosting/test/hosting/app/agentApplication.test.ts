@@ -4,7 +4,7 @@ import * as sinon from 'sinon'
 
 import { AgentApplication } from './../../../src/app'
 import { TestAdapter } from '../testStubs'
-import { Activity, ActivityTypes } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes, Channels } from '@microsoft/agents-activity'
 import { MessageFactory } from '../../../src/messageFactory'
 import { TurnContext } from '../../../src/turnContext'
 import { RouteList } from './../../../src/app/routeList'
@@ -23,7 +23,7 @@ class RecordingTestAdapter extends TestAdapter {
   }
 }
 
-const createTestActivity = () => Activity.fromObject({
+const createTestActivity = (channelId: string = 'test') => Activity.fromObject({
   type: 'message',
   from: {
     id: 'test',
@@ -32,7 +32,7 @@ const createTestActivity = () => Activity.fromObject({
   conversation: {
     id: 'test'
   },
-  channelId: 'test',
+  channelId,
   recipient: {
     id: 'test'
   },
@@ -298,6 +298,38 @@ describe('Application', () => {
       assert.equal(typingActivities.length, 1)
     })
 
+    it('should honor a configured initial delay before the first typing indicator', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({
+        startTypingTimer: true,
+        typing: {
+          initialDelayMs: 250,
+          intervalMs: 1000
+        }
+      })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(249)
+      assert.equal(adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing).length, 0)
+
+      await clock.tickAsync(1)
+      assert.equal(adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing).length, 1)
+    })
+
+    it('should not mark the turn as responded when automatic typing is sent', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(0)
+
+      assert.equal(context.responded, false)
+    })
+
     it('should not start the timer for non-message activities', async () => {
       const adapter = new RecordingTestAdapter()
       const app = new AgentApplication({ startTypingTimer: true })
@@ -366,6 +398,54 @@ describe('Application', () => {
       const typingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing)
 
       assert.equal(typingActivities.length, 1)
+    })
+
+    it('should stop future automatic typing sends after a streamed typing activity is sent', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({ startTypingTimer: true })
+      const context = new TurnContext(adapter, createTestActivity())
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(0)
+      await context.sendActivity(Activity.fromObject({
+        type: ActivityTypes.Typing,
+        entities: [{
+          type: 'streaminfo',
+          streamType: 'streaming'
+        }]
+      }))
+      await clock.tickAsync(5000)
+
+      const automaticTypingActivities = adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing && !activity.entities?.some(entity => entity.type === 'streaminfo'))
+
+      assert.equal(automaticTypingActivities.length, 1)
+    })
+
+    it('should honor channel-specific typing overrides', async () => {
+      const adapter = new RecordingTestAdapter()
+      const app = new AgentApplication({
+        startTypingTimer: true,
+        typing: {
+          initialDelayMs: 500,
+          intervalMs: 4000,
+          channelStrategies: {
+            [Channels.M365Copilot]: {
+              initialDelayMs: 50,
+              intervalMs: 1000
+            }
+          }
+        }
+      })
+      const context = new TurnContext(adapter, createTestActivity(Channels.M365Copilot))
+
+      app.startTypingTimer(context)
+
+      await clock.tickAsync(49)
+      assert.equal(adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing).length, 0)
+
+      await clock.tickAsync(1)
+      assert.equal(adapter.sentActivities.filter(activity => activity.type === ActivityTypes.Typing).length, 1)
     })
   })
 
