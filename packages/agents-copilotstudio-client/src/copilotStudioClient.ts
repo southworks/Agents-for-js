@@ -219,13 +219,14 @@ export class CopilotStudioClient {
 
       if (typeof requestOrFlag === 'boolean' || requestOrFlag === undefined) {
         // Legacy call: startConversationStreaming(true/false)
-        managed.record({ shouldEmitStartEvent: true })
+        managed.record({ shouldEmitStartEvent: requestOrFlag ?? true })
         request = {
           emitStartConversationEvent: requestOrFlag ?? true
         }
       } else {
         // New call: startConversationStreaming({ locale: 'en-US', ... })
         request = requestOrFlag
+        managed.record({ shouldEmitStartEvent: request.emitStartConversationEvent ?? true })
       }
 
       const uriStart: string = getCopilotStudioConnectionUrl(this.settings, request.conversationId)

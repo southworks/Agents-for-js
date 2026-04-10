@@ -518,7 +518,7 @@ export const AuthenticationTraceDefinitions = {
 
       HostingMetrics.authTokenRequestsCounter.add(1, {
         'auth.method': attributes['auth.method'],
-        'auth.success': error !== undefined
+        'auth.success': error === undefined
       })
 
       HostingMetrics.authTokenDuration.record(duration, {
@@ -537,7 +537,7 @@ export const AuthenticationTraceDefinitions = {
 
       HostingMetrics.authTokenRequestsCounter.add(1, {
         'auth.method': method,
-        'auth.success': error !== undefined
+        'auth.success': error === undefined
       })
 
       HostingMetrics.authTokenDuration.record(duration, {
@@ -555,7 +555,7 @@ export const AuthenticationTraceDefinitions = {
       span.setAttribute('agentic.instance_id', record.agenticInstanceId ?? 'unknown')
       HostingMetrics.authTokenRequestsCounter.add(1, {
         'auth.method': method,
-        'auth.success': error !== undefined
+        'auth.success': error === undefined
       })
 
       HostingMetrics.authTokenDuration.record(duration, {
@@ -579,7 +579,7 @@ export const AuthenticationTraceDefinitions = {
       })
       HostingMetrics.authTokenRequestsCounter.add(1, {
         'auth.method': method,
-        'auth.success': error !== undefined
+        'auth.success': error === undefined
       })
 
       HostingMetrics.authTokenDuration.record(duration, {
