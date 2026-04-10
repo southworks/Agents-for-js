@@ -671,8 +671,8 @@ export const AuthorizationTraceDefinitions = {
       span.setAttributes({
         'auth.handler.id': record.handlerId ?? 'unknown',
         'auth.connection.name': record.connectionName ?? 'unknown',
+        'auth.scopes': record.authScopes
       })
-      span.setAttribute('auth.scopes', record.authScopes)
     }
   }),
 }

@@ -182,8 +182,8 @@ export class CloudAdapter extends BaseAdapter {
         )
       }
       record({
-        serviceUrl: activity.serviceUrl ?? '',
-        scope: scope ?? 'unknown',
+        serviceUrl: activity.serviceUrl,
+        scope,
         activityIsAgentic: isAgentic
       })
       return connectorClient

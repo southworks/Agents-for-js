@@ -94,7 +94,7 @@ export class FileStorage implements Storage {
    */
   read (keys: string[]) : Promise<StoreItem> {
     return trace(StorageTraceDefinitions.read, async ({ record }) => {
-      record({ keyCount: keys.length })
+      record({ keyCount: keys?.length })
       return new Promise<StoreItem>((resolve, reject) => {
         if (!keys || keys.length === 0) {
           reject(new ReferenceError('Keys are required when reading.'))
@@ -131,7 +131,7 @@ export class FileStorage implements Storage {
   write (changes: StoreItem) : Promise<void> {
     return trace(StorageTraceDefinitions.write, async ({ record }) => {
       const keys = Object.keys(changes)
-      record({ keyCount: keys.length })
+      record({ keyCount: keys?.length })
       for (const key of keys) {
         this._stateFile[key] = changes[key]
       }
@@ -155,7 +155,7 @@ export class FileStorage implements Storage {
    */
   delete (keys: string[]) : Promise<void> {
     return trace(StorageTraceDefinitions.delete, async ({ record }) => {
-      record({ keyCount: keys.length })
+      record({ keyCount: keys?.length })
       return new Promise<void>((resolve, reject) => {
         if (!keys || keys.length === 0) {
           reject(new ReferenceError('Keys are required when deleting.'))

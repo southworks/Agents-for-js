@@ -36,8 +36,7 @@ export const CopilotStudioClientTraceDefinitions = {
     name: SpanNames.COPILOT_POST_REQUEST,
     record: {
       url: '',
-      method: '',
-      activities: [] as Activity[]
+      method: ''
     },
     actions: ({ span }) => ({
       receivedFromCopilot (activity: Activity) {

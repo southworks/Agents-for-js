@@ -150,7 +150,7 @@ export class UserTokenClient {
       const [channelId] = Activity.parseChannelId(channelIdComposite)
       const params = { connectionName, channelId, userId, code }
       const response = await this.client.get('/api/usertoken/GetToken', { params })
-      record({ connectionName, channelId, userId, httpStatusCode: response.status.toString() })
+      record({ connectionName, channelId, userId, httpStatusCode: response.status?.toString() })
 
       if (response?.data) {
         return response.data as TokenResponse
@@ -171,7 +171,7 @@ export class UserTokenClient {
       const [channelId] = Activity.parseChannelId(channelIdComposite)
       const params = { userId, connectionName, channelId }
       const response = await this.client.delete('/api/usertoken/SignOut', { params })
-      record({ userId, connectionName, channelId, httpStatusCode: response.status.toString() })
+      record({ userId, connectionName, channelId, httpStatusCode: response.status?.toString() })
       if (response.status !== 200) {
         throw new Error('Failed to sign out')
       }
@@ -198,7 +198,7 @@ export class UserTokenClient {
       const state = Buffer.from(JSON.stringify(tokenExchangeStateNormalized)).toString('base64')
       const params = { state }
       const response = await this.client.get('/api/botsignin/GetSignInResource', { params })
-      record({ connectionName, httpStatusCode: response.status.toString() })
+      record({ connectionName, httpStatusCode: response.status?.toString() })
       return response.data as SignInResource
     })
   }
@@ -216,7 +216,7 @@ export class UserTokenClient {
       const [channelId] = Activity.parseChannelId(channelIdComposite)
       const params = { userId, connectionName, channelId }
       const response = await this.client.post('/api/usertoken/exchange', tokenExchangeRequest, { params })
-      record({ userId, connectionName, channelId, httpStatusCode: response.status.toString() })
+      record({ userId, connectionName, channelId, httpStatusCode: response.status?.toString() })
       if (response?.data) {
         return response.data as TokenResponse
       } else {
@@ -243,7 +243,7 @@ export class UserTokenClient {
       const state = Buffer.from(JSON.stringify({ conversation, relatesTo, connectionName, msAppId: this.msAppId })).toString('base64')
       const params = { userId, connectionName, channelId, state, code, finalRedirect, fwdUrl }
       const response = await this.client.get('/api/usertoken/GetTokenOrSignInResource', { params })
-      record({ userId, connectionName, channelId, httpStatusCode: response.status.toString() })
+      record({ userId, connectionName, channelId, httpStatusCode: response.status?.toString() })
       return response.data as TokenOrSinginResourceResponse
     })
   }
@@ -260,7 +260,7 @@ export class UserTokenClient {
       const [channelId] = Activity.parseChannelId(channelIdComposite)
       const params = { userId, channelId, include }
       const response = await this.client.get('/api/usertoken/GetTokenStatus', { params })
-      record({ userId, channelId, httpStatusCode: response.status.toString() })
+      record({ userId, channelId, httpStatusCode: response.status?.toString() })
       return response.data as TokenStatus[]
     })
   }
@@ -278,7 +278,7 @@ export class UserTokenClient {
       const [channelId] = Activity.parseChannelId(channelIdComposite)
       const params = { userId, connectionName, channelId }
       const response = await this.client.post('/api/usertoken/GetAadTokens', resourceUrls, { params })
-      record({ userId, connectionName, channelId, httpStatusCode: response.status.toString() })
+      record({ userId, connectionName, channelId, httpStatusCode: response.status?.toString() })
       return response.data as Record<string, TokenResponse>
     })
   }
