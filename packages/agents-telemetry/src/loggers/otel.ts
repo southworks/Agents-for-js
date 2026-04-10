@@ -41,6 +41,12 @@ function createLogger (otelLogs: OTelLogs, namespace: string, level: LoggerLevel
   }
 }
 
+/**
+ * Formats the message body sent to the OTel log record.
+ *
+ * @remarks
+ * - Extra arguments are serialized and appended to the main message.
+ */
 function formatMessage (message: string, args: unknown[]): string {
   if (args.length === 0) {
     return message
@@ -50,6 +56,9 @@ function formatMessage (message: string, args: unknown[]): string {
   return `${message} ${serialized}`
 }
 
+/**
+ * Converts log arguments to a string form that is safe to emit.
+ */
 function serializeLogValue (value: unknown): string {
   if (value instanceof Error) {
     return `${value.name}: ${value.message}`

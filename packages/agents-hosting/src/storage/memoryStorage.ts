@@ -3,8 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { HostingMetrics } from '../observability'
+import { trace } from '@microsoft/agents-telemetry'
+import { StorageTraceDefinitions } from '../observability'
 import { Storage, StoreItem } from './storage'
 import { debug } from '@microsoft/agents-telemetry'
 
@@ -63,9 +63,8 @@ export class MemoryStorage implements Storage {
    * @throws Will throw an error if keys are not provided or the array is empty
    */
   async read (keys: string[]): Promise<StoreItem> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_READ, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(StorageTraceDefinitions.read, async ({ record }) => {
+      record({ keyCount: keys?.length })
       if (!keys || keys.length === 0) {
         throw new ReferenceError('Keys are required when reading.')
       }
@@ -80,10 +79,6 @@ export class MemoryStorage implements Storage {
       }
 
       return data
-    }).finally(() => {
-      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'read'
-      })
     })
   }
 
@@ -101,12 +96,11 @@ export class MemoryStorage implements Storage {
    * always be written regardless of the current state.
    */
   async write (changes: StoreItem): Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_WRITE, async (span) => {
-      if (!changes || Object.keys(changes).length === 0) {
+    return trace(StorageTraceDefinitions.write, async ({ record }) => {
+      if (!changes || changes.length === 0) {
         throw new ReferenceError('Changes are required when writing.')
       }
-      span.setAttribute('storage.key.count', Object.keys(changes).length)
+      record({ keyCount: changes.length })
 
       for (const [key, newItem] of Object.entries(changes)) {
         logger.debug(`Writing key: ${key}`)
@@ -122,10 +116,6 @@ export class MemoryStorage implements Storage {
           }
         }
       }
-    }).finally(() => {
-      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'write'
-      })
     })
   }
 
@@ -136,17 +126,12 @@ export class MemoryStorage implements Storage {
    * @returns A promise that resolves when the delete operation is complete
    */
   async delete (keys: string[]): Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_DELETE, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(StorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length })
       logger.debug(`Deleting keys: ${keys.join(', ')}`)
       for (const key of keys) {
         delete this.memory[key]
       }
-    }).finally(() => {
-      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'delete'
-      })
     })
   }
 

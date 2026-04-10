@@ -10,8 +10,6 @@
   "compilerOptions": {
     "outDir": "dist/cjs",
     "rootDirs": [ "src/" ],
-    "paths": {
-      "@microsoft/*": ["./packages/*"]
-    }
+    "lib": ["ES2022", "DOM"]
   }
 }

@@ -8,14 +8,13 @@ import { ConnectionSettings } from './connectionSettings'
 import { getCopilotStudioConnectionUrl, getCopilotStudioSubscribeUrl } from './powerPlatformEnvironment'
 import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-activity'
 import { ExecuteTurnRequest } from './executeTurnRequest'
-import { debug } from '@microsoft/agents-telemetry'
+import { debug, trace } from '@microsoft/agents-telemetry'
 import { UserAgentHelper } from './userAgentHelper'
 import { ScopeHelper } from './scopeHelper'
 import { StartRequest } from './startRequest'
 import { StartResponse, ExecuteTurnResponse, createStartResponse, createExecuteTurnResponse } from './responses'
 import { SubscribeEvent } from './subscribeEvent'
-import { SpanNames, managedSpan } from '@microsoft/agents-telemetry'
-import { CopilotStudioClientMetrics } from './observability'
+import { CopilotStudioClientTraceDefinitions } from './observability'
 
 const logger = debug('copilot-studio:client')
 
@@ -74,18 +73,9 @@ export class CopilotStudioClient {
    * @returns An async generator yielding the Agent's Activities.
    */
   private async * postRequestAsync (url: string, body?: any, method: string = 'POST'): AsyncGenerator<Activity> {
-    let caughtError: unknown = null
-    const managed = managedSpan(SpanNames.COPILOT_POST_REQUEST, {
-      attributes: {
-        'copilot.post_request.url': url,
-        'copilot.post_request.method': method
-      },
-      onEnd: () => {
-        CopilotStudioClientMetrics.requestsCounter.add(1, {
-          operation: 'postRequestAsync'
-        })
-      }
-    })
+    const managed = trace(CopilotStudioClientTraceDefinitions.postRequest)
+    managed.record({ url, method })
+
     try {
       this.logDiagnostic(`Request URL: ${url}`)
       this.logDiagnostic(`Request Method: ${method}`)
@@ -95,7 +85,6 @@ export class CopilotStudioClient {
 
       const streamMap = new Map<string, { text: string, sequence: number }[]>()
 
-      const startStreaming = performance.now()
       const eventSource: EventSourceClient = createEventSource({
         url,
         headers: {
@@ -114,19 +103,11 @@ export class CopilotStudioClient {
       })
 
       try {
-        let index = 0
         for await (const { data, event } of eventSource) {
           if (data && event === 'activity') {
             try {
               const activity = Activity.fromJson(data)
-
-              managed.span.setAttributes({
-                [`copilot.post_request.activity.${index}.type`]: activity.type,
-                [`copilot.post_request.activity.${index}.conversation_id`]: activity.conversation?.id
-              })
-              CopilotStudioClientMetrics.activitiesReceivedCounter.add(1, {
-                'copilot.activity.type': activity.type,
-              })
+              managed.actions.receivedFromCopilot(activity)
 
               // check to see if this activity is part of the streamed response, in which case we need to accumulate the text
               const streamingEntity = activity.entities?.find(e => e.type === 'streaminfo' && e.streamType === 'streaming')
@@ -177,26 +158,14 @@ export class CopilotStudioClient {
             logger.debug('Connection closed')
             break
           }
-          index++
         }
       } finally {
         eventSource.close()
-        const duration = performance.now() - startStreaming
-        CopilotStudioClientMetrics.streamDuration.record(duration)
       }
     } catch (error) {
-      caughtError = error
-      throw error
+      throw managed.fail(error)
     } finally {
-      if (caughtError) {
-        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
-        CopilotStudioClientMetrics.requestsErrorCounter.add(1, {
-          operation: 'postRequestAsync',
-          'error.type': caughtError instanceof Error ? caughtError.name : typeof caughtError,
-        })
-      } else {
-        managed.end()
-      }
+      managed.end()
     }
   }
 
@@ -243,23 +212,20 @@ export class CopilotStudioClient {
   public async * startConversationStreaming (
     requestOrFlag?: StartRequest | boolean
   ): AsyncGenerator<Activity> {
-    const start = performance.now()
-    let caughtError: unknown = null
-    const managed = managedSpan(SpanNames.COPILOT_START_CONVERSATION)
+    const managed = trace(CopilotStudioClientTraceDefinitions.startConversation)
     try {
       // Normalize input to StartRequest
       let request: StartRequest
 
       if (typeof requestOrFlag === 'boolean' || requestOrFlag === undefined) {
         // Legacy call: startConversationStreaming(true/false)
-        managed.span.setAttribute('copilot.emit_start_event', requestOrFlag ?? true)
+        managed.record({ shouldEmitStartEvent: true })
         request = {
           emitStartConversationEvent: requestOrFlag ?? true
         }
       } else {
         // New call: startConversationStreaming({ locale: 'en-US', ... })
         request = requestOrFlag
-        managed.span.setAttribute('copilot.request', true)
       }
 
       const uriStart: string = getCopilotStudioConnectionUrl(this.settings, request.conversationId)
@@ -277,19 +243,9 @@ export class CopilotStudioClient {
 
       yield * this.postRequestAsync(uriStart, body, 'POST')
     } catch (error) {
-      caughtError = error
-      throw error
+      throw managed.fail(error)
     } finally {
-      if (caughtError) {
-        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
-      } else {
-        managed.end()
-      }
-      const duration = performance.now() - start
-      CopilotStudioClientMetrics.conversationsStartedCounter.add(1)
-      CopilotStudioClientMetrics.requestDuration.record(duration, {
-        operation: 'startConversationStreaming'
-      })
+      managed.end()
     }
   }
 
@@ -300,14 +256,8 @@ export class CopilotStudioClient {
    * @returns An async generator yielding the Agent's Activities.
    */
   public async * sendActivityStreaming (activity: Activity, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
-    const start = performance.now()
-    let caughtError: unknown = null
-    const managed = managedSpan(SpanNames.COPILOT_SEND_ACTIVITY, {
-      attributes: {
-        'copilot.activity.type': activity.type,
-        'copilot.activity.conversation_id': activity.conversation?.id ?? 'unknown'
-      }
-    })
+    const managed = trace(CopilotStudioClientTraceDefinitions.sendActivity)
+    managed.record({ activity })
     try {
       const localConversationId = activity.conversation?.id ?? conversationId
       const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)
@@ -316,21 +266,9 @@ export class CopilotStudioClient {
       logger.info('Sending activity...', activity)
       yield * this.postRequestAsync(uriExecute, qbody, 'POST')
     } catch (error) {
-      caughtError = error
-      throw error
+      throw managed.fail(error)
     } finally {
-      if (caughtError) {
-        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
-      } else {
-        managed.end()
-      }
-      const duration = performance.now() - start
-      CopilotStudioClientMetrics.activitiesSentCounter.add(1, {
-        'copilot.activity.type': activity.type
-      })
-      CopilotStudioClientMetrics.requestDuration.record(duration, {
-        operation: 'sendActivityStreaming'
-      })
+      managed.end()
     }
   }
 
@@ -346,14 +284,8 @@ export class CopilotStudioClient {
     activity: Activity,
     conversationId: string
   ): AsyncGenerator<Activity> {
-    const start = performance.now()
-    let caughtError: unknown = null
-    const managed = managedSpan(SpanNames.COPILOT_EXECUTE_STREAMING, {
-      attributes: {
-        'copilot.activity.type': activity.type,
-        'copilot.activity.conversation_id': conversationId
-      }
-    })
+    const managed = trace(CopilotStudioClientTraceDefinitions.executeStreaming)
+    managed.record({ activity, conversationId })
     try {
       if (!conversationId || !conversationId.trim()) {
         throw new Error('conversationId is required for executeStreaming')
@@ -371,21 +303,9 @@ export class CopilotStudioClient {
 
       yield * this.postRequestAsync(uriExecute, request, 'POST')
     } catch (error) {
-      caughtError = error
-      throw error
+      throw managed.fail(error)
     } finally {
-      if (caughtError) {
-        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
-      } else {
-        managed.end()
-      }
-      const duration = performance.now() - start
-      CopilotStudioClientMetrics.executeStreamingCounter.add(1, {
-        'copilot.activity.type': activity.type
-      })
-      CopilotStudioClientMetrics.requestDuration.record(duration, {
-        operation: 'executeStreaming'
-      })
+      managed.end()
     }
   }
 
@@ -530,20 +450,8 @@ export class CopilotStudioClient {
     conversationId: string,
     lastReceivedEventId?: string
   ): AsyncGenerator<SubscribeEvent> {
-    let caughtError: unknown = null
-    const managed = managedSpan(SpanNames.COPILOT_SUBSCRIBE_ASYNC, {
-      attributes: {
-        'copilot.conversation_id': conversationId,
-        'copilot.last_received_event_id': lastReceivedEventId ?? 'unknown'
-      },
-      onEnd: () => {
-        CopilotStudioClientMetrics.subscribeAsyncCounter.add(1, {
-          operation: 'subscribeAsync',
-          'copilot.conversation_id': conversationId,
-          'copilot.last_received_event_id': lastReceivedEventId ?? 'unknown'
-        })
-      }
-    })
+    const managed = trace(CopilotStudioClientTraceDefinitions.subscribeAsync)
+    managed.record({ conversationId, lastReceivedEventId })
     try {
       if (!conversationId || !conversationId.trim()) {
         throw new Error('conversationId is required for subscribeAsync')
@@ -554,7 +462,6 @@ export class CopilotStudioClient {
       logger.info('Subscribing to conversation:', conversationId)
       this.logDiagnostic('Subscribe request:', { conversationId, lastReceivedEventId, url })
 
-      const startStreaming = performance.now()
       const eventSource: EventSourceClient = createEventSource({
         url,
         headers: {
@@ -572,7 +479,6 @@ export class CopilotStudioClient {
       })
 
       try {
-        let index = 0
         for await (const { data, event, id } of eventSource) {
           if (data && event === 'activity') {
             try {
@@ -581,13 +487,7 @@ export class CopilotStudioClient {
                 activity,
                 eventId: id
               }
-              managed.span.setAttributes({
-                [`copilot.subscribe_async.event.${index}.id`]: subscribeEvent.eventId,
-                [`copilot.subscribe_async.activity.${index}.type`]: activity.type
-              })
-              CopilotStudioClientMetrics.subscribeEventCounter.add(1, {
-                'copilot.subscribe_async.event.id': subscribeEvent.eventId,
-              })
+              managed.actions.eventReceivedFromCopilot(subscribeEvent)
 
               logger.debug(`Received activity via subscription, event ID: ${id}`)
               this.logDiagnostic('Subscribe event received:', { eventId: id, activityType: activity.type })
@@ -605,22 +505,14 @@ export class CopilotStudioClient {
             logger.debug('Subscription connection closed')
             break
           }
-          index++
         }
       } finally {
         eventSource.close()
-        const duration = performance.now() - startStreaming
-        CopilotStudioClientMetrics.streamDuration.record(duration)
       }
     } catch (error) {
-      caughtError = error
-      throw error
+      throw managed.fail(error)
     } finally {
-      if (caughtError) {
-        managed.endWithError(caughtError instanceof Error ? caughtError : String(caughtError))
-      } else {
-        managed.end()
-      }
+      managed.end()
     }
   }
 }

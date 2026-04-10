@@ -50,6 +50,12 @@ function createLogger (namespace: string, level: LoggerLevel): createDebug.Debug
   return logger
 }
 
+/**
+ * Links the debug logger with additional logger implementations.
+ *
+ * @remarks
+ * - Linked loggers only receive messages when the corresponding debug namespace is enabled.
+ */
 export function link (debugLogger: Logger, ...loggers: BaseLogger[]): BaseLogger {
   return levels.reduce((acc, level) => {
     acc[level] = (message: string, ...args: any[]) => {

@@ -3,7 +3,12 @@
  * Licensed under the MIT License.
  */
 
-function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
+import { AttemptOptions } from '../types.js'
+
+/**
+ * Detects promise-like values returned by internal loaders and callbacks.
+ */
+export function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
   return (
     (typeof value === 'object' || typeof value === 'function') &&
     value !== null &&
@@ -12,35 +17,31 @@ function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
   )
 }
 
-export function attempt<TResult> (options: {
-  try: () => TResult,
-  then?: (result: TResult) => TResult | void,
-  catch?: (error: unknown) => void,
-  finally?: () => void
-}): TResult {
-  let _isPromise = false
+/**
+ * Runs a callback and normalizes sync and async error/finally handling.
+ *
+ * @remarks
+ * - Async results use the returned promise chain for `catch` and `finally`.
+ * - Sync failures are passed to `catch` and do not rethrow automatically.
+ */
+export function attempt<TResult> (options: AttemptOptions<Promise<TResult>>): Promise<TResult>
+export function attempt<TResult> (options: AttemptOptions<TResult>): TResult
+export function attempt<TResult> (options: AttemptOptions<TResult>) {
+  let isAsync = false
   try {
     const result = options.try()
+
     if (isPromise(result)) {
-      _isPromise = true
+      isAsync = true
       return result
-        .then((res) => options.then?.(res) ?? res)
-        .catch((error) => {
-          options.catch?.(error)
-          throw error
-        })
-        .finally(options.finally) as any
+        .catch(options.catch)
+        .finally(options.finally)
     }
 
-    return options.then?.(result) ?? result
+    return result
   } catch (error) {
-    if (!_isPromise) {
-      options.catch?.(error)
-    }
-    throw error
+    options.catch(error)
   } finally {
-    if (!_isPromise) {
-      options.finally?.()
-    }
+    !isAsync && options.finally?.()
   }
 }

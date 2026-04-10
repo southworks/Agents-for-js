@@ -27,8 +27,7 @@
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^4.0.1",
     "object-path": "^0.11.8",
-    "zod": "3.25.75",
-    "@microsoft/agents-telemetry": "file:../agents-telemetry"
+    "zod": "3.25.75"
   },
   "license": "MIT",
   "files": [

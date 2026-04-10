@@ -8,8 +8,8 @@ import { CosmosDbPartitionedStorageOptions } from './cosmosDbPartitionedStorageO
 import { Storage, StoreItems } from '@microsoft/agents-hosting'
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { CosmosStorageMetrics } from './observability'
+import { trace } from '@microsoft/agents-telemetry'
+import { CosmosStorageTraceDefinitions } from './observability'
 
 /**
  * A utility class to ensure that a specific asynchronous task is executed only once for a given key.
@@ -115,8 +115,7 @@ export class CosmosDbPartitionedStorage implements Storage {
    * @returns A promise that resolves to the read items.
    */
   async read (keys: string[]): Promise<StoreItems> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_READ, async (span) => {
+    return trace(CosmosStorageTraceDefinitions.read, async ({ record }) => {
       if (!keys) {
         throw ExceptionHelper.generateException(
           ReferenceError,
@@ -126,7 +125,7 @@ export class CosmosDbPartitionedStorage implements Storage {
         return {}
       }
 
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      record({ keyCount: keys?.length })
       await this.initialize()
 
       const storeItems: StoreItems = {}
@@ -169,10 +168,6 @@ export class CosmosDbPartitionedStorage implements Storage {
       )
 
       return storeItems
-    }).finally(() => {
-      CosmosStorageMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'read'
-      })
     })
   }
 
@@ -181,8 +176,7 @@ export class CosmosDbPartitionedStorage implements Storage {
    * @param changes The items to write.
    */
   async write (changes: StoreItems): Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+    return trace(CosmosStorageTraceDefinitions.write, async ({ record }) => {
       if (!changes) {
         throw ExceptionHelper.generateException(
           ReferenceError,
@@ -191,7 +185,8 @@ export class CosmosDbPartitionedStorage implements Storage {
       } else if (changes.length === 0) {
         return
       }
-      span.setAttribute('storage.key.count', Object.keys(changes).length)
+
+      record({ keyCount: Object.keys(changes).length })
 
       await this.initialize()
 
@@ -224,10 +219,6 @@ export class CosmosDbPartitionedStorage implements Storage {
           }
         })
       )
-    }).finally(() => {
-      CosmosStorageMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'write'
-      })
     })
   }
 
@@ -236,9 +227,8 @@ export class CosmosDbPartitionedStorage implements Storage {
    * @param keys The keys of the items to delete.
    */
   async delete (keys: string[]): Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_DELETE, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(CosmosStorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length })
       await this.initialize()
 
       await Promise.all(
@@ -263,10 +253,6 @@ export class CosmosDbPartitionedStorage implements Storage {
           }
         })
       )
-    }).finally(() => {
-      CosmosStorageMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'delete'
-      })
     })
   }
 

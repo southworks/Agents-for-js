@@ -5,10 +5,11 @@
 
 import { debug } from '@microsoft/agents-telemetry'
 import { TurnContext } from '../../../turnContext'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { trace } from '@microsoft/agents-telemetry'
 import { AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus, AuthorizationHandlerTokenOptions } from '../types'
 import { TokenResponse } from '../../../oauth'
 import { AuthProvider } from '../../../auth'
+import { AuthorizationTraceDefinitions } from '../../../observability'
 
 const logger = debug('agents:authorization:agentic')
 
@@ -98,7 +99,7 @@ export class AgenticAuthorization implements AuthorizationHandler {
    * @inheritdoc
    */
   async token (context: TurnContext, options?: AuthorizationHandlerTokenOptions): Promise<TokenResponse> {
-    return trace(SpanNames.AUTHORIZATION_AGENTIC_TOKEN, async (span) => {
+    return trace(AuthorizationTraceDefinitions.agenticToken, async ({ record }) => {
       let connection: AuthProvider | undefined
       const scopes = options?.scopes || this._options.scopes!
 
@@ -131,9 +132,11 @@ export class AgenticAuthorization implements AuthorizationHandler {
         this._onFailure?.(context, `${reason}: ${(error as Error).message}`)
         return { token: undefined }
       } finally {
-        span.setAttribute('auth.handler.id', this.id)
-        span.setAttribute('auth.connection.name', connection?.connectionSettings?.connectionName ?? this._options.altBlueprintConnectionName ?? 'unknown')
-        span.setAttribute('auth.scopes', scopes ?? [])
+        record({
+          handlerId: this.id,
+          connectionName: connection?.connectionSettings?.connectionName ?? this._options.altBlueprintConnectionName ?? 'unknown',
+          authScopes: scopes ?? []
+        })
       }
     })
   }

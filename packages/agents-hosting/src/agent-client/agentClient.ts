@@ -4,8 +4,8 @@ import { v4 } from 'uuid'
 import { debug } from '@microsoft/agents-telemetry'
 import { ConversationState } from '../state'
 import { TurnContext } from '../turnContext'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { HostingMetrics } from '../observability/metrics'
+import { trace } from '@microsoft/agents-telemetry'
+import { AgentClientTraceDefinitions } from '../observability'
 
 const logger = debug('agents:agent-client')
 
@@ -70,12 +70,10 @@ export class AgentClient {
    * @throws Error if the request to the agent endpoint fails
    */
   public async postActivity (activity: Activity, authConfig: AuthConfiguration, conversationState: ConversationState, context: TurnContext): Promise<string> {
-    const start = performance.now()
-    let httpCode: string = 'unknown'
-    return trace(SpanNames.AGENT_CLIENT_POST_ACTIVITY, async (span) => {
-      span.setAttributes({
-        'target.endpoint': this.agentClientConfig.endPoint,
-        'target.client_id': this.agentClientConfig.clientId,
+    return trace(AgentClientTraceDefinitions.postActivity, async ({ record }) => {
+      record({
+        endpoint: this.agentClientConfig.endPoint,
+        clientId: this.agentClientConfig.clientId,
       })
       const activityCopy = activity.clone()
       activityCopy.serviceUrl = this.agentClientConfig.serviceUrl
@@ -123,24 +121,13 @@ export class AgentClient {
         body: JSON.stringify(activityCopy)
       })
 
-      httpCode = response.status.toString()
-      span.setAttribute('http.status_code', httpCode)
+      record({ httpStatusCode: response.status.toString() })
 
       if (!response.ok) {
         await conversationDataAccessor.delete(context, { channelId: activityCopy.channelId!, conversationId: activityCopy.conversation!.id })
         throw new Error(`Failed to post activity to agent: ${response.statusText}`)
       }
       return response.statusText
-    }).finally(() => {
-      const duration = performance.now() - start
-      HostingMetrics.agentClientRequestsCounter.add(1, {
-        'target.endpoint': this.agentClientConfig.endPoint,
-        'http.status_code': httpCode
-      })
-      HostingMetrics.agentClientRequestDuration.record(duration, {
-        'target.endpoint': this.agentClientConfig.endPoint,
-        'http.status_code': httpCode
-      })
     })
   }
 

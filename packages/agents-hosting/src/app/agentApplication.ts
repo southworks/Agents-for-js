@@ -21,8 +21,8 @@ import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, UserAuthorization, AuthorizationManager } from './auth'
 import { JwtPayload } from 'jsonwebtoken'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { HostingMetrics } from '../observability'
+import { trace } from '@microsoft/agents-telemetry'
+import { AgentApplicationTraceDefinitions } from '../observability'
 
 const logger = debug('agents:app')
 
@@ -610,8 +610,7 @@ export class AgentApplication<TState extends TurnState> {
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
     logger.info('Running application with activity:', turnContext.activity.id!)
     return await this.startLongRunningCall(turnContext, async (context) => {
-      const start = performance.now()
-      return trace(SpanNames.AGENTS_APP_RUN, async (span) => {
+      return trace(AgentApplicationTraceDefinitions.run, async ({ record }) => {
         try {
           if (this._options.startTypingTimer) {
             this.startTypingTimer(context)
@@ -636,11 +635,7 @@ export class AgentApplication<TState extends TurnState> {
             return route?.authHandlers ?? []
           }) ?? { authorized: true } // Default to authorized if no auth manager
 
-          span.setAttributes({
-            'route.authorized': authorized,
-            'activity.type': context.activity.type,
-            'activity.id': context.activity.id,
-          })
+          record({ authorized, activity: context.activity })
 
           if (!authorized) {
             await state.save(context, storage)
@@ -649,7 +644,7 @@ export class AgentApplication<TState extends TurnState> {
 
           const route = await this.getRoute(context)
 
-          span.setAttributes({ 'route.matched': route !== undefined })
+          record({ routeMatched: route !== undefined })
 
           if (!route) {
             logger.debug('No matching route found for activity:', context.activity)
@@ -657,8 +652,8 @@ export class AgentApplication<TState extends TurnState> {
           }
 
           if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
-            await trace(SpanNames.AGENTS_APP_DOWNLOAD_FILES, async (span) => {
-              span.setAttributes({ 'agents.attachments.count': context.activity.attachments?.length ?? 0 })
+            await trace(AgentApplicationTraceDefinitions.downloadFiles, async ({ record }) => {
+              record({ attachmentsCount: context.activity.attachments?.length })
               for (let i = 0; i < this._options.fileDownloaders!.length; i++) {
                 await this._options.fileDownloaders![i].downloadAndStoreFiles(context, state)
               }
@@ -667,7 +662,7 @@ export class AgentApplication<TState extends TurnState> {
 
           let continueExecution = true
           if (this._beforeTurn.length > 0) {
-            await trace(SpanNames.AGENTS_APP_BEFORE_TURN, async () => {
+            await trace(AgentApplicationTraceDefinitions.beforeTurn, async () => {
               continueExecution = await this.callEventHandlers(context, state, this._beforeTurn)
             })
           }
@@ -676,16 +671,13 @@ export class AgentApplication<TState extends TurnState> {
             return false
           }
 
-          await trace(SpanNames.AGENTS_APP_ROUTE_HANDLER, async (span) => {
-            span.setAttributes({
-              'route.is_invoke': route.isInvokeRoute,
-              'route.is_agentic': route.isAgenticRoute
-            })
+          await trace(AgentApplicationTraceDefinitions.routeHandler, async ({ record }) => {
+            record({ isInvoke: route.isInvokeRoute, isAgentic: route.isAgenticRoute })
             await route.handler(context, state)
           })
 
           if (this._afterTurn.length > 0) {
-            await trace(SpanNames.AGENTS_APP_AFTER_TURN, async () => {
+            await trace(AgentApplicationTraceDefinitions.afterTurn, async () => {
               continueExecution = await this.callEventHandlers(context, state, this._afterTurn)
             })
           }
@@ -700,20 +692,6 @@ export class AgentApplication<TState extends TurnState> {
         } finally {
           this.stopTypingTimer()
         }
-      }).catch((error) => {
-        HostingMetrics.turnsErrorsCounter.add(1, {
-          'error.type': error?.constructor?.name
-        })
-        throw error
-      }).finally(() => {
-        HostingMetrics.turnsTotalCounter.add(1, {
-          'activity.type': context.activity.type,
-          'activity.channel_id': context.activity.channelId
-        })
-        HostingMetrics.turnDuration.record(performance.now() - start, {
-          'activity.type': context.activity.type,
-          'activity.channel_id': context.activity.channelId
-        })
       })
     })
   }

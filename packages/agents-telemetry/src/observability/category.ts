@@ -6,21 +6,19 @@
 import { AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES, SpanCategories, SpanNames } from './constants.js'
 import { createDebugLogger } from '../loggers/debug.js'
 import type { SpanName } from '../types.js'
+import { getSetting } from '../utils/setting.js'
 
 const logger = createDebugLogger('agents:telemetry')
 
+/**
+ * Resolves disabled spans once at module load time.
+ *
+ * @remarks
+ * - Unknown categories are ignored and logged as warnings.
+ * - Duplicate categories are de-duplicated by prefix before span names are expanded.
+ */
 const disabledSpans = (() => {
-  let rawValue: string
-  if (typeof window === 'undefined') {
-    rawValue = (process.env[AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES] ?? '').trim().toUpperCase()
-  } else {
-    try {
-      rawValue = (window.localStorage.getItem(AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES) ?? '').trim().toUpperCase()
-    } catch {
-      rawValue = ''
-    }
-  }
-
+  const rawValue = getSetting(AGENTS_TELEMETRY_DISABLED_SPAN_CATEGORIES).trim().toUpperCase()
   if (!rawValue) {
     return []
   }
