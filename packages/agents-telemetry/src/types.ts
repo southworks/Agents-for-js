@@ -20,12 +20,12 @@ export type * from '@opentelemetry/api-logs'
 
 /**
  * Runtime type for the optional OpenTelemetry API module.
-*/
+ */
 export type OTel = typeof import('@opentelemetry/api')
 
 /**
  * Runtime type for the optional OpenTelemetry logs module.
-*/
+ */
 export type OTelLogs = typeof import('@opentelemetry/api-logs')
 
 /**
