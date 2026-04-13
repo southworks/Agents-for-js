@@ -102,19 +102,20 @@ describe('attempt', () => {
     assert.strictEqual(caughtMessage, 'boom')
   })
 
-  it('returns undefined when sync catch is omitted and try throws', () => {
+  it('rethrows when sync catch is omitted and try throws', () => {
     let finallyCount = 0
 
-    const result = attempt({
-      try: () => {
-        throw new Error('boom')
-      },
-      finally: () => {
-        finallyCount += 1
-      }
-    })
+    assert.throws(() => {
+      attempt({
+        try: () => {
+          throw new Error('boom')
+        },
+        finally: () => {
+          finallyCount += 1
+        }
+      })
+    }, /boom/)
 
-    assert.strictEqual(result, undefined)
     assert.strictEqual(finallyCount, 1)
   })
 
@@ -258,21 +259,23 @@ describe('attempt', () => {
     assert.deepStrictEqual(events, ['try:start', 'catch:boom'])
   })
 
-  it('resolves undefined when async catch is omitted and try rejects', async () => {
+  it('rejects when async catch is omitted and try rejects', async () => {
     const events: string[] = []
 
-    const result = await attempt({
-      try: async () => {
-        events.push('try:start')
-        await Promise.resolve()
-        throw new Error('boom')
-      },
-      finally: () => {
-        events.push('finally')
-      }
-    })
+    await assert.rejects(
+      () => attempt({
+        try: async () => {
+          events.push('try:start')
+          await Promise.resolve()
+          throw new Error('boom')
+        },
+        finally: () => {
+          events.push('finally')
+        }
+      }),
+      /boom/
+    )
 
-    assert.strictEqual(result, undefined)
     assert.deepStrictEqual(events, ['try:start', 'finally'])
   })
 })

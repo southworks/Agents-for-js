@@ -25,19 +25,20 @@ type RethrowingAttemptOptions<TResult> = AttemptOptions<TResult, never>
  *
  * @remarks
  * - If try succeeds, its result is returned.
+ * - If try fails and catch is omitted, the original error is propagated.
  * - If try fails and catch throws, that error is propagated.
  * - If try fails and catch completes normally, the failure is treated as swallowed
  *   and attempt returns or resolves to undefined.
  * - catch is side-effect only; any value it returns is ignored.
- * - Type narrowing is based on catch's declared return type:
- *   never means the error is rethrown, void means the error may be swallowed.
+ * - Type narrowing is based on whether catch is omitted or its declared return type:
+ *   omitted or never means the error is rethrown, void means the error may be swallowed.
  * - finally runs once for both sync and async paths.
  */
 export function attempt<TResult> (options: RethrowingAttemptOptions<TResult>): TResult
 export function attempt<TResult> (options: RethrowingAttemptOptions<Promise<TResult>>): Promise<TResult>
 export function attempt<TResult> (options: SwallowingAttemptOptions<TResult>): TResult | undefined
 export function attempt<TResult> (options: SwallowingAttemptOptions<Promise<TResult>>): Promise<TResult | undefined>
-export function attempt<TResult> (options: AttemptOptions<TResult>) {
+export function attempt<TResult> (options: AttemptOptions<TResult, void | never>) {
   // Note: order of overloads ensures correct typing.
   let isAsync = false
   try {
@@ -47,6 +48,9 @@ export function attempt<TResult> (options: AttemptOptions<TResult>) {
       isAsync = true
       return result
         .catch(error => {
+          if (!options.catch) {
+            throw error
+          }
           const result = options.catch?.(error)
           if (isPromise(result)) {
             return result.then(() => undefined)
@@ -58,7 +62,10 @@ export function attempt<TResult> (options: AttemptOptions<TResult>) {
 
     return result
   } catch (error) {
-    options.catch?.(error)
+    if (!options.catch) {
+      throw error
+    }
+    options.catch(error)
     return undefined
   } finally {
     !isAsync && options.finally?.()

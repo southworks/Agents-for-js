@@ -152,11 +152,12 @@ export interface LoadOptions {
  * Options used by the shared `attempt()` helper.
  *
  * @remarks
+ * - Omitting catch preserves the original error.
  * - catch is for side effects only; recovery values are not used.
  * - Declare catch as returning never when it always rethrows.
  * - Declare catch as returning void when it may swallow the failure.
  */
-export interface AttemptOptions<TResult, TCatch = void> {
+export interface AttemptOptions<TResult, TCatch = never> {
   try(): TResult,
   catch?(error: unknown): TCatch,
   finally?(): void
