@@ -72,6 +72,6 @@
     }
   },
   "overridesComments": {
-    "adaptivecards-templating/adaptive-expressions/fast-xml-parser": "Override to ^5.5.7 because adaptive-expressions pulls vulnerable 4.5.3 (test-agents/web-chat)"
+    "adaptivecards-templating/adaptive-expressions/fast-xml-parser": "Override to 5.5.7 because adaptive-expressions pulls vulnerable 4.5.3 (test-agents/web-chat)"
   }
 }
