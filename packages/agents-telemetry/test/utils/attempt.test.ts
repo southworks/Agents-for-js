@@ -72,6 +72,20 @@ describe('attempt', () => {
     assert.strictEqual(result, 'ok')
   })
 
+  it('returns the sync result when catch is omitted', () => {
+    let finallyCount = 0
+
+    const result = attempt({
+      try: () => 'ok',
+      finally: () => {
+        finallyCount += 1
+      }
+    })
+
+    assert.strictEqual(result, 'ok')
+    assert.strictEqual(finallyCount, 1)
+  })
+
   it('returns undefined when sync catch swallows the error and finally is omitted', () => {
     let caughtMessage = ''
 
@@ -86,6 +100,22 @@ describe('attempt', () => {
 
     assert.strictEqual(result, undefined)
     assert.strictEqual(caughtMessage, 'boom')
+  })
+
+  it('returns undefined when sync catch is omitted and try throws', () => {
+    let finallyCount = 0
+
+    const result = attempt({
+      try: () => {
+        throw new Error('boom')
+      },
+      finally: () => {
+        finallyCount += 1
+      }
+    })
+
+    assert.strictEqual(result, undefined)
+    assert.strictEqual(finallyCount, 1)
   })
 
   it('waits for async completion before running finally', async () => {
@@ -156,7 +186,7 @@ describe('attempt', () => {
     assert.deepStrictEqual(events, ['try:start', 'catch:boom', 'finally'])
   })
 
-  it('returns the async catch result before finally and only once', async () => {
+  it('ignores async catch return values, resolves undefined, and runs finally once', async () => {
     const events: string[] = []
 
     const result = await attempt({
@@ -175,7 +205,7 @@ describe('attempt', () => {
       }
     })
 
-    assert.strictEqual(result, 'recovered')
+    assert.strictEqual(result, undefined)
     assert.deepStrictEqual(events, ['try:start', 'catch:boom', 'finally'])
   })
 
@@ -188,6 +218,25 @@ describe('attempt', () => {
     })
 
     assert.strictEqual(result, 'ok')
+  })
+
+  it('returns the async result when catch is omitted', async () => {
+    const events: string[] = []
+
+    const result = await attempt({
+      try: async () => {
+        events.push('try:start')
+        await Promise.resolve()
+        events.push('try:end')
+        return 'ok'
+      },
+      finally: () => {
+        events.push('finally')
+      }
+    })
+
+    assert.strictEqual(result, 'ok')
+    assert.deepStrictEqual(events, ['try:start', 'try:end', 'finally'])
   })
 
   it('resolves undefined when async catch swallows the error and finally is omitted', async () => {
@@ -207,6 +256,24 @@ describe('attempt', () => {
 
     assert.strictEqual(result, undefined)
     assert.deepStrictEqual(events, ['try:start', 'catch:boom'])
+  })
+
+  it('resolves undefined when async catch is omitted and try rejects', async () => {
+    const events: string[] = []
+
+    const result = await attempt({
+      try: async () => {
+        events.push('try:start')
+        await Promise.resolve()
+        throw new Error('boom')
+      },
+      finally: () => {
+        events.push('finally')
+      }
+    })
+
+    assert.strictEqual(result, undefined)
+    assert.deepStrictEqual(events, ['try:start', 'finally'])
   })
 })
 

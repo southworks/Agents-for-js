@@ -7,17 +7,25 @@ import { Logger } from './loggers/base.js'
 import { MetricNames, SpanNames } from './observability/constants.js'
 import type { Span, Meter } from '@opentelemetry/api'
 
+/**
+ * These type re-exports are intentional.
+ *
+ * @remarks
+ * This package is primarily a shared telemetry layer for other Agents SDK packages, so its
+ * TypeScript surface may depend on OpenTelemetry types even when runtime loading falls back
+ * to noop behavior if the optional dependencies are absent.
+ */
 export type * from '@opentelemetry/api'
 export type * from '@opentelemetry/api-logs'
 
 /**
  * Runtime type for the optional OpenTelemetry API module.
- */
+*/
 export type OTel = typeof import('@opentelemetry/api')
 
 /**
  * Runtime type for the optional OpenTelemetry logs module.
- */
+*/
 export type OTelLogs = typeof import('@opentelemetry/api-logs')
 
 /**
@@ -142,9 +150,14 @@ export interface LoadOptions {
 
 /**
  * Options used by the shared `attempt()` helper.
+ *
+ * @remarks
+ * - catch is for side effects only; recovery values are not used.
+ * - Declare catch as returning never when it always rethrows.
+ * - Declare catch as returning void when it may swallow the failure.
  */
-export interface AttemptOptions<TResult> {
+export interface AttemptOptions<TResult, TCatch = void> {
   try(): TResult,
-  catch(error: unknown): void,
+  catch?(error: unknown): TCatch,
   finally?(): void
 }

@@ -140,6 +140,8 @@ MetricNames.AUTH_TOKEN_REQUEST_COUNT   // 'agents.auth.token.request.count'
 
 This section covers internal APIs used to instrument SDK components. If you are contributing to the Agents SDK packages, use `trace`, `debug`, and `metric` to add observability to your code.
 
+Although this package is published, it primarily serves as a shared telemetry layer for other Agents SDK packages. Some exported TypeScript types intentionally depend on OpenTelemetry packages even though runtime behavior still supports noop fallback when those optional peer dependencies are not installed.
+
 ### Using trace
 
 Use `trace` to create validated spans. Every definition requires a `name` from `SpanNames`, a `record` object for tracking state, and an `end` hook called when the span finishes.

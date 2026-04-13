@@ -312,6 +312,8 @@ export class CopilotStudioWebChat {
           await handleAcknowledgementOnce()
         } catch (error) {
           throw managed.fail(error)
+        } finally {
+          managed.end()
         }
       })
 
@@ -395,12 +397,16 @@ export class CopilotStudioWebChat {
                 logger.error('Error sending Activity to Copilot Studio:', error)
                 subscriber.error(error)
                 managed.fail(error)
+              } finally {
+                managed.end()
               }
             })
 
             return result
           } catch (error) {
             throw managed.fail(error)
+          } finally {
+            managed.end()
           }
         },
 
@@ -418,6 +424,8 @@ export class CopilotStudioWebChat {
       }
     } catch (error) {
       throw managed.fail(error)
+    } finally {
+      managed.end()
     }
   }
 }
