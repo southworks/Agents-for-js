@@ -336,6 +336,10 @@ export class CloudAdapter extends BaseAdapter {
     }
 
     const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
+      if (res.headersSent || res.writableEnded) {
+        return
+      }
+
       res.status(status)
       if (isInvokeResponseOrExpectReplies) {
         res.setHeader('content-type', 'application/json')
