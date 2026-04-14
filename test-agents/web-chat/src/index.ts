@@ -60,9 +60,8 @@ const myAgent = createAgent(agentName)
 const app = express()
 
 app.use(express.json())
-app.use(authorizeJWT(authConfig))
 
-app.get('/api/notify', async (_req: Request, res: Response) => {
+app.get('/api/notify', authorizeJWT(authConfig), async (_req: Request, res: Response) => {
   for (const conversationReference of Object.values(conversationReferences)) {
     await adapter.continueConversation(_req.user!, conversationReference, async context => {
       await context.sendActivity('proactive hello')
@@ -75,7 +74,7 @@ app.get('/api/notify', async (_req: Request, res: Response) => {
   res.end()
 })
 
-app.post('/api/messages', async (req: Request, res: Response) => {
+app.post('/api/messages', authorizeJWT(authConfig), async (req: Request, res: Response) => {
   await adapter.process(req, res, async (context) => await myAgent.run(context))
 })
 

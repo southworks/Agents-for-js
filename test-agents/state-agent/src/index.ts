@@ -40,9 +40,8 @@ const adapter = new CloudAdapter(authConfig)
 const app = express()
 
 app.use(express.json())
-app.use(authorizeJWT(authConfig))
 
-app.post('/api/messages', async (req: Request, res: Response) => {
+app.post('/api/messages', authorizeJWT(authConfig), async (req: Request, res: Response) => {
   await adapter.process(req, res, async (context) => await myAgent.run(context))
 })
 
