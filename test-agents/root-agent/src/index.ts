@@ -24,12 +24,12 @@ const myAgent = new RootHandlerWithBlobStorageMemory(conversationState, userStat
 const app = express()
 
 app.use(express.json())
-app.use(authorizeJWT(authConfig))
 
-app.post('/api/messages', async (req: Request, res: Response) => {
+app.post('/api/messages', authorizeJWT(authConfig), async (req: Request, res: Response) => {
   await adapter.process(req, res, async (context) => await myAgent.run(context))
 })
 
+app.use('/api/agentresponse', authorizeJWT(authConfig))
 configureResponseController(app, adapter, myAgent, conversationState)
 
 const port = process.env.PORT || 3978

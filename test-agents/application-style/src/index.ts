@@ -6,7 +6,6 @@ const adapter = new CloudAdapter(authConfig)
 
 const server = express()
 server.use(express.json())
-server.use(authorizeJWT(authConfig))
 
 async function loadApp () {
   const moduleName = process.env.agentName || 'webChat'
@@ -29,7 +28,7 @@ async function loadApp () {
   }
 }
 
-server.post('/api/messages', async (req: Request, res: Response) => {
+server.post('/api/messages', authorizeJWT(authConfig), async (req: Request, res: Response) => {
   await adapter.process(req, res, async (context) => {
     const app = await loadApp()
     await app.run(context)
