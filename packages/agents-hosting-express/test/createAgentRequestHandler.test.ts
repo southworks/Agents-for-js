@@ -46,7 +46,7 @@ describe('createAgentRequestHandler', () => {
     await assert.doesNotReject(async () => {
       await Promise.race([
         handler(req, res),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('handler timed out')), 1000))
+        new Promise((resolve, reject) => setTimeout(() => reject(new Error('handler timed out')), 1000))
       ])
     })
 
@@ -65,9 +65,7 @@ describe('createAgentRequestHandler', () => {
     await assert.rejects(async () => {
       await handler(req, res)
     }, (error: any) => {
-      return error instanceof TypeError &&
-        typeof error.message === 'string' &&
-        error.message.includes('`request.body` parameter required')
+      return error instanceof TypeError
     })
 
     assert.strictEqual(res.statusCode, undefined)

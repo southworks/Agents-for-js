@@ -95,7 +95,7 @@ If you need to apply JWT authorization on specific routes in your own Express ap
 
 ```ts
 import express from 'express';
-import { authorizeJWT, AuthConfiguration, getAuthConfigWithDefaults } from '@microsoft/agents-hosting';
+import { authorizeJWT, getAuthConfigWithDefaults, AgentApplication, TurnState } from '@microsoft/agents-hosting';
 import { createCloudAdapter } from '@microsoft/agents-hosting-express';
 
 const agent = new AgentApplication<TurnState>();

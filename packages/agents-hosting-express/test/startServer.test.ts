@@ -6,60 +6,86 @@
 import { describe, it, before, after } from 'node:test'
 import assert from 'assert'
 import { createServer, type Server } from 'node:http'
-import express, { type Request, type Response } from 'express'
+import express, { type Express, type Request, type Response } from 'express'
 import { ActivityHandler, authorizeJWT } from '@microsoft/agents-hosting'
 import { startServer } from '../src/startServer'
 
 // Using a clientId ensures JWT is enforced (non-empty clientId prevents anonymous fallback)
 const TEST_AUTH_CONFIG = { clientId: 'test-app-id' }
-
-describe('JWT middleware scoped to /api/messages', () => {
+describe('startServer', () => {
   let server: Server
   let port: number
-
+  let beforeListenCalled = false
+  const originalListen = express.application.listen
   before(() => new Promise<void>((resolve, reject) => {
-    const app = express()
-    app.use(express.json())
-
-    // Simulate the fixed startServer pattern: JWT only on /api/messages
-    app.post('/api/messages', authorizeJWT(TEST_AUTH_CONFIG), (_req: Request, res: Response) => {
-      res.status(200).send('ok')
-    })
-
-    // A custom route added by the user — should NOT require JWT
-    app.get('/health', (_req: Request, res: Response) => {
-      res.status(200).json({ status: 'ok' })
-    })
-
-    server = createServer(app)
-    server.listen(0, () => {
-      const addr = server.address()
-      if (addr && typeof addr === 'object') {
-        port = addr.port
-        resolve()
-      } else {
-        reject(new Error('Failed to get server address'))
-      }
-    })
-    server.on('error', reject)
+    const patchedListen = function (this: Express, ...args: unknown[]) {
+      const callback = typeof args[args.length - 1] === 'function'
+        ? args.pop() as (() => void)
+        : undefined
+      const listeningServer = originalListen.call(this, 0, () => {
+        const addr = listeningServer.address()
+        if (addr && typeof addr === 'object') {
+          port = addr.port
+          callback?.()
+          resolve()
+        } else {
+          reject(new Error('Failed to get server address'))
+        }
+      })
+      listeningServer.on('error', reject)
+      server = listeningServer
+      return listeningServer
+    }
+    ;(express.application.listen as unknown as typeof patchedListen) = patchedListen
+    try {
+      startServer(new ActivityHandler(), {
+        ...TEST_AUTH_CONFIG,
+        routePath: '/custom/messages',
+        beforeListen: (app: Express) => {
+          beforeListenCalled = true
+          app.get('/health', (_req, res) => {
+            res.status(200).json({ status: 'ok' })
+          })
+        }
+      } as never)
+    } catch (error) {
+      reject(error)
+    }
   }))
-
-  after(() => new Promise<void>((resolve) => server.close(() => resolve())))
-
-  it('should not require JWT for custom routes', async () => {
+  after(() => new Promise<void>((resolve, reject) => {
+    express.application.listen = originalListen
+    if (!server) {
+      resolve()
+      return
+    }
+    server.close((error) => {
+      if (error) {
+        reject(error)
+        return
+      }
+      resolve()
+    })
+  }))
+  it('should invoke beforeListen and not require JWT for custom routes', async () => {
+    assert.strictEqual(beforeListenCalled, true)
     const res = await fetch(`http://localhost:${port}/health`)
     assert.strictEqual(res.status, 200)
     const body = await res.json() as { status: string }
     assert.strictEqual(body.status, 'ok')
   })
-
-  it('should require JWT for /api/messages when no token is provided', async () => {
-    const res = await fetch(`http://localhost:${port}/api/messages`, {
+  it('should honor routePath and require JWT for the configured messages route', async () => {
+    const protectedRes = await fetch(`http://localhost:${port}/custom/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'message', text: 'hello' })
     })
-    assert.strictEqual(res.status, 401)
+    assert.strictEqual(protectedRes.status, 401)
+    const defaultRouteRes = await fetch(`http://localhost:${port}/api/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'message', text: 'hello' })
+    })
+    assert.strictEqual(defaultRouteRes.status, 404)
   })
 })
 

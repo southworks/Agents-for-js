@@ -96,15 +96,15 @@ export function startServer (agent: AgentApplication<TurnState<any, any>> | Acti
   const server = express()
   server.use(express.json())
 
+  if (opts.beforeListen) {
+    opts.beforeListen(server)
+  }
+
   server.post(routePath, authorizeJWT(authConfig), (req: Request, res: Response) =>
     adapter.process(req, res, (context) =>
       agent.run(context)
     , headerPropagation)
   )
-
-  if (opts.beforeListen) {
-    opts.beforeListen(server)
-  }
 
   const port = opts.port ?? process.env.PORT ?? 3978
   server.listen(port, async () => {
