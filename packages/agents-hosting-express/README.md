@@ -5,7 +5,7 @@
 Provides integration to host agents with Express. The package offers three levels of abstraction:
 
 - **`startServer`** — Quickest way to get running. Creates an Express app, wires up auth, and starts listening.
-- **`createAgentRequestHandler`** — A framework-agnostic request handler you can mount in any HTTP framework.
+- **`createAgentRequestHandler`** — A handler signature without Express imports, for frameworks that can provide Express-compatible request/response objects.
 - **`createCloudAdapter`** — Low-level factory to get a `CloudAdapter` for full control over request processing.
 
 ## Usage
@@ -44,7 +44,7 @@ startServer(agent, {
 
 ### Custom Express setup — `createAgentRequestHandler`
 
-If you manage your own Express app (or any HTTP framework), use `createAgentRequestHandler` to get a handler that includes JWT authorization and activity processing:
+If you manage your own Express app (or another framework with an adapter that exposes Express-compatible request/response objects), use `createAgentRequestHandler` to get a handler that includes JWT authorization and activity processing:
 
 ```ts
 import express from 'express';
@@ -61,9 +61,16 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.listen(3978);
 ```
 
-### Framework-agnostic — `createCloudAdapter`
+### Advanced — `createCloudAdapter`
 
-For full control, use `createCloudAdapter` to obtain the `CloudAdapter` directly. This is useful when you don't use Express at all, or need to customize how the adapter processes requests:
+For full control, use `createCloudAdapter` to obtain the `CloudAdapter` directly. This is useful when you need to customize request processing and can provide the request/response shape expected by `CloudAdapter.process`.
+
+`CloudAdapter.process` expects:
+
+- a parsed activity body on `req.body` (for example, via `express.json()` in Express)
+- a response object that supports `status()`, `setHeader()`, `send()`, and `end()`
+
+If your framework does not expose those members directly, add an adapter layer before calling `adapter.process`.
 
 ```ts
 import http from 'node:http';
@@ -75,7 +82,8 @@ const { adapter, headerPropagation } = createCloudAdapter(agent);
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/messages') {
-    await adapter.process(req, res, (context) => agent.run(context), headerPropagation);
+    // Adapt request/response as needed so they match CloudAdapter.process expectations.
+    await adapter.process(req as any, res as any, (context) => agent.run(context), headerPropagation);
   }
 });
 server.listen(3978);

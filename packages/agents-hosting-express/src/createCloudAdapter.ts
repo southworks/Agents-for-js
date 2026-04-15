@@ -30,7 +30,7 @@ export interface CloudAdapterResult {
  * const app = new AgentApplication<TurnState>();
  * const { adapter, headerPropagation } = createCloudAdapter(app);
  *
- * // Use the adapter directly with any HTTP framework
+ * // Use the adapter directly with request/response objects compatible with CloudAdapter.process
  * adapter.process(req, res, (context) => app.run(context), headerPropagation);
  * ```
  */

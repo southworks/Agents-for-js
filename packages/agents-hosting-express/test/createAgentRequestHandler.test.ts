@@ -3,59 +3,78 @@
  * Licensed under the MIT License.
  */
 
-import { describe, it, before, after } from 'node:test'
+import { describe, it } from 'node:test'
 import assert from 'assert'
-import { createServer, type Server } from 'node:http'
-import express, { type Request, type Response } from 'express'
-import { authorizeJWT } from '@microsoft/agents-hosting'
+import { ActivityHandler, type Request } from '@microsoft/agents-hosting'
 import { createAgentRequestHandler } from '../src/createAgentRequestHandler'
+import { type WebResponse } from '../src/createAgentRequestHandler'
 
 describe('createAgentRequestHandler', () => {
-  describe('JWT enforcement', () => {
-    let server: Server
-    let port: number
+  const createMockResponse = (): WebResponse & { statusCode?: number, body?: unknown } => {
+    return {
+      headersSent: false,
+      statusCode: undefined,
+      body: undefined,
+      status (code: number) {
+        this.statusCode = code
+        return this
+      },
+      setHeader (_name: string, _value: string) {
+        return this
+      },
+      send (body?: unknown) {
+        this.body = body
+        this.headersSent = true
+        return this
+      },
+      end () {
+        this.headersSent = true
+        return this
+      }
+    }
+  }
 
-    before(() => new Promise<void>((resolve, reject) => {
-      const app = express()
-      app.use(express.json())
+  it('should complete without hanging when JWT middleware rejects request', async () => {
+    const handler = createAgentRequestHandler(new ActivityHandler(), { clientId: 'test-app-id' })
+    const req: Request = {
+      method: 'POST',
+      headers: {},
+      body: { type: 'message', text: 'hello' }
+    }
+    const res = createMockResponse()
 
-      // Use createAgentRequestHandler with a lightweight mock:
-      // We only test that JWT middleware is applied correctly (rejects without token).
-      // We simulate the handler by mounting authorizeJWT directly since creating a full
-      // CloudAdapter + agent pipeline would require a real Bot Framework connection.
-      app.post('/api/messages', authorizeJWT({ clientId: 'test-app-id' }), (_req: Request, res: Response) => {
-        res.status(200).send('processed')
-      })
-
-      server = createServer(app)
-      server.listen(0, () => {
-        const addr = server.address()
-        if (addr && typeof addr === 'object') {
-          port = addr.port
-          resolve()
-        } else {
-          reject(new Error('Failed to get server address'))
-        }
-      })
-      server.on('error', reject)
-    }))
-
-    after(() => new Promise<void>((resolve) => server.close(() => resolve())))
-
-    it('should reject requests without JWT token', async () => {
-      const res = await fetch(`http://localhost:${port}/api/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'message', text: 'hello' })
-      })
-      assert.strictEqual(res.status, 401)
+    await assert.doesNotReject(async () => {
+      await Promise.race([
+        handler(req, res),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('handler timed out')), 1000))
+      ])
     })
+
+    assert.strictEqual(res.statusCode, 401)
+    assert.strictEqual(res.headersSent, true)
+  })
+
+  it('should reach adapter.process when middleware allows anonymous auth', async () => {
+    const handler = createAgentRequestHandler(new ActivityHandler(), {})
+    const req: Request = {
+      method: 'POST',
+      headers: {}
+    }
+    const res = createMockResponse()
+
+    await assert.rejects(async () => {
+      await handler(req, res)
+    }, (error: any) => {
+      return error instanceof TypeError &&
+        typeof error.message === 'string' &&
+        error.message.includes('`request.body` parameter required')
+    })
+
+    assert.strictEqual(res.statusCode, undefined)
+    assert.strictEqual(res.headersSent, false)
   })
 
   it('should return a function', () => {
-    // createAgentRequestHandler should return a callable handler
-    // Using a minimal ActivityHandler to avoid full adapter initialization
-    const { ActivityHandler } = require('@microsoft/agents-hosting')
     const handler = createAgentRequestHandler(new ActivityHandler())
     assert.strictEqual(typeof handler, 'function')
   })

@@ -7,7 +7,8 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'assert'
 import { createServer, type Server } from 'node:http'
 import express, { type Request, type Response } from 'express'
-import { authorizeJWT } from '@microsoft/agents-hosting'
+import { ActivityHandler, authorizeJWT } from '@microsoft/agents-hosting'
+import { startServer } from '../src/startServer'
 
 // Using a clientId ensures JWT is enforced (non-empty clientId prevents anonymous fallback)
 const TEST_AUTH_CONFIG = { clientId: 'test-app-id' }
@@ -148,6 +149,34 @@ describe('StartServerOptions', () => {
       assert.strictEqual(res.status, 200)
       const body = await res.json() as { status: string }
       assert.strictEqual(body.status, 'healthy')
+    })
+  })
+
+  describe('port handling', () => {
+    it('should pass non-numeric string listen target unchanged', () => {
+      const target = '\\\\.\\pipe\\agents-hosting-express-test'
+      let capturedListenTarget: string | number | undefined
+
+      const originalListen = express.application.listen
+      ;(express.application as any).listen = function (listenTarget: string | number) {
+        capturedListenTarget = listenTarget
+        return {
+          on: function () {
+            return this
+          }
+        }
+      }
+
+      try {
+        startServer(new ActivityHandler(), {
+          port: target,
+          authConfig: { clientId: 'test-app-id' }
+        })
+
+        assert.strictEqual(capturedListenTarget, target)
+      } finally {
+        ;(express.application as any).listen = originalListen
+      }
     })
   })
 })

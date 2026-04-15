@@ -107,7 +107,7 @@ export function startServer (agent: AgentApplication<TurnState<any, any>> | Acti
   }
 
   const port = opts.port ?? process.env.PORT ?? 3978
-  server.listen(Number(port), async () => {
+  server.listen(port, async () => {
     console.log(`\nServer listening to port ${port} on sdk ${version} for appId ${authConfig.clientId} debug ${process.env.DEBUG}`)
   }).on('error', console.error)
   return server
