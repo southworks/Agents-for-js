@@ -8,7 +8,7 @@ import { ResourceResponse } from '../connector-client'
 import { debug } from '@microsoft/agents-activity/logger'
 import { TurnContext } from '../turnContext'
 import { AdaptiveCardsActions } from './adaptiveCards'
-import { AgentApplicationOptions } from './agentApplicationOptions'
+import { AgentApplicationOptions, TypingTimingOptions } from './agentApplicationOptions'
 import { ConversationUpdateEvents } from './conversationUpdateEvents'
 import { AgentExtension } from './extensions'
 import { RouteHandler } from './routeHandler'
@@ -20,11 +20,29 @@ import { RouteList } from './routeList'
 import { TranscriptLoggerMiddleware } from '../transcript'
 import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, UserAuthorization, AuthorizationManager } from './auth'
+import { Proactive } from './proactive'
 import { JwtPayload } from 'jsonwebtoken'
+import { ExceptionHelper } from '@microsoft/agents-activity'
+import { Errors } from '../errorHelper'
 
 const logger = debug('agents:app')
 
-const TYPING_TIMER_DELAY = 1000
+// Resend typing every 4 seconds to stay ahead of the ~5 second timeout seen in
+// Web Chat and Microsoft 365. Teams may keep typing indicators visible longer.
+const DEFAULT_TYPING_INITIAL_DELAY = 0
+const DEFAULT_TYPING_INTERVAL = 4000
+const TYPING_TIMER_STATE_KEY = Symbol('typingTimerState')
+
+type TypingTimerState = {
+  timer?: NodeJS.Timeout
+  lastSend: Promise<unknown>
+  stop: () => void
+}
+
+type StreamInfoEntity = {
+  type?: string
+  streamType?: string
+}
 
 /**
  * Event handler function type for application events.
@@ -76,7 +94,7 @@ export class AgentApplication<TState extends TurnState> {
   private readonly _adapter?: CloudAdapter
   private readonly _authorizationManager: AuthorizationManager
   private readonly _authorization: Authorization
-  private _typingTimer: NodeJS.Timeout | undefined
+  private readonly _proactive?: Proactive<TState>
   protected readonly _extensions: AgentExtension<TState>[] = []
   private readonly _adaptiveCards: AdaptiveCardsActions<TState>
 
@@ -112,6 +130,7 @@ export class AgentApplication<TState extends TurnState> {
       ...options,
       turnStateFactory: options?.turnStateFactory || (() => new TurnState() as TState),
       startTypingTimer: options?.startTypingTimer !== undefined ? options.startTypingTimer : false,
+      typing: options?.typing || undefined,
       longRunningMessages: options?.longRunningMessages !== undefined ? options.longRunningMessages : false,
       removeRecipientMention: options?.removeRecipientMention !== undefined ? options.removeRecipientMention : true,
       transcriptLogger: options?.transcriptLogger || undefined,
@@ -123,6 +142,14 @@ export class AgentApplication<TState extends TurnState> {
       this._adapter = this._options.adapter
     } else {
       this._adapter = new CloudAdapter()
+    }
+
+    // Create Proactive whenever proactive options are explicitly configured or a storage
+    // backend is available — no explicit `proactive` option is required.
+    if (this._options.proactive !== undefined || this._options.storage !== undefined) {
+      const proactiveOpts = this._options.proactive ?? {}
+      const proactiveStorage = proactiveOpts.storage ?? this._options.storage
+      this._proactive = new Proactive<TState>(this, { ...proactiveOpts, storage: proactiveStorage })
     }
 
     if (this._options.longRunningMessages && !this._adapter && !this._options.agentAppId) {
@@ -154,6 +181,27 @@ export class AgentApplication<TState extends TurnState> {
       throw new Error('The Application.authorization property is unavailable because no authorization options were configured.')
     }
     return this._authorization
+  }
+
+  /**
+   * Gets the proactive messaging subsystem.
+   *
+   * @throws Error if no storage backend was configured (neither `options.storage` nor
+   *   `options.proactive.storage`).
+   */
+  public get proactive (): Proactive<TState> {
+    if (!this._proactive) {
+      throw ExceptionHelper.generateException(Error, Errors.ProactivePropertyUnavailable)
+    }
+    return this._proactive
+  }
+
+  /**
+   * Returns `true` if user authorization was configured, without throwing.
+   * Used internally by the Proactive subsystem to check whether token acquisition is available.
+   */
+  public get hasUserAuthorization (): boolean {
+    return this._authorization !== undefined
   }
 
   /**
@@ -582,10 +630,10 @@ export class AgentApplication<TState extends TurnState> {
    * While this method is public, it's typically called internally by the `run` method.
    *
    * The method performs the following operations:
-   * 1. Starts typing timer if configured
-   * 2. Processes mentions if configured
-   * 3. Loads turn state
-   * 4. Handles authentication flows
+   * 1. Handles authentication flows for routes that have auth handlers configured. If NOT authorized, it will not continue with the 2nd step, returning false.
+   * 2. Starts typing timer if configured
+   * 3. Processes mentions if configured
+   * 4. Loads turn state
    * 5. Downloads files if file downloaders are configured
    * 6. Executes before-turn event handlers
    * 7. Routes to appropriate handlers
@@ -599,76 +647,98 @@ export class AgentApplication<TState extends TurnState> {
    *   console.log('No handler matched the activity');
    * }
    * ```
-   *
    */
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
-    if (turnContext.activity.type === ActivityTypes.Typing) {
+    const { authorized, context } = await this.handleAuthorization(turnContext)
+
+    if (!authorized) {
+      // We don't log a message here because it is handled by the authorization manager and could cause confusion during mid sign-in operations.
       return false
     }
 
-    logger.info('Running application with activity:', turnContext.activity.id!)
-    return await this.startLongRunningCall(turnContext, async (context) => {
-      try {
-        if (this._options.startTypingTimer) {
-          this.startTypingTimer(context)
-        }
+    const isLongRunning =
+      (turnContext.activity.type === ActivityTypes.Invoke && turnContext.activity.name === 'signin/tokenExchange') ||
+      (this._options.longRunningMessages && turnContext.activity.type === ActivityTypes.Message)
 
-        if (this._options.removeRecipientMention && context.activity.type === ActivityTypes.Message) {
-          context.activity.removeRecipientMention()
-        }
+    if (isLongRunning) {
+      logger.debug('Starting long-running messages for activity:', context.activity.id!)
+      this.startLongRunningCall(context, ctx => this.runTurn(ctx))
+      return true
+    }
 
-        if (this._options.normalizeMentions && context.activity.type === ActivityTypes.Message) {
-          context.activity.normalizeMentions()
-        }
+    logger.info('Running application with activity:', context.activity.id!)
+    return this.runTurn(context)
+  }
 
-        const { storage, turnStateFactory } = this._options
-        const state = turnStateFactory()
-        await state.load(context, storage)
+  /**
+   * Determines if the incoming activity is authorized to be processed by the application.
+   * @returns An object containing the authorization status and the context (could have the continuation activity) to be used for further processing.
+   */
+  private async handleAuthorization (context: TurnContext) {
+    if (context.activity.type === ActivityTypes.Typing) {
+      return { authorized: true, context }
+    }
 
-        const { authorized } = await this._authorizationManager.process(context, async activity => {
-          // The incoming activity may come from the storage, so we need to restore the auth handlers.
-          // Since the current route may not have auth handlers.
-          const route = await this.getRoute(new TurnContext(context.adapter, activity, turnContext.identity))
-          return route?.authHandlers ?? []
-        }) ?? { authorized: true } // Default to authorized if no auth manager
+    return this._authorizationManager?.process(context, async activity => {
+      // The incoming activity may come from the storage, so we need to restore the auth handlers.
+      // Since the current route may not have auth handlers.
+      const route = await this.getRoute(new TurnContext(context.adapter, activity, context.identity))
+      return route?.authHandlers ?? []
+    }) ?? { authorized: true, context } // If no authorization manager is configured, we assume the activity is authorized.
+  }
 
-        if (!authorized) {
-          await state.save(context, storage)
-          return false
-        }
-
-        const route = await this.getRoute(context)
-
-        if (!route) {
-          logger.debug('No matching route found for activity:', context.activity)
-          return false
-        }
-
-        if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
-          for (let i = 0; i < this._options.fileDownloaders.length; i++) {
-            await this._options.fileDownloaders[i].downloadAndStoreFiles(context, state)
-          }
-        }
-
-        if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
-          await state.save(context, storage)
-          return false
-        }
-
-        await route.handler(context, state)
-
-        if (await this.callEventHandlers(context, state, this._afterTurn)) {
-          await state.save(context, storage)
-        }
-
-        return true
-      } catch (err: any) {
-        logger.error(err)
-        throw err
-      } finally {
-        this.stopTypingTimer()
+  /**
+   * Executes the turn processing logic for the given context, including routing and handler execution.
+   */
+  private async runTurn (context: TurnContext): Promise<boolean> {
+    try {
+      if (this._options.startTypingTimer) {
+        this.startTypingTimer(context)
       }
-    })
+
+      if (this._options.removeRecipientMention && context.activity.type === ActivityTypes.Message) {
+        context.activity.removeRecipientMention()
+      }
+
+      if (this._options.normalizeMentions && context.activity.type === ActivityTypes.Message) {
+        context.activity.normalizeMentions()
+      }
+
+      const { storage, turnStateFactory } = this._options
+      const state = turnStateFactory()
+      await state.load(context, storage)
+
+      const route = await this.getRoute(context)
+
+      if (!route) {
+        logger.debug('No matching route found for activity:', context.activity)
+        return false
+      }
+
+      if (Array.isArray(this._options.fileDownloaders) && this._options.fileDownloaders.length > 0) {
+        for (let i = 0; i < this._options.fileDownloaders.length; i++) {
+          await this._options.fileDownloaders[i].downloadAndStoreFiles(context, state)
+        }
+      }
+
+      if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
+        await state.save(context, storage)
+        return false
+      }
+
+      await route.handler(context, state)
+
+      if (await this.callEventHandlers(context, state, this._afterTurn)) {
+        await state.save(context, storage)
+      }
+
+      return true
+    } catch (err: any) {
+      logger.error(err)
+      throw err
+    } finally {
+      this.stopTypingTimer(context)
+    }
   }
 
   /**
@@ -743,41 +813,82 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public startTypingTimer (context: TurnContext): void {
-    if (context.activity.type === ActivityTypes.Message && !this._typingTimer) {
-      let timerRunning = true
-      context.onSendActivities(async (context, activities, next) => {
-        if (timerRunning) {
-          for (let i = 0; i < activities.length; i++) {
-            if (activities[i].type === ActivityTypes.Message || activities[i].channelData?.streamType) {
-              this.stopTypingTimer()
-              timerRunning = false
-              await lastSend
-              break
-            }
-          }
-        }
+    const turnState = context.turnState
+    const typingOptions = this.getTypingTimingOptions(context)
+    // Timer state is stored on the current turn so concurrent turns stay isolated.
+    const currentState = () => turnState.get<TypingTimerState>(TYPING_TIMER_STATE_KEY)
 
-        return next()
-      })
-
-      let lastSend: Promise<any> = Promise.resolve()
-      const onTimeout = async () => {
-        try {
-          lastSend = context.sendActivity(Activity.fromObject({ type: ActivityTypes.Typing }))
-          await lastSend
-        } catch (err: any) {
-          logger.error(err)
-          this._typingTimer = undefined
-          timerRunning = false
-          lastSend = Promise.resolve()
-        }
-
-        if (timerRunning) {
-          this._typingTimer = setTimeout(onTimeout, TYPING_TIMER_DELAY)
-        }
-      }
-      this._typingTimer = setTimeout(onTimeout, TYPING_TIMER_DELAY)
+    if (context.activity.type !== ActivityTypes.Message || currentState()) {
+      return
     }
+
+    const state: TypingTimerState = {
+      lastSend: Promise.resolve(),
+      stop: () => {
+        if (state.timer) {
+          clearTimeout(state.timer)
+          state.timer = undefined
+        }
+
+        turnState.delete(TYPING_TIMER_STATE_KEY)
+      }
+    }
+
+    turnState.set(TYPING_TIMER_STATE_KEY, state)
+
+    context.onSendActivities(async (context, activities, next) => {
+      // Any real response or stream start ends the typing loop for this turn.
+      if (activities.some(activity => activity.type === ActivityTypes.Message || this.getStreamType(activity) !== undefined)) {
+        state.stop()
+        // Wait for any in-flight typing send to finish before sending the real response.
+        await state.lastSend.catch((err: any) => {
+          logger.error(err)
+        })
+      }
+
+      return next()
+    })
+
+    const onTimeout = async () => {
+      try {
+        state.lastSend = this.sendTypingActivity(context)
+        await state.lastSend
+      } catch (err: any) {
+        logger.error(err)
+        state.lastSend = Promise.resolve()
+        state.stop()
+        return
+      }
+
+      // Only reschedule if this turn still owns the active timer state.
+      if (currentState() === state) {
+        state.timer = setTimeout(onTimeout, typingOptions.intervalMs)
+      }
+    }
+
+    state.timer = setTimeout(onTimeout, typingOptions.initialDelayMs)
+  }
+
+  private getTypingTimingOptions (context: TurnContext): Required<TypingTimingOptions> {
+    const channelId = context.activity.channelId || context.activity.channelIdChannel || ''
+    const channelOptions = channelId ? this._options.typing?.channelStrategies?.[channelId] : undefined
+
+    return {
+      initialDelayMs: channelOptions?.initialDelayMs ?? this._options.typing?.initialDelayMs ?? DEFAULT_TYPING_INITIAL_DELAY,
+      intervalMs: channelOptions?.intervalMs ?? this._options.typing?.intervalMs ?? DEFAULT_TYPING_INTERVAL
+    }
+  }
+
+  private getStreamType (activity: Activity): string | undefined {
+    const streamingEntity = activity.entities?.find((entity) => (entity as StreamInfoEntity).type === 'streaminfo') as StreamInfoEntity | undefined
+    return streamingEntity?.streamType ?? activity.channelData?.streamType
+  }
+
+  private async sendTypingActivity (context: TurnContext): Promise<ResourceResponse[] | undefined> {
+    const conversationReference = context.activity.getConversationReference()
+    const typingActivity = Activity.fromObject({ type: ActivityTypes.Typing }).applyConversationReference(conversationReference)
+
+    return await context.adapter.sendActivities(context, [typingActivity])
   }
 
   /**
@@ -815,23 +926,37 @@ export class AgentApplication<TState extends TurnState> {
    * @returns void
    *
    * @remarks
-   * This method clears the typing indicator timer to prevent further typing indicators
-   * from being sent. It's typically called automatically when a message is sent, but
-   * can also be called manually to stop the typing indicator.
+   * Calling this overload without a context is deprecated. It only logs a warning and does not stop any timer.
+   *
+   * @deprecated Pass the current TurnContext to stop only that turn's typing timer.
+   */
+  public stopTypingTimer (): void
+
+  /**
+   * Stops the typing indicator timer for the provided turn context.
+   *
+   * @param context - The turn context whose typing timer should be stopped.
+   * @returns void
+   *
+   * @remarks
+   * This method clears the typing indicator timer for the current turn to prevent further typing indicators
+   * from being sent. It's typically called automatically when a message is sent, but can also be called manually.
    *
    * @example
    * ```typescript
-   * app.startTypingTimer(turnContext);
+   * app.startTypingTimer(turnContext)
    * // Do some processing...
-   * app.stopTypingTimer(); // Manually stop the typing indicator
+   * app.stopTypingTimer(turnContext)
    * ```
-   *
    */
-  public stopTypingTimer (): void {
-    if (this._typingTimer) {
-      clearTimeout(this._typingTimer)
-      this._typingTimer = undefined
+  public stopTypingTimer (context: TurnContext): void
+  public stopTypingTimer (context?: TurnContext): void {
+    if (!context) {
+      logger.warn('Application.stopTypingTimer() without a context is deprecated. Pass the current TurnContext instead.')
+      return
     }
+
+    context.turnState.get<TypingTimerState>(TYPING_TIMER_STATE_KEY)?.stop()
   }
 
   /**
@@ -899,35 +1024,31 @@ export class AgentApplication<TState extends TurnState> {
   }
 
   /**
-   * Starts a long-running call, potentially in a new conversation context.
+   * Starts a long-running call by continuing the conversation asynchronously (fire-and-forget).
+   * The current request/response cycle is not blocked; errors are forwarded to the adapter's error handler.
    *
    * @param context - The turn context for the current conversation.
-   * @param handler - The handler function to execute.
-   * @returns A promise that resolves to the result of the handler.
+   * @param handler - The handler function to execute in the continued conversation.
    */
   protected startLongRunningCall (
     context: TurnContext,
-    handler: (context: TurnContext) => Promise<boolean>
-  ): Promise<boolean> {
-    if (context.activity.type === ActivityTypes.Message && this._options.longRunningMessages) {
-      return new Promise<boolean>((resolve, reject) => {
-        this.continueConversationAsync(context.identity, context, async (ctx) => {
-          try {
-            for (const key in context.activity) {
-              (ctx.activity as any)[key] = (context.activity as any)[key]
-            }
-
-            const result = await handler(ctx)
-            resolve(result)
-          } catch (err: any) {
-            logger.error(err)
-            reject(err)
-          }
-        })
-      })
-    } else {
-      return handler(context)
-    }
+    handler: (context: TurnContext) => Promise<any>
+  ) {
+    const activity = Activity.fromObject(context.activity)
+    this.continueConversationAsync(context.identity, activity.getConversationReference(), async (ctx) => {
+      try {
+        Object.assign(ctx.activity, activity)
+        await handler(ctx)
+      } catch (err) {
+        if (this.adapter.onTurnError && err instanceof Error) {
+          await this.adapter.onTurnError(ctx, err)
+        } else {
+          throw err
+        }
+      }
+    }).catch(err => {
+      logger.error(`Unhandled error in long-running call for activity '${activity.type}' (id: ${activity.id}):`, err)
+    })
   }
 
   /**
