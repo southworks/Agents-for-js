@@ -345,8 +345,14 @@ export class AuthorizationManager {
         continue
       }
 
-      result.latest[id] ??= {}
-      result.latest[id][key] = value
+      // Find existing handler ID case-insensitively to avoid duplicates, but keep the original casing for later processing.
+      // This allows users to specify environment variables in a case-insensitive way, while ensuring that the handler IDs are treated in a case-sensitive way internally, to avoid issues when referencing them later.
+      // For example, if the user specifies AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__GRAPH__SETTINGS__AZUREBOTOAUTHCONNECTIONNAME and agentapplication__userauthorization__handlers__graph__settings__azurebotoauthconnectionname, we want to treat them as the same handler ID "graph", and not create two separate handlers "GRAPH" and "graph".
+      // Note: the first environment variable that is processed will determine the casing of the handler ID, and any subsequent environment variable that matches the same handler ID case-insensitively will be treated as referring to the same handler, regardless of its casing.
+      const existingId = id in result.latest ? id : Object.keys(result.latest).find(e => e.toLowerCase() === id.toLowerCase())
+      const realId = existingId ?? id
+      result.latest[realId] ??= {}
+      result.latest[realId][key] = value
     }
 
     if (legacyMessage.length > 0) {

@@ -680,6 +680,26 @@ describe('AuthorizationManager - Configuration', () => {
     assert.equal(handler1.options.azureBotOAuthConnectionName, 'TestAuthLatestEnvConnection')
   })
 
+  it('should merge latest env variables for the same handler id case-insensitively', () => {
+    const key = 'AgentApplication__UserAuthorization__handlers'
+    process.env = {
+      ...process.env,
+      [`${key}__graph__settings__azureBotOAuthConnectionName`]: 'GraphConnection',
+      [`${key}__GRAPH__settings__title`]: 'Graph Title',
+      [`${key}__GrApH__settings__oboScopes`]: 'scope1,scope2'
+    }
+
+    const app = new AgentApplication({ storage: new MemoryStorage() })
+
+    const handlers = (app.authorization as any).manager._handlers
+    assert.deepEqual(Object.keys(handlers), ['graph'])
+
+    const handler = handlers.graph
+    assert.equal(handler.options.azureBotOAuthConnectionName, 'GraphConnection')
+    assert.equal(handler.options.title, 'Graph Title')
+    assert.deepEqual(handler.options.oboScopes, ['scope1', 'scope2'])
+  })
+
   it('should maintain handler id casing for latest env variables', () => {
     const key = 'AgentApplication__UserAuthorization__handlers'
     process.env = {
