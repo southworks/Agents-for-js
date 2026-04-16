@@ -39,7 +39,7 @@ describe('startServer', () => {
     ;(express.application.listen as unknown as typeof patchedListen) = patchedListen
     try {
       startServer(new ActivityHandler(), {
-        ...TEST_AUTH_CONFIG,
+        authConfig: TEST_AUTH_CONFIG,
         routePath: '/custom/messages',
         beforeListen: (app: Express) => {
           beforeListenCalled = true
