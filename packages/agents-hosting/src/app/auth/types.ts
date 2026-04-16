@@ -162,7 +162,7 @@ export interface AzureBotAuthorizationOptionsLegacy {
  * @deprecated
  * Messages configuration for the AzureBotAuthorization handler.
  */
-export interface AzureBotAuthorizationOptionsMessages {
+interface AzureBotAuthorizationOptionsMessages {
   /**
    * @deprecated Use `invalidSignInRetryMessage` instead.
    * Message displayed when an invalid code is entered.
@@ -190,7 +190,7 @@ export interface AzureBotAuthorizationOptionsMessages {
  * @deprecated
  * Settings for on-behalf-of token acquisition.
  */
-export interface AzureBotAuthorizationOptionsOBO {
+interface AzureBotAuthorizationOptionsOBO {
   /**
    * @deprecated Use `oboConnectionName` instead.
    * Connection name to use for on-behalf-of token acquisition.
