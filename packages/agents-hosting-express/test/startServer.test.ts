@@ -7,6 +7,7 @@ import { describe, it, before, after } from 'node:test'
 import assert from 'assert'
 import { createServer, type Server } from 'node:http'
 import express, { type Express, type Request, type Response } from 'express'
+import rateLimit from 'express-rate-limit'
 import { ActivityHandler, authorizeJWT } from '@microsoft/agents-hosting'
 import { startServer, StartServerOptions } from '../src/startServer'
 
@@ -98,8 +99,13 @@ describe('StartServerOptions', () => {
       const app = express()
       app.use(express.json())
 
+      const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100
+      })
+
       // Simulate startServer with a custom routePath
-      app.post('/bot/messages', authorizeJWT(TEST_AUTH_CONFIG), (_req: Request, res: Response) => {
+      app.post('/bot/messages', limiter, authorizeJWT(TEST_AUTH_CONFIG), (_req: Request, res: Response) => {
         res.status(200).send('ok')
       })
 
@@ -146,7 +152,12 @@ describe('StartServerOptions', () => {
       const app = express()
       app.use(express.json())
 
-      app.post('/api/messages', authorizeJWT(TEST_AUTH_CONFIG), (_req: Request, res: Response) => {
+      const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100
+      })
+
+      app.post('/api/messages', limiter, authorizeJWT(TEST_AUTH_CONFIG), (_req: Request, res: Response) => {
         res.status(200).send('ok')
       })
 

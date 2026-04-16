@@ -4,6 +4,7 @@
  */
 
 import express, { Response } from 'express'
+import rateLimit from 'express-rate-limit'
 import { ActivityHandler, AgentApplication, AuthConfiguration, authorizeJWT, getAuthConfigWithDefaults, Request, TurnState } from '@microsoft/agents-hosting'
 import { version } from '@microsoft/agents-hosting/package.json'
 import { createCloudAdapter } from './createCloudAdapter'
@@ -101,7 +102,14 @@ export function startServer (agent: AgentApplication<TurnState<any, any>> | Acti
     opts.beforeListen(server)
   }
 
-  server.post(routePath, authorizeJWT(authConfig), (req: Request, res: Response) =>
+  const messagesRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+
+  server.post(routePath, messagesRateLimiter, authorizeJWT(authConfig), (req: Request, res: Response) =>
     adapter.process(req, res, (context) =>
       agent.run(context)
     , headerPropagation)

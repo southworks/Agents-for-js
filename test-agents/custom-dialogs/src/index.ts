@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import express, { Response } from 'express'
+import rateLimit from 'express-rate-limit'
 import { DialogHandler } from './dialogs/dialogBot'
 import { CloudAdapter, authorizeJWT, loadAuthConfigFromEnv, UserState, ConversationState, MemoryStorage, Request } from '@microsoft/agents-hosting'
 import { version as sdkVersion } from '@microsoft/agents-hosting/package.json'
@@ -29,7 +30,12 @@ const app = express()
 
 app.use(express.json())
 
-app.post('/api/messages', authorizeJWT(authConfig), async (req: Request, res: Response) => {
+const messagesRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+})
+
+app.post('/api/messages', messagesRateLimiter, authorizeJWT(authConfig), async (req: Request, res: Response) => {
   // console.log(req.body)
   // console.log('req.user', req.user)
   await adapter.process(req, res, async (context) => await myAgent.run(context))

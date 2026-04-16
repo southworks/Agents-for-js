@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 import express, { Response } from 'express'
+import rateLimit from 'express-rate-limit'
 
 import { Request, CloudAdapter, authorizeJWT, AuthConfiguration, loadAuthConfigFromEnv, MemoryStorage, ConversationState, UserState } from '@microsoft/agents-hosting'
 import { ConversationReference } from '@microsoft/agents-activity'
@@ -59,9 +60,14 @@ const myAgent = createAgent(agentName)
 
 const app = express()
 
+const messagesRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+})
+
 app.use(express.json())
 
-app.get('/api/notify', authorizeJWT(authConfig), async (_req: Request, res: Response) => {
+app.get('/api/notify', messagesRateLimiter, authorizeJWT(authConfig), async (_req: Request, res: Response) => {
   for (const conversationReference of Object.values(conversationReferences)) {
     await adapter.continueConversation(_req.user!, conversationReference, async context => {
       await context.sendActivity('proactive hello')
@@ -74,7 +80,7 @@ app.get('/api/notify', authorizeJWT(authConfig), async (_req: Request, res: Resp
   res.end()
 })
 
-app.post('/api/messages', authorizeJWT(authConfig), async (req: Request, res: Response) => {
+app.post('/api/messages', messagesRateLimiter, authorizeJWT(authConfig), async (req: Request, res: Response) => {
   await adapter.process(req, res, async (context) => await myAgent.run(context))
 })
 
