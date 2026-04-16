@@ -616,9 +616,6 @@ export class AgentApplication<TState extends TurnState> {
    *
    */
   public async run (turnContext:TurnContext): Promise<void> {
-    if (turnContext.activity.type === ActivityTypes.Typing) {
-      return
-    }
     await this.runInternal(turnContext)
   }
 
@@ -653,29 +650,28 @@ export class AgentApplication<TState extends TurnState> {
    * ```
    */
   public async runInternal (turnContext: TurnContext): Promise<boolean> {
-    return await trace(AgentApplicationTraceDefinitions.run, async ({ record }) => {
-      const { authorized, context } = await this.handleAuthorization(turnContext)
+    const { authorized, context } = await this.handleAuthorization(turnContext)
 
-      record({ authorized, activity: context.activity })
+    if (!authorized) {
+      const managed = trace(AgentApplicationTraceDefinitions.run)
+      managed.record({ authorized, activity: context.activity })
+      managed.end()
+      // We don't log a message here because it is handled by the authorization manager and could cause confusion during mid sign-in operations.
+      return false
+    }
 
-      if (!authorized) {
-        // We don't log a message here because it is handled by the authorization manager and could cause confusion during mid sign-in operations.
-        return false
-      }
-
-      const isLongRunning =
+    const isLongRunning =
         (turnContext.activity.type === ActivityTypes.Invoke && turnContext.activity.name === 'signin/tokenExchange') ||
         (this._options.longRunningMessages && turnContext.activity.type === ActivityTypes.Message)
 
-      if (isLongRunning) {
-        logger.debug('Starting long-running messages for activity:', context.activity.id!)
-        this.startLongRunningCall(context, ctx => this.runTurn(ctx))
-        return true
-      }
+    if (isLongRunning) {
+      logger.debug('Starting long-running messages for activity:', context.activity.id!)
+      this.startLongRunningCall(context, ctx => this.runTurn(ctx))
+      return true
+    }
 
-      logger.info('Running application with activity:', context.activity.id!)
-      return this.runTurn(context)
-    })
+    logger.info('Running application with activity:', context.activity.id!)
+    return this.runTurn(context)
   }
 
   /**
@@ -699,6 +695,9 @@ export class AgentApplication<TState extends TurnState> {
    * Executes the turn processing logic for the given context, including routing and handler execution.
    */
   private async runTurn (context: TurnContext): Promise<boolean> {
+    const managed = trace(AgentApplicationTraceDefinitions.run)
+    managed.record({ authorized: true, activity: context.activity })
+
     try {
       if (this._options.startTypingTimer) {
         this.startTypingTimer(context)
@@ -717,6 +716,8 @@ export class AgentApplication<TState extends TurnState> {
       await state.load(context, storage)
 
       const route = await this.getRoute(context)
+
+      managed.record({ routeMatched: route !== undefined })
 
       if (!route) {
         logger.debug('No matching route found for activity:', context.activity)
@@ -761,9 +762,10 @@ export class AgentApplication<TState extends TurnState> {
       return true
     } catch (err: any) {
       logger.error(err)
-      throw err
+      throw managed.fail(err)
     } finally {
       this.stopTypingTimer(context)
+      managed.end()
     }
   }
 
