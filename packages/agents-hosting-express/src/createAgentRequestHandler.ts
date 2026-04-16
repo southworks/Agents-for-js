@@ -64,7 +64,7 @@ export const createAgentRequestHandler = (
   authConfiguration?: AuthConfiguration
 ): AgentRequestHandler => {
   const authConfig = getAuthConfigWithDefaults(authConfiguration)
-  const { adapter, headerPropagation } = createCloudAdapter(agent)
+  const { adapter, headerPropagation } = createCloudAdapter(agent, authConfig)
   const jwtMiddleware = authorizeJWT(authConfig)
 
   return async (req: Request, res: WebResponse): Promise<void> => {

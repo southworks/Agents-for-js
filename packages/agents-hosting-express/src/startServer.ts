@@ -86,17 +86,18 @@ export interface StartServerOptions {
 export function startServer (agent: AgentApplication<TurnState<any, any>> | ActivityHandler, options?: StartServerOptions): express.Express
 export function startServer (agent: AgentApplication<TurnState<any, any>> | ActivityHandler, authConfiguration?: AuthConfiguration): express.Express
 export function startServer (agent: AgentApplication<TurnState<any, any>> | ActivityHandler, optionsOrAuth?: StartServerOptions | AuthConfiguration): express.Express {
-  const isOptions = optionsOrAuth != null && ('authConfig' in optionsOrAuth || 'port' in optionsOrAuth || 'routePath' in optionsOrAuth || 'beforeListen' in optionsOrAuth)
-  const opts: StartServerOptions = isOptions ? optionsOrAuth as StartServerOptions : { authConfig: optionsOrAuth as AuthConfiguration | undefined }
+  const isOptions = typeof optionsOrAuth === 'object' && optionsOrAuth !== null &&
+    ('authConfig' in optionsOrAuth || 'port' in optionsOrAuth || 'routePath' in optionsOrAuth || 'beforeListen' in optionsOrAuth)
 
+  const opts: StartServerOptions = isOptions ? optionsOrAuth as StartServerOptions : { authConfig: optionsOrAuth as AuthConfiguration | undefined }
   const authConfig: AuthConfiguration = getAuthConfigWithDefaults(opts.authConfig)
   const routePath = opts.routePath ?? '/api/messages'
-  const { adapter, headerPropagation } = createCloudAdapter(agent)
+  const { adapter, headerPropagation } = createCloudAdapter(agent, authConfig)
 
   const server = express()
   server.use(express.json())
 
-  if (opts.beforeListen) {
+  if (opts.beforeListen && typeof opts.beforeListen === 'function') {
     opts.beforeListen(server)
   }
 

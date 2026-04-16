@@ -8,7 +8,7 @@ import assert from 'assert'
 import { createServer, type Server } from 'node:http'
 import express, { type Express, type Request, type Response } from 'express'
 import { ActivityHandler, authorizeJWT } from '@microsoft/agents-hosting'
-import { startServer } from '../src/startServer'
+import { startServer, StartServerOptions } from '../src/startServer'
 
 // Using a clientId ensures JWT is enforced (non-empty clientId prevents anonymous fallback)
 const TEST_AUTH_CONFIG = { clientId: 'test-app-id' }
@@ -47,7 +47,7 @@ describe('startServer', () => {
             res.status(200).json({ status: 'ok' })
           })
         }
-      } as never)
+      } as StartServerOptions)
     } catch (error) {
       reject(error)
     }

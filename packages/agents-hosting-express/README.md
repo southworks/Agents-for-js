@@ -74,11 +74,12 @@ If your framework does not expose those members directly, add an adapter layer b
 
 ```ts
 import http from 'node:http';
-import { AgentApplication, TurnState } from '@microsoft/agents-hosting';
+import { AgentApplication, TurnState, getAuthConfigWithDefaults } from '@microsoft/agents-hosting';
 import { createCloudAdapter } from '@microsoft/agents-hosting-express';
 
 const agent = new AgentApplication<TurnState>();
-const { adapter, headerPropagation } = createCloudAdapter(agent);
+const authConfig = getAuthConfigWithDefaults();
+const { adapter, headerPropagation } = createCloudAdapter(agent, authConfig);
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/messages') {
@@ -100,7 +101,7 @@ import { createCloudAdapter } from '@microsoft/agents-hosting-express';
 
 const agent = new AgentApplication<TurnState>();
 const authConfig = getAuthConfigWithDefaults();
-const { adapter, headerPropagation } = createCloudAdapter(agent);
+const { adapter, headerPropagation } = createCloudAdapter(agent, authConfig);
 
 const app = express();
 app.use(express.json());
