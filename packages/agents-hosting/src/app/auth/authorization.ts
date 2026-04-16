@@ -4,11 +4,13 @@
  */
 
 import { debug } from '@microsoft/agents-activity/logger'
+import { ExceptionHelper } from '@microsoft/agents-activity'
 import { TokenResponse } from '../../oauth'
 import { TurnContext } from '../../turnContext'
 import { TurnState } from '../turnState'
 import { AuthorizationManager } from './authorizationManager'
 import { AuthorizationHandlerTokenOptions } from './types'
+import { Errors } from '../../errorHelper'
 
 const logger = debug('agents:authorization')
 
@@ -148,7 +150,7 @@ export class UserAuthorization implements Authorization {
       return { token }
     }
 
-    throw new Error('Invalid parameters for exchangeToken method.')
+    throw ExceptionHelper.generateException(Error, Errors.InvalidExchangeTokenParameters)
   }
 
   /**
@@ -255,7 +257,7 @@ export class UserAuthorization implements Authorization {
   private getHandler (id: string) {
     const handler = this.manager.handlers.find(e => e.id.toLowerCase() === id.toLowerCase())
     if (!handler) {
-      throw new Error(`Cannot find auth handler with ID '${id}'. Ensure it is configured in the agent application options.`)
+      throw ExceptionHelper.generateException(Error, Errors.AuthHandlerNotFound, undefined, { handlerId: id })
     }
     return handler
   }

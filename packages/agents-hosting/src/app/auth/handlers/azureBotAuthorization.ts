@@ -11,8 +11,9 @@ import { TurnContext } from '../../../turnContext'
 import { TokenExchangeRequest, TokenExchangeInvokeResponse, TokenResponse, UserTokenClient } from '../../../oauth'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import { HandlerStorage } from '../handlerStorage'
-import { Activity, ActivityTypes, Channels } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes, Channels, ExceptionHelper } from '@microsoft/agents-activity'
 import { InvokeResponse, TokenExchangeInvokeRequest } from '../../../invoke'
+import { Errors } from '../../../errorHelper'
 
 const logger = debug('agents:authorization:azurebot')
 
@@ -142,15 +143,15 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    */
   constructor (public readonly id: string, private options: AzureBotAuthorizationOptions, private settings: AzureBotAuthorizationSettings) {
     if (!this.settings.storage) {
-      throw new Error(this.prefix('The \'storage\' option is not available in the app options. Ensure that the app is properly configured.'))
+      throw ExceptionHelper.generateException(Error, Errors.StorageOptionNotAvailable)
     }
 
     if (!this.settings.connections) {
-      throw new Error(this.prefix('The \'connections\' option is not available in the app options. Ensure that the app is properly configured.'))
+      throw ExceptionHelper.generateException(Error, Errors.ConnectionsOptionNotAvailable)
     }
 
     if (!options.azureBotOAuthConnectionName) {
-      throw new Error(this.prefix('The \'azureBotOAuthConnectionName\' option is not available in the app options. Ensure that the app is properly configured.'))
+      throw ExceptionHelper.generateException(Error, Errors.AzureBotOAuthConnectionNameRequired)
     }
   }
 
@@ -215,7 +216,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     const connection = this.options.azureBotOAuthConnectionName!
 
     if (!channel || !user) {
-      throw new Error(this.prefix('Both \'activity.channelId\' and \'activity.from.id\' are required to perform signout.'))
+      throw ExceptionHelper.generateException(Error, Errors.ChannelIdAndFromIdRequiredForSignout)
     }
 
     logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
@@ -298,7 +299,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
     }
 
     if (!this.isExchangeable(token)) {
-      throw new Error(this.prefix(`The current token for the '${this.options.azureBotOAuthConnectionName}' AzureBot connection is not exchangeable for an on-behalf-of flow. Ensure the token exchange URL starts with 'api://'.`))
+      throw ExceptionHelper.generateException(Error, Errors.AzureBotConnectionTokenNotExchangeable, undefined, { connectionName: this.options.azureBotOAuthConnectionName! })
     }
 
     try {
@@ -489,7 +490,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
   private async getUserTokenClient (context: TurnContext): Promise<UserTokenClient> {
     const userTokenClient = context.turnState.get<UserTokenClient>(context.adapter.UserTokenClientKey)
     if (!userTokenClient) {
-      throw new Error(this.prefix('The \'userTokenClient\' is not available in the adapter. Ensure that the adapter supports user token operations.'))
+      throw ExceptionHelper.generateException(Error, Errors.UserTokenClientNotAvailable)
     }
     return userTokenClient
   }

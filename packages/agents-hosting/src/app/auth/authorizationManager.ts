@@ -3,16 +3,21 @@
  * Licensed under the MIT License.
  */
 
-import { Activity, debug } from '@microsoft/agents-activity'
+import { Activity, debug, ExceptionHelper } from '@microsoft/agents-activity'
 import { AgentApplication } from '../agentApplication'
 import { AgenticAuthorization, AzureBotAuthorization } from './handlers'
 import { TurnContext } from '../../turnContext'
 import { HandlerStorage } from './handlerStorage'
+import { Errors } from '../../errorHelper'
 import { ActiveAuthorizationHandler, AuthorizationHandlerStatus, AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationOptions } from './types'
 import { Connections } from '../../auth/connections'
 import { envParser, envParserUtils } from '../../auth'
 
 const logger = debug('agents:authorization:manager')
+
+const AGENTIC = 'AgenticUserAuthorization'
+const AGENTIC_LEGACY = 'agentic'
+const AZURE_BOT = 'AzureBotUserAuthorization'
 
 /**
  * Active handler information used by the AuthorizationManager.
@@ -146,7 +151,7 @@ export class AuthorizationManager {
     this.createHandlers()
 
     if (this.handlers.length === 0 && app.options.authorization !== undefined) {
-      throw new Error('The AgentApplication.authorization does not have any auth handlers configured.')
+      throw ExceptionHelper.generateException(Error, Errors.NoAuthHandlersConfigured)
     }
   }
 
@@ -166,7 +171,7 @@ export class AuthorizationManager {
    */
   public async process (context: TurnContext, getHandlerIds: GetHandlerIds): Promise<AuthorizationManagerProcessResult> {
     if (this.handlers.length === 0) {
-      return { authorized: true }
+      return { authorized: true, context }
     }
 
     const storage = new HandlerStorage(this.app.options.storage!, context)
@@ -208,7 +213,7 @@ export class AuthorizationManager {
       }
 
       if (status !== AuthorizationHandlerStatus.APPROVED) {
-        throw new Error(this.prefix(handler.id, `Unexpected registration status: ${status}`))
+        throw ExceptionHelper.generateException(Error, Errors.UnexpectedRegistrationStatus, undefined, { status })
       }
 
       await storage.delete()
@@ -255,7 +260,7 @@ export class AuthorizationManager {
       return await handler.signin(context, active)
     } catch (cause) {
       await storage.delete()
-      throw new Error(this.prefix(handler.id, 'Failed to sign in'), { cause })
+      throw ExceptionHelper.generateException(Error, Errors.FailedToSignIn, cause as Error)
     }
   }
 
@@ -273,7 +278,7 @@ export class AuthorizationManager {
     }).filter((handler) => handler !== undefined)
 
     if (unknownHandlers.length > 0) {
-      throw new Error(`Cannot find auth handlers with ID(s): ${unknownHandlers.join(', ')}, make sure they are configured correctly.`)
+      throw ExceptionHelper.generateException(Error, Errors.AuthHandlersNotFound, undefined, { handlerIds: unknownHandlers.join(', ') })
     }
 
     return handlers
@@ -292,7 +297,7 @@ export class AuthorizationManager {
   private createHandlers () {
     let legacyMessage = ''
     const settings: AuthorizationHandlerSettings = { storage: this.app.options.storage!, connections: this.connections }
-    const runtimeEntries = Object.entries(this.app.options.authorization ?? {})
+    let runtimeEntries = Object.entries(this.app.options.authorization ?? {})
     const result = { latest: {}, legacy: {} } as {
       latest: Record<string, Record<string, any> | undefined>;
       legacy: Record<string, Record<string, any> | undefined>;
@@ -348,11 +353,17 @@ export class AuthorizationManager {
       logger.warn('Deprecated environment variables detected, update to the latest format: (case-insensitive)', `[\n${legacyMessage}]`)
     }
 
-    const latestEntries = Object.entries(result.latest)
-    const legacyEntries = Object.entries(result.legacy)
+    // Fix types
+    const fixTypes = (entries: [string, any][]) => entries
+      .map(([id, options]) => [id, { ...options, type: this.fixType(id, options?.type) }] as [string, AuthorizationOptions[string]])
 
-    for (const [id] of new Set([...runtimeEntries, ...latestEntries])) {
-      if (this._handlers[id] !== undefined) {
+    runtimeEntries = fixTypes(runtimeEntries)
+    const latestEntries = fixTypes(Object.entries(result.latest))
+    const legacyEntries = fixTypes(Object.entries(result.legacy))
+
+    const registeredHandlers = new Set()
+    for (const [id] of [...runtimeEntries, ...latestEntries]) {
+      if (registeredHandlers.has(id.toLowerCase())) {
         continue
       }
 
@@ -365,19 +376,8 @@ export class AuthorizationManager {
         logger.warn(this.prefix(id, 'Both runtime and latest environment variable configurations detected. Runtime configuration will take precedence over latest environment variables.'))
       }
 
-      // Convert incoming type identifiers to standard types for processing.
-      const fixType = runtime ?? latest ?? legacy
-      if (fixType?.type?.toLowerCase() === 'agentic') {
-        fixType.type = 'AgenticUserAuthorization'
-        logger.warn(this.prefix(id, 'The \'agentic\' type is deprecated. Please use \'AgenticUserAuthorization\' instead.'))
-      } else if (fixType?.type?.toLowerCase() === 'agenticuserauthorization') {
-        fixType.type = 'AgenticUserAuthorization'
-      } else if (fixType && (fixType.type === undefined || fixType.type.toLowerCase() === 'azurebotuserauthorization')) {
-        fixType.type = 'AzureBotUserAuthorization'
-      }
-
       // Normalize runtime legacy options to latest format
-      if (runtime?.type === 'AzureBotUserAuthorization') {
+      if (runtime?.type === AZURE_BOT) {
         runtime.azureBotOAuthConnectionName ??= runtime.name
         runtime.invalidSignInRetryMax ??= runtime.maxAttempts
         runtime.invalidSignInRetryMessage ??= runtime.messages?.invalidCode
@@ -399,15 +399,15 @@ export class AuthorizationManager {
 
       // Priority: runtime > latest > legacy
       // Pruning done individually to avoid overwriting with undefined when merging.
-      const options = runtime ? { ...prune(legacy || {}), ...prune(runtime) } : prune(latest || {}) as AuthorizationOptions[string]
+      const options: AuthorizationOptions[string] = runtime ? { ...prune(legacy || {}), ...prune(runtime) } : prune(latest || {})
 
       if (!settings.storage) {
-        throw new Error('Storage is required for Authorization. Ensure that a storage provider is configured in the AgentApplication options.')
+        throw ExceptionHelper.generateException(Error, Errors.StorageRequiredForAuthorization)
       }
 
-      if (options.type === 'AgenticUserAuthorization') {
+      if (options.type === AGENTIC) {
         this._handlers[id] = new AgenticAuthorization(id, options, settings)
-      } else if (options.type === 'AzureBotUserAuthorization') {
+      } else if (options.type === AZURE_BOT) {
         // Set default values if not provided
         options.title ||= 'Sign-in'
         options.text ||= 'Please sign-in to continue'
@@ -415,9 +415,33 @@ export class AuthorizationManager {
         options.enableSso = options.enableSso !== false // default value is true if undefined.
 
         this._handlers[id] = new AzureBotAuthorization(id, options, settings)
-      } else {
-        throw new Error(this.prefix(id, `Unsupported authorization handler type: '${options.type}'. Supported types are 'AgenticUserAuthorization' and default (AzureBotUserAuthorization).`))
       }
+
+      registeredHandlers.add(id.toLowerCase())
     }
+  }
+
+  /**
+   * Fixes the handler type based on the provided type string, supporting both latest and legacy formats.
+   */
+  private fixType (handlerId: string, type: AuthorizationOptions[string]['type'] | string) {
+    if (!type) {
+      return AZURE_BOT
+    }
+
+    if (type.toLowerCase() === AGENTIC_LEGACY.toLowerCase()) {
+      logger.warn(this.prefix(handlerId, 'The \'agentic\' type is deprecated. Please use \'AgenticUserAuthorization\' instead.'))
+      return AGENTIC
+    }
+
+    if (type.toLowerCase() === AGENTIC.toLowerCase()) {
+      return AGENTIC
+    }
+
+    if (type.toLowerCase() === AZURE_BOT.toLowerCase()) {
+      return AZURE_BOT
+    }
+
+    throw ExceptionHelper.generateException(Error, Errors.UnsupportedAuthHandlerType, undefined, { handlerType: type })
   }
 }

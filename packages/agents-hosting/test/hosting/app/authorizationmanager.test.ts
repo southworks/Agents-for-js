@@ -564,7 +564,7 @@ describe('AuthorizationManager - Configuration', () => {
         }
       })
       assert.equal(app, undefined)
-    }, { message: '[handler:testAuth] The \'azureBotOAuthConnectionName\' option is not available in the app options. Ensure that the app is properly configured.' })
+    }, /'azureBotOAuthConnectionName' option is not available in the app options/)
   })
 
   // AgenticUserAuthorization type tests
@@ -649,7 +649,7 @@ describe('AuthorizationManager - Configuration', () => {
         }
       })
       assert.equal(app, undefined)
-    }, { message: '[handler:testAuth] At least one scope must be specified for the Agentic authorization handler.' })
+    }, /At least one scope must be specified for the Agentic authorization handler/)
   })
 
   it('should load agentic altBlueprintConnectionName from env', () => {

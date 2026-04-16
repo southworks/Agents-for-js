@@ -31,7 +31,7 @@ describe('AgentApplication - Authorization Setup', () => {
         }
       })
       assert.equal(app.options.authorization, undefined)
-    }, { message: 'Storage is required for Authorization. Ensure that a storage provider is configured in the AgentApplication options.' })
+    }, /Storage is required for Authorization/)
   })
 
   it('should throw when authorization has no handlers', () => {
@@ -41,7 +41,7 @@ describe('AgentApplication - Authorization Setup', () => {
         authorization: {}
       })
       assert.equal(app.options.authorization, undefined)
-    }, { message: 'The AgentApplication.authorization does not have any auth handlers configured.' })
+    }, /The AgentApplication.authorization does not have any auth handlers/)
   })
 
   it('should initialize successfully with valid auth configuration', () => {
@@ -224,7 +224,7 @@ describe('UserAuthorization', () => {
     const auth = new UserAuthorization(manager)
     await assert.rejects(
       async () => auth.getToken(context, 'nonExistinghandler'),
-      { message: "Cannot find auth handler with ID 'nonExistinghandler'. Ensure it is configured in the agent application options." }
+      /Cannot find auth handler with ID 'nonExistinghandler'. Ensure it is configured in the agent application options./
     )
   })
 })

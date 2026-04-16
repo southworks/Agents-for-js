@@ -3,11 +3,12 @@
  * Licensed under the MIT License.
  */
 
-import { debug } from '@microsoft/agents-activity'
+import { debug, ExceptionHelper } from '@microsoft/agents-activity'
 import { TurnContext } from '../../../turnContext'
 import { AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus, AuthorizationHandlerTokenOptions } from '../types'
 import { TokenResponse } from '../../../oauth'
 import { AuthProvider } from '../../../auth'
+import { Errors } from '../../../errorHelper'
 
 const logger = debug('agents:authorization:agentic')
 
@@ -61,11 +62,11 @@ export class AgenticAuthorization implements AuthorizationHandler {
    */
   constructor (public readonly id: string, private options: AgenticAuthorizationOptions, private settings: AgenticAuthorizationSettings) {
     if (!this.settings.connections) {
-      throw new Error(this.prefix('The \'connections\' option is not available in the app options. Ensure that the app is properly configured.'))
+      throw ExceptionHelper.generateException(Error, Errors.ConnectionsOptionNotAvailable)
     }
 
     if (!options.scopes || options.scopes.length === 0) {
-      throw new Error(this.prefix('At least one scope must be specified for the Agentic authorization handler.'))
+      throw ExceptionHelper.generateException(Error, Errors.AtLeastOneScopeRequired)
     }
   }
 
