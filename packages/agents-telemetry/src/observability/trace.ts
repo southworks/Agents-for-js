@@ -42,6 +42,7 @@ export function traceFactory (otel: OTel) {
     const record = createRecord(target)
 
     if (!callback) {
+      // TODO: if parent/child span connections are needed, we could expose a 'child' function that internally connects them.
       const span = tracer.startSpan(target.name)
       const flow = start(otel, target, span, record)
 

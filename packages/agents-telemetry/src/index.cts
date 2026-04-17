@@ -10,6 +10,7 @@
  */
 
 import { index } from './index.js'
+import { OTel, OTelLogs } from './types.js'
 
 export type { TraceDefinition } from './types.js'
 
@@ -19,4 +20,7 @@ export const {
   debug,
   trace,
   metric,
-} = index((lib): unknown => require(lib))
+} = index({
+  otel: () => require('@opentelemetry/api') as OTel,
+  logs: () => require('@opentelemetry/api-logs') as OTelLogs,
+})
