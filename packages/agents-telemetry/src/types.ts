@@ -149,14 +149,6 @@ export interface Factory {
 }
 
 /**
- * Options used by internal module loaders.
- */
-export interface LoadOptions {
-  lib: string
-  warningMessage: string
-}
-
-/**
  * Options used by the shared `attempt()` helper.
  *
  * @remarks
