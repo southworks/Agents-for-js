@@ -4,30 +4,23 @@
  */
 
 import { z } from 'zod'
-import { MessagingExtensionParameter, messagingExtensionParameterZodSchema } from './messagingExtensionParameter'
-import { MessagingExtensionQueryOptions, messagingExtensionQueryOptionsZodSchema } from './messagingExtensionQueryOptions'
+import type { MessagingExtensionQuery } from '@microsoft/teams.api'
 
 /**
- * Represents a query for a messaging extension.
+ * Zod schema for validating MessagingExtensionParameter.
  */
-export interface MessagingExtensionQuery {
-  /**
-   * The ID of the command.
-   */
-  commandId?: string
-  /**
-   * A list of parameters for the query.
-   */
-  parameters?: MessagingExtensionParameter[]
-  /**
-   * Options for the query.
-   */
-  queryOptions?: MessagingExtensionQueryOptions
-  /**
-   * The state of the query.
-   */
-  state?: string
-}
+export const messagingExtensionParameterZodSchema = z.object({
+  name: z.string().min(1).optional(),
+  value: z.any().optional()
+})
+
+/**
+ * Zod schema for validating MessagingExtensionQueryOptions.
+ */
+export const messagingExtensionQueryOptionsZodSchema = z.object({
+  skip: z.number().optional(),
+  count: z.number().optional()
+})
 
 /**
  * Zod schema for validating MessagingExtensionQuery.

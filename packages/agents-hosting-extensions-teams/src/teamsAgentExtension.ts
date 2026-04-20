@@ -1,10 +1,10 @@
 import { Meeting } from './meeting/meeting'
 import { ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, AgentExtension, RouteHandler, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { parseTeamsChannelData } from './activity-extensions/teamsChannelDataParser'
+import { parseTeamsChannelData } from './activity-extensions'
 import { MessageExtension } from './messageExtension/messageExtension'
 import { TaskModule } from './taskModule/taskModule'
-import { FeedbackLoopData } from './feedbackLoopData'
+import type { IMessageSubmitActionInvokeActivity } from '@microsoft/teams.api'
 
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
   private _app: AgentApplication<TState>
@@ -33,11 +33,12 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
 
   onFeedback (handler: RouteHandler<TurnState>) {
     const routeSel: RouteSelector = (context: TurnContext) => {
+      const submitValue = context.activity.value as IMessageSubmitActionInvokeActivity['value'] | undefined
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
         context.activity.name === 'message/submitAction' &&
-        (context.activity.value as FeedbackLoopData).actionName === 'feedback'
+        submitValue?.actionName === 'feedback'
       )
     }
     this._app.addRoute(routeSel, handler, true) // Invoke requires true
