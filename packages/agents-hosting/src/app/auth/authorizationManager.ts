@@ -10,6 +10,7 @@ import { TurnContext } from '../../turnContext'
 import { HandlerStorage } from './handlerStorage'
 import { ActiveAuthorizationHandler, AuthorizationHandlerStatus, AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationOptions } from './types'
 import { Connections } from '../../auth/connections'
+import { sendInvokeResponse } from './utils'
 
 const logger = debug('agents:authorization:manager')
 
@@ -108,17 +109,28 @@ export class AuthorizationManager {
    * @returns The result of the authorization process.
    */
   public async process (context: TurnContext, getHandlerIds: GetHandlerIds): Promise<AuthorizationManagerProcessResult> {
+    const activity = context.activity
     const storage = new HandlerStorage(this.app.options.storage!, context)
 
     let active = await this.active(storage, getHandlerIds)
 
-    if (active !== undefined && active?.data.activity.conversation?.id !== context.activity.conversation?.id) {
+    if (activity.name?.startsWith('signin/')) {
+      const reason = `Received '${activity.name}' but no active sign-in flow exists for user '${activity.from?.id}'.`
+      logger.warn(reason, activity)
+      await sendInvokeResponse(context, {
+        status: 400,
+        body: { failureDetail: reason }
+      })
+      return { authorized: false, context }
+    }
+
+    if (active !== undefined && active?.data.activity.conversation?.id !== activity.conversation?.id) {
       logger.warn('Discarding the active session due to the conversation has changed during an active sign-in process', active?.data.activity)
       await storage.delete()
       return { authorized: true, context }
     }
 
-    const handlers = active?.handlers ?? this.mapHandlers(await getHandlerIds(context.activity) ?? []) ?? []
+    const handlers = active?.handlers ?? this.mapHandlers(await getHandlerIds(activity) ?? []) ?? []
 
     // Create a shallow copy to modify the activity, since the signin process depends on it and we want to ensure the next handler depends on the initial activity, not the modified one.
     const sharedContext = new TurnContext(context)
