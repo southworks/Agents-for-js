@@ -10,7 +10,7 @@ import { Activity, ActivityTypes, Channels } from '@microsoft/agents-activity'
 /**
  * Sends an InvokeResponse activity if the channel is Microsoft Teams, including Copilot within MS Teams.
  */
-export function sendInvokeResponse <T> (context: TurnContext, response: InvokeResponse<T>) {
+export function sendInvokeResponse<T> (context: TurnContext, response: InvokeResponse<T>) {
   if (context.activity.channelIdChannel !== Channels.Msteams) {
     return Promise.resolve()
   }
