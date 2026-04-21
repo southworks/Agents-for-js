@@ -114,7 +114,7 @@ export class AuthorizationManager {
 
     let active = await this.active(storage, getHandlerIds)
 
-    if (activity.name?.startsWith('signin/')) {
+    if (!active && activity.name?.startsWith('signin/')) {
       const reason = `Received '${activity.name}' but no active sign-in flow exists for user '${activity.from?.id}'.`
       logger.warn(reason, activity)
       await sendInvokeResponse(context, {
