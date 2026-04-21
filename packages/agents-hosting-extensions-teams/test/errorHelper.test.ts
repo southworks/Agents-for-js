@@ -24,6 +24,7 @@ describe('TeamsExtensionErrors', () => {
     assert.strictEqual(Errors.UnexpectedTaskModuleSubmit.code, -150016)
     assert.strictEqual(Errors.NotImplemented.code, -150017)
     assert.strictEqual(Errors.BadRequest.code, -150018)
+    assert.strictEqual(Errors.TeamsApiClientNotAvailable.code, -150019)
   })
 
   it('should contain error message in description', () => {

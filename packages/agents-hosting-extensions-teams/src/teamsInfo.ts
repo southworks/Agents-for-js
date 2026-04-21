@@ -8,7 +8,7 @@ import { Errors } from './errorHelper'
 import { type ChannelInfo, type MeetingInfo, type MeetingNotificationParams, type MeetingNotificationResponse, type MeetingParticipant, type PagedMembersResult, type TeamDetails, type TeamsChannelAccount } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
 import { CloudAdapter, ConnectorClient, TurnContext } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension } from './teamsAgentExtension'
+import { getTeamsClient } from './teamsApiClient'
 
 /**
  * Provides utility methods for interacting with Microsoft Teams-specific features.
@@ -60,7 +60,7 @@ export class TeamsInfo {
       tenantId = tenant?.id
     }
 
-    const res = await TeamsAgentExtension.getTeamsClient(context).meetings.getParticipant(meetingId, participantId, tenantId!)
+    const res = await getTeamsClient(context).meetings.getParticipant(meetingId, participantId, tenantId!)
     return res as MeetingParticipant
   }
 
@@ -76,7 +76,7 @@ export class TeamsInfo {
       const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
       meetingId = teamsChannelData.meeting?.id
     }
-    const res = await TeamsAgentExtension.getTeamsClient(context).meetings.getById(meetingId!)
+    const res = await getTeamsClient(context).meetings.getById(meetingId!)
     return res as MeetingInfo
   }
 
@@ -95,7 +95,7 @@ export class TeamsInfo {
     if (!teamId) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    const res = await TeamsAgentExtension.getTeamsClient(context).teams.getById(teamId!)
+    const res = await getTeamsClient(context).teams.getById(teamId!)
     return res as TeamDetails
   }
 
@@ -172,7 +172,7 @@ export class TeamsInfo {
     if (!teamId) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    return await TeamsAgentExtension.getTeamsClient(context).teams.getConversations(teamId!)
+    return await getTeamsClient(context).teams.getConversations(teamId!)
   }
 
   /**
@@ -191,7 +191,7 @@ export class TeamsInfo {
     } else {
       const conversation = context.activity.conversation
       const conversationId = conversation && conversation.id ? conversation.id : undefined
-      const client = TeamsAgentExtension.getTeamsClient(context)
+      const client = getTeamsClient(context)
       const pagedResults = await client.conversations.members(conversationId!).getPaged(pageSize, continuationToken)
       do {
         if (pagedResults.continuationToken) {
@@ -239,7 +239,7 @@ export class TeamsInfo {
     if (!teamId) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    const client = TeamsAgentExtension.getTeamsClient(context)
+    const client = getTeamsClient(context)
     const pagedResults = await client.conversations.members(teamId).getPaged(pageSize, continuationToken)
     do {
       if (pagedResults.continuationToken) {
@@ -260,7 +260,7 @@ export class TeamsInfo {
    * @returns {Promise<TeamsChannelAccount>} - The member information.
    */
   static async getTeamMember (context: TurnContext, teamId: string, userId: string): Promise<TeamsChannelAccount> {
-    return await TeamsAgentExtension.getTeamsClient(context).conversations.members(teamId).getById(userId)
+    return await getTeamsClient(context).conversations.members(teamId).getById(userId)
   }
 
   /**
@@ -285,10 +285,10 @@ export class TeamsInfo {
       throw ExceptionHelper.generateException(Error, Errors.MeetingIdRequired)
     }
 
-    return await TeamsAgentExtension.getTeamsClient(context).meetings.sendNotification(meetingId, notification)
+    return await getTeamsClient(context).meetings.sendNotification(meetingId, notification)
   }
 
   private static async getMemberInternal (context: TurnContext, conversationId: string, userId: string): Promise<TeamsChannelAccount> {
-    return await TeamsAgentExtension.getTeamsClient(context).conversations.members(conversationId).getById(userId)
+    return await getTeamsClient(context).conversations.members(conversationId).getById(userId)
   }
 }
