@@ -5,10 +5,10 @@
 
 import { Activity, Channels, ConversationParameters, ConversationReference, ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
-import type { ChannelInfo, MeetingInfo, MeetingNotificationParams, MeetingNotificationResponse, MeetingParticipant, PagedMembersResult, TeamDetails, TeamsChannelAccount } from '@microsoft/teams.api'
-import { TeamsConnectorClient } from './client/teamsConnectorClient'
+import { type ChannelInfo, type MeetingInfo, type MeetingNotificationParams, type MeetingNotificationResponse, type MeetingParticipant, type PagedMembersResult, type TeamDetails, type TeamsChannelAccount } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
 import { CloudAdapter, ConnectorClient, TurnContext } from '@microsoft/agents-hosting'
+import { TeamsAgentExtension } from './teamsAgentExtension'
 
 /**
  * Provides utility methods for interacting with Microsoft Teams-specific features.
@@ -60,7 +60,7 @@ export class TeamsInfo {
       tenantId = tenant?.id
     }
 
-    const res = await this.getRestClient(context).fetchMeetingParticipant(meetingId, participantId, tenantId!)
+    const res = await TeamsAgentExtension.getTeamsClient(context).meetings.getParticipant(meetingId, participantId, tenantId!)
     return res as MeetingParticipant
   }
 
@@ -76,7 +76,7 @@ export class TeamsInfo {
       const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
       meetingId = teamsChannelData.meeting?.id
     }
-    const res = await this.getRestClient(context).fetchMeetingInfo(meetingId!)
+    const res = await TeamsAgentExtension.getTeamsClient(context).meetings.getById(meetingId!)
     return res as MeetingInfo
   }
 
@@ -95,7 +95,7 @@ export class TeamsInfo {
     if (!teamId) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    const res = await this.getRestClient(context).fetchTeamDetails(teamId!)
+    const res = await TeamsAgentExtension.getTeamsClient(context).teams.getById(teamId!)
     return res as TeamDetails
   }
 
@@ -172,7 +172,7 @@ export class TeamsInfo {
     if (!teamId) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    return await this.getRestClient(context).fetchChannelList(teamId!)
+    return await TeamsAgentExtension.getTeamsClient(context).teams.getConversations(teamId!)
   }
 
   /**
@@ -191,7 +191,16 @@ export class TeamsInfo {
     } else {
       const conversation = context.activity.conversation
       const conversationId = conversation && conversation.id ? conversation.id : undefined
-      return this.getRestClient(context).getConversationPagedMember(conversationId!, pageSize!, continuationToken!)
+      const client = TeamsAgentExtension.getTeamsClient(context)
+      const pagedResults = await client.conversations.members(conversationId!).getPaged(pageSize, continuationToken)
+      do {
+        if (pagedResults.continuationToken) {
+          const nextResults = await client.conversations.members(conversationId!).getPaged(pageSize, pagedResults.continuationToken)
+          pagedResults.members.push(...nextResults.members)
+          pagedResults.continuationToken = nextResults.continuationToken
+        }
+      } while (pagedResults.continuationToken)
+      return pagedResults
     }
   }
 
@@ -230,10 +239,11 @@ export class TeamsInfo {
     if (!teamId) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    const pagedResults = await this.getRestClient(context).getConversationPagedMember(teamId, pageSize!, continuationToken!)
+    const client = TeamsAgentExtension.getTeamsClient(context)
+    const pagedResults = await client.conversations.members(teamId).getPaged(pageSize, continuationToken)
     do {
       if (pagedResults.continuationToken) {
-        const nextResults = await this.getRestClient(context).getConversationPagedMember(teamId, pageSize!, pagedResults.continuationToken)
+        const nextResults = await client.conversations.members(teamId).getPaged(pageSize, pagedResults.continuationToken)
         pagedResults.members.push(...nextResults.members)
         pagedResults.continuationToken = nextResults.continuationToken
       }
@@ -250,7 +260,7 @@ export class TeamsInfo {
    * @returns {Promise<TeamsChannelAccount>} - The member information.
    */
   static async getTeamMember (context: TurnContext, teamId: string, userId: string): Promise<TeamsChannelAccount> {
-    return await this.getRestClient(context).getConversationMember(teamId, userId) as TeamsChannelAccount
+    return await TeamsAgentExtension.getTeamsClient(context).conversations.members(teamId).getById(userId)
   }
 
   /**
@@ -259,9 +269,10 @@ export class TeamsInfo {
    * @param {TurnContext} context - The turn context.
    * @param {MeetingNotificationParams} notification - The meeting notification params.
    * @param {string} [meetingId] - The meeting ID.
-   * @returns {Promise<MeetingNotificationResponse>} - The meeting notification response.
+   * @returns {Promise<MeetingNotificationResponse | undefined>} - `undefined` on full success (HTTP 202) or a `MeetingNotificationResponse`
+   * with per-recipient failure info on partial success (HTTP 207).
    */
-  static async sendMeetingNotification (context: TurnContext, notification: MeetingNotificationParams, meetingId?: string): Promise<MeetingNotificationResponse> {
+  static async sendMeetingNotification (context: TurnContext, notification: MeetingNotificationParams, meetingId?: string): Promise<MeetingNotificationResponse | undefined> {
     const activity = context.activity
 
     if (meetingId == null) {
@@ -274,16 +285,10 @@ export class TeamsInfo {
       throw ExceptionHelper.generateException(Error, Errors.MeetingIdRequired)
     }
 
-    return await this.getRestClient(context).sendMeetingNotification(meetingId, notification)
+    return await TeamsAgentExtension.getTeamsClient(context).meetings.sendNotification(meetingId, notification)
   }
 
   private static async getMemberInternal (context: TurnContext, conversationId: string, userId: string): Promise<TeamsChannelAccount> {
-    const connectorClient : ConnectorClient = context.turnState.get<ConnectorClient>(context.adapter.ConnectorClientKey)
-    return await connectorClient.getConversationMember(userId, conversationId) as TeamsChannelAccount
-  }
-
-  private static getRestClient (context: TurnContext) : TeamsConnectorClient {
-    const connectorClient : ConnectorClient = context.turnState.get<ConnectorClient>(context.adapter.ConnectorClientKey)
-    return new TeamsConnectorClient(connectorClient)
+    return await TeamsAgentExtension.getTeamsClient(context).conversations.members(conversationId).getById(userId)
   }
 }

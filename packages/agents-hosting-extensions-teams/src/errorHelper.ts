@@ -108,7 +108,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'operationId is required.'
   },
 
-  // TeamsConnectorClient Errors (-150011 to -150014)
+  // Teams client lookup errors (-150011 to -150015)
   /**
    * Error thrown when activity parameter is missing.
    */
@@ -173,5 +173,13 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   BadRequest: {
     code: -150018,
     description: 'BadRequest'
+  },
+
+  /**
+   * Error thrown when the Teams SDK client is not available in the context.
+   */
+  TeamsApiClientNotAvailable: {
+    code: -150019,
+    description: 'Teams API client is not available in the context.'
   }
 }

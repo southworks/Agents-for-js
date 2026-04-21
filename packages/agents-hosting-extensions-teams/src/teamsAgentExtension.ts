@@ -1,22 +1,54 @@
 import { Meeting } from './meeting/meeting'
-import { ActivityTypes } from '@microsoft/agents-activity'
-import { AgentApplication, AgentExtension, RouteHandler, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { ActivityTypes, ExceptionHelper } from '@microsoft/agents-activity'
+import { AgentApplication, AgentExtension, ConnectorClient, RouteHandler, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { parseTeamsChannelData } from './activity-extensions'
 import { MessageExtension } from './messageExtension/messageExtension'
 import { TaskModule } from './taskModule/taskModule'
-import type { IMessageSubmitActionInvokeActivity } from '@microsoft/teams.api'
+import { Client as TeamsClient, type IMessageSubmitActionInvokeActivity } from '@microsoft/teams.api'
+import { Errors } from './errorHelper'
 
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
+  static readonly TeamsApiClientKey = Symbol('TeamsApiClient')
+
   private _app: AgentApplication<TState>
   private _meeting: Meeting<TState>
   private _messageExtension: MessageExtension<TState>
   private _taskModule: TaskModule<TState>
+
   constructor (app: AgentApplication<TState>) {
     super('msteams')
     this._app = app
     this._meeting = new Meeting(app)
     this._messageExtension = new MessageExtension(app)
     this._taskModule = new TaskModule(app)
+    this._app.onTurn('beforeTurn', async (context) => {
+      if (context.activity.channelId !== this.channelId || context.turnState.has(TeamsAgentExtension.TeamsApiClientKey)) {
+        return true
+      }
+
+      const connectorClient = context.turnState.get<ConnectorClient>(context.adapter.ConnectorClientKey)
+      const serviceUrl = context.activity.serviceUrl ?? connectorClient?.axiosInstance.defaults.baseURL
+
+      if (!connectorClient || !serviceUrl) {
+        return true
+      }
+
+      context.turnState.set(
+        TeamsAgentExtension.TeamsApiClientKey,
+        new TeamsClient(serviceUrl, {
+          headers: TeamsAgentExtension.getClientHeaders(connectorClient)
+        })
+      )
+
+      return true
+    })
+  }
+
+  private static getClientHeaders (connectorClient: ConnectorClient): Record<string, string> {
+    const commonHeaders = connectorClient.axiosInstance.defaults.headers.common
+    const headers = Object.entries(commonHeaders ?? {}).filter(([, value]) => typeof value === 'string')
+
+    return Object.fromEntries(headers) as Record<string, string>
   }
 
   public get meeting (): Meeting<TState> {
@@ -236,5 +268,15 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     }
     this.addRoute(this._app, routeSel, handler, false)
     return this
+  }
+
+  public static getTeamsClient (context: TurnContext): TeamsClient {
+    const teamsClient = context.turnState.get<TeamsClient>(TeamsAgentExtension.TeamsApiClientKey)
+
+    if (!teamsClient) {
+      throw ExceptionHelper.generateException(Error, Errors.TeamsApiClientNotAvailable)
+    }
+
+    return teamsClient
   }
 }

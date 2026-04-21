@@ -3,4 +3,4 @@
  * Licensed under the MIT License.
  */
 
-export * from './teamsConnectorClient'
+export { Client as TeamsClient } from '@microsoft/teams.api'
