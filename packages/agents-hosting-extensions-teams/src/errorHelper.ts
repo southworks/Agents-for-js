@@ -19,7 +19,7 @@ import { AgentErrorDefinition } from '@microsoft/agents-activity'
  * ```
  */
 export const Errors: { [key: string]: AgentErrorDefinition } = {
-  // TeamsInfo Errors (-150000 to -150025)
+  // TeamsInfo Errors (-150000 to -150006)
   /**
    * Error thrown when context is required but not provided.
    */
@@ -76,94 +76,21 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'The teamsChannelId cannot be null or empty'
   },
 
-  /**
-   * Error thrown when activity is required but not provided.
-   */
-  ActivityRequired: {
-    code: -150007,
-    description: 'activity is required.'
-  },
-
-  /**
-   * Error thrown when tenantId is required but not provided.
-   */
-  TenantIdRequired: {
-    code: -150008,
-    description: 'tenantId is required.'
-  },
-
-  /**
-   * Error thrown when members list is required but not provided.
-   */
-  MembersListRequired: {
-    code: -150009,
-    description: 'members list is required.'
-  },
-
-  /**
-   * Error thrown when operationId is required but not provided.
-   */
-  OperationIdRequired: {
-    code: -150010,
-    description: 'operationId is required.'
-  },
-
-  // Teams client lookup errors (-150011 to -150015)
-  /**
-   * Error thrown when activity parameter is missing.
-   */
-  MissingActivityParameter: {
-    code: -150011,
-    description: 'Missing activity parameter'
-  },
-
-  /**
-   * Error thrown when method is only valid within MS Teams Team scope.
-   */
-  OnlyValidInTeamsScope: {
-    code: -150012,
-    description: 'This method is only valid within the scope of a MS Teams Team.'
-  },
-
-  /**
-   * Error thrown when userId is required but not provided.
-   */
-  UserIdRequired: {
-    code: -150013,
-    description: 'userId is required'
-  },
-
-  /**
-   * Error thrown when conversationId is required but not provided.
-   */
-  ConversationIdRequired: {
-    code: -150014,
-    description: 'conversationId is required'
-  },
-
-  /**
-   * Error thrown when client is not available in the context.
-   */
-  ClientNotAvailable: {
-    code: -150015,
-    description: 'Client is not available in the context.'
-  },
-
-  // TaskModule Errors (-150016)
+  // TaskModule Errors (-150007)
   /**
    * Error thrown when unexpected TaskModules.submit() is triggered.
    */
   UnexpectedTaskModuleSubmit: {
-    code: -150016,
+    code: -150007,
     description: 'Unexpected TaskModules.submit() triggered for activity type: {activityType}'
   },
 
-  // TeamsActivityHandler Errors (-150017 to -150018)
+  // TeamsActivityHandler Errors (-150008 to -150009)
   /**
    * Error thrown when method is not implemented.
    */
   NotImplemented: {
-    code: -150017,
+    code: -150008,
     description: 'NotImplemented'
   },
 
@@ -171,15 +98,16 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
    * Error thrown for bad request.
    */
   BadRequest: {
-    code: -150018,
+    code: -150009,
     description: 'BadRequest'
   },
 
+  // TeamsApiClient Errors (-150010)
   /**
    * Error thrown when the Teams SDK client is not available in the context.
    */
   TeamsApiClientNotAvailable: {
-    code: -150019,
+    code: -150010,
     description: 'Teams API client is not available in the context.'
   }
 }

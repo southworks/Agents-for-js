@@ -4,6 +4,14 @@ import type { MessagingExtensionAction, MessagingExtensionActionResponse, Messag
 import { z } from 'zod'
 import { messagingExtensionQueryZodSchema } from './messagingExtensionQuery'
 
+const appBasedLinkQuerySchema = z.object({
+  url: z.string().url()
+})
+
+function parseAppBasedLinkQuery (value: unknown): { url: string } {
+  return appBasedLinkQuerySchema.parse(value)
+}
+
 type RouteQueryHandler<TState extends TurnState> = (context: TurnContext, state: TState, query: MessagingExtensionQuery) => Promise<MessagingExtensionResult>
 type SelectItemHandler<TState extends TurnState> = (context: TurnContext, state: TState, item: unknown) => Promise<MessagingExtensionResult>
 type QueryLinkHandler<TState extends TurnState> = (context: TurnContext, state: TState, url: string) => Promise<MessagingExtensionResult>
@@ -97,10 +105,7 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler : RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
-      const appBasedLinkQuerySchema = z.object({
-        url: z.string().url()
-      })
-      const query = appBasedLinkQuerySchema.parse(context.activity.value)
+      const query = parseAppBasedLinkQuery(context.activity.value)
       const res = await handler(context, state, query.url)
       const response: MessagingExtensionResponse = { composeExtension: res }
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
@@ -124,10 +129,7 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler : RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
-      const appBasedLinkQuerySchema = z.object({
-        url: z.string().url()
-      })
-      const query = appBasedLinkQuerySchema.parse(context.activity.value)
+      const query = parseAppBasedLinkQuery(context.activity.value)
       const res = await handler(context, state, query.url)
       const response: MessagingExtensionResponse = { composeExtension: res }
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })

@@ -192,15 +192,7 @@ export class TeamsInfo {
       const conversation = context.activity.conversation
       const conversationId = conversation && conversation.id ? conversation.id : undefined
       const client = getTeamsClient(context)
-      const pagedResults = await client.conversations.members(conversationId!).getPaged(pageSize, continuationToken)
-      do {
-        if (pagedResults.continuationToken) {
-          const nextResults = await client.conversations.members(conversationId!).getPaged(pageSize, pagedResults.continuationToken)
-          pagedResults.members.push(...nextResults.members)
-          pagedResults.continuationToken = nextResults.continuationToken
-        }
-      } while (pagedResults.continuationToken)
-      return pagedResults
+      return await client.conversations.members(conversationId!).getPaged(pageSize, continuationToken)
     }
   }
 
@@ -240,15 +232,7 @@ export class TeamsInfo {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
     const client = getTeamsClient(context)
-    const pagedResults = await client.conversations.members(teamId).getPaged(pageSize, continuationToken)
-    do {
-      if (pagedResults.continuationToken) {
-        const nextResults = await client.conversations.members(teamId).getPaged(pageSize, pagedResults.continuationToken)
-        pagedResults.members.push(...nextResults.members)
-        pagedResults.continuationToken = nextResults.continuationToken
-      }
-    } while (pagedResults.continuationToken)
-    return pagedResults
+    return await client.conversations.members(teamId).getPaged(pageSize, continuationToken)
   }
 
   /**

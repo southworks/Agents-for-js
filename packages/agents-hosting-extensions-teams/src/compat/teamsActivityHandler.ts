@@ -1082,7 +1082,7 @@ export class TeamsActivityHandler extends ActivityHandler {
           type: meeting.MeetingType,
           scheduledEndTime: new Date(meeting.EndTime),
           title: meeting.Title,
-          msGraphResourceId: ''
+          msGraphResourceId: meeting.MsGraphResourceId
         },
         context,
         next
