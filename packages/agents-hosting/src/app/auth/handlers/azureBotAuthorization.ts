@@ -13,8 +13,9 @@ import jwt, { JwtPayload } from 'jsonwebtoken'
 import { HandlerStorage } from '../handlerStorage'
 import { Activity, ActivityTypes, Channels } from '@microsoft/agents-activity'
 import { InvokeResponse, TokenExchangeInvokeRequest } from '../../../invoke'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { trace } from '@microsoft/agents-telemetry'
 import { AuthProvider } from '../../../auth'
+import { AuthorizationTraceDefinitions } from '../../../observability'
 
 const logger = debug('agents:authorization:azurebot')
 
@@ -241,7 +242,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    * @returns The token response containing the token or undefined if not available.
    */
   async token (context: TurnContext, options?: AuthorizationHandlerTokenOptions): Promise<TokenResponse> {
-    return trace(SpanNames.AUTHORIZATION_AZURE_BOT_TOKEN, async (span) => {
+    return trace(AuthorizationTraceDefinitions.azureBotToken, async ({ record }) => {
       let { token } = this.getContext(context)
       const traceContext = { connection: this._options.name, scopes: [] }
 
@@ -261,11 +262,14 @@ export class AzureBotAuthorization implements AuthorizationHandler {
 
         return await this.handleOBO(token, options, traceContext)
       } finally {
-        span.setAttribute('auth.handler.id', this.id)
-        span.setAttribute('auth.connection.name', traceContext.connection ?? 'unknown')
+        record({
+          handlerId: this.id,
+          connectionName: traceContext.connection ?? 'unknown',
+          authFlow: traceContext.scopes && traceContext.scopes.length > 0 ? 'obo' : '',
+          authScopes: traceContext.scopes ?? []
+        })
         if (traceContext.scopes && traceContext.scopes.length > 0) {
-          span.setAttribute('auth.flow', 'obo')
-          span.setAttribute('auth.scopes', traceContext.scopes)
+          record({ authFlow: 'obo', authScopes: traceContext.scopes })
         }
       }
     })
@@ -277,25 +281,21 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    * @returns True if the signout was successful, false otherwise.
    */
   async signout (context: TurnContext): Promise<boolean> {
-    return trace(SpanNames.AUTHORIZATION_AZURE_BOT_SIGNOUT, async (span) => {
+    return trace(AuthorizationTraceDefinitions.azureBotSignout, async ({ record }) => {
       const user = context.activity.from?.id
       const channel = context.activity.channelId
       const connection = this._options.name!
 
-      try {
-        if (!channel || !user) {
-          throw new Error(this.prefix('Both \'activity.channelId\' and \'activity.from.id\' are required to perform signout.'))
-        }
+      record({ handlerId: this.id, connectionName: connection, channelId: channel ?? 'unknown' })
 
-        logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
-        const userTokenClient = await this.getUserTokenClient(context)
-        await userTokenClient.signOut(user, connection, channel)
-        return true
-      } finally {
-        span.setAttribute('auth.handler.id', this.id)
-        span.setAttribute('auth.connection.name', connection)
-        span.setAttribute('activity.channel_id', channel ?? 'unknown')
+      if (!channel || !user) {
+        throw new Error(this.prefix('Both \'activity.channelId\' and \'activity.from.id\' are required to perform signout.'))
       }
+
+      logger.debug(this.prefix(`Signing out User '${user}' from => Channel: '${channel}', Connection: '${connection}'`), context.activity)
+      const userTokenClient = await this.getUserTokenClient(context)
+      await userTokenClient.signOut(user, connection, channel)
+      return true
     })
   }
 
@@ -306,7 +306,7 @@ export class AzureBotAuthorization implements AuthorizationHandler {
    * @returns The status of the sign-in attempt.
    */
   async signin (context: TurnContext, active?: AzureBotActiveHandler): Promise<AuthorizationHandlerStatus> {
-    return trace(SpanNames.AUTHORIZATION_AZURE_BOT_SIGNIN, async (span) => {
+    return trace(AuthorizationTraceDefinitions.azureBotSignin, async ({ record, actions }) => {
       const reason = { message: '' }
       let status: AuthorizationHandlerStatus | undefined
       const { activity } = context
@@ -370,10 +370,13 @@ export class AzureBotAuthorization implements AuthorizationHandler {
           throw error
         }
       } finally {
-        span.setAttribute('auth.handler.id', this.id)
-        span.setAttribute('auth.handler.status', status ?? 'unknown')
-        span.setAttribute('auth.handler.status.reason', reason.message)
-        span.setAttribute('auth.connection.name', this._options.name ?? 'unknown')
+        await actions.link(storage)
+        record({
+          handlerId: this.id,
+          status: status ?? 'unknown',
+          statusReason: reason.message,
+          connectionName: this._options.name ?? 'unknown'
+        })
       }
     })
   }

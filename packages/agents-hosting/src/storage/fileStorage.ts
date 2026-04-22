@@ -6,8 +6,8 @@
 import path from 'path'
 import fs from 'fs'
 import { Storage, StoreItem } from './storage'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { HostingMetrics } from '../observability'
+import { trace } from '@microsoft/agents-telemetry'
+import { StorageTraceDefinitions } from '../observability'
 
 /**
  * A file-based storage implementation that persists data to the local filesystem.
@@ -93,9 +93,8 @@ export class FileStorage implements Storage {
    *
    */
   read (keys: string[]) : Promise<StoreItem> {
-    const start = performance.now()
-    return (trace(SpanNames.STORAGE_READ, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(StorageTraceDefinitions.read, async ({ record }) => {
+      record({ keyCount: keys?.length })
       return new Promise<StoreItem>((resolve, reject) => {
         if (!keys || keys.length === 0) {
           reject(new ReferenceError('Keys are required when reading.'))
@@ -109,10 +108,6 @@ export class FileStorage implements Storage {
           }
           resolve(data)
         }
-      })
-    }) as Promise<StoreItem>).finally(() => {
-      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'read'
       })
     })
   }
@@ -134,18 +129,13 @@ export class FileStorage implements Storage {
    *
    */
   write (changes: StoreItem) : Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+    return trace(StorageTraceDefinitions.write, async ({ record }) => {
       const keys = Object.keys(changes)
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+      record({ keyCount: keys?.length })
       for (const key of keys) {
         this._stateFile[key] = changes[key]
       }
       fs.writeFileSync(this._folder + '/state.json', JSON.stringify(this._stateFile, null, 2))
-    }).finally(() => {
-      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'write'
-      })
     })
   }
 
@@ -164,9 +154,8 @@ export class FileStorage implements Storage {
    *
    */
   delete (keys: string[]) : Promise<void> {
-    const start = performance.now()
-    return (trace(SpanNames.STORAGE_DELETE, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(StorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length })
       return new Promise<void>((resolve, reject) => {
         if (!keys || keys.length === 0) {
           reject(new ReferenceError('Keys are required when deleting.'))
@@ -177,10 +166,6 @@ export class FileStorage implements Storage {
           fs.writeFileSync(this._folder + '/state.json', JSON.stringify(this._stateFile, null, 2))
           resolve(undefined)
         }
-      })
-    }) as Promise<void>).finally(() => {
-      HostingMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'delete'
       })
     })
   }

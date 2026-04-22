@@ -9,18 +9,14 @@
  * entrypoint uses async import() fallback loading that is only valid in an ES module.
  */
 
-import { startManagedSpan } from './traces/trace.js'
-import { loadTelemetryDependencies } from './utils/load.js'
-import { factory } from './factory.js'
+import { index } from './index.js'
 
-export { SpanNames, MetricNames } from './traces/constants.js'
-export type { ManagedSpanOptions, ManagedSpanResult } from './traces/trace.js'
+export type { TraceDefinition } from './types.js'
 
-const [_otel, logs] = loadTelemetryDependencies(
-  [() => require('@opentelemetry/api'), () => require('@microsoft/agents-opentelemetry-api')],
-  [() => require('@opentelemetry/api-logs'), () => require('@microsoft/agents-opentelemetry-api-logs')]
-)
-
-export const otel = _otel
-export const managedSpan = startManagedSpan(otel)
-export const { trace, debug } = factory(otel, logs)
+export const {
+  SpanNames,
+  MetricNames,
+  debug,
+  trace,
+  metric,
+} = index((lib): unknown => require(lib))

@@ -13,8 +13,8 @@ import { AttachmentData } from './attachmentData'
 import { normalizeOutgoingActivity } from '../activityWireCompat'
 import { getProductInfo } from '../getProductInfo'
 import { HeaderPropagation, HeaderPropagationCollection } from '../headerPropagation'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { HostingMetrics } from '../observability/metrics'
+import { trace } from '@microsoft/agents-telemetry'
+import { ConnectorClientTraceDefinitions } from '../observability'
 
 const logger = debug('agents:connector-client')
 
@@ -142,27 +142,20 @@ export class ConnectorClient {
    * @returns A list of conversations.
    */
   public async getConversations (continuationToken?: string): Promise<ConversationsResult> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_GET_CONVERSATIONS, async (span) => {
+    return trace(ConnectorClientTraceDefinitions.getConversations, async ({ record }) => {
       const config: AxiosRequestConfig = {
         method: 'get',
         url: '/v3/conversations',
         params: continuationToken ? { continuationToken } : undefined
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('get.conversations', 'GET', duration, httpCode)
     })
   }
 
   public async getConversationMember (userId: string, conversationId: string): Promise<ChannelAccount> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_GET_CONVERSATION_MEMBER, async (span) => {
+    return trace(ConnectorClientTraceDefinitions.getConversationMember, async ({ record }) => {
       if (!userId || !conversationId) {
         throw ExceptionHelper.generateException(Error, Errors.UserIdAndConversationIdRequired)
       }
@@ -174,11 +167,8 @@ export class ConnectorClient {
         }
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('get.conversation_member', 'GET', duration, httpCode)
     })
   }
 
@@ -188,9 +178,7 @@ export class ConnectorClient {
    * @returns The conversation resource response.
    */
   public async createConversation (body: ConversationParameters): Promise<ConversationResourceResponse> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_CREATE_CONVERSATION, async (span) => {
+    return trace(ConnectorClientTraceDefinitions.createConversation, async ({ record }) => {
       const payload = {
         ...body,
         activity: normalizeOutgoingActivity(body.activity)
@@ -204,11 +192,8 @@ export class ConnectorClient {
         data: payload
       }
       const response: AxiosResponse = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('create.conversation', 'POST', duration, httpCode)
     })
   }
 
@@ -224,14 +209,9 @@ export class ConnectorClient {
     activityId: string,
     body: Activity
   ): Promise<ResourceResponse> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_REPLY_TO_ACTIVITY, async (span) => {
+    return trace(ConnectorClientTraceDefinitions.replyToActivity, async ({ record }) => {
       logger.debug(`Replying to activity: ${activityId} in conversation: ${conversationId}`)
-      span.setAttributes({
-        'activity.conversation_id': conversationId,
-        'activity.id': activityId
-      })
+      record({ conversationId, activityId })
 
       if (!conversationId || !activityId) {
         throw ExceptionHelper.generateException(Error, Errors.ConversationIdAndActivityIdRequired)
@@ -248,12 +228,9 @@ export class ConnectorClient {
         data: normalizeOutgoingActivity(body)
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status ? response.status.toString() : ''
+      record({ httpStatusCode: response.status?.toString() })
       logger.info('Reply to conversation/activity: ', response.data.id!, activityId)
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('reply.to.activity', 'POST', duration, httpCode)
     })
   }
 
@@ -287,15 +264,13 @@ export class ConnectorClient {
     conversationId: string,
     body: Activity
   ): Promise<ResourceResponse> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_SEND_TO_CONVERSATION, async (span) => {
+    return trace(ConnectorClientTraceDefinitions.sendToConversation, async ({ record }) => {
       logger.debug(`Send to conversation: ${conversationId} activity: ${body.id}`)
       if (!conversationId) {
         throw ExceptionHelper.generateException(Error, Errors.ConversationIdRequired)
       }
 
-      span.setAttribute('activity.conversation_id', conversationId)
+      record({ conversationId })
 
       const trimmedConversationId: string = this.conditionallyTruncateConversationId(conversationId, body)
 
@@ -308,11 +283,8 @@ export class ConnectorClient {
         data: normalizeOutgoingActivity(body)
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status ? response.status.toString() : ''
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('send.to.conversation', 'POST', duration, httpCode)
     })
   }
 
@@ -328,16 +300,11 @@ export class ConnectorClient {
     activityId: string,
     body: Activity
   ): Promise<ResourceResponse> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_UPDATE_ACTIVITY, async (span) => {
+    return trace(ConnectorClientTraceDefinitions.updateActivity, async ({ record }) => {
       if (!conversationId || !activityId) {
         throw ExceptionHelper.generateException(Error, Errors.ConversationIdAndActivityIdRequired)
       }
-      span.setAttributes({
-        'activity.conversation_id': conversationId,
-        'activity.id': activityId
-      })
+      record({ conversationId, activityId })
       const config: AxiosRequestConfig = {
         method: 'put',
         url: `v3/conversations/${conversationId}/activities/${activityId}`,
@@ -347,11 +314,8 @@ export class ConnectorClient {
         data: normalizeOutgoingActivity(body)
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('update.activity', 'PUT', duration, httpCode)
     })
   }
 
@@ -365,13 +329,8 @@ export class ConnectorClient {
     conversationId: string,
     activityId: string
   ): Promise<void> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_DELETE_ACTIVITY, async (span) => {
-      span.setAttributes({
-        'activity.conversation_id': conversationId,
-        'activity.id': activityId
-      })
+    return trace(ConnectorClientTraceDefinitions.deleteActivity, async ({ record }) => {
+      record({ conversationId, activityId })
 
       if (!conversationId || !activityId) {
         throw ExceptionHelper.generateException(Error, Errors.ConversationIdAndActivityIdRequired)
@@ -384,11 +343,8 @@ export class ConnectorClient {
         }
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('delete.activity', 'DELETE', duration, httpCode)
     })
   }
 
@@ -402,10 +358,8 @@ export class ConnectorClient {
     conversationId: string,
     body: AttachmentData
   ): Promise<ResourceResponse> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_UPLOAD_ATTACHMENT, async (span) => {
-      span.setAttribute('activity.conversation_id', conversationId)
+    return trace(ConnectorClientTraceDefinitions.uploadAttachment, async ({ record }) => {
+      record({ conversationId })
       if (conversationId === undefined) {
         throw ExceptionHelper.generateException(Error, Errors.ConversationIdRequired)
       }
@@ -418,12 +372,8 @@ export class ConnectorClient {
         data: body
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      // The operation name is not added in the trace because this method is not directly exposed and is used by other methods which have their own metrics.
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('upload.attachment', 'POST', duration, httpCode)
     })
   }
 
@@ -435,10 +385,8 @@ export class ConnectorClient {
   public async getAttachmentInfo (
     attachmentId: string
   ): Promise<AttachmentInfo> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_GET_ATTACHMENT_INFO, async (span) => {
-      span.setAttribute('attachment.id', attachmentId)
+    return trace(ConnectorClientTraceDefinitions.getAttachmentInfo, async ({ record }) => {
+      record({ attachmentId })
       if (attachmentId === undefined) {
         throw ExceptionHelper.generateException(Error, Errors.AttachmentIdRequired)
       }
@@ -450,11 +398,8 @@ export class ConnectorClient {
         }
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('get.attachment.info', 'GET', duration, httpCode)
     })
   }
 
@@ -468,11 +413,8 @@ export class ConnectorClient {
     attachmentId: string,
     viewId: string
   ): Promise<NodeJS.ReadableStream> {
-    const start = performance.now()
-    let httpCode: string
-    return trace(SpanNames.CONNECTOR_GET_ATTACHMENT, async (span) => {
-      span.setAttribute('attachment.id', attachmentId)
-      span.setAttribute('view.id', viewId)
+    return trace(ConnectorClientTraceDefinitions.getAttachment, async ({ record }) => {
+      record({ attachmentId, viewId })
       if (attachmentId === undefined) {
         throw ExceptionHelper.generateException(Error, Errors.AttachmentIdRequired)
       }
@@ -487,23 +429,8 @@ export class ConnectorClient {
         }
       }
       const response = await this._axiosInstance(config)
-      httpCode = response.status.toString()
+      record({ httpStatusCode: response.status?.toString() })
       return response.data
-    }).finally(() => {
-      const duration = performance.now() - start
-      this.recordConnectorMetrics('get.attachment', 'GET', duration, httpCode)
     })
-  }
-
-  private recordConnectorMetrics (operation: string, httpMethod: string, duration: number, httpCode?: string): void {
-    const attributes = {
-      operation,
-      'http.method': httpMethod,
-      'http.status_code': httpCode ?? 'unknown'
-    }
-
-    HostingMetrics.connectorRequestsCounter.add(1, attributes)
-
-    HostingMetrics.connectorRequestDuration.record(duration, attributes)
   }
 }

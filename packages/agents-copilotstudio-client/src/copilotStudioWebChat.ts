@@ -9,8 +9,8 @@ import { Activity, Attachment, ConversationAccount } from '@microsoft/agents-act
 import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
-import { debug, SpanNames, managedSpan } from '@microsoft/agents-telemetry'
-import { CopilotStudioClientMetrics } from './observability'
+import { debug, trace } from '@microsoft/agents-telemetry'
+import { CopilotStudioClientTraceDefinitions } from './observability'
 
 const logger = debug('copilot-studio:webchat')
 
@@ -257,11 +257,8 @@ export class CopilotStudioWebChat {
     client: CopilotStudioClient,
     settings?: CopilotStudioWebChatSettings
   ): CopilotStudioWebChatConnection {
-    const managed = managedSpan(SpanNames.COPILOT_CREATE_CONNECTION, {
-      attributes: {
-        'copilot.webchat.show_typing': settings?.showTyping ?? 'unknown'
-      }
-    })
+    const managed = trace(CopilotStudioClientTraceDefinitions.createConnection)
+    managed.record({ showTyping: settings?.showTyping })
 
     try {
       logger.info('--> Creating connection between Copilot Studio and WebChat ...')
@@ -297,7 +294,6 @@ export class CopilotStudioWebChat {
           started = true
 
           logger.debug('--> Connection established.')
-          CopilotStudioClientMetrics.webchatConnectionsCounter.add(1)
           notifyTyping()
 
           for await (const activity of client.startConversationStreaming()) {
@@ -310,16 +306,14 @@ export class CopilotStudioWebChat {
             }
             await handleAcknowledgementOnce()
             notifyActivity(activity)
-            managed.span.addEvent('Activity received from Copilot Studio', {
-              'copilot.webchat.activity.type': activity.type,
-              'copilot.webchat.activity.conversation_id': activity.conversation?.id ?? 'unknown'
-            })
+            managed.actions.receivedFromCopilot(activity)
           }
           // If no activities received from bot, we should still acknowledge.
           await handleAcknowledgementOnce()
         } catch (error) {
-          managed.endWithError(error)
-          throw error
+          throw managed.fail(error)
+        } finally {
+          managed.end()
         }
       })
 
@@ -382,10 +376,7 @@ export class CopilotStudioWebChat {
                 })
 
                 notifyActivity(newActivity)
-                managed.span.addEvent('Activity sent to WebChat', {
-                  'copilot.webchat.activity.type': newActivity.type,
-                  'copilot.webchat.activity.conversation_id': newActivity.conversation?.id ?? 'unknown'
-                })
+                managed.actions.sentToWebChat(newActivity)
                 notifyTyping()
 
                 // Notify WebChat immediately that the message was sent
@@ -397,10 +388,7 @@ export class CopilotStudioWebChat {
                     activeConversationId = responseActivity.conversation.id
                   }
                   notifyActivity(responseActivity)
-                  managed.span.addEvent('Activity received from Copilot Studio', {
-                    'copilot.webchat.activity.type': responseActivity.type,
-                    'copilot.webchat.activity.conversation_id': responseActivity.conversation?.id ?? 'unknown'
-                  })
+                  managed.actions.receivedFromCopilot(responseActivity)
                   logger.info('<-- Activity received correctly from Copilot Studio.')
                 }
 
@@ -408,14 +396,17 @@ export class CopilotStudioWebChat {
               } catch (error) {
                 logger.error('Error sending Activity to Copilot Studio:', error)
                 subscriber.error(error)
-                managed.endWithError(error)
+                managed.fail(error)
+              } finally {
+                managed.end()
               }
             })
 
             return result
           } catch (error) {
-            managed.endWithError(error)
-            throw error
+            throw managed.fail(error)
+          } finally {
+            managed.end()
           }
         },
 
@@ -432,8 +423,9 @@ export class CopilotStudioWebChat {
         },
       }
     } catch (error) {
-      managed.endWithError(error)
-      throw error
+      throw managed.fail(error)
+    } finally {
+      managed.end()
     }
   }
 }

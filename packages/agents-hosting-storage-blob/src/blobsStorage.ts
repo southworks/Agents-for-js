@@ -12,8 +12,8 @@ import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
 import { sanitizeBlobKey } from './blobsTranscriptStore'
 import { ignoreError, isStatusCodeError } from './ignoreError'
-import { SpanNames, trace, debug } from '@microsoft/agents-telemetry'
-import { BlobsStorageMetrics } from './observability'
+import { trace, debug } from '@microsoft/agents-telemetry'
+import { BlobsStorageTraceDefinitions } from './observability'
 
 const logger = debug('agents:blob-storage')
 
@@ -100,9 +100,8 @@ export class BlobsStorage implements Storage {
    * @throws Will throw if keys parameter is invalid or if there's an error reading from storage
    */
   async read (keys: string[]): Promise<StoreItems> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_READ, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(BlobsStorageTraceDefinitions.read, async ({ record }) => {
+      record({ keyCount: keys?.length ?? 0 })
       z.object({ keys: z.array(z.string()) }).parse({ keys })
 
       await this._initialize()
@@ -131,10 +130,6 @@ export class BlobsStorage implements Storage {
       }))
 
       return results.reduce((acc, { key, value }) => (value ? { ...acc, [key]: value } : acc), {})
-    }).finally(() => {
-      BlobsStorageMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'read'
-      })
     })
   }
 
@@ -146,10 +141,9 @@ export class BlobsStorage implements Storage {
    * @throws Will throw if there's a validation error, eTag conflict, or other storage error
    */
   async write (changes: StoreItems): Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_WRITE, async (span) => {
+    return trace(BlobsStorageTraceDefinitions.write, async ({ record }) => {
       z.record(z.unknown()).parse(changes)
-      span.setAttribute('storage.key.count', Object.keys(changes).length)
+      record({ keyCount: Object.keys(changes).length })
 
       await this._initialize()
 
@@ -172,10 +166,6 @@ export class BlobsStorage implements Storage {
           }
         })
       )
-    }).finally(() => {
-      BlobsStorageMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'write'
-      })
     })
   }
 
@@ -187,9 +177,8 @@ export class BlobsStorage implements Storage {
    * @throws Will throw if keys parameter is invalid
    */
   async delete (keys: string[]): Promise<void> {
-    const start = performance.now()
-    return trace(SpanNames.STORAGE_DELETE, async (span) => {
-      span.setAttribute('storage.key.count', keys?.length ?? 0)
+    return trace(BlobsStorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length ?? 0 })
       z.object({ keys: z.array(z.string()) }).parse({ keys })
 
       await this._initialize()
@@ -197,10 +186,6 @@ export class BlobsStorage implements Storage {
       await Promise.all(
         keys.map((key) => ignoreError(this._containerClient.deleteBlob(sanitizeBlobKey(key)), isStatusCodeError(404)))
       )
-    }).finally(() => {
-      BlobsStorageMetrics.storageOperationDuration.record(performance.now() - start, {
-        'storage.operation': 'delete'
-      })
     })
   }
 }

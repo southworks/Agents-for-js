@@ -28,8 +28,8 @@ import { HeaderPropagation, HeaderPropagationCollection, HeaderPropagationDefini
 import { JwtPayload } from 'jsonwebtoken'
 import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
-import { HostingMetrics } from './observability/metrics'
+import { trace } from '@microsoft/agents-telemetry'
+import { AdapterTraceDefinitions } from './observability'
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -102,11 +102,8 @@ export class CloudAdapter extends BaseAdapter {
     identity: JwtPayload,
     headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
-    return trace(SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT, async (span) => {
-      span.setAttributes({
-        service_url: serviceUrl,
-        'auth.scope': scope
-      })
+    return trace(AdapterTraceDefinitions.createConnectorClient, async ({ record }) => {
+      record({ serviceUrl, scope })
 
       // get the correct token provider
       const tokenProvider = this.connectionManager.getTokenProvider(identity, serviceUrl)
@@ -133,7 +130,7 @@ export class CloudAdapter extends BaseAdapter {
     identity: JwtPayload,
     activity: Activity,
     headers?: HeaderPropagationCollection) {
-    return trace(SpanNames.ADAPTER_CREATE_CONNECTOR_CLIENT, async (span) => {
+    return trace(AdapterTraceDefinitions.createConnectorClient, async ({ record }) => {
       if (!identity?.aud) {
         // anonymous
         logger.warn('Missing identity or identity.aud when creating connector client. Using anonymous identity')
@@ -184,10 +181,10 @@ export class CloudAdapter extends BaseAdapter {
           headers
         )
       }
-      span.setAttributes({
-        service_url: activity.serviceUrl,
-        'auth.scope': scope ?? 'unknown',
-        'activity.is_agentic': isAgentic
+      record({
+        serviceUrl: activity.serviceUrl,
+        scope,
+        activityIsAgentic: isAgentic
       })
       return connectorClient
     })
@@ -235,11 +232,8 @@ export class CloudAdapter extends BaseAdapter {
     audience: string = 'https://api.botframework.com',
     headers?: HeaderPropagationCollection
   ): Promise<UserTokenClient> {
-    return trace(SpanNames.ADAPTER_CREATE_USER_TOKEN_CLIENT, async (span) => {
-      span.setAttributes({
-        'token.service.endpoint': tokenServiceEndpoint,
-        'auth.scope': scope
-      })
+    return trace(AdapterTraceDefinitions.createUserTokenClient, async ({ record }) => {
+      record({ tokenServiceEndpoint, authScope: scope })
       if (!identity?.aud) {
         // anonymous
         return UserTokenClient.createClientWithScope(
@@ -294,7 +288,8 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise representing the array of ResourceResponses for the sent activities.
    */
   async sendActivities (context: TurnContext, activities: Activity[]): Promise<ResourceResponse[]> {
-    return trace(SpanNames.ADAPTER_SEND_ACTIVITIES, async (span) => {
+    return trace(AdapterTraceDefinitions.sendActivities, async ({ record, actions }) => {
+      record({ activityCount: activities?.length })
       if (!context) {
         throw ExceptionHelper.generateException(TypeError, Errors.ContextParameterRequired)
       }
@@ -307,23 +302,9 @@ export class CloudAdapter extends BaseAdapter {
         throw ExceptionHelper.generateException(Error, Errors.EmptyActivitiesArray)
       }
 
-      span.setAttributes({
-        'activity.count': activities?.length,
-        'activity.conversation_id': activities[0]?.conversation?.id
-      })
-
       const responses: ResourceResponse[] = []
-      let index = 0
       for (const activity of activities) {
-        span.setAttributes({
-          [`activity.${index}.type`]: activity.type,
-          [`activity.${index}.id`]: activity.id
-        })
-        HostingMetrics.activitiesSentCounter.add(1, {
-          'activity.type': activity.type,
-          'activity.channel_id': activity.channelId
-        })
-
+        actions.recordActivity(activity)
         delete activity.id
         let response: ResourceResponse = { id: '' }
 
@@ -348,7 +329,6 @@ export class CloudAdapter extends BaseAdapter {
         }
 
         responses.push(response)
-        index++
       }
 
       return responses
@@ -371,9 +351,7 @@ export class CloudAdapter extends BaseAdapter {
     res: Response,
     logic: (context: TurnContext) => Promise<void>,
     headerPropagation?: HeaderPropagationDefinition): Promise<void> {
-    const start = performance.now()
-    let tracedActivity: Activity
-    return trace(SpanNames.ADAPTER_PROCESS, async (span) => {
+    return trace(AdapterTraceDefinitions.process, async ({ record }) => {
       const headers = new HeaderPropagation(request.headers)
       if (headerPropagation && typeof headerPropagation === 'function') {
         headerPropagation(headers)
@@ -399,19 +377,7 @@ export class CloudAdapter extends BaseAdapter {
 
       const isAgentic = activity.isAgenticRequest()
 
-      tracedActivity = activity
-      span.setAttributes({
-        'activity.type': tracedActivity.type,
-        'activity.channel_id': tracedActivity.channelId,
-        'activity.delivery_mode': tracedActivity.deliveryMode,
-        'activity.conversation_id': tracedActivity.conversation?.id,
-        'activity.is_agentic': isAgentic
-      })
-
-      HostingMetrics.activitiesReceivedCounter.add(1, {
-        'activity.type': tracedActivity.type,
-        'activity.channel_id': tracedActivity.channelId
-      })
+      record({ activity })
 
       if (!this.isValidChannelActivity(activity)) {
         return end(StatusCodes.BAD_REQUEST)
@@ -445,11 +411,6 @@ export class CloudAdapter extends BaseAdapter {
       await this.runMiddleware(context, logic)
       const invokeResponse = this.processTurnResults(context)
       return end(invokeResponse?.status ?? StatusCodes.OK, invokeResponse?.body)
-    }).finally(() => {
-      const duration = performance.now() - start
-      HostingMetrics.adapterProcessDuration.record(duration, {
-        'activity.type': tracedActivity?.type ?? 'unknown',
-      })
     })
   }
 
@@ -479,7 +440,7 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise representing the ResourceResponse for the updated activity.
    */
   async updateActivity (context: TurnContext, activity: Activity): Promise<ResourceResponse | void> {
-    return trace(SpanNames.ADAPTER_UPDATE_ACTIVITY, async (span) => {
+    return trace(AdapterTraceDefinitions.updateActivity, async ({ record }) => {
       if (!context) {
         throw new TypeError('`context` parameter required')
       }
@@ -488,14 +449,7 @@ export class CloudAdapter extends BaseAdapter {
         throw new TypeError('`activity` parameter required')
       }
 
-      span.setAttributes({
-        'activity.id': activity.id,
-        'activity.conversation_id': activity.conversation?.id
-      })
-
-      HostingMetrics.activitiesUpdatedCounter.add(1, {
-        'activity.channel_id': activity.channelId
-      })
+      record({ activity })
 
       if (!activity.serviceUrl || (activity.conversation == null) || !activity.conversation.id || !activity.id) {
         throw ExceptionHelper.generateException(Error, Errors.InvalidActivityObject)
@@ -518,7 +472,7 @@ export class CloudAdapter extends BaseAdapter {
    * @returns A promise representing the completion of the delete operation.
    */
   async deleteActivity (context: TurnContext, reference: Partial<ConversationReference>): Promise<void> {
-    return trace(SpanNames.ADAPTER_DELETE_ACTIVITY, async (span) => {
+    return trace(AdapterTraceDefinitions.deleteActivity, async ({ record }) => {
       if (!context) {
         throw new TypeError('`context` parameter required')
       }
@@ -527,14 +481,7 @@ export class CloudAdapter extends BaseAdapter {
         throw ExceptionHelper.generateException(Error, Errors.InvalidConversationReference)
       }
 
-      span.setAttributes({
-        'activity.id': reference.activityId,
-        'activity.conversation_id': reference.conversation?.id
-      })
-
-      HostingMetrics.activitiesDeletedCounter.add(1, {
-        'activity.channel_id': reference.channelId
-      })
+      record({ reference })
 
       await context.turnState.get(this.ConnectorClientKey).deleteActivity(reference.conversation.id, reference.activityId)
     })
@@ -554,7 +501,7 @@ export class CloudAdapter extends BaseAdapter {
     reference: ConversationReference,
     logic: (revocableContext: TurnContext) => Promise<void>,
     isResponse: Boolean = false): Promise<void> {
-    return trace(SpanNames.ADAPTER_CONTINUE_CONVERSATION, async (span) => {
+    return trace(AdapterTraceDefinitions.continueConversation, async ({ record }) => {
       if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id) {
         throw ExceptionHelper.generateException(Error, Errors.ContinueConversationInvalidReference)
       }
@@ -578,10 +525,10 @@ export class CloudAdapter extends BaseAdapter {
 
       const isAgentic = context.activity.isAgenticRequest()
 
-      span.setAttributes({
-        'bot.app_id': botAppId,
-        'activity.conversation_id': reference.conversation?.id,
-        'activity.is_agentic': isAgentic
+      record({
+        botAppId,
+        conversationId: reference.conversation?.id,
+        isAgentic
       })
 
       if (!isAgentic) {

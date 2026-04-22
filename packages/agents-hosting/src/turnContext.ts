@@ -8,7 +8,8 @@ import { AttachmentInfo } from './connector-client/attachmentInfo'
 import { AttachmentData } from './connector-client/attachmentData'
 import { StreamingResponse } from './app/streaming/streamingResponse'
 import { JwtPayload } from 'jsonwebtoken'
-import { SpanNames, trace } from '@microsoft/agents-telemetry'
+import { trace } from '@microsoft/agents-telemetry'
+import { TurnContextTraceDefinitions } from './observability'
 
 /**
  * Defines a handler for processing and sending activities.
@@ -167,16 +168,12 @@ export class TurnContext {
    * the adapter.
    */
   async sendActivities (activities: Activity[]): Promise<ResourceResponse[]> {
-    return trace(SpanNames.TURN_SEND_ACTIVITIES, async (span) => {
-      span.setAttribute('activity.count', activities.length)
+    return trace(TurnContextTraceDefinitions.sendActivities, async ({ record, actions }) => {
+      record({ activityCount: activities?.length })
       let sentNonTraceActivity = false
       const ref = this.activity.getConversationReference()
-      const output = activities.map((activity, index) => {
-        span.setAttributes({
-          [`activity.${index}.type`]: activity.type,
-          [`activity.${index}.delivery_mode`]: activity.deliveryMode,
-          [`activity.${index}.id`]: activity.id
-        })
+      const output = activities.map((activity) => {
+        actions.recordActivity(activity)
         const newActivity = Activity.fromObject(activity)
         const result = newActivity.applyConversationReference(ref)
         if (!result.type) {

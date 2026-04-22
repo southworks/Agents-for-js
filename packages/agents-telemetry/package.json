@@ -39,10 +39,12 @@
       "optional": true
     }
   },
+  "devDependencies": {
+    "@opentelemetry/api": "1",
+    "@opentelemetry/api-logs": "^0.211.0"
+  },
   "dependencies": {
-    "debug": "^4.4.3",
-    "@microsoft/agents-opentelemetry-api": "npm:@opentelemetry/api@1",
-    "@microsoft/agents-opentelemetry-api-logs": "npm:@opentelemetry/api-logs@0.211.0"
+    "debug": "^4.4.3"
   },
   "license": "MIT",
   "files": [

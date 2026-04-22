@@ -3,6 +3,11 @@
  * Licensed under the MIT License.
  */
 
+import { AttemptOptions } from '../types.js'
+
+/**
+ * Detects promise-like values returned by internal loaders and callbacks.
+ */
 export function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
   return (
     (typeof value === 'object' || typeof value === 'function') &&
@@ -12,35 +17,57 @@ export function isPromise<T> (value: T | Promise<T>): value is Promise<T> {
   )
 }
 
-export function attempt<TResult> (options: {
-  try: () => TResult,
-  then?: (result: TResult) => TResult | void,
-  catch?: (error: unknown) => void,
-  finally?: () => void
-}): TResult {
-  let _isPromise = false
+type SwallowingAttemptOptions<TResult> = AttemptOptions<TResult, void>
+type RethrowingAttemptOptions<TResult> = AttemptOptions<TResult, never>
+
+/**
+ * Runs a callback and normalizes sync and async error/finally handling.
+ *
+ * @remarks
+ * - If try succeeds, its result is returned.
+ * - If try fails and catch is omitted, the original error is propagated.
+ * - If try fails and catch throws, that error is propagated.
+ * - If try fails and catch completes normally, the failure is treated as swallowed
+ *   and attempt returns or resolves to undefined.
+ * - catch is side-effect only; any value it returns is ignored.
+ * - Type narrowing is based on whether catch is omitted or its declared return type:
+ *   omitted or never means the error is rethrown, void means the error may be swallowed.
+ * - finally runs once for both sync and async paths.
+ */
+export function attempt<TResult> (options: RethrowingAttemptOptions<TResult>): TResult
+export function attempt<TResult> (options: RethrowingAttemptOptions<Promise<TResult>>): Promise<TResult>
+export function attempt<TResult> (options: SwallowingAttemptOptions<TResult>): TResult | undefined
+export function attempt<TResult> (options: SwallowingAttemptOptions<Promise<TResult>>): Promise<TResult | undefined>
+export function attempt<TResult> (options: AttemptOptions<TResult, void | never>) {
+  // Note: order of overloads ensures correct typing.
+  let isAsync = false
   try {
     const result = options.try()
+
     if (isPromise(result)) {
-      _isPromise = true
+      isAsync = true
       return result
-        .then((res) => options.then?.(res) ?? res)
-        .catch((error) => {
-          options.catch?.(error)
-          throw error
+        .catch(error => {
+          if (!options.catch) {
+            throw error
+          }
+          const result = options.catch?.(error)
+          if (isPromise(result)) {
+            return result.then(() => undefined)
+          }
+          return undefined
         })
-        .finally(options.finally) as any
+        .finally(options.finally)
     }
 
-    return options.then?.(result) ?? result
+    return result
   } catch (error) {
-    if (!_isPromise) {
-      options.catch?.(error)
+    if (!options.catch) {
+      throw error
     }
-    throw error
+    options.catch(error)
+    return undefined
   } finally {
-    if (!_isPromise) {
-      options.finally?.()
-    }
+    !isAsync && options.finally?.()
   }
 }
