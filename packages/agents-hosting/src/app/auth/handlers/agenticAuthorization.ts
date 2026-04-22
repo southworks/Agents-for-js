@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { debug } from '@microsoft/agents-activity'
+import { debug } from '@microsoft/agents-activity/logger'
 import { TurnContext } from '../../../turnContext'
 import { AuthorizationHandler, AuthorizationHandlerSettings, AuthorizationHandlerStatus, AuthorizationHandlerTokenOptions } from '../types'
 import { TokenResponse } from '../../../oauth'
@@ -77,6 +77,15 @@ export class AgenticAuthorization implements AuthorizationHandler {
     }
 
     return result
+  }
+
+  readonly type = 'agentic'
+
+  /**
+   * The scopes configured for this handler.
+   */
+  get scopes (): string[] | undefined {
+    return this._options.scopes
   }
 
   /**
