@@ -68,24 +68,30 @@ export class MsalTokenProvider implements AuthProvider {
         record({ method: 'unknown' })
         return ''
       }
+
       let token
       if (authConfig.WIDAssertionFile !== undefined) {
         record({ method: 'wid' })
+        logger.debug('getAccessToken via WID clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
       } else if (authConfig.FICClientId !== undefined) {
         record({ method: 'fic' })
+        logger.debug('getAccessToken via FIC clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
       } else if (authConfig.clientSecret !== undefined) {
         record({ method: 'secret' })
+        logger.debug('getAccessToken via secret clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
       } else if (authConfig.certPemFile !== undefined &&
           authConfig.certKeyFile !== undefined) {
         record({ method: 'certificate' })
+        logger.debug('getAccessToken via certificate clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireTokenWithCertificate(authConfig, actualScope)
       } else if (authConfig.clientSecret === undefined &&
           authConfig.certPemFile === undefined &&
           authConfig.certKeyFile === undefined) {
         record({ method: 'managed_identity' })
+        logger.debug('getAccessToken via managed identity clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
       } else {
         throw new Error('Invalid authConfig. ')
@@ -126,6 +132,7 @@ export class MsalTokenProvider implements AuthProvider {
       }
 
       record({ scopes: actualScopes })
+      logger.debug('acquireTokenOnBehalfOf clientId=%s scopes=%o', authConfig.clientId, actualScopes)
 
       const cca = new ConfidentialClientApplication({
         auth: {
@@ -149,7 +156,7 @@ export class MsalTokenProvider implements AuthProvider {
 
   public async getAgenticInstanceToken (tenantId: string, agentAppInstanceId: string): Promise<string> {
     return trace(AuthenticationTraceDefinitions.getAgenticInstanceToken, async ({ record }) => {
-      logger.debug('Getting agentic instance token')
+      logger.debug('getAgenticInstanceToken tenantId=%s agentAppInstanceId=%s', tenantId, agentAppInstanceId)
       record({ agenticInstanceId: agentAppInstanceId })
 
       if (!this.connectionSettings) {
@@ -224,6 +231,7 @@ export class MsalTokenProvider implements AuthProvider {
       throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
     }
 
+    logger.debug('acquireTokenForAgenticScenarios clientId=%s tenantId=%s scopes=%o grant_type=%s', clientId, tenantId, scopes, tokenBodyParameters.grant_type)
     // Check cache first
     const cacheKey = `${clientId}/${Object.keys(tokenBodyParameters).map(key => key !== 'user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&')}/${scopes.join(';')}`
     if (this._agenticTokenCache.get(cacheKey)) {
@@ -269,7 +277,7 @@ export class MsalTokenProvider implements AuthProvider {
 
   public async getAgenticUserToken (tenantId: string, agentAppInstanceId: string, agenticUserId: string, scopes: string[]): Promise<string> {
     return trace(AuthenticationTraceDefinitions.getAgenticUserToken, async ({ record }) => {
-      logger.debug('Getting agentic user token')
+      logger.debug('getAgenticUserToken tenantId=%s agentAppInstanceId=%s scopes=%o', tenantId, agentAppInstanceId, scopes)
       record({ agenticInstanceId: agentAppInstanceId, agenticUserId, scopes })
 
       const agentToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
@@ -293,7 +301,7 @@ export class MsalTokenProvider implements AuthProvider {
     if (!this.connectionSettings?.clientId) {
       throw new Error('Connection settings must be provided when calling getAgenticApplicationToken')
     }
-    logger.debug('Getting agentic application token')
+    logger.debug('getAgenticApplicationToken clientId=%s tenantId=%s agentAppInstanceId=%s', this.connectionSettings.clientId, tenantId, agentAppInstanceId)
 
     let clientAssertion
 
@@ -519,7 +527,7 @@ export class MsalTokenProvider implements AuthProvider {
       system: this.sysOptions
     })
     const token = await cca.acquireTokenByClientCredential({ scopes })
-    logger.info('got token using WID client assertion')
+    logger.debug('got token using WID client assertion')
     if (!token?.accessToken) {
       throw new Error('Failed to acquire token using WID client assertion')
     }
