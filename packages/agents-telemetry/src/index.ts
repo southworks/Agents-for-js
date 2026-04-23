@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import type { Factory, FactoryAttempt, OTel, OTelLogs, } from './types.js'
+import type { Factory, Loader, LoaderReturn, OTel, OTelLogs, } from './types.js'
 import { traceFactory } from './observability/trace.js'
 import { metricFactory } from './observability/metric.js'
 import { createDebugLogger, link } from './loggers/debug.js'
@@ -22,23 +22,23 @@ const logger = createDebugLogger('agents:telemetry')
  * - The loader can be synchronous or asynchronous.
  * - Missing optional dependencies only disable the related feature and emit a warning.
  */
-export function index<TResult> (loader: (lib: string) => TResult): FactoryAttempt<TResult> {
+export function index<TLoader extends Loader> (loader: TLoader): LoaderReturn<TLoader> {
   const otel = attempt({
-    try: () => loader('@opentelemetry/api') as OTel,
+    try: () => loader.otel() as OTel,
     catch: () => logger.warn('OpenTelemetry API not found. Install @opentelemetry/api as a dependency to enable tracing and metrics.')
   })
 
   const logs = attempt({
-    try: () => loader('@opentelemetry/api-logs') as OTelLogs,
+    try: () => loader.logs() as OTelLogs,
     catch: () => logger.warn('OpenTelemetry API Logs not found. Install @opentelemetry/api-logs as a dependency to enable OTel logging.')
   })
 
   if (isPromise(otel) || isPromise(logs)) {
     return Promise.all([otel, logs])
-      .then(([otel, logs]) => factory(otel, logs)) as FactoryAttempt<TResult>
+      .then(([otel, logs]) => factory(otel, logs)) as LoaderReturn<TLoader>
   }
 
-  return factory(otel, logs) as FactoryAttempt<TResult>
+  return factory(otel, logs) as LoaderReturn<TLoader>
 }
 
 /**

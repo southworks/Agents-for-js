@@ -110,9 +110,17 @@ export interface Metric {
 }
 
 /**
- * Resolves the factory return type based on whether the dependency loader is sync or async.
+ * Loader interface for the index function, which conditionally loads OpenTelemetry dependencies at runtime.
  */
-export type FactoryAttempt<TResult> = TResult extends Promise<unknown> ? Promise<Factory> : Factory
+export interface Loader {
+  otel(): OTel | Promise<OTel>
+  logs(): OTelLogs | Promise<OTelLogs>
+}
+
+/**
+ * Conditional return type for the index loader function, based on whether the loader returns Promises.
+ */
+export type LoaderReturn<TLoader extends Loader> = Extract<ReturnType<TLoader['otel']> | ReturnType<TLoader['logs']>, PromiseLike<unknown>> extends never ? Factory : Promise<Factory>
 
 /**
  * Public telemetry API exported by the package entrypoints.
@@ -138,14 +146,6 @@ export interface Factory {
    * Exposes histogram and counter creators from the package meter.
    */
   metric: Metric
-}
-
-/**
- * Options used by internal module loaders.
- */
-export interface LoadOptions {
-  lib: string
-  warningMessage: string
 }
 
 /**

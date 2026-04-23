@@ -2,10 +2,18 @@ import assert from 'assert'
 import { describe, it } from 'node:test'
 import { index } from '../src/index.js'
 import { SpanNames, MetricNames } from '../src/observability/constants'
+import type { OTel, OTelLogs } from '../src/types.js'
+
+function createMissingLoader () {
+  return {
+    otel (): never { throw new Error('not found') },
+    logs (): never { throw new Error('not found') },
+  }
+}
 
 describe('index', () => {
   it('returns a Factory with noop trace and metric when loader throws', () => {
-    const factory = index(() => { throw new Error('not found') })
+    const factory = index(createMissingLoader())
 
     assert.deepStrictEqual(factory.SpanNames, SpanNames)
     assert.deepStrictEqual(factory.MetricNames, MetricNames)
@@ -16,7 +24,7 @@ describe('index', () => {
   })
 
   it('debug creates a logger with expected methods when otel-logs not available', () => {
-    const factory = index(() => { throw new Error('not found') })
+    const factory = index(createMissingLoader())
     const logger = factory.debug('test:namespace')
 
     assert.strictEqual(typeof logger.info, 'function')
@@ -26,7 +34,7 @@ describe('index', () => {
   })
 
   it('noop trace can be called in managed mode without errors', () => {
-    const factory = index(() => { throw new Error('not found') })
+    const factory = index(createMissingLoader())
 
     const result = factory.trace({
       name: SpanNames.ADAPTER_PROCESS,
@@ -40,7 +48,7 @@ describe('index', () => {
   })
 
   it('noop trace can be called with callback without errors', () => {
-    const factory = index(() => { throw new Error('not found') })
+    const factory = index(createMissingLoader())
 
     const result = (factory.trace as Function)(
       { name: SpanNames.ADAPTER_PROCESS, record: {}, end: () => {} },
@@ -54,7 +62,7 @@ describe('index', () => {
   })
 
   it('noop metric histogram and counter are callable', () => {
-    const factory = index(() => { throw new Error('not found') })
+    const factory = index(createMissingLoader())
 
     const histogram = factory.metric.histogram('test') as any
     const counter = factory.metric.counter('test') as any
@@ -88,9 +96,9 @@ describe('index', () => {
       SpanStatusCode: { OK: 1, ERROR: 2 },
     }
 
-    const factory = index((lib: string) => {
-      if (lib === '@opentelemetry/api') return mockOTel
-      throw new Error('not found')
+    const factory = index({
+      otel: () => mockOTel as unknown as OTel,
+      logs: () => { throw new Error('not found') },
     })
 
     assert.strictEqual(typeof factory.trace, 'function')
@@ -107,7 +115,10 @@ describe('index', () => {
   })
 
   it('returns a Promise<Factory> when loader returns promises', async () => {
-    const result = index(async () => { throw new Error('not found') })
+    const result = index({
+      otel: async () => { throw new Error('not found') },
+      logs: async () => { throw new Error('not found') },
+    })
 
     assert.ok(result instanceof Promise)
 
@@ -149,10 +160,9 @@ describe('index', () => {
       SeverityNumber: { DEBUG: 5, INFO: 9, WARN: 13, ERROR: 17 },
     }
 
-    const result = index(async (lib: string) => {
-      if (lib === '@opentelemetry/api') return mockOTel
-      if (lib === '@opentelemetry/api-logs') return mockLogs
-      throw new Error('not found')
+    const result = index({
+      otel: async () => mockOTel as unknown as OTel,
+      logs: async () => mockLogs as unknown as OTelLogs,
     })
 
     assert.ok(result instanceof Promise)

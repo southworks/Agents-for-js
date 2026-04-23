@@ -9,6 +9,7 @@
  * entrypoint uses async import() fallback loading that is only valid in an ES module.
  */
 
+import { OTel, OTelLogs } from './types.js'
 import { index } from './index.js'
 
 export type { TraceDefinition } from './types.js'
@@ -19,4 +20,7 @@ export const {
   debug,
   trace,
   metric,
-} = index((lib): unknown => require(lib))
+} = index({
+  otel: () => require('@opentelemetry/api') as OTel,
+  logs: () => require('@opentelemetry/api-logs') as OTelLogs,
+})

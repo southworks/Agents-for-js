@@ -19,4 +19,7 @@ export const {
   debug,
   trace,
   metric,
-} = await index((lib) => import(lib))
+} = await index({
+  otel: () => import('@opentelemetry/api'),
+  logs: () => import('@opentelemetry/api-logs'),
+})
