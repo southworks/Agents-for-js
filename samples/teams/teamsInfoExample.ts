@@ -1,6 +1,6 @@
 import { AgentApplication, MemoryStorage, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { TeamsInfo } from '@microsoft/agents-hosting-extensions-teams'
+import { SetTeamsApiClientMiddleware, TeamsInfo } from '@microsoft/agents-hosting-extensions-teams'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 
@@ -25,13 +25,11 @@ app
     const thisTeam = await TeamsInfo.getPagedMembers(context)
     await context.sendActivity(`Hello ${JSON.stringify(thisTeam)}, I am your friendly bot!`)
   })
-  .onMessage('getTeamDetails', async (context) => {
-    const thisTeam = await TeamsInfo.getTeamDetails(context)
-    await context.sendActivity(`Hello ${JSON.stringify(thisTeam)}, I am your friendly bot!`)
-  })
-  .onMessage('getMeetingInfo', async (context) => {
-    const thisMeeting = await TeamsInfo.getMeetingInfo(context)
-    await context.sendActivity(`Hello ${JSON.stringify(thisMeeting)}, I am your friendly bot!`)
-  })
 
-startServer(app)
+startServer(
+  app,
+  {
+    configureAdapter: (adapter) => {
+      adapter.use(new SetTeamsApiClientMiddleware())
+    }
+  })
