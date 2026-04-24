@@ -513,7 +513,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
      */
   AzureBotConnectionTokenNotExchangeable: {
     code: -120592,
-    description: "The current token for the '{connectionName}' AzureBot connection is not exchangeable for an on-behalf-of flow. Ensure the token exchange URL starts with 'api://'."
+    description: "The current token for the '{connectionName}' AzureBot connection is not exchangeable for an on-behalf-of flow."
   },
 
   // ============================================================================
