@@ -13,8 +13,12 @@ export function setTeamsApiClient (context: TurnContext, channelId: string = 'ms
   const connectorClient = context.turnState.get<ConnectorClient>(context.adapter.ConnectorClientKey)
   const serviceUrl = context.activity.serviceUrl ?? connectorClient?.axiosInstance.defaults.baseURL
 
-  if (!connectorClient || !serviceUrl) {
-    return
+  if (!connectorClient) {
+    throw ExceptionHelper.generateException(Error, Errors.TeamsApiClientSetupFailed, undefined, { missing: 'ConnectorClient in turnState' })
+  }
+
+  if (!serviceUrl) {
+    throw ExceptionHelper.generateException(Error, Errors.TeamsApiClientSetupFailed, undefined, { missing: 'activity.serviceUrl and ConnectorClient baseURL' })
   }
 
   context.turnState.set(

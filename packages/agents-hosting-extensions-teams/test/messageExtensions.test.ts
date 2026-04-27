@@ -10,6 +10,21 @@ interface InvokeValue {
   body?: any
 }
 
+function addConnectorClientToTurnState (context: TurnContext): void {
+  context.turnState.set(context.adapter.ConnectorClientKey, {
+    axiosInstance: {
+      defaults: {
+        baseURL: 'https://service.example.com',
+        headers: {
+          common: {
+            Authorization: 'Bearer token'
+          }
+        }
+      }
+    }
+  })
+}
+
 describe('MessageExtension', function () {
   const app = new AgentApplication()
   const adapter = new CloudAdapter()
@@ -39,6 +54,7 @@ describe('MessageExtension', function () {
 
     activity.name = 'composeExtension/querySettingUrl'
     const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
     await app.run(context)
 
     assert.strictEqual(handled, true)
@@ -64,6 +80,7 @@ describe('MessageExtension', function () {
 
     activity.name = 'composeExtension/setting'
     const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
     await app.run(context)
 
     assert.strictEqual(handled, true)

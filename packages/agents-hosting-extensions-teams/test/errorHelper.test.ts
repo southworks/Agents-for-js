@@ -12,10 +12,11 @@ describe('TeamsExtensionErrors', () => {
     assert.strictEqual(Errors.TurnContextCannotBeNull.code, -150004)
     assert.strictEqual(Errors.ActivityCannotBeNull.code, -150005)
     assert.strictEqual(Errors.TeamsChannelIdRequired.code, -150006)
-    assert.strictEqual(Errors.UnexpectedTaskModuleSubmit.code, -150007)
-    assert.strictEqual(Errors.NotImplemented.code, -150008)
-    assert.strictEqual(Errors.BadRequest.code, -150009)
+    assert.strictEqual(Errors.UnexpectedTaskModuleSubmit.code, -150016)
+    assert.strictEqual(Errors.NotImplemented.code, -150017)
+    assert.strictEqual(Errors.BadRequest.code, -150018)
     assert.strictEqual(Errors.TeamsApiClientNotAvailable.code, -150010)
+    assert.strictEqual(Errors.TeamsApiClientSetupFailed.code, -150011)
   })
 
   it('should contain error message in description', () => {

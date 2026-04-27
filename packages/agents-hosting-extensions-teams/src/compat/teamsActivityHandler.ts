@@ -1117,7 +1117,6 @@ export class TeamsActivityHandler extends ActivityHandler {
     ) => Promise<void>
   ): this {
     return this.on('TeamsMeetingParticipantsJoin', async (context, next) => {
-      // const meeting = TeamsMeetingStartT.parse(context.activity.value)
       const participants = TeamsMeetingParticipantsT.parse(context.activity.value)
       await handler(
         participants.members,

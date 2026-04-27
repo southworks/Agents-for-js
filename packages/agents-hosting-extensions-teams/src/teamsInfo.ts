@@ -55,12 +55,12 @@ export class TeamsInfo {
       throw ExceptionHelper.generateException(Error, Errors.ParticipantIdRequired)
     }
 
-    if (tenantId === undefined) {
-      const tenant = teamsChannelData.tenant
-      tenantId = tenant?.id
+    const resolvedTenantId = tenantId ?? teamsChannelData.tenant?.id
+    if (resolvedTenantId == null) {
+      throw ExceptionHelper.generateException(Error, Errors.TenantIdRequired)
     }
 
-    const res = await getTeamsClient(context).meetings.getParticipant(meetingId, participantId, tenantId!)
+    const res = await getTeamsClient(context).meetings.getParticipant(meetingId, participantId, resolvedTenantId)
     return res as MeetingParticipant
   }
 
