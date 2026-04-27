@@ -1,3 +1,5 @@
+import './instrumentation.js'
+
 import { startServer } from '@microsoft/agents-hosting-express'
 import { AgentApplication, AttachmentDownloader } from '@microsoft/agents-hosting'
 

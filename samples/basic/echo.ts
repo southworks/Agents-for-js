@@ -1,3 +1,5 @@
+import './instrumentation'
+
 import { startServer } from '@microsoft/agents-hosting-express'
 import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 
@@ -7,6 +9,10 @@ echo.onConversationUpdate('membersAdded', async (context: TurnContext) => {
 })
 echo.onActivity('message', async (context: TurnContext, state: TurnState) => {
   let counter: number = state.getValue('conversation.counter') || 0
+  await context.sendActivities([
+    { type: 'typing' },
+    { type: 'message', text: 'Echoing your message back in 1 second...' },
+  ] as any)
   await context.sendActivity(`[${counter++}]You said: ${context.activity.text}`)
   state.setValue('conversation.counter', counter)
 })

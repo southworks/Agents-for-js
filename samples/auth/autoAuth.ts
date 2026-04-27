@@ -1,3 +1,5 @@
+import '../basic/instrumentation.js'
+
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
@@ -6,11 +8,15 @@ import { AgentApplication, CardFactory, MemoryStorage, MessageFactory, TurnConte
 import { Template } from 'adaptivecards-templating'
 import { getUserInfo } from '../_shared/userGraphClient.js'
 import { getCurrentProfile, getPullRequests } from '../_shared/githubApiClient.js'
+import { debug } from '@microsoft/agents-telemetry'
+
+const logger = debug('autoAuthSample')
 
 class OneProvider extends AgentApplication<TurnState> {
   constructor () {
     super({
       storage: new MemoryStorage(),
+      longRunningMessages: true,
       authorization: {
         graph: { text: 'Sign in with Microsoft Graph', title: 'Graph Sign In' },
         github: { text: 'Sign in with GitHub', title: 'GitHub Sign In' },
@@ -54,6 +60,7 @@ class OneProvider extends AgentApplication<TurnState> {
   }
 
   private _message = async (context: TurnContext, state: TurnState): Promise<void> => {
+    logger.debug(`Processing message: ${context.activity.text}`)
     await context.sendActivity(MessageFactory.text('You said.' + context.activity.text))
   }
 

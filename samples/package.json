@@ -1,0 +1,11 @@
+{
+    "name": "name",
+    "type": "module",
+    "main": "./node-esm-agents-telemetry-test.mjs",
+    "scripts": {
+        "start": "node ."
+    },
+    "dependencies": {
+        "@microsoft/agents-telemetry": "file:../packages/agents-telemetry"
+    }
+}

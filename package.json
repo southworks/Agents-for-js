@@ -19,6 +19,8 @@
   "type": "module",
   "scripts": {
     "play": "agentsplayground",
+    "aspire": "aspire run --project ./aspire/apphost.cs -- --launch-profile http",
+    "aspire:otlp:smoke": "node devTools/send-otlp-smoke.mjs",
     "lint": "eslint",
     "lint:deps": "knip",
     "lint:deps:ci": "knip --reporter github-actions",
@@ -28,6 +30,8 @@
     "clean:dist": "rm -rfv packages/*/dist",
     "clean": "git clean -xdf",
     "build:samples": "tsc --build --verbose tsconfig.samples.json",
+    "vite": "cd samples && npx vite@5 --open /vite-agents-telemetry-test.html",
+    "node": "node samples/node-esm-agents-telemetry-test.mjs",
     "build:browser": "npm run build:browser --workspaces --if-present",
     "build:esm": "npm run build:esm --workspaces --if-present",
     "build": "tsc --build --verbose tsconfig.build.json",
@@ -58,7 +62,20 @@
     "sinon": "21.0.3",
     "tsx": "4.21.0",
     "typedoc": "0.28.18",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    
+    "@opentelemetry/exporter-logs-otlp-grpc": "^0.211.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.211.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.211.0",
+    "@opentelemetry/instrumentation-document-load": "^0.58.0",
+    "@opentelemetry/sdk-trace-web": "^2.6.0",
+    "@opentelemetry/resources": "^2.5.0",
+    "@opentelemetry/sdk-logs": "^0.211.0",
+    "@opentelemetry/sdk-metrics": "^2.5.0",
+    "@opentelemetry/sdk-node": "^0.211.0",
+    "@opentelemetry/sdk-trace-base": "^2.5.0",
+    "@opentelemetry/sdk-trace-node": "^2.5.0",
+    "@opentelemetry/semantic-conventions": "^1.39.0"
   },
   "peerDependencies": {
     "@rushstack/terminal": "*"
