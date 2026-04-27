@@ -1,8 +1,5 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": [
-    "src/**/*.cts"
-  ],
   "compilerOptions": {
     "outDir": "dist/esm",
     "composite": false,

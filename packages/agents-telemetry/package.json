@@ -25,7 +25,8 @@
   "browser": "./dist/esm/src/index.mjs",
   "scripts": {
     "clean:esm": "node -e \"require('node:fs').rmSync('dist/esm', { recursive: true, force: true })\"",
-    "build:esm": "tsc --project tsconfig.esm.json && node scripts/esm.mjs"
+    "build:esm": "tsc --project tsconfig.esm.json && node scripts/esm.mjs",
+    "build:browser": "esbuild src/index.cts --bundle --format=esm --sourcemap --platform=browser --target=es2022 --outdir=dist/browser --jsx=automatic --external:@opentelemetry/api --external:@opentelemetry/api-logs"
   },
   "peerDependencies": {
     "@opentelemetry/api": "1",
@@ -56,7 +57,7 @@
     ".": {
       "import": {
         "types": "./dist/esm/src/index.d.mts",
-        "browser": "./dist/esm/src/index.mjs",
+        "browser": "./dist/esm/src/index.cjs",
         "default": "./dist/esm/src/index.mjs"
       },
       "require": {

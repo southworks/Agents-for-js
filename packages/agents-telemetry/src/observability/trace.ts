@@ -64,7 +64,11 @@ export function traceFactory (otel: OTel) {
     })
   } as TraceFunction
 
-  trace.define = definition => definition
+  trace.define = definition => {
+    console.log('Trace definition created:', definition, otel)
+
+    return definition
+  }
 
   return trace
 }
