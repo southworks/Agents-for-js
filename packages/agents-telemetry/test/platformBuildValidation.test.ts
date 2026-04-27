@@ -108,7 +108,7 @@ describe('agents-telemetry platform build validation', () => {
     assert.strictEqual(stdout.trim(), 'function')
   })
 
-  it('should bundle for the browser with esbuild', async () => {
+  it('should bundle for the browser with esbuild iife output', async () => {
     const result = await esbuild.build({
       stdin: {
         contents: `import * as telemetry from '${packageName}';\nexport default typeof telemetry.trace`,
@@ -118,7 +118,8 @@ describe('agents-telemetry platform build validation', () => {
       },
       bundle: true,
       platform: 'browser',
-      format: 'esm',
+      format: 'iife',
+      target: 'esnext',
       write: false,
     })
 
