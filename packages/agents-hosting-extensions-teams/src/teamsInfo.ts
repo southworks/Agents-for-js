@@ -72,11 +72,11 @@ export class TeamsInfo {
    * @returns {Promise<MeetingInfo>} - The meeting information.
    */
   static async getMeetingInfo (context: TurnContext, meetingId?: string): Promise<MeetingInfo> {
-    if (!meetingId) {
-      const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
-      meetingId = teamsChannelData.meeting?.id
+    const resolvedMeetingId = meetingId ?? parseTeamsChannelData(context.activity.channelData)?.meeting?.id
+    if (resolvedMeetingId == null) {
+      throw ExceptionHelper.generateException(Error, Errors.MeetingIdRequired)
     }
-    const res = await getTeamsClient(context).meetings.getById(meetingId!)
+    const res = await getTeamsClient(context).meetings.getById(resolvedMeetingId)
     return res as MeetingInfo
   }
 
@@ -88,14 +88,11 @@ export class TeamsInfo {
    * @returns {Promise<TeamDetails>} - The team details.
    */
   static async getTeamDetails (context: TurnContext, teamId?: string): Promise<TeamDetails> {
-    if (!teamId) {
-      const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
-      teamId = teamsChannelData.team?.id
-    }
-    if (!teamId) {
+    const resolvedTeamId = teamId ?? parseTeamsChannelData(context.activity.channelData)?.team?.id
+    if (resolvedTeamId == null) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    const res = await getTeamsClient(context).teams.getById(teamId!)
+    const res = await getTeamsClient(context).teams.getById(resolvedTeamId)
     return res as TeamDetails
   }
 
@@ -165,14 +162,11 @@ export class TeamsInfo {
    * @returns {Promise<ChannelInfo[]>} - The list of channels.
    */
   static async getTeamChannels (context: TurnContext, teamId?: string): Promise<ChannelInfo[]> {
-    if (!teamId) {
-      const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
-      teamId = teamsChannelData.team?.id
-    }
-    if (!teamId) {
+    const resolvedTeamId = teamId ?? parseTeamsChannelData(context.activity.channelData)?.team?.id
+    if (resolvedTeamId == null) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
-    return await getTeamsClient(context).teams.getConversations(teamId!)
+    return await getTeamsClient(context).teams.getConversations(resolvedTeamId)
   }
 
   /**
@@ -224,15 +218,12 @@ export class TeamsInfo {
    * @returns {Promise<PagedMembersResult>} - The paged members result.
    */
   static async getPagedTeamMembers (context: TurnContext, teamId?: string, pageSize?: number, continuationToken?: string): Promise<PagedMembersResult> {
-    if (!teamId) {
-      const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
-      teamId = teamsChannelData.team?.id
-    }
-    if (!teamId) {
+    const resolvedTeamId = teamId ?? parseTeamsChannelData(context.activity.channelData)?.team?.id
+    if (resolvedTeamId == null) {
       throw ExceptionHelper.generateException(Error, Errors.TeamIdRequired)
     }
     const client = getTeamsClient(context)
-    return await client.conversations.members(teamId).getPaged(pageSize, continuationToken)
+    return await client.conversations.members(resolvedTeamId).getPaged(pageSize, continuationToken)
   }
 
   /**
