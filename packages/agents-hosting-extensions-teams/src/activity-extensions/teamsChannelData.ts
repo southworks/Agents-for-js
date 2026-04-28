@@ -12,7 +12,7 @@ import type { ChannelData } from '@microsoft/teams.api'
  * The Teams SDK already defines the nested ChannelData shape. This parser only
  * verifies that the payload is an object and preserves all properties as-is.
  */
-export const teamsChannelDataZodSchema = z.object({}).passthrough()
+const teamsChannelDataZodSchema = z.object({}).passthrough()
 
 /**
  * Parses the given object as Teams ChannelData.
