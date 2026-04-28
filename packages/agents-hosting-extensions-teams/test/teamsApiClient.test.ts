@@ -4,7 +4,6 @@ import { TurnContext } from '@microsoft/agents-hosting'
 import { Activity } from '@microsoft/agents-activity'
 import { getTeamsClient, setTeamsApiClient, TeamsApiClientKey } from '../src/teamsApiClient'
 import { SetTeamsApiClientMiddleware } from '../src/compat/setTeamsApiClientMiddleware'
-import { Errors } from '../src/errorHelper'
 
 function createContext (channelId: string = 'msteams', withConnectorClient: boolean = true, serviceUrl: string = 'https://service.example.com'): TurnContext {
   const context = new TurnContext(
