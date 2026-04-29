@@ -5,7 +5,7 @@
 
 import { Activity, RoleTypes } from '@microsoft/agents-activity'
 import { debug } from '@microsoft/agents-telemetry'
-import { AuthConfiguration, resolveAuthority } from './authConfiguration'
+import { AuthConfiguration, AuthType, resolveAuthority } from './authConfiguration'
 import { Connections } from './connections'
 import { MsalTokenProvider } from './msalTokenProvider'
 import { JwtPayload } from 'jsonwebtoken'
@@ -48,7 +48,7 @@ export class MsalConnectionManager implements Connections {
         ? 'certificate'
         : cfg?.clientSecret
           ? 'clientSecret'
-          : cfg?.WIDAssertionFile || cfg?.FICClientId
+          : cfg?.authtype === AuthType.WorkloadIdentity || cfg?.WIDAssertionFile || cfg?.FICClientId
             ? 'workloadIdentity'
             : 'none'
       logger.debug('connection "%s" clientId=%s tenantId=%s authType=%s', name, cfg?.clientId ?? '<none>', cfg?.tenantId ?? '<none>', authType)

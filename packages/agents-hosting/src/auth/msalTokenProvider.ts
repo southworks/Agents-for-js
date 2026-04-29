@@ -5,7 +5,7 @@
 
 import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
 import axios from 'axios'
-import { AuthConfiguration, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
+import { AuthConfiguration, AuthType, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { v4 } from 'uuid'
@@ -70,7 +70,7 @@ export class MsalTokenProvider implements AuthProvider {
       }
 
       let token
-      if (authConfig.WIDAssertionFile !== undefined) {
+      if (authConfig.authtype === AuthType.WorkloadIdentity || authConfig.WIDAssertionFile !== undefined) {
         record({ method: 'wid' })
         logger.debug('getAccessToken via WID clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
@@ -305,8 +305,9 @@ export class MsalTokenProvider implements AuthProvider {
 
     let clientAssertion
 
-    if (this.connectionSettings.WIDAssertionFile !== undefined) {
-      clientAssertion = fs.readFileSync(this.connectionSettings.WIDAssertionFile as string, 'utf8')
+    if (this.connectionSettings.authtype === AuthType.WorkloadIdentity || this.connectionSettings.WIDAssertionFile !== undefined) {
+      const tokenFilePath = this.connectionSettings.federatedtokenfile ?? this.connectionSettings.WIDAssertionFile
+      clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
     } else if (this.connectionSettings.FICClientId !== undefined) {
       clientAssertion = await this.fetchExternalToken(this.connectionSettings.FICClientId as string)
     } else if (this.connectionSettings.certPemFile !== undefined &&
@@ -517,7 +518,8 @@ export class MsalTokenProvider implements AuthProvider {
    */
   private async acquireAccessTokenViaWID (authConfig: AuthConfiguration, scope: string) : Promise<string> {
     const scopes = [`${scope}/.default`]
-    const clientAssertion = fs.readFileSync(authConfig.WIDAssertionFile as string, 'utf8')
+    const tokenFilePath = authConfig.federatedtokenfile ?? authConfig.WIDAssertionFile
+    const clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
     const cca = new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId as string,
