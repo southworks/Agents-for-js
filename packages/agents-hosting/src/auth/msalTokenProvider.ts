@@ -70,7 +70,39 @@ export class MsalTokenProvider implements AuthProvider {
       }
 
       let token
-      if (authConfig.authtype === AuthType.WorkloadIdentity || authConfig.WIDAssertionFile !== undefined) {
+      if (authConfig.authtype) {
+        switch (authConfig.authtype) {
+          case AuthType.WorkloadIdentity:
+            record({ method: 'wid' })
+            logger.debug('getAccessToken via WID clientId=%s scope=%s', authConfig.clientId, actualScope)
+            token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
+            break
+          case AuthType.FederatedCredentials:
+            record({ method: 'fic' })
+            logger.debug('getAccessToken via FIC clientId=%s scope=%s', authConfig.clientId, actualScope)
+            token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
+            break
+          case AuthType.ClientSecret:
+            record({ method: 'secret' })
+            logger.debug('getAccessToken via secret clientId=%s scope=%s', authConfig.clientId, actualScope)
+            token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
+            break
+          case AuthType.Certificate:
+          case AuthType.CertificateSubjectName:
+            record({ method: 'certificate' })
+            logger.debug('getAccessToken via certificate clientId=%s scope=%s', authConfig.clientId, actualScope)
+            token = await this.acquireTokenWithCertificate(authConfig, actualScope)
+            break
+          case AuthType.UserManagedIdentity:
+          case AuthType.SystemManagedIdentity:
+            record({ method: 'managed_identity' })
+            logger.debug('getAccessToken via managed identity clientId=%s scope=%s', authConfig.clientId, actualScope)
+            token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
+            break
+          default:
+            throw new Error(`Unsupported authtype: ${authConfig.authtype}`)
+        }
+      } else if (authConfig.WIDAssertionFile !== undefined) {
         record({ method: 'wid' })
         logger.debug('getAccessToken via WID clientId=%s scope=%s', authConfig.clientId, actualScope)
         token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
@@ -305,7 +337,22 @@ export class MsalTokenProvider implements AuthProvider {
 
     let clientAssertion
 
-    if (this.connectionSettings.authtype === AuthType.WorkloadIdentity || this.connectionSettings.WIDAssertionFile !== undefined) {
+    if (this.connectionSettings.authtype) {
+      switch (this.connectionSettings.authtype) {
+        case AuthType.WorkloadIdentity: {
+          const tokenFilePath = this.connectionSettings.federatedtokenfile ?? this.connectionSettings.WIDAssertionFile
+          clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
+          break
+        }
+        case AuthType.FederatedCredentials:
+          clientAssertion = await this.fetchExternalToken(this.connectionSettings.FICClientId as string)
+          break
+        case AuthType.Certificate:
+        case AuthType.CertificateSubjectName:
+          clientAssertion = this.getAssertionFromCert(this.connectionSettings)
+          break
+      }
+    } else if (this.connectionSettings.WIDAssertionFile !== undefined) {
       const tokenFilePath = this.connectionSettings.federatedtokenfile ?? this.connectionSettings.WIDAssertionFile
       clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
     } else if (this.connectionSettings.FICClientId !== undefined) {
