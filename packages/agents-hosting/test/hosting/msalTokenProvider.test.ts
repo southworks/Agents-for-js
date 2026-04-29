@@ -2,7 +2,7 @@ import { strict as assert } from 'assert'
 import { describe, it, beforeEach } from 'node:test'
 import sinon from 'sinon'
 import { ConfidentialClientApplication, ManagedIdentityApplication } from '@azure/msal-node'
-import { MsalTokenProvider, ConnectorClient, AuthConfiguration, CloudAdapter } from '../../src'
+import { MsalTokenProvider, ConnectorClient, AuthConfiguration, AuthType, CloudAdapter } from '../../src'
 import fs from 'fs'
 import crypto from 'crypto'
 import axios from 'axios'
@@ -82,6 +82,20 @@ describe('MsalTokenProvider', () => {
     authConfig.certPemFile = undefined
     authConfig.certKeyFile = undefined
     authConfig.WIDAssertionFile = '/etc/issue'
+    // @ts-ignore
+    const acquireTokenStub = sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').resolves({ accessToken: 'test-token' })
+    const token = await msalTokenProvider.getAccessToken(authConfig, 'scope')
+    assert.strictEqual(token, 'test-token')
+    acquireTokenStub.restore()
+  })
+
+  it('should acquire token with WID using authtype and federatedtokenfile', async () => {
+    authConfig.clientSecret = undefined
+    authConfig.certPemFile = undefined
+    authConfig.certKeyFile = undefined
+    authConfig.WIDAssertionFile = undefined
+    authConfig.authtype = AuthType.WorkloadIdentity
+    authConfig.federatedtokenfile = '/etc/issue'
     // @ts-ignore
     const acquireTokenStub = sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').resolves({ accessToken: 'test-token' })
     const token = await msalTokenProvider.getAccessToken(authConfig, 'scope')
