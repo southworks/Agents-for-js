@@ -10,6 +10,9 @@ import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
 import { trace } from '@microsoft/agents-telemetry'
 import { CosmosStorageTraceDefinitions } from './observability'
+import { debug } from '@microsoft/agents-telemetry'
+
+const logger = debug('agents:cosmos-storage')
 
 /**
  * A utility class to ensure that a specific asynchronous task is executed only once for a given key.
@@ -107,6 +110,22 @@ export class CosmosDbPartitionedStorage implements Storage {
         )
       }
     }
+
+    logger.info('CosmosDbPartitionedStorage settings loaded', {
+      container: {
+        id: cosmosDbStorageOptions.containerId,
+        databaseId: cosmosDbStorageOptions.databaseId,
+        throughput: cosmosDbStorageOptions.containerThroughput,
+      },
+      connection: {
+        mode: cosmosClientOptions.tokenProvider !== undefined ? 'tokenProvider' : 'connectionString',
+        endpoint: cosmosClientOptions.endpoint,
+      },
+      partitioning: {
+        compatibilityMode: cosmosDbStorageOptions.compatibilityMode,
+        keySuffix: cosmosDbStorageOptions.keySuffix,
+      },
+    })
   }
 
   /**

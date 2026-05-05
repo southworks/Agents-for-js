@@ -10,6 +10,30 @@ import objectPath from 'object-path'
 const logger = debug('agents:authConfiguration')
 const DEFAULT_CONNECTION = 'serviceConnection'
 
+function redactValue (value: string | undefined): string | undefined {
+  return value !== undefined ? '<redacted>' : undefined
+}
+
+// Helper to remove undefined options
+const prune = <T extends Record<string, any>>(obj: T) => {
+  const entries = Object.entries(obj).filter(([, e]) => e !== undefined)
+  return Object.fromEntries(entries) as T
+}
+
+function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<string, unknown> {
+  return [...authConfig.connections?.entries() ?? []].reduce((summary, [name, config]) => {
+    summary[name] = prune({
+      ...config,
+      clientSecret: redactValue(config.clientSecret),
+      certPemFile: redactValue(config.certPemFile),
+      certKeyFile: redactValue(config.certKeyFile),
+      WIDAssertionFile: redactValue(config.WIDAssertionFile),
+      FICClientId: redactValue(config.FICClientId),
+    } satisfies AuthConfiguration)
+    return summary
+  }, {} as Record<string, AuthConfiguration>)
+}
+
 /**
  * Represents the authentication configuration.
  */
@@ -159,10 +183,11 @@ export const loadAuthConfigFromEnv = (cnxName?: string): AuthConfiguration => {
     authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
   }
 
-  return {
-    ...authConfig,
-    ...envConnections,
-  }
+  const result = { ...authConfig, ...envConnections }
+
+  logger.info('Auth settings loaded from environment', summarizeAuthConfiguration(result), result.connectionsMap)
+
+  return result
 }
 
 /**
@@ -223,7 +248,10 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
   authConfig.authority ??= 'https://login.microsoftonline.com'
   authConfig.issuers ??= getDefaultIssuers(authConfig.tenantId ?? '', authConfig.authority)
 
-  return { ...authConfig, ...envConnections }
+  const result = { ...authConfig, ...envConnections }
+  logger.info('Legacy auth settings loaded from environment', summarizeAuthConfiguration(result), result.connectionsMap)
+
+  return result
 }
 
 function loadConnectionsMapFromEnv () {
@@ -326,10 +354,10 @@ export function getAuthConfigWithDefaults (config?: AuthConfiguration): AuthConf
     mergedConfig = buildLegacyAuthConfig(undefined, defaultConn)
   }
 
-  return {
-    ...mergedConfig,
-    ...connections,
-  }
+  const result = { ...mergedConfig, ...connections }
+  logger.info('Auth settings loaded from runtime configuration', summarizeAuthConfiguration(result), result.connectionsMap)
+
+  return result
 }
 
 function buildLegacyAuthConfig (envPrefix: string = '', customConfig?: AuthConfiguration): AuthConfiguration {
