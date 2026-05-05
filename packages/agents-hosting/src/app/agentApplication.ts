@@ -169,7 +169,7 @@ export class AgentApplication<TState extends TurnState> {
 
     const className = (obj: any) => obj?.constructor?.name ?? (obj ? 'custom' : undefined)
     logger.info('AgentApplication settings loaded', {
-      agentAppId: this._options.agentAppId,
+      agentAppId: this._options.agentAppId ? '<redacted>' : undefined,
       adapter: {
         className: className(this._adapter),
         source: this._options.adapter ? 'consumed' : 'created',

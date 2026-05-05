@@ -119,7 +119,7 @@ export class CosmosDbPartitionedStorage implements Storage {
       },
       connection: {
         mode: cosmosClientOptions.tokenProvider !== undefined ? 'tokenProvider' : 'connectionString',
-        endpoint: cosmosClientOptions.endpoint,
+        endpoint: cosmosClientOptions.endpoint ? '<redacted>' : undefined,
       },
       partitioning: {
         compatibilityMode: cosmosDbStorageOptions.compatibilityMode,

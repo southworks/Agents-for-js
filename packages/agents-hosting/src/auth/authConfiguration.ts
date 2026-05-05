@@ -24,6 +24,8 @@ function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<stri
   return [...authConfig.connections?.entries() ?? []].reduce((summary, [name, config]) => {
     summary[name] = prune({
       ...config,
+      clientId: redactValue(config.clientId),
+      tenantId: redactValue(config.tenantId),
       clientSecret: redactValue(config.clientSecret),
       certPemFile: redactValue(config.certPemFile),
       certKeyFile: redactValue(config.certKeyFile),
