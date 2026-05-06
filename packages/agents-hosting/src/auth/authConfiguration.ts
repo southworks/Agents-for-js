@@ -3,34 +3,28 @@
  * Licensed under the MIT License.
  */
 
-import { debug } from '@microsoft/agents-telemetry'
+import { debug, redactString, redactScopes, redactUrl } from '@microsoft/agents-telemetry'
 import { ConnectionMapItem } from './msalConnectionManager'
 import objectPath from 'object-path'
+import { prune } from '../utils'
 
 const logger = debug('agents:authConfiguration')
 const DEFAULT_CONNECTION = 'serviceConnection'
-
-function redactValue (value: string | undefined): string | undefined {
-  return value !== undefined ? '<redacted>' : undefined
-}
-
-// Helper to remove undefined options
-const prune = <T extends Record<string, any>>(obj: T) => {
-  const entries = Object.entries(obj).filter(([, e]) => e !== undefined)
-  return Object.fromEntries(entries) as T
-}
 
 function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<string, unknown> {
   return [...authConfig.connections?.entries() ?? []].reduce((summary, [name, config]) => {
     summary[name] = prune({
       ...config,
-      clientId: redactValue(config.clientId),
-      tenantId: redactValue(config.tenantId),
-      clientSecret: redactValue(config.clientSecret),
-      certPemFile: redactValue(config.certPemFile),
-      certKeyFile: redactValue(config.certKeyFile),
-      WIDAssertionFile: redactValue(config.WIDAssertionFile),
-      FICClientId: redactValue(config.FICClientId),
+      clientId: redactString(config.clientId, true),
+      tenantId: redactString(config.tenantId, true),
+      clientSecret: redactString(config.clientSecret),
+      authority: config.authority ? redactUrl(config.authority) : undefined,
+      scope: config.scope ? redactScopes([config.scope]) : undefined,
+      issuers: config.issuers?.map(redactUrl),
+      FICClientId: redactString(config.FICClientId, true),
+      certPemFile: redactString(config.certPemFile),
+      certKeyFile: redactString(config.certKeyFile),
+      WIDAssertionFile: redactString(config.WIDAssertionFile),
     } satisfies AuthConfiguration)
     return summary
   }, {} as Record<string, AuthConfiguration>)

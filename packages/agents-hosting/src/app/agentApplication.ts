@@ -21,7 +21,7 @@ import { CloudAdapter } from '../cloudAdapter'
 import { Authorization, UserAuthorization, AuthorizationManager } from './auth'
 import { Proactive } from './proactive'
 import { JwtPayload } from 'jsonwebtoken'
-import { trace, debug } from '@microsoft/agents-telemetry'
+import { trace, debug, redactString } from '@microsoft/agents-telemetry'
 import { AgentApplicationTraceDefinitions } from '../observability'
 import { Errors } from '../errorHelper'
 
@@ -169,7 +169,7 @@ export class AgentApplication<TState extends TurnState> {
 
     const className = (obj: any) => obj?.constructor?.name ?? (obj ? 'custom' : undefined)
     logger.info('AgentApplication settings loaded', {
-      agentAppId: this._options.agentAppId ? '<redacted>' : undefined,
+      agentAppId: redactString(this._options.agentAppId, true),
       adapter: {
         className: className(this._adapter),
         source: this._options.adapter ? 'consumed' : 'created',

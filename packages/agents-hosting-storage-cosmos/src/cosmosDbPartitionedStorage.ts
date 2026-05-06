@@ -8,7 +8,7 @@ import { CosmosDbPartitionedStorageOptions } from './cosmosDbPartitionedStorageO
 import { Storage, StoreItems } from '@microsoft/agents-hosting'
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
-import { trace } from '@microsoft/agents-telemetry'
+import { trace, redactString } from '@microsoft/agents-telemetry'
 import { CosmosStorageTraceDefinitions } from './observability'
 import { debug } from '@microsoft/agents-telemetry'
 
@@ -113,13 +113,13 @@ export class CosmosDbPartitionedStorage implements Storage {
 
     logger.info('CosmosDbPartitionedStorage settings loaded', {
       container: {
-        id: cosmosDbStorageOptions.containerId,
-        databaseId: cosmosDbStorageOptions.databaseId,
+        id: redactString(cosmosDbStorageOptions.containerId, true),
+        databaseId: redactString(cosmosDbStorageOptions.databaseId, true),
         throughput: cosmosDbStorageOptions.containerThroughput,
       },
       connection: {
         mode: cosmosClientOptions.tokenProvider !== undefined ? 'tokenProvider' : 'connectionString',
-        endpoint: cosmosClientOptions.endpoint ? '<redacted>' : undefined,
+        endpoint: redactString(cosmosClientOptions.endpoint),
       },
       partitioning: {
         compatibilityMode: cosmosDbStorageOptions.compatibilityMode,

@@ -4,7 +4,7 @@
  */
 
 import { Activity, ExceptionHelper } from '@microsoft/agents-activity'
-import { debug } from '@microsoft/agents-telemetry'
+import { debug, redactScopes } from '@microsoft/agents-telemetry'
 import { AgentApplication } from '../agentApplication'
 import { AgenticAuthorization, AzureBotAuthorization } from './handlers'
 import { TurnContext } from '../../turnContext'
@@ -14,6 +14,7 @@ import { ActiveAuthorizationHandler, AuthorizationHandlerStatus, AuthorizationHa
 import { Connections } from '../../auth/connections'
 import { sendInvokeResponse } from './utils'
 import { envParser, envParserUtils } from '../../auth'
+import { prune } from '../../utils'
 
 const logger = debug('agents:authorization:manager')
 
@@ -402,7 +403,17 @@ export class AuthorizationManager {
         options.enableSso = options.enableSso !== false // default value is true if undefined.
       }
 
-      logger.info(this.prefix(id, 'settings loaded from \'%s\''), format, options)
+      const maskedOptions: any = {}
+
+      if ('oboScopes' in options && options.oboScopes && options.oboScopes.length > 0) {
+        maskedOptions.oboScopes = redactScopes(options.oboScopes)
+      }
+
+      if ('scopes' in options && options.scopes && options.scopes.length > 0) {
+        maskedOptions.scopes = redactScopes(options.scopes)
+      }
+
+      logger.info(this.prefix(id, 'settings loaded from \'%s\''), format, { ...options, ...maskedOptions })
 
       if (!settings.storage) {
         throw ExceptionHelper.generateException(Error, Errors.StorageRequiredForAuthorization)
@@ -454,11 +465,6 @@ export class AuthorizationManager {
       options: AuthorizationOptions[string];
       format: string;
     } {
-    const prune = <T extends Record<string, any>>(obj: T) => {
-      const entries = Object.entries(obj).filter(([, value]) => value !== undefined)
-      return Object.fromEntries(entries) as T
-    }
-
     const matchesId = ([_id]: [string, AuthorizationOptions[string]]) => _id.toLowerCase() === id.toLowerCase()
 
     // Find entries case-insensitively for later processing
