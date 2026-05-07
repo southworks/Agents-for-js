@@ -4,3 +4,4 @@
  */
 
 export { messagingExtensionQueryZodSchema, parseValueMessagingExtensionQuery } from './messagingExtensionQuery'
+export * from './messageExtension'

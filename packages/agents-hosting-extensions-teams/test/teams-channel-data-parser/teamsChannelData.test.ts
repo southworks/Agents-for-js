@@ -5,6 +5,11 @@ import { parseTeamsChannelData } from '../../src/activity-extensions'
 import type { ChannelInfo } from '@microsoft/teams.api'
 
 describe('parseTeamsChannelData test', () => {
+  it('Parse undefined as empty object', () => {
+    const teamsChannelData = parseTeamsChannelData(undefined)
+    assert.deepEqual(teamsChannelData, {})
+  })
+
   it('Parse with no properties defined', () => {
     const teamsChannelDataObject = {}
     const obj = { type: ActivityTypes.Message, channelData: teamsChannelDataObject }

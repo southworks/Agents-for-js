@@ -7,7 +7,7 @@ import { ActivityHandler, InvokeResponse, TurnContext } from '@microsoft/agents-
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from '../errorHelper'
 import type { AppBasedLinkQuery, FileConsentCardResponse, MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse, TaskModuleRequest, TaskModuleResponse, ChannelInfo, TeamInfo, TeamsChannelAccount, MeetingDetails, MeetingParticipant } from '@microsoft/teams.api'
-import { parseValueMessagingExtensionQuery } from '../messageExtension'
+import { parseValueMessagingExtensionQuery } from '../messageExtensions'
 import { parseTeamsChannelData } from '../activity-extensions'
 import { ReadReceiptInfo } from './readReceipInfo'
 

@@ -1,5 +1,8 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
-import { AgentApplication, RouteHandler, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import type { MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse, MessagingExtensionResult, TaskModuleResponse } from '@microsoft/teams.api'
 import { z } from 'zod'
 import { messagingExtensionQueryZodSchema } from './messagingExtensionQuery'
@@ -12,64 +15,54 @@ function parseAppBasedLinkQuery (value: unknown): { url: string } {
   return appBasedLinkQuerySchema.parse(value)
 }
 
+function matchesCommandId (context: TurnContext, commandId: string | RegExp): boolean {
+  const activityCommandId = (context.activity.value as any)?.commandId
+  if (activityCommandId == null) return false
+  return typeof commandId === 'string'
+    ? activityCommandId === commandId
+    : commandId.test(activityCommandId)
+}
+
 type RouteQueryHandler<TState extends TurnState> = (context: TurnContext, state: TState, query: MessagingExtensionQuery) => Promise<MessagingExtensionResult>
 type SelectItemHandler<TState extends TurnState> = (context: TurnContext, state: TState, item: unknown) => Promise<MessagingExtensionResult>
 type QueryLinkHandler<TState extends TurnState> = (context: TurnContext, state: TState, url: string) => Promise<MessagingExtensionResult>
-type FetchTaskHandler<TState extends TurnState> = (context: TurnContext, state: TState) => Promise<TaskModuleResponse>
+type FetchActionHandler<TState extends TurnState> = (context: TurnContext, state: TState) => Promise<TaskModuleResponse>
 type SubmitActionHandler<TState extends TurnState> = (context: TurnContext, state: TState, data: unknown) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewEditHandler<TState extends TurnState> = (context: TurnContext, state: TState, activity: Activity) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewSendHandler<TState extends TurnState> = (context: TurnContext, state: TState, activity: Activity) => Promise<void>
-type ConfigureQuerySettingUrlHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: unknown) => Promise<MessagingExtensionResponse>
+type QueryUrlSettingHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: unknown) => Promise<MessagingExtensionResponse>
 type ConfigureSettingsHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: unknown) => Promise<void>
 type CardButtonClickedHandler<TState extends TurnState> = (context: TurnContext, state: TState, cardData: unknown) => Promise<void>
-/**
- * Class that exposes Teams messaging extension-related events.
- * Provides an organized way to handle messaging extension operations in Microsoft Teams.
- */
+
 export class MessageExtension<TState extends TurnState> {
   _app: AgentApplication<TState>
 
-  /**
-   * Creates a new instance of the MessageExtension class.
-   * @param app - The agent application
-   */
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
-  /**
-   * Handles queries from messaging extensions.
-   * @param handler - The handler to call when a query is received
-   * @returns this (for method chaining)
-   */
-  onQuery (handler: RouteQueryHandler<TState>) {
+  onQuery (commandId: string | RegExp, handler: RouteQueryHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
-        context.activity.name === 'composeExtension/query'
+        context.activity.name === 'composeExtension/query' &&
+        matchesCommandId(context, commandId)
       )
     }
-    const routeHandler : RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const messageExtensionQuery: MessagingExtensionQuery = messagingExtensionQueryZodSchema.parse(context.activity.value)
-      const parameters: Record<string, unknown> = {}
-      messageExtensionQuery.parameters?.forEach((param) => {
-        parameters[param.name!] = param.value
-      })
-      const result : MessagingExtensionResult = await handler(context, state, messageExtensionQuery)
+      const result: MessagingExtensionResult = await handler(context, state, messageExtensionQuery)
       const response: MessagingExtensionResponse = { composeExtension: result }
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200,
-        body: response
-      }
+      invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true) // Invoke requires true
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  onSelectItem (handler: SelectItemHandler<TurnState>) {
+  onSelectItem (handler: SelectItemHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -77,50 +70,37 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.name === 'composeExtension/selectItem'
       )
     }
-    const routeHandler : RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
-      const result : MessagingExtensionResult = await handler(context, state, context.activity.value)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const result: MessagingExtensionResult = await handler(context, state, context.activity.value)
       const response: MessagingExtensionResponse = { composeExtension: result }
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200,
-        body: response
-      }
+      invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true) // Invoke requires true
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles link queries from messaging extensions.
-   * @param handler - The handler to call when a link query is received
-   * @returns this (for method chaining)
-  */
-  onQueryLink (handler: QueryLinkHandler<TurnState>) {
+  onQueryLink (handler: QueryLinkHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
-       context.activity.channelId === 'msteams' &&
-       context.activity.name === 'composeExtension/queryLink'
+        context.activity.channelId === 'msteams' &&
+        context.activity.name === 'composeExtension/queryLink'
       )
     }
-    const routeHandler : RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = parseAppBasedLinkQuery(context.activity.value)
       const res = await handler(context, state, query.url)
       const response: MessagingExtensionResponse = { composeExtension: res }
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles anonymous link queries (for public access) from messaging extensions.
-   * @param handler - The handler to call when an anonymous link query is received
-   * @returns this (for method chaining)
-  */
-  onAnonymousQueryLink (handler: QueryLinkHandler<TurnState>) {
+  onAnonymousQueryLink (handler: QueryLinkHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -128,130 +108,99 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.name === 'composeExtension/anonymousQueryLink'
       )
     }
-    const routeHandler : RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = parseAppBasedLinkQuery(context.activity.value)
       const res = await handler(context, state, query.url)
       const response: MessagingExtensionResponse = { composeExtension: res }
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles fetch task requests from messaging extensions.
-   * @param handler - The handler to call when a fetch task is requested
-   * @returns this (for method chaining)
-  */
-  onFetchTask (handler: FetchTaskHandler<TurnState>) {
+  onFetchAction (commandId: string | RegExp, handler: FetchActionHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
-        context.activity.name === 'composeExtension/fetchTask'
+        context.activity.name === 'composeExtension/fetchTask' &&
+        matchesCommandId(context, commandId)
       )
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const taskModuleResponse: TaskModuleResponse = await handler(context, state)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200,
-        body: taskModuleResponse
-      }
+      invokeResponse.value = { status: 200, body: taskModuleResponse }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles action submissions from messaging extensions.
-   * @param handler - The handler to call when an action is submitted
-   * @returns this (for method chaining)
-   */
-  onSubmitAction (handler: SubmitActionHandler<TurnState>) {
+  onSubmitAction (commandId: string | RegExp, handler: SubmitActionHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
-        context.activity.name === 'composeExtension/submitAction' // && TODO
-        // (!context.activity.value || !('botMessagePreviewAction' in context.activity.value.))
+        context.activity.name === 'composeExtension/submitAction' &&
+        !(context.activity.value as any)?.botMessagePreviewAction &&
+        matchesCommandId(context, commandId)
       )
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
-      const data = context.activity.value
-      const response: MessagingExtensionActionResponse = await handler(context, state, data)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const response: MessagingExtensionActionResponse = await handler(context, state, context.activity.value)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200,
-        body: response
-      }
+      invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true) // Invoke requires true
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles message preview edit actions from messaging extensions.
-   * @param handler - The handler to call when a message preview edit action is received
-   * @returns this (for method chaining)
-   */
-  onMessagePreviewEdit (handler: MessagePreviewEditHandler<TurnState>) {
+  onMessagePreviewEdit (commandId: string | RegExp, handler: MessagePreviewEditHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(!!(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
         context.activity.name === 'composeExtension/submitAction' &&
-        context.activity.value &&
-        // @ts-ignore
-        context.activity.value['botMessagePreviewAction'] === 'edit'))
+        (context.activity.value as any)?.botMessagePreviewAction === 'edit' &&
+        matchesCommandId(context, commandId)
+      ))
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const activity = context.activity.value as Activity
       const response: MessagingExtensionActionResponse = await handler(context, state, activity)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200,
-        body: response
-      }
+      invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles message preview send actions from messaging extensions.
-   * @param handler - The handler to call when a message preview send action is received
-   * @returns this (for method chaining)
-   */
-  onMessagePreviewSend (handler: MessagePreviewSendHandler<TurnState>) {
+  onMessagePreviewSend (commandId: string | RegExp, handler: MessagePreviewSendHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(!!(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
         context.activity.name === 'composeExtension/submitAction' &&
-        context.activity.value &&
-        // @ts-ignore
-        context.activity.value['botMessagePreviewAction'] === 'send'))
+        (context.activity.value as any)?.botMessagePreviewAction === 'send' &&
+        matchesCommandId(context, commandId)
+      ))
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const msgExtensionAction = context.activity.value as MessagingExtensionAction
-      const activityPreview : Activity = msgExtensionAction.botActivityPreview?.length! > 0 ? Activity.fromObject(msgExtensionAction.botActivityPreview![0]) : new Activity(ActivityTypes.Message)
+      const activityPreview: Activity = msgExtensionAction.botActivityPreview?.length! > 0
+        ? Activity.fromObject(msgExtensionAction.botActivityPreview![0])
+        : new Activity(ActivityTypes.Message)
       await handler(context, state, activityPreview)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles configuration query setting URL requests from messaging extensions.
-   * @param handler - The handler to call when a config query setting URL is requested
-   * @returns this (for method chaining)
-   */
-  onConfigurationQuerySettingUrl (handler: ConfigureQuerySettingUrlHandler<TurnState>) {
+  onQueryUrlSetting (handler: QueryUrlSettingHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -259,25 +208,17 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.name === 'composeExtension/querySettingUrl'
       )
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
-      const response : MessagingExtensionResponse = await handler(context, state, context.activity.value)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const response: MessagingExtensionResponse = await handler(context, state, context.activity.value)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200,
-        body: response
-      }
+      invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles configuration setting updates from messaging extensions.
-   * @param handler - The handler to call when configuration settings are updated
-   * @returns this (for method chaining)
-   */
-  onConfigurationSetting (handler: ConfigureSettingsHandler<TurnState>) {
+  onConfigureSettings (handler: ConfigureSettingsHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -285,24 +226,17 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.name === 'composeExtension/setting'
       )
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       await handler(context, state, context.activity.value)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200
-      }
+      invokeResponse.value = { status: 200 }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  /**
-   * Handles card button click events from messaging extensions.
-   * @param handler - The handler to call when a card button is clicked
-   * @returns this (for method chaining)
-   */
-  onCardButtonClicked (handler: CardButtonClickedHandler<TurnState>) {
+  onCardButtonClicked (handler: CardButtonClickedHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -310,15 +244,13 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.name === 'composeExtension/onCardButtonClicked'
       )
     }
-    const routeHandler: RouteHandler<TurnState> = async (context: TurnContext, state: TurnState) => {
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       await handler(context, state, context.activity.value)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = {
-        status: 200
-      }
+      invokeResponse.value = { status: 200 }
       await context.sendActivity(invokeResponse)
     }
-    this._app.addRoute(routeSel, routeHandler, true)
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 }
