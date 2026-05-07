@@ -16,7 +16,7 @@ import { MsalConnectionManager } from './auth/msalConnectionManager'
 import { Activity, ActivityEventNames, ActivityTypes, Channels, ConversationReference, DeliveryModes, ConversationParameters, RoleTypes, ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
 import { ResourceResponse } from './connector-client/resourceResponse'
-import * as uuid from 'uuid'
+import { randomUUID } from 'crypto'
 import { debug } from '@microsoft/agents-telemetry'
 import { StatusCodes } from './statusCodes'
 import { InvokeResponse } from './invoke/invokeResponse'
@@ -599,7 +599,7 @@ export class CloudAdapter extends BaseAdapter {
     activity.name = ActivityEventNames.CreateConversation
     activity.channelId = channelId
     activity.serviceUrl = serviceUrl
-    activity.id = createdConversationId ?? uuid.v4()
+    activity.id = createdConversationId ?? randomUUID()
     activity.conversation = {
       conversationType: undefined,
       id: createdConversationId!,
