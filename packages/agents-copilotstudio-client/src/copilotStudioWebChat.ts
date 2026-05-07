@@ -269,6 +269,14 @@ export class CopilotStudioWebChat {
         : undefined
       const shouldStart = settings?.startConversation ?? !normalizedConversationId
 
+      logger.info('Copilot Studio WebChat settings loaded', {
+        showTyping: settings?.showTyping,
+        conversationId: normalizedConversationId,
+        startConversation: settings?.startConversation,
+        connectionMode: normalizedConversationId ? 'resume' : 'new',
+        acknowledgementMode: shouldStart ? 'startConversationStreaming' : 'resumeWithoutStart',
+      })
+
       let sequence = 0
       let activitySubscriber: Subscriber<Partial<Activity>> | undefined
       let conversation: ConversationAccount | undefined

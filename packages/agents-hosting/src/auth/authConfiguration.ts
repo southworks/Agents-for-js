@@ -20,7 +20,7 @@ function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<stri
       clientSecret: redactString(config.clientSecret),
       authority: config.authority ? redactUrl(config.authority) : undefined,
       scope: config.scope ? redactScopes([config.scope]) : undefined,
-      issuers: config.issuers?.map(redactUrl),
+      issuers: config.issuers?.map(redactUrl).filter(e => e !== undefined),
       FICClientId: redactString(config.FICClientId, true),
       certPemFile: redactString(config.certPemFile),
       certKeyFile: redactString(config.certKeyFile),

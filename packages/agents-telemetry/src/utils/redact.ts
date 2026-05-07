@@ -27,7 +27,11 @@ export function redactString (value: string | undefined, peek: boolean = false):
  * @param value The URL string to redact.
  * @returns The redacted URL string, which includes only the origin and an indication of how many path segments were redacted, or just the origin if there are no path segments. Query parameters are not included in the output to avoid exposing sensitive information. If the input value is not a valid URL, it will be returned as-is with a redaction notice.
  */
-export function redactUrl (value: string): string {
+export function redactUrl (value: string | undefined): string | undefined {
+  if (!value?.trim()) {
+    return undefined
+  }
+
   try {
     const url = new URL(value)
     const pathSegments = url.pathname.split('/').filter(Boolean)
