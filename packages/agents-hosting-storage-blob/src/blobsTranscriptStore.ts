@@ -220,7 +220,7 @@ export class BlobsTranscriptStore implements TranscriptStore {
       container: containerName,
       connection: {
         mode: tokenCredential !== undefined ? 'tokenCredential' : 'connectionString',
-        type: (blobServiceUri ?? connectionString).trim() === 'UseDevelopmentStorage=true;' ? 'development' : 'production',
+        type: (blobServiceUri || connectionString).trim() === 'UseDevelopmentStorage=true;' ? 'development' : 'production',
       },
       pipeline: options?.storagePipelineOptions !== undefined ? 'custom' : 'default',
       transcriptKey: this._isDecodeTranscriptKey ? 'decoded' : 'encoded',

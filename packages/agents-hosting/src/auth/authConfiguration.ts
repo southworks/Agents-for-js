@@ -181,7 +181,10 @@ export const loadAuthConfigFromEnv = (cnxName?: string): AuthConfiguration => {
 
   const result = { ...authConfig, ...envConnections }
 
-  logger.info('Auth settings loaded from environment', summarizeAuthConfiguration(result), result.connectionsMap)
+  logger.info('Auth settings loaded from environment', {
+    connections: summarizeAuthConfiguration(result),
+    connectionsMap: result.connectionsMap.map(e => ({ ...e, serviceUrl: e.serviceUrl !== '*' ? redactUrl(e.serviceUrl) : e.serviceUrl })),
+  })
 
   return result
 }

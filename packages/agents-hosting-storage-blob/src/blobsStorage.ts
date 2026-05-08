@@ -82,7 +82,7 @@ export class BlobsStorage implements Storage {
       container: containerName,
       connection: {
         mode: isTokenCredential(credential) ? 'tokenCredential' : 'connectionString',
-        type: (url ?? connectionString).trim() === 'UseDevelopmentStorage=true;' ? 'development' : 'production',
+        type: (url.trim() !== '' ? url : connectionString!).trim() === 'UseDevelopmentStorage=true;' ? 'development' : 'production',
       },
       pipeline: options?.storagePipelineOptions !== undefined ? 'custom' : 'default',
     })

@@ -9,7 +9,7 @@ const REDACTION_PEEK_LENGTH = 2
 /**
  * Redacts a string value, optionally allowing a peek at the beginning of the string for context.
  * @param value The string value to redact.
- * @param peek Whether to allow a peek at the beginning of the string (default: false). If true, the first few characters of the string will be included in the redacted output for context, along with an indication of how many total characters were redacted.
+ * @param peek Whether to allow a peek at the beginning of the string (default: false). If true and the string is long enough, the first few characters of the string will be included in the redacted output for context before `'<redacted>'`.
  * @returns The redacted string, or undefined if the input value was undefined.
  */
 export function redactString (value: string | undefined, peek: boolean = false): string | undefined {
@@ -23,9 +23,9 @@ export function redactString (value: string | undefined, peek: boolean = false):
 }
 
 /**
- * Redacts sensitive information from a URL by removing path segments and query parameters, while optionally allowing a peek at the base URL for context.
+ * Redacts sensitive information from a URL by removing path segments and query parameters.
  * @param value The URL string to redact.
- * @returns The redacted URL string, which includes only the origin and an indication of how many path segments were redacted, or just the origin if there are no path segments. Query parameters are not included in the output to avoid exposing sensitive information. If the input value is not a valid URL, it will be returned as-is with a redaction notice.
+ * @returns The redacted URL string, which includes only the origin and an indication of how many path segments were redacted, or just the origin if there are no path segments. Query parameters are not included in the output to avoid exposing sensitive information. If the input value is not a valid URL, the function returns a fully redacted placeholder.
  */
 export function redactUrl (value: string | undefined): string | undefined {
   if (!value?.trim()) {
@@ -47,7 +47,7 @@ export function redactUrl (value: string | undefined): string | undefined {
 }
 
 /**
- * Redacts sensitive information from an array of scopes, while optionally allowing a peek at the first scope for context.
+ * Redacts sensitive information from an array of scopes.
  * @param scopes The array of scopes to redact.
  * @returns The redacted scopes string, which includes an indication of how many scopes were redacted. If the input value is undefined, it will be returned as undefined.
  */
