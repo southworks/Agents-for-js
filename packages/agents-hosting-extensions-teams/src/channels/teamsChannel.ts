@@ -4,8 +4,11 @@
 import { ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { parseTeamsChannelData } from '../activity-extensions'
+import { ChannelInfo } from '@microsoft/teams.api'
 
 const CHANNEL_EVENT_TYPES = ['channelCreated', 'channelDeleted', 'channelRenamed', 'channelRestored', 'channelShared', 'channelUnshared']
+
+type ChannelUpdateHandler<TState extends TurnState> = (context: TurnContext, state: TState, data: ChannelInfo) => Promise<void>
 
 export class TeamsChannel<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -14,7 +17,7 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
     this._app = app
   }
 
-  onChannelEventReceived (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onChannelEventReceived (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -24,11 +27,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         CHANNEL_EVENT_TYPES.includes(channelData.eventType as string)
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onCreated (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onCreated (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -37,11 +44,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         channelData?.eventType === 'channelCreated'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onDeleted (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onDeleted (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -50,11 +61,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         channelData?.eventType === 'channelDeleted'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onRenamed (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onRenamed (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -63,11 +78,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         channelData?.eventType === 'channelRenamed'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onRestored (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onRestored (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -76,11 +95,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         channelData?.eventType === 'channelRestored'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onShared (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onShared (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -89,11 +112,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         channelData?.eventType === 'channelShared'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onUnshared (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onUnshared (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -102,11 +129,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         channelData?.eventType === 'channelUnshared'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onMemberAdded (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMemberAdded (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.ConversationUpdate &&
@@ -115,11 +146,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         context.activity.membersAdded.length > 0
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onMemberRemoved (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMemberRemoved (handler: ChannelUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.ConversationUpdate &&
@@ -128,7 +163,11 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
         context.activity.membersRemoved.length > 0
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const channelInfo = parseTeamsChannelData(context.activity.channelData)?.channel
+      await handler(context, state, channelInfo ?? {} as ChannelInfo)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 }

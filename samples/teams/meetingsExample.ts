@@ -7,12 +7,12 @@ const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 const teamsExt = new TeamsAgentExtension(app)
 
 app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
-  tae.meeting
-    .onMeetingStart(async (context: TurnContext, state: TurnState) => {
+  tae.meetings
+    .onStart(async (context: TurnContext, state: TurnState) => {
       console.log('Meeting started:', context.activity.value)
       await context.sendActivity('Welcome to the meeting! I\'m your meeting assistant.')
     })
-    .onMeetingEnd(async (context: TurnContext, state: TurnState) => {
+    .onEnd(async (context: TurnContext, state: TurnState) => {
       console.log('Meeting ended:', context.activity.value)
       await context.sendActivity('The meeting has ended. Thanks for participating!')
     })
@@ -21,25 +21,10 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
       console.log('Participants joined:', participantInfo)
       await context.sendActivity('Welcome to the meeting!')
     })
-    .onReaction(async (context: TurnContext, state: TurnState) => {
-      const reactionInfo = context.activity.value
-      console.log('Reaction received:', reactionInfo)
-    })
-    .onPollResponse(async (context: TurnContext, state: TurnState) => {
-      const pollData = context.activity.value
-      console.log('Poll response received:', pollData)
-    })
-    .onScreenShareStart(async (context: TurnContext, state: TurnState) => {
-      console.log('Screen sharing started')
-      await context.sendActivity('Screen sharing has started.')
-    })
-    .onRecordingStarted(async (context: TurnContext, state: TurnState) => {
-      console.log('Recording started')
-      await context.sendActivity('Recording has started.')
-    })
-    .onRecordingStopped(async (context: TurnContext, state: TurnState) => {
-      console.log('Recording stopped')
-      await context.sendActivity('Recording has stopped.')
+    .onParticipantsLeave(async (context: TurnContext, state: TurnState) => {
+      const participantInfo = context.activity.value
+      console.log('Participants left:', participantInfo)
+      await context.sendActivity('Goodbye from the meeting!')
     })
 })
 
