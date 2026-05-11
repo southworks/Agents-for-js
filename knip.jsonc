@@ -40,11 +40,19 @@
         "@opentelemetry/api-logs"
       ]
     },
+    "packages/agents-activity": {
+      "project": ["src/**/*.ts"],
+      "ignore": [
+         // Ignore fake module used in browser builds by esbuild.
+        "src/browser/crypto.ts"
+      ]
+    },
     "packages/agents-copilotstudio-client": {
       "project": ["src/**/*.ts"],
       "ignore": [
-         // Ignore fake os module used in browser builds by esbuild.
-        "src/browser/os.ts"
+         // Ignore fake module used in browser builds by esbuild.
+        "src/browser/os.ts",
+        "src/browser/crypto.ts"
       ]
     },
     "packages/*/test": {
