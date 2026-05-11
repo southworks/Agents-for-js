@@ -25,6 +25,9 @@ app
     const thisTeam = await TeamsInfo.getPagedMembers(context)
     await context.sendActivity(`Hello ${JSON.stringify(thisTeam)}, I am your friendly bot!`)
   })
+  .onActivity('message', async (context) => {
+    await context.sendActivity('Welcome! Choose a Teams Info demo action (getMember, getTeamDetails, getTeamChannels, getMeetingInfo, getPagedMembers)')
+  })
 
 startServer(
   app,
