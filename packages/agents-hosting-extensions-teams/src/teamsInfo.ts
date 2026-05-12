@@ -97,64 +97,6 @@ export class TeamsInfo {
   }
 
   /**
-   * Sends a message to a Teams channel.
-   *
-   * @param {TurnContext} context - The turn context.
-   * @param {Activity} activity - The activity to send.
-   * @param {string} teamsChannelId - The Teams channel ID.
-   * @param {string} [appId] - The application ID.
-   * @returns {Promise<[ConversationReference, string]>} - The conversation reference and new activity ID.
-   */
-  static async sendMessageToTeamsChannel (context: TurnContext, activity: Activity, teamsChannelId: string, appId?: string): Promise<[ConversationReference, string]> {
-    if (!context) {
-      throw ExceptionHelper.generateException(Error, Errors.TurnContextCannotBeNull)
-    }
-
-    if (!activity) {
-      throw ExceptionHelper.generateException(Error, Errors.ActivityCannotBeNull)
-    }
-
-    if (!teamsChannelId) {
-      throw ExceptionHelper.generateException(Error, Errors.TeamsChannelIdRequired)
-    }
-    const convoParams = {
-      isGroup: true,
-      channelData: {
-        channel: {
-          id: teamsChannelId,
-        },
-      },
-      activity,
-      agent: context.activity.recipient,
-    } as ConversationParameters
-
-    let conversationReference: Partial<ConversationReference>
-    let newActivityId: string
-    if (appId && context.adapter instanceof CloudAdapter) {
-      await context.adapter.createConversationAsync(
-        appId,
-        Channels.Msteams,
-        context.activity.serviceUrl!,
-        'https://api.botframework.com',
-        convoParams,
-        async (turnContext) => {
-          conversationReference = turnContext.activity.getConversationReference()
-          newActivityId = turnContext.activity.id!
-        }
-      )
-    } else {
-      const connectorClient : ConnectorClient = context.turnState.get<ConnectorClient>(context.adapter.ConnectorClientKey)
-      const conversationResourceResponse = await connectorClient.createConversation(convoParams)
-      conversationReference = context.activity.getConversationReference()
-      conversationReference.conversation!.id = conversationResourceResponse.id
-      newActivityId = conversationResourceResponse.activityId
-    }
-
-    // @ts-ignore
-    return [conversationReference as ConversationReference, newActivityId]
-  }
-
-  /**
    * Gets the channels of a team.
    *
    * @param {TurnContext} context - The turn context.

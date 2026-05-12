@@ -24,8 +24,8 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
   private _channels: TeamsChannel<TState>
   private _teams: TeamsTeam<TState>
   private _messages: Message<TState>
-  private _fileConsents: FileConsent<TState>
-  private _configurations: Configuration<TState>
+  private _fileConsent: FileConsent<TState>
+  private _configuration: Configuration<TState>
 
   constructor (app: AgentApplication<TState>) {
     super('msteams')
@@ -36,8 +36,8 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     this._channels = new TeamsChannel(app)
     this._teams = new TeamsTeam(app)
     this._messages = new Message(app)
-    this._fileConsents = new FileConsent(app)
-    this._configurations = new Configuration(app)
+    this._fileConsent = new FileConsent(app)
+    this._configuration = new Configuration(app)
     this._app.onTurn('beforeTurn', async (context) => {
       if (context.activity.channelId === this.channelId) {
         setTeamsApiClient(context, this.channelId)
@@ -75,12 +75,12 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     return this._messages
   }
 
-  public get fileConsents (): FileConsent<TState> {
-    return this._fileConsents
+  public get fileConsent (): FileConsent<TState> {
+    return this._fileConsent
   }
 
-  public get configurations (): Configuration<TState> {
-    return this._configurations
+  public get configuration (): Configuration<TState> {
+    return this._configuration
   }
 
   public static getTeamsClient (context: import('@microsoft/agents-hosting').TurnContext): TeamsClient {
