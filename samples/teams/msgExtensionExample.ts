@@ -1,9 +1,7 @@
-import { Activity } from '@microsoft/agents-activity'
 import { AdaptiveCard, AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-teams'
 import { MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse, MessagingExtensionResult } from '@microsoft/teams.api'
-import { wrap } from 'node:module'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 

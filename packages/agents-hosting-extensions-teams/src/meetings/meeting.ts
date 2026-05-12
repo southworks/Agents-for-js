@@ -3,6 +3,21 @@
 
 import { ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import type { MeetingDetails, TeamsChannelAccount } from '@microsoft/teams.api'
+
+export interface MeetingParticipantsEventDetails {
+  members: {
+    user: TeamsChannelAccount
+    meeting: {
+      inMeeting: boolean
+      role: string
+    }
+  }[]
+}
+
+type MeetingStartHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingDetails) => Promise<void>
+type MeetingEndHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingDetails) => Promise<void>
+type MeetingParticipantsHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingParticipantsEventDetails) => Promise<void>
 
 export class Meeting<TState extends TurnState> {
   private _app: AgentApplication<TState>
@@ -11,7 +26,7 @@ export class Meeting<TState extends TurnState> {
     this._app = app
   }
 
-  onStart (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onStart (handler: MeetingStartHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Event &&
@@ -19,11 +34,15 @@ export class Meeting<TState extends TurnState> {
         context.activity.name === 'application/vnd.microsoft.meetingStart'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const details = context.activity.value as MeetingDetails
+      await handler(context, state, details)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onEnd (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onEnd (handler: MeetingEndHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Event &&
@@ -31,11 +50,15 @@ export class Meeting<TState extends TurnState> {
         context.activity.name === 'application/vnd.microsoft.meetingEnd'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const details = context.activity.value as MeetingDetails
+      await handler(context, state, details)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onParticipantsJoin (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onParticipantsJoin (handler: MeetingParticipantsHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Event &&
@@ -43,11 +66,15 @@ export class Meeting<TState extends TurnState> {
         context.activity.name === 'application/vnd.microsoft.meetingParticipantJoin'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const details = context.activity.value as MeetingParticipantsEventDetails
+      await handler(context, state, details)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 
-  onParticipantsLeave (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onParticipantsLeave (handler: MeetingParticipantsHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Event &&
@@ -55,7 +82,11 @@ export class Meeting<TState extends TurnState> {
         context.activity.name === 'application/vnd.microsoft.meetingParticipantLeave'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const details = context.activity.value as MeetingParticipantsEventDetails
+      await handler(context, state, details)
+    }
+    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
   }
 }

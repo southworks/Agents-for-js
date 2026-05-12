@@ -1,8 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { ActivityTypes } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import type { FileConsentCardResponse } from '@microsoft/teams.api'
+
+type FileConsentHandler<TState extends TurnState> = (context: TurnContext, state: TState, response: FileConsentCardResponse) => Promise<void>
 
 export class FileConsent<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -11,7 +14,7 @@ export class FileConsent<TState extends TurnState = TurnState> {
     this._app = app
   }
 
-  onAccept (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onAccept (handler: FileConsentHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -20,11 +23,18 @@ export class FileConsent<TState extends TurnState = TurnState> {
         (context.activity.value as any)?.action === 'accept'
       )
     }
-    this._app.addRoute(routeSel, handler, true, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const cardResponse = context.activity.value as FileConsentCardResponse
+      await handler(context, state, cardResponse)
+      const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
+      invokeResponse.value = { status: 200 }
+      await context.sendActivity(invokeResponse)
+    }
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  onDecline (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onDecline (handler: FileConsentHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -33,7 +43,14 @@ export class FileConsent<TState extends TurnState = TurnState> {
         (context.activity.value as any)?.action === 'decline'
       )
     }
-    this._app.addRoute(routeSel, handler, true, rank, authHandlers)
+    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
+      const cardResponse = context.activity.value as FileConsentCardResponse
+      await handler(context, state, cardResponse)
+      const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
+      invokeResponse.value = { status: 200 }
+      await context.sendActivity(invokeResponse)
+    }
+    this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 }
