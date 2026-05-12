@@ -3,11 +3,11 @@
  * Licensed under the MIT License.
  */
 
-import { Activity, Channels, ConversationParameters, ConversationReference, ExceptionHelper } from '@microsoft/agents-activity'
+import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from './errorHelper'
 import { type ChannelInfo, type MeetingInfo, type MeetingNotificationParams, type MeetingNotificationResponse, type MeetingParticipant, type PagedMembersResult, type TeamDetails, type TeamsChannelAccount } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
-import { CloudAdapter, ConnectorClient, TurnContext } from '@microsoft/agents-hosting'
+import { TurnContext } from '@microsoft/agents-hosting'
 import { getTeamsClient } from './teamsApiClient'
 
 /**
