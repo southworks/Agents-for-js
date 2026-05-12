@@ -14,7 +14,6 @@ import type { ChannelData } from '@microsoft/teams.api';
 import { ChannelInfo } from '@microsoft/teams.api';
 import { Client } from '@microsoft/teams.api';
 import type { ConfigResponse } from '@microsoft/teams.api';
-import { ConversationReference } from '@microsoft/agents-activity';
 import type { FileConsentCardResponse } from '@microsoft/teams.api';
 import { InvokeResponse } from '@microsoft/agents-hosting';
 import type { MeetingDetails } from '@microsoft/teams.api';
@@ -305,9 +304,9 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     // (undocumented)
     get channels(): TeamsChannel<TState>;
     // (undocumented)
-    get configurations(): Configuration<TState>;
+    get configuration(): Configuration<TState>;
     // (undocumented)
-    get fileConsents(): FileConsent<TState>;
+    get fileConsent(): FileConsent<TState>;
     // (undocumented)
     static getTeamsClient(context: TurnContext): Client;
     // (undocumented)
@@ -384,7 +383,6 @@ export class TeamsInfo {
     static getTeamDetails(context: TurnContext, teamId?: string): Promise<TeamDetails>;
     static getTeamMember(context: TurnContext, teamId: string, userId: string): Promise<TeamsChannelAccount>;
     static sendMeetingNotification(context: TurnContext, notification: MeetingNotificationParams, meetingId?: string): Promise<MeetingNotificationResponse | undefined>;
-    static sendMessageToTeamsChannel(context: TurnContext, activity: Activity, teamsChannelId: string, appId?: string): Promise<[ConversationReference, string]>;
 }
 
 // @public
