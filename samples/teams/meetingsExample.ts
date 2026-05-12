@@ -1,6 +1,7 @@
 import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-teams'
+import { TeamsAgentExtension, MeetingParticipantsEventDetails } from '@microsoft/agents-hosting-extensions-teams'
+import { MeetingDetails } from '@microsoft/teams.api'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 
@@ -8,21 +9,21 @@ const teamsExt = new TeamsAgentExtension(app)
 
 app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
   tae.meetings
-    .onStart(async (context: TurnContext, state: TurnState) => {
-      console.log('Meeting started:', context.activity.value)
+    .onStart(async (context: TurnContext, state: TurnState, details: MeetingDetails) => {
+      console.log('Meeting started:', details)
       await context.sendActivity('Welcome to the meeting! I\'m your meeting assistant.')
     })
-    .onEnd(async (context: TurnContext, state: TurnState) => {
-      console.log('Meeting ended:', context.activity.value)
+    .onEnd(async (context: TurnContext, state: TurnState, details: MeetingDetails) => {
+      console.log('Meeting ended:', details)
       await context.sendActivity('The meeting has ended. Thanks for participating!')
     })
-    .onParticipantsJoin(async (context: TurnContext, state: TurnState) => {
-      const participantInfo = context.activity.value
+    .onParticipantsJoin(async (context: TurnContext, state: TurnState, details: MeetingParticipantsEventDetails) => {
+      const participantInfo = details
       console.log('Participants joined:', participantInfo)
       await context.sendActivity('Welcome to the meeting!')
     })
-    .onParticipantsLeave(async (context: TurnContext, state: TurnState) => {
-      const participantInfo = context.activity.value
+    .onParticipantsLeave(async (context: TurnContext, state: TurnState, details: MeetingParticipantsEventDetails) => {
+      const participantInfo = details
       console.log('Participants left:', participantInfo)
       await context.sendActivity('Goodbye from the meeting!')
     })
