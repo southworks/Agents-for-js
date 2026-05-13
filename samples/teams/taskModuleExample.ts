@@ -9,63 +9,52 @@ const teamsExt = new TeamsAgentExtension<TurnState>(app)
 
 app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
   console.log('Teams extension registered')
-  tae.taskModules.onSubmit('simple_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
-    const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
-    console.log('Task module submit:', request.data)
-    await context.sendActivity(`Task module submitted successfully for ${name}!`)
+  tae.taskModules.onFetch('simple_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
+    const formCard = {
+      type: 'AdaptiveCard',
+      body: [
+        {
+          type: 'TextBlock',
+          size: 'Large',
+          weight: 'Bolder',
+          text: 'Simple Form'
+        },
+        {
+          type: 'Input.Text',
+          id: 'name',
+          label: 'Your Name',
+          isRequired: true
+        }
+      ],
+      actions: [
+        {
+          type: 'Action.Submit',
+          title: 'Submit',
+          data: {
+            task: 'simple_form'
+          }
+        }
+      ],
+      $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+      version: '1.4'
+    } as AdaptiveCard
 
     return {
       task: {
-        type: 'message',
-        value: `Thanks ${name}, the task module was submitted.`
+        type: 'continue',
+        value: {
+          title: 'Simple Form',
+          height: 'small',
+          width: 'small',
+          card: CardFactory.adaptiveCard(formCard)
+        }
       }
     }
   })
-    .onFetch('simple_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
-      const formCard = {
-        type: 'AdaptiveCard',
-        body: [
-          {
-            type: 'TextBlock',
-            size: 'Large',
-            weight: 'Bolder',
-            text: 'Simple Form'
-          },
-          {
-            type: 'Input.Text',
-            id: 'name',
-            label: 'Your Name',
-            isRequired: true
-          }
-        ],
-        actions: [
-          {
-            type: 'Action.Submit',
-            title: 'Submit',
-            data: {
-              task: 'simple_form'
-            }
-          }
-        ],
-        $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
-        version: '1.4'
-      } as AdaptiveCard
-
-      return {
-        task: {
-          type: 'continue',
-          value: {
-            title: 'Simple Form',
-            height: 'small',
-            width: 'small',
-            card: CardFactory.adaptiveCard(formCard)
-          }
-        }
-      }
-    })
     .onSubmit('simple_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
       const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
-      await context.sendActivity(`Hi ${name}, thanks for submitting the form!`)
+      console.log('Task module submit:', request.data)
+      await context.sendActivity(`Task module submitted successfully for ${name}!`)
 
       return {
         task: {
@@ -201,32 +190,12 @@ app.onActivity('message', async (context: TurnContext, state: TurnState) => {
       },
       {
         type: 'Action.Submit',
-        title: 'Webpage Dialog',
-        data: {
-          msteams: {
-            type: 'task/fetch'
-          },
-          task: 'webpage_dialog'
-        }
-      },
-      {
-        type: 'Action.Submit',
         title: 'Multi-Step Form',
         data: {
           msteams: {
             type: 'task/fetch'
           },
           task: 'multi_step_form'
-        }
-      },
-      {
-        type: 'Action.Submit',
-        title: 'Mixed Example',
-        data: {
-          msteams: {
-            type: 'task/fetch'
-          },
-          task: 'mixed_example'
         }
       }
     ],

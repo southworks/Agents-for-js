@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { describe, it } from 'node:test'
+import { beforeEach, describe, it } from 'node:test'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
@@ -26,8 +26,13 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 }
 
 describe('TaskModule', function () {
-  const app = new AgentApplication()
-  const adapter = new CloudAdapter()
+  let app: AgentApplication<TurnState>
+  let adapter: CloudAdapter
+
+  beforeEach(function () {
+    app = new AgentApplication()
+    adapter = new CloudAdapter()
+  })
 
   it('onFetch sets an InvokeResponse with status and body when handler returns a response', async function () {
     let handled = false

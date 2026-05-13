@@ -37,30 +37,26 @@ export class TeamsConversationBot extends TeamsActivityHandler {
     })
 
     this.onTeamsMembersAddedEvent(async (membersAdded: TeamsChannelAccount[], teamInfo: TeamInfo, context: TurnContext, next) => {
-      if (context.activity.conversation?.conversationType === 'personal') {
-        return
-      }
-
-      membersAdded.forEach(async (member) => {
-        if (member.id !== context.activity.recipient?.id) {
-          await context.sendActivity(`Welcome to the team ${member.name ?? ''} !`)
+      if (context.activity.conversation?.conversationType !== 'personal') {
+        for (const member of membersAdded) {
+          if (member.id !== context.activity.recipient?.id) {
+            await context.sendActivity(`Welcome to the team ${member.name ?? ''} !`)
+          }
         }
-      })
+      }
 
       await next()
     })
 
     this.onTeamsMembersRemovedEvent(async (membersRemoved: TeamsChannelAccount[], teamInfo: TeamInfo, context: TurnContext, next) => {
-      membersRemoved.forEach(async (member) => {
-        if (member.id === context.activity.recipient?.id) {
-          // the bot was removed.
-          return
+      for (const member of membersRemoved) {
+        if (member.id !== context.activity.recipient?.id) {
+          const card = CardFactory.heroCard('', `${member.id} was removed from ${teamInfo.name}.`)
+          await context.sendActivity(MessageFactory.attachment(card))
         }
+      }
 
-        const card = CardFactory.heroCard('', `${member.id} was removed from ${teamInfo.name}.`)
-        await context.sendActivity(MessageFactory.attachment(card))
-        await next()
-      })
+      await next()
     })
 
     this.onTeamsChannelCreatedEvent(async (channelInfo: ChannelInfo, teamInfo: TeamInfo, context: TurnContext, next): Promise<void> => {
@@ -261,7 +257,7 @@ export class TeamsConversationBot extends TeamsActivityHandler {
         'https://api.botframework.com',
         conversationParameters,
         async (context) => {
-          const convReference = await context.activity.getConversationReference()
+          const convReference = context.activity.getConversationReference()
           await adapter.continueConversation(
             appId,
             convReference,

@@ -5,7 +5,7 @@
   "body": [
     {
       "type": "TextBlock",
-      "text": "Mention a user by User Principle Name: Hello <at>${userName} UPN</at>"
+      "text": "Mention a user by User Principal Name: Hello <at>${userName} UPN</at>"
     },
     {
       "type": "TextBlock",

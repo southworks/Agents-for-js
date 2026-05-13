@@ -113,7 +113,8 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
             type: 'TextBlock',
             size: 'Large',
             weight: 'Bolder',
-            color: 'Accent',
+            color: 'Good',
+            text: 'Custom Card Created'
           },
           {
             type: 'TextBlock',

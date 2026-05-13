@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { describe, it } from 'node:test'
+import { beforeEach, describe, it } from 'node:test'
 import { AgentApplication, TurnContext, TurnState, INVOKE_RESPONSE_KEY, CloudAdapter } from '@microsoft/agents-hosting'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
@@ -26,14 +26,20 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 }
 
 describe('MessageExtension', function () {
-  const app = new AgentApplication()
-  const adapter = new CloudAdapter()
-  const activity = Activity.fromObject({
-    type: ActivityTypes.Invoke,
-    channelId: 'msteams',
-    from: { id: 'user', name: 'User' },
-    conversation: { id: 'conv' },
-    recipient: { id: 'bot' }
+  let app: AgentApplication<TurnState>
+  let adapter: CloudAdapter
+  let activity: Activity
+
+  beforeEach(function () {
+    app = new AgentApplication()
+    adapter = new CloudAdapter()
+    activity = Activity.fromObject({
+      type: ActivityTypes.Invoke,
+      channelId: 'msteams',
+      from: { id: 'user', name: 'User' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' }
+    })
   })
 
   it('onQueryUrlSetting sets an InvokeResponse with status and body when handler returns a response', async function () {
