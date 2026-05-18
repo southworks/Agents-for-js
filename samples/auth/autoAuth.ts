@@ -73,6 +73,7 @@ class OneProvider extends AgentApplication<TurnState> {
       .replaceAll('${givenName}', userInfo.$root.givenName)
       .replaceAll('${surname}', userInfo.$root.surname)
       .replaceAll('${imageUri}', userInfo.$root.imageUri))
+    /* eslint-enable no-template-curly-in-string */
     const activity = MessageFactory.attachment(CardFactory.adaptiveCard(card))
     await context.sendActivity(activity)
   }

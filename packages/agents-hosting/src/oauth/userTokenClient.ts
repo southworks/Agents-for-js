@@ -244,7 +244,7 @@ export class UserTokenClient {
       const params = { userId, connectionName, channelId, state, code, finalRedirect, fwdUrl }
       const response = await this.client.get('/api/usertoken/GetTokenOrSignInResource', { params })
       record({ userId, connectionName, channelId, httpStatusCode: response?.status?.toString() })
-      return response?.data as TokenOrSinginResourceResponse
+      return response.data as TokenOrSinginResourceResponse
     })
   }
 
