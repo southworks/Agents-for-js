@@ -48,7 +48,7 @@ export class MsalConnectionManager implements Connections {
         ? 'certificate'
         : cfg?.clientSecret
           ? 'clientSecret'
-          : cfg?.WIDAssertionFile || cfg?.FICClientId
+          : cfg?.WIDAssertionFile || cfg?.federatedClientId || cfg?.FICClientId
             ? 'workloadIdentity'
             : 'none'
       logger.debug('connection "%s" clientId=%s tenantId=%s authType=%s', name, cfg?.clientId ?? '<none>', cfg?.tenantId ?? '<none>', authType)
@@ -185,13 +185,27 @@ export class MsalConnectionManager implements Connections {
 
   private applyConnectionDefaults (conn: MsalTokenProvider): MsalTokenProvider {
     if (conn.connectionSettings) {
-      conn.connectionSettings.authority ??= 'https://login.microsoftonline.com'
+      conn.connectionSettings.authorityEndpoint ??= conn.connectionSettings.authority || 'https://login.microsoftonline.com'
+      conn.connectionSettings.authority ??= conn.connectionSettings.authorityEndpoint
       conn.connectionSettings.issuers ??= [
         'https://api.botframework.com',
         `${resolveAuthority('https://sts.windows.net', conn.connectionSettings.tenantId)}/`,
-        `${resolveAuthority(conn.connectionSettings.authority, conn.connectionSettings.tenantId)}/v2.0`
+        `${resolveAuthority(conn.connectionSettings.authorityEndpoint, conn.connectionSettings.tenantId)}/v2.0`
       ]
+      // For backward compatibility
+      if (conn.connectionSettings.federatedClientId) {
+        conn.connectionSettings.FICClientId = conn.connectionSettings.federatedClientId
+      }
+
+      if (conn.connectionSettings.scopes?.length) {
+        conn.connectionSettings.scope = conn.connectionSettings.scopes?.[0]
+      }
+
+      if (conn.connectionSettings.authorityEndpoint) {
+        conn.connectionSettings.authority = conn.connectionSettings.authorityEndpoint
+      }
     }
+
     return conn
   }
 }

@@ -2,6 +2,8 @@ import { strict as assert } from 'assert'
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import { AuthConfiguration, getAuthConfigWithDefaults, loadAuthConfigFromEnv, loadPrevAuthConfigFromEnv, resolveAuthority } from '../../src'
 
+process.env.TEST_MODE = 'true' // Enable test mode to allow reloading env vars
+
 describe('AuthConfiguration', () => {
   let originalEnv: NodeJS.ProcessEnv
 
@@ -35,13 +37,13 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, 'test-cert.pem')
       assert.strictEqual(config.certKeyFile, 'test-cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
-      assert.strictEqual(config.FICClientId, 'test-fic-client-id')
+      assert.strictEqual(config.federatedClientId, 'test-fic-client-id')
       assert.deepStrictEqual(config.issuers, [
         'https://api.botframework.com',
         'https://sts.windows.net/test-tenant-id/',
         'https://login.microsoftonline.com/test-tenant-id/v2.0'
       ])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
     })
 
     it('should throw an error if clientId is not provided in production', () => {
@@ -72,13 +74,13 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, undefined)
       assert.strictEqual(config.certKeyFile, undefined)
       assert.strictEqual(config.connectionName, undefined)
-      assert.strictEqual(config.FICClientId, undefined)
+      assert.strictEqual(config.federatedClientId, undefined)
       assert.deepStrictEqual(config.issuers, [
         'https://api.botframework.com',
         'https://sts.windows.net/botframework.com/',
         'https://login.microsoftonline.com/botframework.com/v2.0'
       ])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
     })
   })
 
@@ -102,13 +104,13 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, 'conn-cert.pem')
       assert.strictEqual(config.certKeyFile, 'conn-cert.key')
       assert.strictEqual(config.connectionName, 'conn-connection-name')
-      assert.strictEqual(config.FICClientId, undefined) // Falls back to global FICClientId
+      assert.strictEqual(config.federatedClientId, undefined) // Falls back to global federatedClientId
       assert.deepStrictEqual(config.issuers, [
         'https://api.botframework.com',
         'https://sts.windows.net/conn-tenant-id/',
         'https://login.microsoftonline.com/conn-tenant-id/v2.0'
       ])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
     })
 
     it('should throw an error if connection-specific clientId is not found', () => {
@@ -125,13 +127,13 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, undefined)
       assert.strictEqual(config.certKeyFile, undefined)
       assert.strictEqual(config.connectionName, undefined)
-      assert.strictEqual(config.FICClientId, undefined)
+      assert.strictEqual(config.federatedClientId, undefined)
       assert.deepStrictEqual(config.issuers, [
         'https://api.botframework.com',
         'https://sts.windows.net/botframework.com/',
         'https://login.microsoftonline.com/botframework.com/v2.0'
       ])
-      assert.deepStrictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
     })
   })
 
@@ -149,7 +151,7 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.tenantId, 'microsoft-tenant-id')
       assert.strictEqual(config.clientId, 'microsoft-app-id')
       assert.strictEqual(config.clientSecret, 'microsoft-app-password')
-      assert.strictEqual(config.FICClientId, 'microsoft-app-client-id')
+      assert.strictEqual(config.federatedClientId, 'microsoft-app-client-id')
       assert.strictEqual(config.certPemFile, 'test-cert.pem')
       assert.strictEqual(config.certKeyFile, 'test-cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
@@ -158,7 +160,7 @@ describe('AuthConfiguration', () => {
         'https://sts.windows.net/microsoft-tenant-id/',
         'https://login.microsoftonline.com/microsoft-tenant-id/v2.0'
       ])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
     })
 
     it('should throw an error if MicrosoftAppId is not provided in production', () => {
@@ -186,7 +188,7 @@ describe('AuthConfiguration', () => {
       const config = loadPrevAuthConfigFromEnv()
       assert.strictEqual(config.tenantId, undefined)
       assert.strictEqual(config.clientSecret, undefined)
-      assert.strictEqual(config.FICClientId, undefined)
+      assert.strictEqual(config.federatedClientId, undefined)
       assert.strictEqual(config.certPemFile, undefined)
       assert.strictEqual(config.certKeyFile, undefined)
       assert.strictEqual(config.connectionName, undefined)
@@ -195,7 +197,7 @@ describe('AuthConfiguration', () => {
         'https://sts.windows.net/botframework.com/',
         'https://login.microsoftonline.com/botframework.com/v2.0'
       ])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
     })
   })
 
@@ -217,9 +219,9 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, 'test-cert.pem')
       assert.strictEqual(config.certKeyFile, 'test-cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
-      assert.strictEqual(config.FICClientId, 'test-fic-client-id')
+      assert.strictEqual(config.federatedClientId, 'test-fic-client-id')
       assert.deepStrictEqual(config.issuers, ['https://example.com'])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
       assert.strictEqual(config.altBlueprintConnectionName, 'blue-connection')
       assert.strictEqual(config.connections?.size, 1)
       assert.strictEqual(config.connectionsMap?.length, 1)
@@ -242,9 +244,9 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, 'test-cert.pem')
       assert.strictEqual(config.certKeyFile, 'test-cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
-      assert.strictEqual(config.FICClientId, 'test-fic-client-id')
+      assert.strictEqual(config.federatedClientId, 'test-fic-client-id')
       assert.deepStrictEqual(config.issuers?.length, 3)
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
       assert.strictEqual(config.altBlueprintConnectionName, undefined)
       assert.strictEqual(config.connections?.size, 1)
       assert.strictEqual(config.connectionsMap?.length, 1)
@@ -261,8 +263,8 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, 'test-cert.pem')
       assert.strictEqual(config.certKeyFile, 'test-cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
-      assert.strictEqual(config.FICClientId, 'test-fic-client-id')
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.federatedClientId, 'test-fic-client-id')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
       assert.deepStrictEqual(config.issuers, [
         'https://api.botframework.com',
         'https://sts.windows.net/test-tenant-id/',
@@ -346,6 +348,117 @@ describe('AuthConfiguration', () => {
     })
   })
 
+  describe('connections env parsing', () => {
+    it('should preserve explicit connections map entries from env', () => {
+      process.env['connections__serviceConnection__settings__clientId'] = 'test-client-id'
+      process.env['connectionsMap__0__serviceUrl'] = '*'
+      process.env['connectionsMap__0__connection'] = 'serviceConnection'
+      process.env['connectionsMap__1__serviceUrl'] = 'https://service.example'
+      process.env['connectionsMap__1__connection'] = 'serviceConnection'
+      process.env['connectionsMap__1__audience'] = 'aud-1'
+
+      const config = loadAuthConfigFromEnv()
+
+      assert.deepStrictEqual(config.connectionsMap, [
+        {
+          serviceUrl: '*',
+          connection: 'serviceConnection'
+        },
+        {
+          serviceUrl: 'https://service.example',
+          connection: 'serviceConnection',
+          audience: 'aud-1'
+        }
+      ])
+    })
+
+    it('should preserve all env-defined connections', () => {
+      process.env['connections__first__settings__clientId'] = 'cid-1'
+      process.env['connections__second__settings__clientId'] = 'cid-2'
+      process.env['connectionsMap__0__serviceUrl'] = '*'
+      process.env['connectionsMap__0__connection'] = 'second'
+
+      const config = loadAuthConfigFromEnv()
+
+      assert.strictEqual(config.connections?.size, 2)
+      assert.deepStrictEqual([...(config.connections?.keys() ?? [])].sort(), ['first', 'second'])
+      assert.strictEqual(config.connectionsMap?.[0]?.connection, 'second')
+    })
+
+    it('should preserve a wildcard map that points to a custom connection without synthesizing serviceConnection', () => {
+      process.env['connections__custom__settings__clientId'] = 'cid-custom'
+      process.env['connectionsMap__0__serviceUrl'] = '*'
+      process.env['connectionsMap__0__connection'] = 'custom'
+
+      const config = loadAuthConfigFromEnv()
+
+      assert.strictEqual(config.connections?.size, 1)
+      assert.deepStrictEqual([...(config.connections?.keys() ?? [])], ['custom'])
+      assert.strictEqual(config.connections?.has('serviceConnection'), false)
+      assert.deepStrictEqual(config.connectionsMap, [{ serviceUrl: '*', connection: 'custom' }])
+    })
+
+    it('should throw the legacy default-connection error when latest-format config has no wildcard mapping', () => {
+      process.env['connections__first__settings__clientId'] = 'cid-1'
+      process.env['connectionsMap__0__serviceUrl'] = 'https://service.example'
+      process.env['connectionsMap__0__connection'] = 'first'
+
+      assert.throws(
+        () => loadAuthConfigFromEnv(),
+        /No default connection found in environment connections\./
+      )
+    })
+
+    it('should parse AuthorityEndpoint and FederatedClientId aliases in latest connections format', () => {
+      process.env['connections__serviceConnection__settings__clientId'] = 'test-client-id'
+      process.env['connections__serviceConnection__settings__AuthorityEndpoint'] = 'https://login.microsoftonline.com/custom-tenant'
+      process.env['connections__serviceConnection__settings__FederatedClientId'] = 'federated-client-id'
+      process.env['connectionsMap__0__serviceUrl'] = '*'
+      process.env['connectionsMap__0__connection'] = 'serviceConnection'
+
+      const config = loadAuthConfigFromEnv()
+
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com/custom-tenant')
+      assert.strictEqual(config.federatedClientId, 'federated-client-id')
+    })
+
+    it('should parse Scopes alias in latest connections format and preserve the first scope alias', () => {
+      process.env['connections__serviceConnection__settings__clientId'] = 'test-client-id'
+      process.env['connections__serviceConnection__settings__Scopes'] = 'https://api.botframework.com https://graph.microsoft.com'
+      process.env['connectionsMap__0__serviceUrl'] = '*'
+      process.env['connectionsMap__0__connection'] = 'serviceConnection'
+
+      const config = loadAuthConfigFromEnv()
+
+      assert.deepStrictEqual(config.scopes, ['https://api.botframework.com', 'https://graph.microsoft.com'])
+    })
+
+    it('should expose deprecated scope as the first scopes entry', () => {
+      process.env['connections__serviceConnection__settings__clientId'] = 'test-client-id'
+      process.env['connections__serviceConnection__settings__Scopes'] = 'https://api.botframework.com https://graph.microsoft.com'
+      process.env['connectionsMap__0__serviceUrl'] = '*'
+      process.env['connectionsMap__0__connection'] = 'serviceConnection'
+
+      const config = loadAuthConfigFromEnv()
+
+      assert.strictEqual(config.scope, 'https://api.botframework.com')
+    })
+
+    it('should ignore malformed latest-format connection keys without throwing', () => {
+      process.env['connections__serviceConnection__settings'] = 'ignored'
+
+      assert.doesNotThrow(() => loadAuthConfigFromEnv())
+      assert.strictEqual(loadAuthConfigFromEnv().clientId, 'test-client-id')
+    })
+
+    it('should ignore malformed latest-format connectionsMap keys without throwing', () => {
+      process.env['connectionsMap__0'] = 'ignored'
+
+      assert.doesNotThrow(() => loadAuthConfigFromEnv())
+      assert.strictEqual(loadAuthConfigFromEnv().clientId, 'test-client-id')
+    })
+  })
+
   describe('AuthConfiguration interface', () => {
     it('should allow creating a valid AuthConfiguration object', () => {
       const config: AuthConfiguration = {
@@ -355,9 +468,10 @@ describe('AuthConfiguration', () => {
         certPemFile: 'cert.pem',
         certKeyFile: 'cert.key',
         connectionName: 'test-connection',
-        FICClientId: 'fic-client',
+        federatedClientId: 'fic-client',
         issuers: ['https://example.com'],
-        authority: 'https://login.microsoftonline.us'
+        authorityEndpoint: 'https://login.microsoftonline.us',
+        scopes: ['https://api.botframework.com']
       }
 
       assert.strictEqual(config.tenantId, 'test-tenant')
@@ -366,9 +480,10 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.certPemFile, 'cert.pem')
       assert.strictEqual(config.certKeyFile, 'cert.key')
       assert.strictEqual(config.connectionName, 'test-connection')
-      assert.strictEqual(config.FICClientId, 'fic-client')
+      assert.strictEqual(config.federatedClientId, 'fic-client')
       assert.deepStrictEqual(config.issuers, ['https://example.com'])
-      assert.strictEqual(config.authority, 'https://login.microsoftonline.us')
+      assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.us')
+      assert.deepStrictEqual(config.scopes, ['https://api.botframework.com'])
     })
 
     it('should allow creating minimal AuthConfiguration with only required fields', () => {
