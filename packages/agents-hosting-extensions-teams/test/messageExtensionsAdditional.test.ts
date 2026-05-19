@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
-import type { MessagingExtensionActionResponse, MessagingExtensionResult, TaskModuleResponse } from '@microsoft/teams.api'
+import type { MessagingExtensionActionResponse, MessagingExtensionResponse, TaskModuleResponse } from '@microsoft/teams.api'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
   context.turnState.set(context.adapter.ConnectorClientKey, {
@@ -36,10 +36,10 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onQuery('searchCmd', async (_ctx, _state, query): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onQuery('searchCmd', async (_ctx, _state, query): Promise<MessagingExtensionResponse> => {
         handled = true
         assert.strictEqual(query.commandId, 'searchCmd')
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
@@ -64,9 +64,9 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onQuery(/search.*/, async (): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onQuery(/search.*/, async (): Promise<MessagingExtensionResponse> => {
         handled = true
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
@@ -85,9 +85,9 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onQuery('searchCmd', async (): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onQuery('searchCmd', async (): Promise<MessagingExtensionResponse> => {
         handled = true
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
@@ -107,10 +107,10 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onSelectItem(async (_ctx, _state, item): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onSelectItem(async (_ctx, _state, item): Promise<MessagingExtensionResponse> => {
         handled = true
         receivedItem = item
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
@@ -133,10 +133,10 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onQueryLink(async (_ctx, _state, url): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onQueryLink(async (_ctx, _state, url): Promise<MessagingExtensionResponse> => {
         handled = true
         receivedUrl = url
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
@@ -158,10 +158,10 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onAnonymousQueryLink(async (_ctx, _state, url): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onAnonymousQueryLink(async (_ctx, _state, url): Promise<MessagingExtensionResponse> => {
         handled = true
         receivedUrl = url
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
@@ -348,9 +348,9 @@ describe('MessageExtension - additional handlers', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onSelectItem(async (): Promise<MessagingExtensionResult> => {
+      tae.messageExtensions.onSelectItem(async (): Promise<MessagingExtensionResponse> => {
         handled = true
-        return { type: 'result', attachmentLayout: 'list', attachments: [] }
+        return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 

@@ -3,7 +3,7 @@
 
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import type { MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse, MessagingExtensionResult, TaskModuleResponse } from '@microsoft/teams.api'
+import type { MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
 import { z } from 'zod'
 import { messagingExtensionQueryZodSchema } from './messagingExtensionQuery'
 
@@ -23,16 +23,16 @@ function matchesCommandId (context: TurnContext, commandId: string | RegExp): bo
     : commandId.test(activityCommandId)
 }
 
-type RouteQueryHandler<TState extends TurnState> = (context: TurnContext, state: TState, query: MessagingExtensionQuery) => Promise<MessagingExtensionResult>
-type SelectItemHandler<TState extends TurnState> = (context: TurnContext, state: TState, item: unknown) => Promise<MessagingExtensionResult>
-type QueryLinkHandler<TState extends TurnState> = (context: TurnContext, state: TState, url: string) => Promise<MessagingExtensionResult>
-type FetchActionHandler<TState extends TurnState> = (context: TurnContext, state: TState) => Promise<TaskModuleResponse>
-type SubmitActionHandler<TState extends TurnState> = (context: TurnContext, state: TState, data: unknown) => Promise<MessagingExtensionActionResponse>
+type RouteQueryHandler<TState extends TurnState> = (context: TurnContext, state: TState, query: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
+type SelectItemHandler<TState extends TurnState, TData = unknown> = (context: TurnContext, state: TState, item: TData) => Promise<MessagingExtensionResponse>
+type QueryLinkHandler<TState extends TurnState> = (context: TurnContext, state: TState, url: string) => Promise<MessagingExtensionResponse>
+type FetchActionHandler<TState extends TurnState> = (context: TurnContext, state: TState, action: MessagingExtensionAction) => Promise<MessagingExtensionActionResponse>
+type SubmitActionHandler<TState extends TurnState> = (context: TurnContext, state: TState, action: MessagingExtensionAction) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewEditHandler<TState extends TurnState> = (context: TurnContext, state: TState, activity: Activity) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewSendHandler<TState extends TurnState> = (context: TurnContext, state: TState, activity: Activity) => Promise<void>
-type QueryUrlSettingHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: unknown) => Promise<MessagingExtensionResponse>
-type ConfigureSettingsHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: unknown) => Promise<void>
-type CardButtonClickedHandler<TState extends TurnState> = (context: TurnContext, state: TState, cardData: unknown) => Promise<void>
+type QueryUrlSettingHandler<TState extends TurnState> = (context: TurnContext, state: TState) => Promise<MessagingExtensionResponse>
+type ConfigureSettingsHandler<TState extends TurnState> = (context: TurnContext, state: TState, settings: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
+type CardButtonClickedHandler<TState extends TurnState, TData = unknown> = (context: TurnContext, state: TState, cardData: TData) => Promise<void>
 
 export class MessageExtension<TState extends TurnState> {
   _app: AgentApplication<TState>
@@ -52,8 +52,7 @@ export class MessageExtension<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const messageExtensionQuery: MessagingExtensionQuery = messagingExtensionQueryZodSchema.parse(context.activity.value)
-      const result: MessagingExtensionResult = await handler(context, state, messageExtensionQuery)
-      const response: MessagingExtensionResponse = { composeExtension: result }
+      const response: MessagingExtensionResponse = await handler(context, state, messageExtensionQuery)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
@@ -62,7 +61,7 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
-  onSelectItem (handler: SelectItemHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onSelectItem<TData = unknown> (handler: SelectItemHandler<TState, TData>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -71,8 +70,7 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const result: MessagingExtensionResult = await handler(context, state, context.activity.value)
-      const response: MessagingExtensionResponse = { composeExtension: result }
+      const response: MessagingExtensionResponse = await handler(context, state, context.activity.value as TData)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
@@ -91,8 +89,7 @@ export class MessageExtension<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = parseAppBasedLinkQuery(context.activity.value)
-      const res = await handler(context, state, query.url)
-      const response: MessagingExtensionResponse = { composeExtension: res }
+      const response: MessagingExtensionResponse = await handler(context, state, query.url)
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
       await context.sendActivity(invokeResponse)
     }
@@ -110,8 +107,7 @@ export class MessageExtension<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = parseAppBasedLinkQuery(context.activity.value)
-      const res = await handler(context, state, query.url)
-      const response: MessagingExtensionResponse = { composeExtension: res }
+      const response: MessagingExtensionResponse = await handler(context, state, query.url)
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
       await context.sendActivity(invokeResponse)
     }
@@ -129,9 +125,9 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const taskModuleResponse: TaskModuleResponse = await handler(context, state)
+      const actionResponse: MessagingExtensionActionResponse = await handler(context, state, context.activity.value as MessagingExtensionAction)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = { status: 200, body: taskModuleResponse }
+      invokeResponse.value = { status: 200, body: actionResponse }
       await context.sendActivity(invokeResponse)
     }
     this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
@@ -149,7 +145,7 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const response: MessagingExtensionActionResponse = await handler(context, state, context.activity.value)
+      const response: MessagingExtensionActionResponse = await handler(context, state, context.activity.value as MessagingExtensionAction)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
@@ -209,7 +205,7 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const response: MessagingExtensionResponse = await handler(context, state, context.activity.value)
+      const response: MessagingExtensionResponse = await handler(context, state)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
@@ -227,16 +223,16 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      await handler(context, state, context.activity.value)
+      const response: MessagingExtensionResponse = await handler(context, state, context.activity.value as MessagingExtensionQuery)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
-      invokeResponse.value = { status: 200 }
+      invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
     }
     this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this
   }
 
-  onCardButtonClicked (handler: CardButtonClickedHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onCardButtonClicked<TData = unknown> (handler: CardButtonClickedHandler<TState, TData>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -245,7 +241,7 @@ export class MessageExtension<TState extends TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      await handler(context, state, context.activity.value)
+      await handler(context, state, context.activity.value as TData)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200 }
       await context.sendActivity(invokeResponse)

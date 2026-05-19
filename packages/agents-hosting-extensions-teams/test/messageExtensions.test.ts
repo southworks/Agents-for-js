@@ -3,7 +3,7 @@ import { beforeEach, describe, it } from 'node:test'
 import { AgentApplication, TurnContext, TurnState, INVOKE_RESPONSE_KEY, CloudAdapter } from '@microsoft/agents-hosting'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
-import type { MessagingExtensionResponse } from '@microsoft/teams.api'
+import type { MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
 
 interface InvokeValue {
   status: number
@@ -47,7 +47,7 @@ describe('MessageExtension', function () {
     const teamsExt = new TeamsAgentExtension(app)
 
     app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
-      tae.messageExtensions.onQueryUrlSetting(async (_context: TurnContext, _state: TurnState, _settings: unknown): Promise<MessagingExtensionResponse> => {
+      tae.messageExtensions.onQueryUrlSetting(async (_context: TurnContext, _state: TurnState): Promise<MessagingExtensionResponse> => {
         handled = true
         return {
           composeExtension: {
@@ -79,8 +79,14 @@ describe('MessageExtension', function () {
     let handled = false
 
     app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
-      tae.messageExtensions.onConfigureSettings(async (_context: TurnContext, _state: TurnState, _settings: unknown): Promise<void> => {
+      tae.messageExtensions.onConfigureSettings(async (_context: TurnContext, _state: TurnState, _settings: MessagingExtensionQuery): Promise<MessagingExtensionResponse> => {
         handled = true
+        return {
+          composeExtension: {
+            type: 'result',
+            text: 'settings configured'
+          }
+        }
       })
     })
 
