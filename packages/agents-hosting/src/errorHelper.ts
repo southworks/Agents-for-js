@@ -537,6 +537,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   /**
+   * Error thrown when agent name contains invalid characters.
+   */
+  AgentNameInvalid: {
+    code: -120650,
+    description: 'Agent name contains invalid characters: {agentName}'
+  },
+
+  /**
      * Error thrown when failed to post activity to agent.
      */
   FailedToPostActivityToAgent: {

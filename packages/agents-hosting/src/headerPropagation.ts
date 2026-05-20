@@ -8,6 +8,7 @@
  * It filters the incoming request headers based on the definition provided and loads them into the outgoing headers collection.
  */
 export class HeaderPropagation implements HeaderPropagationCollection {
+  private _keys = new Set<string>()
   private _incomingRequests: Record<string, string>
   private _outgoingHeaders: Record<string, string> = {}
 
@@ -32,49 +33,57 @@ export class HeaderPropagation implements HeaderPropagationCollection {
 
   propagate (headers: string[]) {
     for (const key of headers ?? []) {
-      const lowerKey = key.toLowerCase()
-      if (this._incomingRequests[lowerKey] && !this._outgoingHeaders[lowerKey]) {
-        this._outgoingHeaders[lowerKey] = this._incomingRequests[lowerKey]
+      const realKey = this.key(key)
+      if (this._incomingRequests[realKey] && !this._outgoingHeaders[realKey]) {
+        this._outgoingHeaders[realKey] = this._incomingRequests[realKey]
+        this._keys.add(realKey)
       }
     }
   }
 
   add (headers: Record<string, string>) {
     for (const [key, value] of Object.entries(headers ?? {})) {
-      const lowerKey = key.toLowerCase()
-      if (!this._incomingRequests[lowerKey] && !this._outgoingHeaders[lowerKey]) {
-        this._outgoingHeaders[lowerKey] = value
+      const realKey = this.key(key)
+      if (!this._incomingRequests[realKey] && !this._outgoingHeaders[realKey]) {
+        this._outgoingHeaders[realKey] = value
+        this._keys.add(realKey)
       }
     }
   }
 
   concat (headers: Record<string, string>) {
     for (const [key, value] of Object.entries(headers ?? {})) {
-      const lowerKey = key.toLowerCase()
-      if (this._incomingRequests[lowerKey] && !this._headersToPropagate.includes(lowerKey)) {
-        this._outgoingHeaders[lowerKey] = `${this._outgoingHeaders[lowerKey] ?? this._incomingRequests[lowerKey]} ${value}`.trim()
+      const realKey = this.key(key)
+      if (this._incomingRequests[realKey] && !this._headersToPropagate.includes(realKey.toLowerCase())) {
+        this._outgoingHeaders[realKey] = `${this._outgoingHeaders[realKey] ?? this._incomingRequests[realKey]} ${value}`.trim()
+        this._keys.add(realKey)
       }
     }
   }
 
   override (headers: Record<string, string>) {
     for (const [key, value] of Object.entries(headers ?? {})) {
-      const lowerKey = key.toLowerCase()
-      if (!this._headersToPropagate.includes(lowerKey)) {
-        this._outgoingHeaders[lowerKey] = value
+      const realKey = this.key(key)
+      if (!this._headersToPropagate.includes(realKey.toLowerCase())) {
+        this._outgoingHeaders[realKey] = value
+        this._keys.add(realKey)
       }
     }
   }
 
+  key (key: string) {
+    return Array.from(this._keys).find(k => k.toLowerCase() === key.toLowerCase()) ?? key
+  }
+
   /**
-   * Normalizes the headers by lowercasing the keys and ensuring the values are strings.
+   * Normalizes the headers by ensuring the values are strings.
    * @param headers The headers to normalize.
    * @returns A new object with normalized headers.
    */
   private normalizeHeaders (headers: Record<string, string | string[] | undefined>) {
     return Object.entries(headers).reduce((acc, [key, value]) => {
       if (value) {
-        acc[key.toLowerCase()] = Array.isArray(value) ? value.join(' ') : value
+        acc[key] = Array.isArray(value) ? value.join(' ') : value
       }
       return acc
     }, {} as Record<string, string>)
@@ -138,4 +147,13 @@ export interface HeaderPropagationCollection {
    * If the header does not exist in the incoming headers, it will be added to the outgoing collection.
    */
   override(headers: Record<string, string>): void
+  /**
+   * Finds the real key in the incoming headers based on a case-insensitive search.
+   * If the key is not found, it returns the provided key.
+   * This is necessary because HTTP headers are case-insensitive, but the incoming headers may have different casing.
+   * The outgoing headers should maintain the same casing as the incoming headers for consistency.
+   * @param key The header key to find.
+   * @returns The real key from the incoming headers or the provided key if not found.
+   */
+  key(key: string): string
 }

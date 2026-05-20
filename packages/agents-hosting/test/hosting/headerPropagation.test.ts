@@ -14,24 +14,24 @@ describe('HeaderPropagation', () => {
     assert.throws(() => new HeaderPropagation(undefined as any))
   })
 
-  it('should normalize headers', async () => {
+  it('should normalize header values without changing header names', async () => {
     const headers = new HeaderPropagation({
       'X-HEADER': 'headerValue',
       'x-Header-List': ['One', 'Two'],
     })
 
     headers.add({ 'x-header-ADD': 'headerValue' })
-    headers.propagate(['x-Header', 'x-header-list'])
+    headers.propagate(['X-HEADER', 'x-Header-List'])
 
     assert.deepStrictEqual(headers.incoming, {
-      'x-header': 'headerValue',
-      'x-header-list': 'One Two',
+      'X-HEADER': 'headerValue',
+      'x-Header-List': 'One Two',
     })
 
     assert.deepStrictEqual(headers.outgoing, {
-      'x-header': 'headerValue',
-      'x-header-list': 'One Two',
-      'x-header-add': 'headerValue',
+      'X-HEADER': 'headerValue',
+      'x-Header-List': 'One Two',
+      'x-header-ADD': 'headerValue',
     })
   })
 
