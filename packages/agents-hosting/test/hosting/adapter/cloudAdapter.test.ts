@@ -287,6 +287,29 @@ describe('CloudAdapter', function () {
 
       stubfromObject.restore()
     })
+
+    it('Should reject request processing when no agent id can be resolved', async function () {
+      const adapterWithoutClientId = new CloudAdapter({
+        tenantId: 'tenantId',
+        clientSecret: 'clientSecret',
+        issuers: ['issuers']
+      })
+      const localCreateUserTokenClientSpy = sinon.stub(adapterWithoutClientId as any, 'createUserTokenClient').returns(mockUserTokenClient)
+      const localCreateConnectorClientSpy = sinon.stub(adapterWithoutClientId as any, 'createConnectorClientWithIdentity').returns(mockConnectorClient)
+      const activity = createActivity(ActivityTypes.Message)
+      const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+
+      await assert.rejects(async () => {
+        await adapterWithoutClientId.process(req as Request, res as Response, async () => {})
+      }, {
+        name: 'Error',
+        message: '[-120640] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120640'
+      })
+
+      sinon.assert.notCalled(localCreateConnectorClientSpy)
+      sinon.assert.notCalled(localCreateUserTokenClientSpy)
+      stubfromObject.restore()
+    })
   })
 
   describe('sendActivities', function () {

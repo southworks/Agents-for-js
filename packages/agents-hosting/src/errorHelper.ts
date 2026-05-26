@@ -517,7 +517,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Agent and Client Errors (-120600 to -120630)
+  // Agent and Client Errors (-120600 to -120650)
   // ============================================================================
 
   /**
@@ -534,6 +534,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   AgentNameRequired: {
     code: -120610,
     description: 'Agent name is required'
+  },
+
+  /**
+   * Error thrown when agent ID is required.
+   */
+  AgentIdRequired: {
+    code: -120640,
+    description: 'Agent ID is required to apply outbound agent headers'
   },
 
   /**

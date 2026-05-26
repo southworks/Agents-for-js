@@ -35,6 +35,18 @@ describe('HeaderPropagation', () => {
     })
   })
 
+  it('should propagate headers case-insensitively while preserving incoming casing', async () => {
+    const headers = new HeaderPropagation({
+      'X-HEADER': 'headerValue',
+    })
+
+    headers.propagate(['x-header'])
+
+    assert.deepStrictEqual(headers.outgoing, {
+      'X-HEADER': 'headerValue',
+    })
+  })
+
   it('should propagate readonly x-ms-correlation-id request header', async () => {
     const headers = new HeaderPropagation(requestHeaders)
 

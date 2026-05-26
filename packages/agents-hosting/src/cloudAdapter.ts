@@ -31,6 +31,7 @@ import { Connections } from './auth/connections'
 import { trace } from '@microsoft/agents-telemetry'
 import { AdapterTraceDefinitions } from './observability'
 import { applyAgentHeaders } from './getProductInfo'
+
 const logger = debug('agents:cloud-adapter')
 
 /**
@@ -367,7 +368,7 @@ export class CloudAdapter extends BaseAdapter {
       const headers = new HeaderPropagation(request.headers)
       if (headerPropagation && typeof headerPropagation === 'function') {
         headerPropagation(headers)
-        logger.debug('Headers to propagate: ', headers.outgoing)
+        logger.debug('Headers to propagate: ', { keys: Object.keys(headers.outgoing) })
       }
 
       const end = (status: StatusCodes, body?: unknown, isInvokeResponseOrExpectReplies: boolean = false) => {
@@ -404,7 +405,6 @@ export class CloudAdapter extends BaseAdapter {
       logger.debug('Received activity: ', activity)
 
       applyAgentHeaders(headers, activity, this._agentName, this.authConfig.clientId)
-      logger.debug('Applied Agent SDK headers for outgoing request: ', { incoming: headers.incoming, outgoing: headers.outgoing })
 
       const context = new TurnContext(this, activity, request.user!)
       // if Delivery Mode == ExpectReplies, we don't need a connector client.

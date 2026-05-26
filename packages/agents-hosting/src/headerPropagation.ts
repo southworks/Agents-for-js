@@ -8,11 +8,11 @@
  * It filters the incoming request headers based on the definition provided and loads them into the outgoing headers collection.
  */
 export class HeaderPropagation implements HeaderPropagationCollection {
-  private _keys = new Set<string>()
+  private _keys: string[] = []
   private _incomingRequests: Record<string, string>
   private _outgoingHeaders: Record<string, string> = {}
 
-  private _headersToPropagate = ['x-ms-correlation-id']
+  private _protectedHeaders = ['x-ms-correlation-id']
 
   public get incoming (): Record<string, string> {
     return this._incomingRequests
@@ -28,51 +28,64 @@ export class HeaderPropagation implements HeaderPropagationCollection {
     }
 
     this._incomingRequests = this.normalizeHeaders(headers)
-    this.propagate(this._headersToPropagate)
+
+    // Ensure protected headers are propagated from incoming to outgoing by default without allowing modifications.
+    const protectedHeaders = [...this._protectedHeaders]
+    this._protectedHeaders = [] // Temporarily clear protected headers to allow propagation without restriction
+    this.propagate(protectedHeaders)
+    this._protectedHeaders = protectedHeaders // Restore protected headers list after propagation
   }
 
   propagate (headers: string[]) {
-    for (const key of headers ?? []) {
-      const realKey = this.key(key)
-      if (this._incomingRequests[realKey] && !this._outgoingHeaders[realKey]) {
-        this._outgoingHeaders[realKey] = this._incomingRequests[realKey]
-        this._keys.add(realKey)
+    this.process(headers.map(h => [h, '']), key => {
+      if (this._incomingRequests[key] && !this._outgoingHeaders[key]) {
+        this._outgoingHeaders[key] = this._incomingRequests[key]
       }
-    }
+    })
   }
 
   add (headers: Record<string, string>) {
-    for (const [key, value] of Object.entries(headers ?? {})) {
-      const realKey = this.key(key)
-      if (!this._incomingRequests[realKey] && !this._outgoingHeaders[realKey]) {
-        this._outgoingHeaders[realKey] = value
-        this._keys.add(realKey)
+    this.process(Object.entries(headers ?? {}), (key, value) => {
+      if (!this._incomingRequests[key] && !this._outgoingHeaders[key]) {
+        this._outgoingHeaders[key] = value
       }
-    }
+    })
   }
 
   concat (headers: Record<string, string>) {
-    for (const [key, value] of Object.entries(headers ?? {})) {
-      const realKey = this.key(key)
-      if (this._incomingRequests[realKey] && !this._headersToPropagate.includes(realKey.toLowerCase())) {
-        this._outgoingHeaders[realKey] = `${this._outgoingHeaders[realKey] ?? this._incomingRequests[realKey]} ${value}`.trim()
-        this._keys.add(realKey)
+    this.process(Object.entries(headers ?? {}), (key, value) => {
+      if (this._incomingRequests[key] || this._outgoingHeaders[key]) {
+        this._outgoingHeaders[key] = `${this._outgoingHeaders[key] ?? this._incomingRequests[key]} ${value}`.trim()
       }
-    }
+    })
   }
 
   override (headers: Record<string, string>) {
-    for (const [key, value] of Object.entries(headers ?? {})) {
-      const realKey = this.key(key)
-      if (!this._headersToPropagate.includes(realKey.toLowerCase())) {
-        this._outgoingHeaders[realKey] = value
-        this._keys.add(realKey)
-      }
-    }
+    this.process(Object.entries(headers ?? {}), (key, value) => {
+      this._outgoingHeaders[key] = value
+    })
   }
 
   key (key: string) {
-    return Array.from(this._keys).find(k => k.toLowerCase() === key.toLowerCase()) ?? key
+    return this._keys.find(k => k.toLowerCase() === key.toLowerCase())
+  }
+
+  /**
+   * A helper method to process headers based on a provided callback function. It iterates over the headers and applies the callback to each header key and value.
+   * @param headers An array of header key-value pairs to process.
+   * @param callback A function that takes a header key and value, allowing for custom processing logic to be applied to each header.
+   */
+  private process (headers: [string, string][], callback: (key: string, value: string) => void) {
+    for (const [key, value] of headers) {
+      const savedKey = this.key(key)
+      const realKey = savedKey ?? key
+      if (!savedKey) {
+        this._keys.push(realKey)
+      }
+      if (!this._protectedHeaders.includes(key.toLowerCase())) {
+        callback(realKey, value)
+      }
+    }
   }
 
   /**
@@ -84,6 +97,9 @@ export class HeaderPropagation implements HeaderPropagationCollection {
     return Object.entries(headers).reduce((acc, [key, value]) => {
       if (value) {
         acc[key] = Array.isArray(value) ? value.join(' ') : value
+        if (!this._keys.includes(key)) {
+          this._keys.push(key) // Store the original casing of the header keys
+        }
       }
       return acc
     }, {} as Record<string, string>)
@@ -148,12 +164,10 @@ export interface HeaderPropagationCollection {
    */
   override(headers: Record<string, string>): void
   /**
-   * Finds the real key in the incoming headers based on a case-insensitive search.
-   * If the key is not found, it returns the provided key.
-   * This is necessary because HTTP headers are case-insensitive, but the incoming headers may have different casing.
-   * The outgoing headers should maintain the same casing as the incoming headers for consistency.
-   * @param key The header key to find.
-   * @returns The real key from the incoming headers or the provided key if not found.
+   * Resolves the actual header key in a case-insensitive manner.
+   * This is useful for ensuring that headers are accessed correctly regardless of their case in the incoming request.
+   * @param key The header key to resolve.
+   * @returns The resolved header key or undefined if not found.
    */
-  key(key: string): string
+  key?(key: string): string | undefined
 }
