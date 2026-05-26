@@ -30,7 +30,7 @@ import { getTokenServiceEndpoint } from './oauth/customUserTokenAPI'
 import { Connections } from './auth/connections'
 import { trace } from '@microsoft/agents-telemetry'
 import { AdapterTraceDefinitions } from './observability'
-import { applyAgentHeaders } from './getProductInfo'
+import { applyAgenticHeaders } from './getProductInfo'
 
 const logger = debug('agents:cloud-adapter')
 
@@ -396,6 +396,8 @@ export class CloudAdapter extends BaseAdapter {
       const activity = Activity.fromObject(incoming)
       logger.info(`--> Processing incoming activity, type:${activity.type} channel:${activity.channelId}`)
 
+      const isAgentic = activity.isAgenticRequest()
+
       record({ activity })
 
       if (!this.isValidChannelActivity(activity)) {
@@ -404,8 +406,6 @@ export class CloudAdapter extends BaseAdapter {
 
       logger.debug('Received activity: ', activity)
 
-      applyAgentHeaders(headers, activity, this._agentName, this.authConfig.clientId)
-
       const context = new TurnContext(this, activity, request.user!)
       // if Delivery Mode == ExpectReplies, we don't need a connector client.
       if (this.resolveIfConnectorClientIsNeeded(activity)) {
@@ -413,7 +413,9 @@ export class CloudAdapter extends BaseAdapter {
         this.setConnectorClient(context, connectorClient)
       }
 
-      if (!activity.isAgenticRequest()) {
+      if (isAgentic) {
+        applyAgenticHeaders(headers, activity, this._agentName)
+      } else {
         const userTokenClient = await this.createUserTokenClient(request.user!, undefined, undefined, undefined, headers)
         this.setUserTokenClient(context, userTokenClient)
       }

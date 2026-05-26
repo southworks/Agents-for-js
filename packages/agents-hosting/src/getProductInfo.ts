@@ -37,39 +37,35 @@ export function applyUserAgentHeader (headers: HeaderPropagationCollection): voi
 }
 
 /**
- * Applies standardized agent-related headers to the outgoing request based on the incoming activity.
+ * Applies standardized agent-related headers for agentic requests.
  *
  * @param headers The HeaderPropagationCollection to which the agent headers will be applied.
- * @param activity The incoming Activity that may contain agentic request information.
+ * @param activity The incoming Activity containing agentic request information.
  * @param agentName An optional human-friendly name for the agent, which will be validated and included in the headers.
- * @param clientId An optional default AgentID to use if it cannot be resolved from the activity.
  *
  * @remarks
  * The function sets the following headers:
  * - `AgentRegistrar`: A fixed value indicating the registrar of the agent (e.g., "A365").
  * - `AgentName`: A human-friendly name for the agent, validated against a pattern to ensure it only contains allowed characters.
- * - `AgentID`: A unique identifier for the agent instance, resolved from the activity's agentic instance ID, agentic user, or a provided default.
+ * - `AgentID`: A unique identifier for the agent instance, resolved from the activity's agentic instance ID or agentic user.
  * - `Agent-Referrer`: The channel ID from the incoming activity, indicating the source of the request.
- * - `User-Agent`: Includes the SDK product information for telemetry and identification purposes.
  * The function ensures that the agent headers are consistently applied to outgoing requests for proper identification and tracing.
  */
-export function applyAgentHeaders (
+export function applyAgenticHeaders (
   headers: HeaderPropagationCollection,
   activity: Activity,
-  agentName?: string,
-  clientId?: string
+  agentName?: string
 ): void {
-  applyUserAgentHeader(headers)
   headers.override({
     AgentRegistrar: AGENT_REGISTRAR,
     AgentName: normalizeAgentName(agentName),
-    AgentID: resolveAgentId(activity, clientId),
+    AgentID: resolveAgentId(activity),
     'Agent-Referrer': activity.channelId ?? '',
   })
 }
 
-function resolveAgentId (activity: Activity, clientId?: string): string {
-  const agentId = activity.getAgenticInstanceId() ?? activity.getAgenticUser() ?? clientId
+function resolveAgentId (activity: Activity): string {
+  const agentId = activity.getAgenticInstanceId() ?? activity.getAgenticUser()
 
   if (!agentId) {
     throw ExceptionHelper.generateException(Error, Errors.AgentIdRequired)

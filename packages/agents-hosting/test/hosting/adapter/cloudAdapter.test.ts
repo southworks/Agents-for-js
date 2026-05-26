@@ -195,7 +195,7 @@ describe('CloudAdapter', function () {
       stubfromObject.restore()
     })
 
-    it('Should apply M365 agent headers for normal requests', async function () {
+    it('Should not apply agentic headers for normal requests', async function () {
       const activity = createActivity(ActivityTypes.Message)
       const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       cloudAdapter.setAgentName('Valid Agent_1')
@@ -205,15 +205,17 @@ describe('CloudAdapter', function () {
       const connectorHeaders = createConnectorClientWithIdentitySpy.firstCall.args[2]
       const userTokenHeaders = createUserTokenClientSpy.firstCall.args[4]
 
-      assert.strictEqual(connectorHeaders.outgoing.AgentRegistrar, 'A365')
-      assert.strictEqual(connectorHeaders.outgoing.AgentID, 'clientId')
-      assert.strictEqual(connectorHeaders.outgoing.AgentName, 'Valid Agent_1')
-      assert.strictEqual(connectorHeaders.outgoing['Agent-Referrer'], 'test-channel')
+      assert.strictEqual(connectorHeaders.outgoing.AgentRegistrar, undefined)
+      assert.strictEqual(connectorHeaders.outgoing.AgentID, undefined)
+      assert.strictEqual(connectorHeaders.outgoing.AgentName, undefined)
+      assert.strictEqual(connectorHeaders.outgoing['Agent-Referrer'], undefined)
+      assert.strictEqual(connectorHeaders.outgoing['User-Agent'], undefined)
 
-      assert.strictEqual(userTokenHeaders.outgoing.AgentRegistrar, 'A365')
-      assert.strictEqual(userTokenHeaders.outgoing.AgentID, 'clientId')
-      assert.strictEqual(userTokenHeaders.outgoing.AgentName, 'Valid Agent_1')
-      assert.strictEqual(userTokenHeaders.outgoing['Agent-Referrer'], 'test-channel')
+      assert.strictEqual(userTokenHeaders.outgoing.AgentRegistrar, undefined)
+      assert.strictEqual(userTokenHeaders.outgoing.AgentID, undefined)
+      assert.strictEqual(userTokenHeaders.outgoing.AgentName, undefined)
+      assert.strictEqual(userTokenHeaders.outgoing['Agent-Referrer'], undefined)
+      assert.strictEqual(userTokenHeaders.outgoing['User-Agent'], undefined)
 
       stubfromObject.restore()
     })
@@ -237,6 +239,7 @@ describe('CloudAdapter', function () {
       assert.strictEqual(connectorHeaders.outgoing.AgentName, 'Valid Agent_1')
       assert.strictEqual(connectorHeaders.outgoing.AgentRegistrar, 'A365')
       assert.strictEqual(connectorHeaders.outgoing['Agent-Referrer'], 'test-channel')
+      assert.strictEqual(connectorHeaders.outgoing['User-Agent'], undefined)
       sinon.assert.notCalled(createUserTokenClientSpy)
 
       stubfromObject.restore()
@@ -244,6 +247,12 @@ describe('CloudAdapter', function () {
 
     it('Should trim agent name when applying agent headers', async function () {
       const activity = createActivity(ActivityTypes.Message)
+      activity.recipient = {
+        id: 'test-bot-id',
+        name: 'test-bot-name',
+        role: 'agenticUser',
+        agenticAppId: 'agentic-app-id'
+      }
       const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       cloudAdapter.setAgentName('  Valid Agent_1  ')
 
@@ -251,7 +260,7 @@ describe('CloudAdapter', function () {
 
       const connectorHeaders = createConnectorClientWithIdentitySpy.firstCall.args[2]
 
-      assert.strictEqual(connectorHeaders.outgoing.AgentID, 'clientId')
+      assert.strictEqual(connectorHeaders.outgoing.AgentID, 'agentic-app-id')
       assert.strictEqual(connectorHeaders.outgoing.AgentName, 'Valid Agent_1')
       assert.strictEqual(connectorHeaders.outgoing.AgentRegistrar, 'A365')
       assert.strictEqual(connectorHeaders.outgoing['Agent-Referrer'], 'test-channel')
@@ -261,6 +270,12 @@ describe('CloudAdapter', function () {
 
     it('Should use default agent name when adapter is configured without one', async function () {
       const activity = createActivity(ActivityTypes.Message)
+      activity.recipient = {
+        id: 'test-bot-id',
+        name: 'test-bot-name',
+        role: 'agenticUser',
+        agenticAppId: 'agentic-app-id'
+      }
       const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       cloudAdapter.setAgentName(undefined)
 
@@ -268,7 +283,7 @@ describe('CloudAdapter', function () {
 
       const connectorHeaders = createConnectorClientWithIdentitySpy.firstCall.args[2]
 
-      assert.strictEqual(connectorHeaders.outgoing.AgentID, 'clientId')
+      assert.strictEqual(connectorHeaders.outgoing.AgentID, 'agentic-app-id')
       assert.strictEqual(connectorHeaders.outgoing.AgentName, 'Agents-SDK-JS')
       assert.strictEqual(connectorHeaders.outgoing.AgentRegistrar, 'A365')
       assert.strictEqual(connectorHeaders.outgoing['Agent-Referrer'], 'test-channel')
@@ -278,6 +293,12 @@ describe('CloudAdapter', function () {
 
     it('Should reject invalid agent name when processing a request', async function () {
       const activity = createActivity(ActivityTypes.Message)
+      activity.recipient = {
+        id: 'test-bot-id',
+        name: 'test-bot-name',
+        role: 'agenticUser',
+        agenticAppId: 'agentic-app-id'
+      }
       const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       cloudAdapter.setAgentName('Bad!Name')
 
@@ -285,6 +306,18 @@ describe('CloudAdapter', function () {
         await cloudAdapter.process(req as Request, res as Response, async () => {})
       })
 
+      stubfromObject.restore()
+    })
+
+    it('Should ignore invalid agent name for non-agentic requests', async function () {
+      const activity = createActivity(ActivityTypes.Message)
+      const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      cloudAdapter.setAgentName('Bad!Name')
+
+      await cloudAdapter.process(req as Request, res as Response, async () => {})
+
+      sinon.assert.calledOnce(createConnectorClientWithIdentitySpy)
+      sinon.assert.calledOnce(createUserTokenClientSpy)
       stubfromObject.restore()
     })
 
@@ -297,6 +330,11 @@ describe('CloudAdapter', function () {
       const localCreateUserTokenClientSpy = sinon.stub(adapterWithoutClientId as any, 'createUserTokenClient').returns(mockUserTokenClient)
       const localCreateConnectorClientSpy = sinon.stub(adapterWithoutClientId as any, 'createConnectorClientWithIdentity').returns(mockConnectorClient)
       const activity = createActivity(ActivityTypes.Message)
+      activity.recipient = {
+        id: 'test-bot-id',
+        name: 'test-bot-name',
+        role: 'agenticUser'
+      }
       const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
 
       await assert.rejects(async () => {
@@ -306,8 +344,26 @@ describe('CloudAdapter', function () {
         message: '[-120620] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120620'
       })
 
-      sinon.assert.notCalled(localCreateConnectorClientSpy)
+      sinon.assert.calledOnce(localCreateConnectorClientSpy)
       sinon.assert.notCalled(localCreateUserTokenClientSpy)
+      stubfromObject.restore()
+    })
+
+    it('Should process non-agentic requests without a client id', async function () {
+      const adapterWithoutClientId = new CloudAdapter({
+        tenantId: 'tenantId',
+        clientSecret: 'clientSecret',
+        issuers: ['issuers']
+      })
+      const localCreateUserTokenClientSpy = sinon.stub(adapterWithoutClientId as any, 'createUserTokenClient').returns(mockUserTokenClient)
+      const localCreateConnectorClientSpy = sinon.stub(adapterWithoutClientId as any, 'createConnectorClientWithIdentity').returns(mockConnectorClient)
+      const activity = createActivity(ActivityTypes.Message)
+      const stubfromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+
+      await adapterWithoutClientId.process(req as Request, res as Response, async () => {})
+
+      sinon.assert.calledOnce(localCreateConnectorClientSpy)
+      sinon.assert.calledOnce(localCreateUserTokenClientSpy)
       stubfromObject.restore()
     })
   })

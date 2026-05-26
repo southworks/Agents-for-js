@@ -2,7 +2,7 @@ import { strict as assert } from 'assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { HeaderPropagation } from '../../src/headerPropagation'
-import { applyAgentHeaders, applyUserAgentHeader, getProductInfo } from '../../src/getProductInfo'
+import { applyAgenticHeaders, applyUserAgentHeader, getProductInfo } from '../../src/getProductInfo'
 
 describe('getProductInfo helpers', () => {
   it('should append product info using incoming header casing without requiring key()', () => {
@@ -22,21 +22,25 @@ describe('getProductInfo helpers', () => {
     assert.equal(headers.outgoing['user-agent'], `TestUserAgent/1.0 ${productInfo}`)
   })
 
-  it('should apply agent headers for non-agentic activities with a client id fallback', () => {
-    const headers = new HeaderPropagation({ 'user-agent': 'TestUserAgent/1.0' })
+  it('should apply agentic headers for agentic activities', () => {
+    const headers = new HeaderPropagation({})
     const activity = Activity.fromObject({
       type: ActivityTypes.Message,
       channelId: 'test-channel',
-      recipient: { id: 'test-bot-id', name: 'test-bot-name' }
+      recipient: {
+        id: 'test-bot-id',
+        name: 'test-bot-name',
+        role: 'agenticUser',
+        agenticAppId: 'agentic-app-id'
+      }
     })
 
-    applyAgentHeaders(headers, activity, 'Valid Agent_1', 'clientId')
+    applyAgenticHeaders(headers, activity, 'Valid Agent_1')
 
     assert.equal(headers.outgoing.AgentRegistrar, 'A365')
     assert.equal(headers.outgoing.AgentName, 'Valid Agent_1')
-    assert.equal(headers.outgoing.AgentID, 'clientId')
+    assert.equal(headers.outgoing.AgentID, 'agentic-app-id')
     assert.equal(headers.outgoing['Agent-Referrer'], 'test-channel')
-    assert.equal(headers.outgoing['user-agent'], `TestUserAgent/1.0 ${getProductInfo()}`)
   })
 
   it('should throw when no agent id can be resolved', () => {
@@ -46,7 +50,7 @@ describe('getProductInfo helpers', () => {
       channelId: 'test-channel',
     })
 
-    assert.throws(() => applyAgentHeaders(headers, activity), {
+    assert.throws(() => applyAgenticHeaders(headers, activity), {
       name: 'Error',
       message: '[-120620] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120620'
     })
