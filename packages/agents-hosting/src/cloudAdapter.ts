@@ -406,6 +406,10 @@ export class CloudAdapter extends BaseAdapter {
 
       logger.debug('Received activity: ', activity)
 
+      if (isAgentic) {
+        applyAgenticHeaders(headers, activity, this._agentName)
+      }
+
       const context = new TurnContext(this, activity, request.user!)
       // if Delivery Mode == ExpectReplies, we don't need a connector client.
       if (this.resolveIfConnectorClientIsNeeded(activity)) {
@@ -413,9 +417,7 @@ export class CloudAdapter extends BaseAdapter {
         this.setConnectorClient(context, connectorClient)
       }
 
-      if (isAgentic) {
-        applyAgenticHeaders(headers, activity, this._agentName)
-      } else {
+      if (!isAgentic) {
         const userTokenClient = await this.createUserTokenClient(request.user!, undefined, undefined, undefined, headers)
         this.setUserTokenClient(context, userTokenClient)
       }
