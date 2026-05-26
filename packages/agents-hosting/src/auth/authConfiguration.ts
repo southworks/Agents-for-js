@@ -11,6 +11,20 @@ const logger = debug('agents:authConfiguration')
 const DEFAULT_CONNECTION = 'serviceConnection'
 
 /**
+ * Supported authentication types for agent connections.
+ */
+export enum AuthType {
+  Certificate = 'Certificate',
+  CertificateSubjectName = 'CertificateSubjectName',
+  ClientSecret = 'ClientSecret',
+  UserManagedIdentity = 'UserManagedIdentity',
+  SystemManagedIdentity = 'SystemManagedIdentity',
+  FederatedCredentials = 'FederatedCredentials',
+  WorkloadIdentity = 'WorkloadIdentity',
+  IdentityProxyManager = 'IdentityProxyManager'
+}
+
+/**
  * Represents the authentication configuration.
  */
 export interface AuthConfiguration {
@@ -91,6 +105,21 @@ export interface AuthConfiguration {
    */
   WIDAssertionFile?: string
 
+  /**
+   * The authentication type for the connection.
+   */
+  authType?: AuthType | string
+
+  /**
+   * Sets the resource URL for Identity Proxy Manager (IDPM).
+   *
+   * @remarks
+   * Set this to the appropriate resource identifier when the application is running in an environment,
+   * such as a Foundry container, that exposes Managed Identity through a container-specific IMDS endpoint.
+   * This setting is only meaningful when using Identity Proxy Manager (AuthType.IdentityProxyManager) for authentication.
+   */
+
+  idpmResource?: string
   /**
    * The Azure region for ESTS-R regional token acquisition (e.g. 'westus', 'eastus').
    * When set, MSAL routes token requests to the specified regional endpoint.
@@ -203,6 +232,8 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
       issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority),
       altBlueprintConnectionName: process.env.altBlueprintConnectionName,
       WIDAssertionFile: process.env.WIDAssertionFile,
+      authType: process.env.authType,
+      idpmResource: process.env.idpmResource,
       azureRegion: process.env.azureRegion,
     }
     envConnections.connections.set(DEFAULT_CONNECTION, authConfig)
@@ -361,6 +392,8 @@ function buildLegacyAuthConfig (envPrefix: string = '', customConfig?: AuthConfi
     issuers: customConfig?.issuers ?? getDefaultIssuers(tenantId as string, authority),
     altBlueprintConnectionName: customConfig?.altBlueprintConnectionName ?? process.env[`${prefix}altBlueprintConnectionName`],
     WIDAssertionFile: customConfig?.WIDAssertionFile ?? process.env[`${prefix}WIDAssertionFile`],
+    authType: customConfig?.authType ?? process.env[`${prefix}authType`],
+    idpmResource: customConfig?.idpmResource ?? process.env[`${prefix}idpmResource`],
     azureRegion: customConfig?.azureRegion ?? process.env[`${prefix}azureRegion`]
   }
 }

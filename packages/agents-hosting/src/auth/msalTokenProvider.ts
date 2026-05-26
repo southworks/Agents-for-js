@@ -5,7 +5,7 @@
 
 import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
 import axios from 'axios'
-import { AuthConfiguration, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
+import { AuthConfiguration, AuthType, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { randomUUID } from 'crypto'
@@ -302,6 +302,31 @@ export class MsalTokenProvider implements AuthProvider {
       throw new Error('Connection settings must be provided when calling getAgenticApplicationToken')
     }
     logger.debug('getAgenticApplicationToken clientId=%s tenantId=%s agentAppInstanceId=%s', this.connectionSettings.clientId, tenantId, agentAppInstanceId)
+
+    if (this.connectionSettings.authType === AuthType.IdentityProxyManager) {
+      let resource
+      if (!this.connectionSettings.idpmResource) {
+        resource = 'api://AzureAdTokenExchange/.default'
+      } else {
+        try {
+          resource = new URL(this.connectionSettings.idpmResource).toString()
+        } catch {
+          throw new Error('IdpmResource must be a valid absolute URI')
+        }
+      }
+      const msiApp = new ManagedIdentityApplication({
+        managedIdentityIdParams: {
+          userAssignedClientId: this.connectionSettings.clientId
+        },
+        system: this.sysOptions
+      })
+      const tokenResult = await msiApp.acquireToken({ resource })
+      if (!tokenResult?.accessToken) {
+        throw new Error(`Failed to acquire token via IdentityProxyManager for agent instance: ${agentAppInstanceId}`)
+      }
+      logger.debug('getAgenticApplicationToken via IdentityProxyManager clientId=%s resource=%s', this.connectionSettings.clientId, resource)
+      return tokenResult.accessToken
+    }
 
     let clientAssertion
 
