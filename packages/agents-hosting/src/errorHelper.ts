@@ -540,7 +540,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
    * Error thrown when agent ID is required.
    */
   AgentIdRequired: {
-    code: -120640,
+    code: -120620,
     description: 'Agent ID is required to apply outbound agent headers'
   },
 
@@ -548,23 +548,23 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
    * Error thrown when agent name contains invalid characters.
    */
   AgentNameInvalid: {
-    code: -120650,
+    code: -120630,
     description: 'Agent name contains invalid characters: {agentName}'
   },
 
   /**
-     * Error thrown when failed to post activity to agent.
-     */
+   * Error thrown when failed to post activity to agent.
+   */
   FailedToPostActivityToAgent: {
-    code: -120620,
+    code: -120640,
     description: 'Failed to post activity to agent: {statusText}'
   },
 
   /**
-     * Error thrown when logic parameter must be defined.
-     */
+   * Error thrown when logic parameter must be defined.
+   */
   LogicParameterRequired: {
-    code: -120630,
+    code: -120650,
     description: 'logic must be defined'
   },
 

@@ -48,7 +48,7 @@ describe('getProductInfo helpers', () => {
 
     assert.throws(() => applyAgentHeaders(headers, activity), {
       name: 'Error',
-      message: '[-120640] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120640'
+      message: '[-120620] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120620'
     })
   })
 })

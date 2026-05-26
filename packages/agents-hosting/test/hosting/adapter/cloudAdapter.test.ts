@@ -269,7 +269,7 @@ describe('CloudAdapter', function () {
       const connectorHeaders = createConnectorClientWithIdentitySpy.firstCall.args[2]
 
       assert.strictEqual(connectorHeaders.outgoing.AgentID, 'clientId')
-      assert.strictEqual(connectorHeaders.outgoing.AgentName, 'Agent-SDK-JS')
+      assert.strictEqual(connectorHeaders.outgoing.AgentName, 'Agents-SDK-JS')
       assert.strictEqual(connectorHeaders.outgoing.AgentRegistrar, 'A365')
       assert.strictEqual(connectorHeaders.outgoing['Agent-Referrer'], 'test-channel')
 
@@ -303,7 +303,7 @@ describe('CloudAdapter', function () {
         await adapterWithoutClientId.process(req as Request, res as Response, async () => {})
       }, {
         name: 'Error',
-        message: '[-120640] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120640'
+        message: '[-120620] - Agent ID is required to apply outbound agent headers - https://aka.ms/M365AgentsErrorCodesJS/#-120620'
       })
 
       sinon.assert.notCalled(localCreateConnectorClientSpy)
