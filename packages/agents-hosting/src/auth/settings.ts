@@ -4,7 +4,7 @@
  */
 
 import { debug } from '@microsoft/agents-telemetry'
-import { ConnectionMapItem } from './msalConnectionManager'
+import type { ConnectionMapItem } from './msalConnectionManager'
 
 const logger = debug('agents:authConfiguration')
 
@@ -59,7 +59,7 @@ export function applyDefaultSettings (config: AuthConfiguration) {
 
   const defaultConnections = settings.connections?.size
     ? settings.connections
-    : new Map([[DEFAULT_CONNECTION, settings]])
+    : new Map([[DEFAULT_CONNECTION, { ...settings }]])
   const defaultConnectionsMap = settings.connectionsMap?.length
     ? settings.connectionsMap
     : [DEFAULT_CONNECTION_MAP]
@@ -139,13 +139,22 @@ export const envParserUtils = {
  * Also handles trailing slashes on authority.
  */
 export function resolveAuthority (authority?: string, tenantId?: string): string {
-  const base = (authority ?? AUTHORITY_DEFAULT).replace(/\/+$/, '')
+  const base = trimTrailingSlashes(authority ?? AUTHORITY_DEFAULT)
   const url = new URL(base)
   const hasPathSegment = url.pathname !== '/'
   if (hasPathSegment) {
     return base
   }
   return `${base}/${tenantId ?? 'botframework.com'}`
+}
+
+function trimTrailingSlashes (value: string): string {
+  let end = value.length
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end--
+  }
+
+  return end === value.length ? value : value.slice(0, end)
 }
 
 function getDefaultIssuers (tenantId: string, authority: string) : string[] {

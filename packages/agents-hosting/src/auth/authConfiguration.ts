@@ -4,7 +4,7 @@
  */
 
 import { debug } from '@microsoft/agents-telemetry'
-import { ConnectionMapItem } from './msalConnectionManager'
+import type { ConnectionMapItem } from './msalConnectionManager'
 import { loadEnvSettings, AuthConfiguration, envParser, envParserUtils, LoadEnv, applyDefaultSettings, DEFAULT_CONNECTION_MAP, ConnectionKeys, ConnectionMapKeys } from './settings'
 
 export { AuthConfiguration, resolveAuthority } from './settings'
@@ -70,9 +70,15 @@ const connectionsEnv = {
   },
   process (key:string, value: string) {
     const format = 'Connections__<id>__Settings__<property>'
-    const [connections, id, settings, prop] = key.split('__')
+    const parts = key.split('__')
+    const [connections, id, settings, prop] = parts
 
     if (`${connections}/${settings}`.toUpperCase() !== 'CONNECTIONS/SETTINGS') {
+      return false
+    }
+
+    if (parts.length !== 4) {
+      logger.warn(`Invalid connection environment variable: ${key}. Expected format: ${format}.`)
       return false
     }
 
@@ -107,9 +113,15 @@ const connectionsMapEnv = {
   }),
   process (key: string, value: string) {
     const format = 'ConnectionsMap__<index>__<property>'
-    const [connectionsMap, index, prop] = key.split('__')
+    const parts = key.split('__')
+    const [connectionsMap, index, prop] = parts
 
     if (connectionsMap.toUpperCase() !== 'CONNECTIONSMAP') {
+      return false
+    }
+
+    if (parts.length !== 3) {
+      logger.warn(`Invalid connection map environment variable: ${key}. Expected format: ${format}.`)
       return false
     }
 

@@ -1,17 +1,19 @@
 import { strict as assert } from 'assert'
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import { AuthConfiguration, getAuthConfigWithDefaults, loadAuthConfigFromEnv, loadPrevAuthConfigFromEnv, resolveAuthority } from '../../src'
-
-process.env.TEST_MODE = 'true' // Enable test mode to allow reloading env vars
+import { envParser, envParserUtils } from '../../src/auth/settings'
 
 describe('AuthConfiguration', () => {
   let originalEnv: NodeJS.ProcessEnv
+  let originalTestMode: string | undefined
 
   beforeEach(() => {
     // Store original environment variables
     originalEnv = { ...process.env }
+    originalTestMode = process.env.TEST_MODE
 
     // Reset environment variables before each test
+    process.env.TEST_MODE = 'true'
     process.env.tenantId = 'test-tenant-id'
     process.env.clientId = 'test-client-id'
     process.env.clientSecret = 'test-client-secret'
@@ -26,6 +28,12 @@ describe('AuthConfiguration', () => {
   afterEach(() => {
     // Restore original environment variables
     process.env = originalEnv
+    process.env.TEST_MODE = originalTestMode
+  })
+
+  it('should re-export parser utilities from public surface', () => {
+    assert.strictEqual(typeof envParser, 'function')
+    assert.strictEqual(typeof envParserUtils.bypass, 'function')
   })
 
   describe('loadAuthConfigFromEnv without connection name', () => {
@@ -225,6 +233,8 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.altBlueprintConnectionName, 'blue-connection')
       assert.strictEqual(config.connections?.size, 1)
       assert.strictEqual(config.connectionsMap?.length, 1)
+      assert.notStrictEqual(config.connections?.get('serviceConnection'), config)
+      assert.strictEqual(config.connections?.get('serviceConnection')?.clientId, 'custom-test-client')
     })
 
     it('should load configuration with connections', () => {
@@ -451,8 +461,22 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(loadAuthConfigFromEnv().clientId, 'test-client-id')
     })
 
+    it('should ignore latest-format connection keys with extra segments without throwing', () => {
+      process.env['connections__serviceConnection__settings__clientId__extra'] = 'ignored'
+
+      assert.doesNotThrow(() => loadAuthConfigFromEnv())
+      assert.strictEqual(loadAuthConfigFromEnv().clientId, 'test-client-id')
+    })
+
     it('should ignore malformed latest-format connectionsMap keys without throwing', () => {
       process.env['connectionsMap__0'] = 'ignored'
+
+      assert.doesNotThrow(() => loadAuthConfigFromEnv())
+      assert.strictEqual(loadAuthConfigFromEnv().clientId, 'test-client-id')
+    })
+
+    it('should ignore latest-format connectionsMap keys with extra segments without throwing', () => {
+      process.env['connectionsMap__0__serviceUrl__extra'] = 'ignored'
 
       assert.doesNotThrow(() => loadAuthConfigFromEnv())
       assert.strictEqual(loadAuthConfigFromEnv().clientId, 'test-client-id')
