@@ -304,15 +304,13 @@ export class MsalTokenProvider implements AuthProvider {
     logger.debug('getAgenticApplicationToken clientId=%s tenantId=%s agentAppInstanceId=%s', this.connectionSettings.clientId, tenantId, agentAppInstanceId)
 
     if (this.connectionSettings.authType === AuthType.IdentityProxyManager) {
-      let resource
+      let resource: string
       if (!this.connectionSettings.idpmResource) {
         resource = 'api://AzureAdTokenExchange/.default'
+      } else if (!URL.canParse(this.connectionSettings.idpmResource)) {
+        throw new Error('idpmResource must be a valid absolute URI')
       } else {
-        try {
-          resource = new URL(this.connectionSettings.idpmResource).toString()
-        } catch {
-          throw new Error('IdpmResource must be a valid absolute URI')
-        }
+        resource = this.connectionSettings.idpmResource
       }
       const msiApp = new ManagedIdentityApplication({
         managedIdentityIdParams: {

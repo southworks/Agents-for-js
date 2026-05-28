@@ -118,8 +118,8 @@ export interface AuthConfiguration {
    * such as a Foundry container, that exposes Managed Identity through a container-specific IMDS endpoint.
    * This setting is only meaningful when using Identity Proxy Manager (AuthType.IdentityProxyManager) for authentication.
    */
-
   idpmResource?: string
+
   /**
    * The Azure region for ESTS-R regional token acquisition (e.g. 'westus', 'eastus').
    * When set, MSAL routes token requests to the specified regional endpoint.
