@@ -733,7 +733,7 @@ describe('MsalTokenProvider', () => {
     try {
       await assert.rejects(
         tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id'),
-        /IdpmResource must be a valid absolute URI/
+        /idpmResource must be a valid absolute URI/
       )
     } finally {
       sinon.restore()
