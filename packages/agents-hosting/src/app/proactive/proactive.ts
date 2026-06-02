@@ -49,6 +49,10 @@ export class Proactive<TState extends TurnState> {
     this._storage = options.storage
   }
 
+  private _storageKey (conversationId: string): string {
+    return `${STORAGE_KEY_PREFIX}${conversationId}`
+  }
+
   private requireStorage (): Storage {
     if (!this._storage) {
       throw ExceptionHelper.generateException(Error, Errors.ProactiveStorageRequired)
@@ -104,7 +108,7 @@ export class Proactive<TState extends TurnState> {
    */
   storeConversation (conversation: Conversation): Promise<string>
   async storeConversation (contextOrConversation: TurnContext | Conversation): Promise<string> {
-    return trace(ProactiveTraceDefinitions.storeConversation, async ({ record }) => {
+    return trace(ProactiveTraceDefinitions.storeConversation, async ({ record, actions }) => {
       const conv =
         contextOrConversation instanceof Conversation
           ? contextOrConversation
@@ -113,7 +117,7 @@ export class Proactive<TState extends TurnState> {
       conv.validate()
       const id = conv.reference.conversation.id
       record({ conversationId: id })
-      await this.requireStorage().write({ [`${STORAGE_KEY_PREFIX}${id}`]: { reference: conv.reference, claims: conv.claims } })
+      await actions.link(this.requireStorage(), this._storageKey(id), { reference: conv.reference, claims: conv.claims })
       return id
     })
   }
@@ -134,8 +138,8 @@ export class Proactive<TState extends TurnState> {
   async getConversation (conversationId: string): Promise<Conversation | undefined> {
     return trace(ProactiveTraceDefinitions.getConversation, async ({ record }) => {
       record({ conversationId })
-      const result = await this.requireStorage().read([`${STORAGE_KEY_PREFIX}${conversationId}`])
-      const stored = result[`${STORAGE_KEY_PREFIX}${conversationId}`] as { reference: any; claims: any } | undefined
+      const storageKey = this._storageKey(conversationId)
+      const stored = (await this.requireStorage().read([storageKey]))?.[storageKey]
       if (!stored) {
         record({ found: false })
         return undefined
@@ -186,7 +190,7 @@ export class Proactive<TState extends TurnState> {
   async deleteConversation (conversationId: string): Promise<void> {
     return trace(ProactiveTraceDefinitions.deleteConversation, async ({ record }) => {
       record({ conversationId })
-      await this.requireStorage().delete([`${STORAGE_KEY_PREFIX}${conversationId}`])
+      await this.requireStorage().delete([this._storageKey(conversationId)])
     })
   }
 
@@ -231,22 +235,22 @@ export class Proactive<TState extends TurnState> {
     conversationOrId: Conversation | string,
     activity: Partial<Activity>
   ): Promise<ResourceResponse> {
-    return trace(ProactiveTraceDefinitions.sendActivity, async ({ record }) => {
-      const conv =
-        typeof conversationOrId === 'string'
-          ? await this.getConversationOrThrow(conversationOrId)
-          : conversationOrId
+    return trace(ProactiveTraceDefinitions.sendActivity, async ({ record, actions }) => {
+      const conv = typeof conversationOrId === 'string'
+        ? await this.getConversationOrThrow(conversationOrId)
+        : conversationOrId
 
+      const id = conv.reference.conversation.id
       const activityToSend: Partial<Activity> = { type: 'message', ...activity }
 
       record({
-        conversationId: conv.reference.conversation.id,
+        conversationId: id,
         channelId: conv.reference.channelId,
         activityType: activityToSend.type ?? 'message',
       })
 
       logger.info('sendActivity: conversation=%s channel=%s serviceUrl=%s',
-        conv.reference.conversation.id, conv.reference.channelId, conv.reference.serviceUrl)
+        id, conv.reference.channelId, conv.reference.serviceUrl)
 
       let response: ResourceResponse | undefined
       let caughtError: unknown
@@ -261,7 +265,7 @@ export class Proactive<TState extends TurnState> {
       })
 
       if (caughtError !== undefined) {
-        logger.warn('sendActivity: failed for conversation=%s: %s', conv.reference.conversation.id, caughtError)
+        logger.warn('sendActivity: failed for conversation=%s: %s', id, caughtError)
         throw caughtError
       }
       if (response === undefined) throw ExceptionHelper.generateException(Error, Errors.ProactiveSendActivityNoResponse)
@@ -345,20 +349,22 @@ export class Proactive<TState extends TurnState> {
     autoSignInHandlers?: string[],
     continuationActivity?: Partial<Activity>
   ): Promise<void> {
-    return trace(ProactiveTraceDefinitions.continueConversation, async ({ record }) => {
-      const conv =
-        typeof conversationOrId === 'string'
-          ? await this.getConversationOrThrow(conversationOrId)
-          : conversationOrId
+    return trace(ProactiveTraceDefinitions.continueConversation, async ({ record, actions }) => {
+      const conv = typeof conversationOrId === 'string'
+        ? await this.getConversationOrThrow(conversationOrId)
+        : conversationOrId
+
+      const id = conv.reference.conversation.id
 
       record({
-        conversationId: conv.reference.conversation.id,
+        conversationId: id,
         channelId: conv.reference.channelId,
         hasAutoSignIn: !!autoSignInHandlers?.length,
       })
+      await actions.link(this.requireStorage(), this._storageKey(id))
 
       logger.info('continueConversation: conversation=%s channel=%s serviceUrl=%s',
-        conv.reference.conversation.id, conv.reference.channelId, conv.reference.serviceUrl)
+        id, conv.reference.channelId, conv.reference.serviceUrl)
 
       let caughtError: unknown
 
@@ -384,7 +390,7 @@ export class Proactive<TState extends TurnState> {
             const allAcquired = results.every((r) => !!r.token)
             if (!allAcquired) {
               logger.warn('continueConversation: not all tokens acquired for conversation=%s handlers=%o',
-                conv.reference.conversation.id, autoSignInHandlers)
+                id, autoSignInHandlers)
               if (this._options.failOnUnsignedInConnections !== false) {
                 throw ExceptionHelper.generateException(Error, Errors.ProactiveNotAllTokensAcquired)
               }
@@ -403,10 +409,10 @@ export class Proactive<TState extends TurnState> {
       })
 
       if (caughtError !== undefined) {
-        logger.warn('continueConversation: failed for conversation=%s: %s', conv.reference.conversation.id, caughtError)
+        logger.warn('continueConversation: failed for conversation=%s: %s', id, caughtError)
         throw caughtError
       }
-      logger.debug('continueConversation: complete for conversation=%s', conv.reference.conversation.id)
+      logger.debug('continueConversation: complete for conversation=%s', id)
     })
   }
 

@@ -5,6 +5,7 @@ import { SpanNames, trace } from '@microsoft/agents-telemetry'
 import { HostingMetrics } from './metrics'
 import { Activity, ConversationReference } from '@microsoft/agents-activity'
 import { HandlerStorage } from '../app/auth/handlerStorage'
+import type { Storage } from '../storage'
 
 export const AgentApplicationTraceDefinitions = {
   run: trace.define({
@@ -259,6 +260,12 @@ export const ProactiveTraceDefinitions = {
     record: {
       conversationId: '',
     },
+    actions: ({ span }) => ({
+      async link (storage: Storage, key: string, data: any) {
+        const item = (await storage.read([key]))?.[key] ?? {}
+        await storage.write({ [key]: { ...item, ...data, ...link(span) } })
+      }
+    }),
     end ({ span, record }) {
       span.setAttributes({
         'activity.conversation_id': record.conversationId ?? 'unknown',
@@ -335,6 +342,12 @@ export const ProactiveTraceDefinitions = {
       channelId: '',
       hasAutoSignIn: false,
     },
+    actions: ({ span }) => ({
+      async link (storage: Storage, key: string) {
+        const item = (await storage.read([key]))?.[key] ?? {}
+        link(span, item)
+      }
+    }),
     end ({ span, record, duration, error }) {
       const attributes = {
         'activity.channel_id': record.channelId ?? 'unknown',
@@ -783,12 +796,7 @@ export const AuthorizationTraceDefinitions = {
           return
         }
 
-        if (active.__link) {
-          span.addLink({ context: active.__link })
-        }
-
-        active.__link = span.spanContext()
-        await storage.write(active)
+        await storage.write(link(span, active))
       }
     }),
     end ({ span, record }) {
@@ -985,4 +993,21 @@ export const UserTokenClientTraceDefinitions = {
       HostingMetrics.userTokenClientRequestDuration.record(duration, attributes)
     }
   }),
+}
+
+/**
+ * Adds a link to the span in the item and returns the updated item with the new link context.
+ * @remarks
+ * - **Parent to child**: use the returned item to 'link' future child spans.
+ * - **Parent to children**: use the original item  to 'link' future child spans. Ignore the returned item.
+ */
+function link <T extends { __link?: unknown }> (span: any, item?: T) {
+  if (item?.__link) {
+    span.addLink({ context: item.__link })
+  }
+
+  return {
+    ...(item ?? {}),
+    __link: span.spanContext()
+  } as T
 }
