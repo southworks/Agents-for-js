@@ -248,6 +248,7 @@ export class Proactive<TState extends TurnState> {
         channelId: conv.reference.channelId,
         activityType: activityToSend.type ?? 'message',
       })
+      await actions.link(this.requireStorage(), this._storageKey(id))
 
       logger.info('sendActivity: conversation=%s channel=%s serviceUrl=%s',
         id, conv.reference.channelId, conv.reference.serviceUrl)

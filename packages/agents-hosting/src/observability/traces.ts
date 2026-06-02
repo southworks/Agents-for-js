@@ -314,6 +314,12 @@ export const ProactiveTraceDefinitions = {
       channelId: '',
       activityType: '',
     },
+    actions: ({ span }) => ({
+      async link (storage: Storage, key: string) {
+        const item = (await storage.read([key]))?.[key] ?? {}
+        link(span, item)
+      }
+    }),
     end ({ span, record, duration, error }) {
       const attributes = {
         'activity.channel_id': record.channelId ?? 'unknown',
