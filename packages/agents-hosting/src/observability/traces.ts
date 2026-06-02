@@ -261,9 +261,9 @@ export const ProactiveTraceDefinitions = {
       conversationId: '',
     },
     actions: ({ span }) => ({
-      async link (storage: Storage, key: string, data: any) {
+      async link (storage: Storage, key: string) {
         const item = (await storage.read([key]))?.[key] ?? {}
-        await storage.write({ [key]: { ...item, ...data, ...link(span) } })
+        return link(span, item)
       }
     }),
     end ({ span, record }) {

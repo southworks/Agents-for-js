@@ -116,8 +116,11 @@ export class Proactive<TState extends TurnState> {
 
       conv.validate()
       const id = conv.reference.conversation.id
+      const storage = this.requireStorage()
+      const key = this._storageKey(id)
       record({ conversationId: id })
-      await actions.link(this.requireStorage(), this._storageKey(id), { reference: conv.reference, claims: conv.claims })
+      const linkedItem = await actions.link(storage, key)
+      await storage.write({ [key]: { ...linkedItem, reference: conv.reference, claims: conv.claims } })
       return id
     })
   }
