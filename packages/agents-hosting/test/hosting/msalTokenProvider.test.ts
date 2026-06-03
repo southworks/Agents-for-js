@@ -5,9 +5,21 @@ import { ConfidentialClientApplication, ManagedIdentityApplication } from '@azur
 import { MsalTokenProvider, ConnectorClient, AuthConfiguration, CloudAdapter } from '../../src'
 import fs from 'fs'
 import crypto from 'crypto'
-import axios from 'axios'
 import jwt from 'jsonwebtoken'
 import { MemoryCache } from '../../src/auth/MemoryCache'
+
+function mockFetchResponse (data: Record<string, unknown>) {
+  return sinon.stub(global, 'fetch').resolves(new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+}
+
+function getFetchUrl (fetchStub: sinon.SinonStub): string {
+  return fetchStub.getCall(0).args[0] as string
+}
+
+function getFetchBody (fetchStub: sinon.SinonStub): Record<string, string> {
+  const body = fetchStub.getCall(0).args[1]?.body as string
+  return Object.fromEntries(new URLSearchParams(body))
+}
 
 describe('MsalTokenProvider', () => {
   let msalTokenProvider: MsalTokenProvider
@@ -105,30 +117,24 @@ describe('MsalTokenProvider', () => {
       tenantId: 'common',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
 
-      // Assert that axios.post was called
-      assert.strictEqual(axiosPostStub.called, true)
+      // Assert that fetch was called
+      assert.strictEqual(fetchStub.called, true)
 
       // Check the URL it was called with - should have the tenant-id, not 'common'
-      const callArgs = axiosPostStub.getCall(0).args
-      const url = callArgs[0]
+      const url = getFetchUrl(fetchStub)
       assert.ok(url === 'https://foo.bar.com/agentic-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'tenant-id', got: ${url}`)
       assert.ok(!url.includes('common'), `Expected URL to NOT contain 'common', got: ${url}`)
     } finally {
       // stop caching
       // @ts-ignore
       tokenProvider._agenticTokenCache.destroy()
-      axiosPostStub.restore()
+      fetchStub.restore()
     }
   })
 
@@ -138,30 +144,24 @@ describe('MsalTokenProvider', () => {
       tenantId: 'common',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('A0000009-0000-0000-0000-0000000000AF', 'agent-app-instance-id')
 
-      // Assert that axios.post was called
-      assert.strictEqual(axiosPostStub.called, true)
+      // Assert that fetch was called
+      assert.strictEqual(fetchStub.called, true)
 
       // Check the URL it was called with - should have the tenant-id, not 'common'
-      const callArgs = axiosPostStub.getCall(0).args
-      const url = callArgs[0]
+      const url = getFetchUrl(fetchStub)
       assert.ok(url === 'https://login.microsoftonline.com/A0000009-0000-0000-0000-0000000000AF/oauth2/v2.0/token', `Expected URL to contain 'A0000009-0000-0000-0000-0000000000AF', got: ${url}`)
       assert.ok(!url.includes('common'), `Expected URL to NOT contain 'common', got: ${url}`)
     } finally {
       // stop caching
       // @ts-ignore
       tokenProvider._agenticTokenCache.destroy()
-      axiosPostStub.restore()
+      fetchStub.restore()
     }
   })
 
@@ -172,29 +172,23 @@ describe('MsalTokenProvider', () => {
       tenantId: 'original-tenant-id',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('', 'agent-app-instance-id')
 
-      // Assert that axios.post was called
-      assert.strictEqual(axiosPostStub.called, true)
+      // Assert that fetch was called
+      assert.strictEqual(fetchStub.called, true)
 
       // Check the URL it was called with - should have the tenant-id, not 'common'
-      const callArgs = axiosPostStub.getCall(0).args
-      const url = callArgs[0]
+      const url = getFetchUrl(fetchStub)
       assert.ok(url === 'http://foo.bar/original-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'foo.bar', got: ${url}`)
     } finally {
       // stop caching
       // @ts-ignore
       tokenProvider._agenticTokenCache.destroy()
-      axiosPostStub.restore()
+      fetchStub.restore()
     }
   })
 
@@ -204,29 +198,23 @@ describe('MsalTokenProvider', () => {
       tenantId: 'original-tenant-id',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('', 'agent-app-instance-id')
 
-      // Assert that axios.post was called
-      assert.strictEqual(axiosPostStub.called, true)
+      // Assert that fetch was called
+      assert.strictEqual(fetchStub.called, true)
 
       // Check the URL it was called with - should have the tenant-id, not 'common'
-      const callArgs = axiosPostStub.getCall(0).args
-      const url = callArgs[0]
+      const url = getFetchUrl(fetchStub)
       assert.ok(url === 'https://login.microsoftonline.com/original-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'https://login.microsoftonline.com/original-tenant-id/oauth2/v2.0/token', got: ${url}`)
     } finally {
       // stop caching
       // @ts-ignore
       tokenProvider._agenticTokenCache.destroy()
-      axiosPostStub.restore()
+      fetchStub.restore()
     }
   })
 
@@ -238,13 +226,8 @@ describe('MsalTokenProvider', () => {
       authority: 'https://foo.bar.com',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     const connectorClientStub = sinon.stub(ConnectorClient, 'createClientWithToken').resolves({} as any)
 
@@ -273,17 +256,16 @@ describe('MsalTokenProvider', () => {
       },
       res, async () => { })
 
-    // Assert that axios.post was called
-    assert.strictEqual(axiosPostStub.called, true)
+    // Assert that fetch was called
+    assert.strictEqual(fetchStub.called, true)
     assert.strictEqual(connectorClientStub.called, true)
     assert.strictEqual(memoryCacheStub.called, true)
     assert.strictEqual(ConfidentialClientApplicationStub.called, true)
 
     // Check the URL it was called with - should have the tenant-id, not 'common'
-    const callArgs = axiosPostStub.getCall(0).args
-    const url = callArgs[0]
+    const url = getFetchUrl(fetchStub)
     assert.ok(url === 'https://foo.bar.com/agentic-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'foo.bar', got: ${url}`)
-    axiosPostStub.restore()
+    fetchStub.restore()
     memoryCacheStub.restore()
     connectorClientStub.restore()
     ConfidentialClientApplicationStub.restore()
@@ -297,13 +279,8 @@ describe('MsalTokenProvider', () => {
       authority: 'https://foo.bar.com',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     const connectorClientStub = sinon.stub(ConnectorClient, 'createClientWithToken').resolves({} as any)
 
@@ -332,17 +309,16 @@ describe('MsalTokenProvider', () => {
       },
       res, async () => { })
 
-    // Assert that axios.post was called
-    assert.strictEqual(axiosPostStub.called, true)
+    // Assert that fetch was called
+    assert.strictEqual(fetchStub.called, true)
     assert.strictEqual(connectorClientStub.called, true)
     assert.strictEqual(memoryCacheStub.called, true)
     assert.strictEqual(ConfidentialClientApplicationStub.called, true)
 
     // Check the URL it was called with - should have the tenant-id, not 'common'
-    const callArgs = axiosPostStub.getCall(0).args
-    const url = callArgs[0]
+    const url = getFetchUrl(fetchStub)
     assert.ok(url === 'https://foo.bar.com/agentic-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'foo.bar', got: ${url}`)
-    axiosPostStub.restore()
+    fetchStub.restore()
     memoryCacheStub.restore()
     connectorClientStub.restore()
     ConfidentialClientApplicationStub.restore()
@@ -355,13 +331,8 @@ describe('MsalTokenProvider', () => {
       clientSecret: 'client-secret',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     const connectorClientStub = sinon.stub(ConnectorClient, 'createClientWithToken').resolves({} as any)
 
@@ -390,17 +361,16 @@ describe('MsalTokenProvider', () => {
       },
       res, async () => { })
 
-    // Assert that axios.post was called
-    assert.strictEqual(axiosPostStub.called, true)
+    // Assert that fetch was called
+    assert.strictEqual(fetchStub.called, true)
     assert.strictEqual(connectorClientStub.called, true)
     assert.strictEqual(memoryCacheStub.called, true)
     assert.strictEqual(ConfidentialClientApplicationStub.called, true)
 
     // Check the URL it was called with - should have the tenant-id, not 'common'
-    const callArgs = axiosPostStub.getCall(0).args
-    const url = callArgs[0]
+    const url = getFetchUrl(fetchStub)
     assert.ok(url === 'https://login.microsoftonline.com/agentic-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'https://login.microsoftonline.com/agentic-tenant-id/oauth2/v2.0/token', got: ${url}`)
-    axiosPostStub.restore()
+    fetchStub.restore()
     memoryCacheStub.restore()
     connectorClientStub.restore()
     ConfidentialClientApplicationStub.restore()
@@ -413,13 +383,8 @@ describe('MsalTokenProvider', () => {
       clientSecret: 'client-secret',
     })
 
-    // Spy on axios.post
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: {
-        access_token: 'test-access-token',
-        expires_in: 3600
-      }
-    })
+    // Spy on fetch
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     const connectorClientStub = sinon.stub(ConnectorClient, 'createClientWithToken').resolves({} as any)
 
@@ -448,17 +413,16 @@ describe('MsalTokenProvider', () => {
       },
       res, async () => { })
 
-    // Assert that axios.post was called
-    assert.strictEqual(axiosPostStub.called, true)
+    // Assert that fetch was called
+    assert.strictEqual(fetchStub.called, true)
     assert.strictEqual(connectorClientStub.called, true)
     assert.strictEqual(memoryCacheStub.called, true)
     assert.strictEqual(ConfidentialClientApplicationStub.called, true)
 
     // The passed agentic-tenant-id should be preferred over the configured original-tenant-id
-    const callArgs = axiosPostStub.getCall(0).args
-    const url = callArgs[0]
+    const url = getFetchUrl(fetchStub)
     assert.ok(url === 'https://login.microsoftonline.com/agentic-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'agentic-tenant-id', got: ${url}`)
-    axiosPostStub.restore()
+    fetchStub.restore()
     memoryCacheStub.restore()
     connectorClientStub.restore()
     ConfidentialClientApplicationStub.restore()
@@ -490,9 +454,7 @@ describe('MsalTokenProvider', () => {
 
     const jwtSignStub = sinon.stub(jwt, 'sign').returns('fake-jwt-token' as any)
 
-    sinon.stub(axios, 'post').resolves({
-      data: { access_token: 'test-access-token', expires_in: 3600 }
-    })
+    mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
@@ -536,9 +498,7 @@ describe('MsalTokenProvider', () => {
 
     const jwtSignStub = sinon.stub(jwt, 'sign').returns('fake-jwt-token' as any)
 
-    sinon.stub(axios, 'post').resolves({
-      data: { access_token: 'test-access-token', expires_in: 3600 }
-    })
+    mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
@@ -578,9 +538,7 @@ describe('MsalTokenProvider', () => {
 
     const jwtSignStub = sinon.stub(jwt, 'sign').returns('fake-jwt-token' as any)
 
-    sinon.stub(axios, 'post').resolves({
-      data: { access_token: 'test-access-token', expires_in: 3600 }
-    })
+    mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
@@ -642,15 +600,13 @@ describe('MsalTokenProvider', () => {
 
     sinon.stub(jwt, 'sign').returns('fake-jwt-with-x5c' as any)
 
-    const axiosPostStub = sinon.stub(axios, 'post').resolves({
-      data: { access_token: 'test-access-token', expires_in: 3600 }
-    })
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
 
     try {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
 
-      assert.strictEqual(axiosPostStub.called, true)
-      const postData = axiosPostStub.getCall(0).args[1] as any
+      assert.strictEqual(fetchStub.called, true)
+      const postData = getFetchBody(fetchStub)
       assert.strictEqual(postData.client_assertion, 'fake-jwt-with-x5c', 'client_assertion should be the JWT signed with x5c')
       assert.strictEqual(postData.client_assertion_type, 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer')
     } finally {

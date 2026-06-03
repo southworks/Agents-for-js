@@ -5,21 +5,18 @@ import { Activity, RoleTypes, Channels } from '@microsoft/agents-activity'
 import sinon from 'sinon'
 
 describe('ConnectorClient', () => {
-  let mockAxios: any
+  let mockRequest: sinon.SinonStub
   let client: ConnectorClient
   let sandbox: sinon.SinonSandbox
 
   beforeEach(() => {
     sandbox = sinon.createSandbox()
 
-    // Create a mock axios instance with the methods we need
-    mockAxios = sandbox.stub().resolves({ data: { id: 'reply-id' } })
-
     // Create ConnectorClient using the factory method with mock token
     client = ConnectorClient.createClientWithToken('https://test.com', 'mock-token')
 
-    // Replace the internal axios instance with our mock
-    ; (client as any)._axiosInstance = mockAxios
+    // Stub the request method on the internal HttpClient
+    mockRequest = sandbox.stub((client as any)._httpClient, 'request').resolves({ data: { id: 'reply-id' }, status: 200, statusText: 'OK', headers: new Headers(), config: {} })
   })
 
   afterEach(function () {
@@ -36,9 +33,9 @@ describe('ConnectorClient', () => {
       await client.replyToActivity(conversationId350chars, 'activityId', Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${expectedTruncatedId}/activities/activityId`,
         headers: {
@@ -56,9 +53,9 @@ describe('ConnectorClient', () => {
       await client.replyToActivity(conversationId350chars, 'activityId', Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${expectedTruncatedId}/activities/activityId`,
         headers: {
@@ -75,9 +72,9 @@ describe('ConnectorClient', () => {
       await client.replyToActivity(conversationId350chars, 'activityId', Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${conversationId350chars}/activities/activityId`,
         headers: {
@@ -93,9 +90,9 @@ describe('ConnectorClient', () => {
       await client.replyToActivity(conversationId350chars, 'activityId', Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.User } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${conversationId350chars}/activities/activityId`,
         headers: {
@@ -120,9 +117,9 @@ describe('ConnectorClient', () => {
       await client.sendToConversation(conversationId350chars, Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${expectedTruncatedId}/activities`,
         headers: {
@@ -140,9 +137,9 @@ describe('ConnectorClient', () => {
       await client.sendToConversation(conversationId350chars, Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${expectedTruncatedId}/activities`,
         headers: {
@@ -159,9 +156,9 @@ describe('ConnectorClient', () => {
       await client.sendToConversation(conversationId350chars, Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${conversationId350chars}/activities`,
         headers: {
@@ -177,9 +174,9 @@ describe('ConnectorClient', () => {
       await client.sendToConversation(conversationId350chars, Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.User } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${conversationId350chars}/activities`,
         headers: {
@@ -196,9 +193,9 @@ describe('ConnectorClient', () => {
       await client.sendToConversation(conversationId350chars, Activity.fromObject({ type: 'message', channelId: Channels.Msteams, from: { role: RoleTypes.AgenticUser } }))
 
       // Verify that post was called once
-      sinon.assert.calledOnce(mockAxios)
+      sinon.assert.calledOnce(mockRequest)
 
-      sinon.assert.calledWith(mockAxios, {
+      sinon.assert.calledWith(mockRequest, {
         method: 'post',
         url: `v3/conversations/${expectedTruncatedId}/activities`,
         headers: {
@@ -217,8 +214,8 @@ describe('ConnectorClient', () => {
 
       await client.sendToConversation('conv-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.deepStrictEqual(config.params, { isTargetedActivity: 'true' })
     })
 
@@ -227,8 +224,8 @@ describe('ConnectorClient', () => {
 
       await client.sendToConversation('conv-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
@@ -238,8 +235,8 @@ describe('ConnectorClient', () => {
 
       await client.sendToConversation('conv-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
@@ -249,8 +246,8 @@ describe('ConnectorClient', () => {
 
       await client.replyToActivity('conv-id', 'act-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.deepStrictEqual(config.params, { isTargetedActivity: 'true' })
     })
 
@@ -259,8 +256,8 @@ describe('ConnectorClient', () => {
 
       await client.replyToActivity('conv-id', 'act-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
@@ -270,8 +267,8 @@ describe('ConnectorClient', () => {
 
       await client.replyToActivity('conv-id', 'act-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
@@ -281,8 +278,8 @@ describe('ConnectorClient', () => {
 
       await client.updateActivity('conv-id', 'act-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.deepStrictEqual(config.params, { isTargetedActivity: 'true' })
     })
 
@@ -291,8 +288,8 @@ describe('ConnectorClient', () => {
 
       await client.updateActivity('conv-id', 'act-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
@@ -302,32 +299,32 @@ describe('ConnectorClient', () => {
 
       await client.updateActivity('conv-id', 'act-id', activity)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
     it('deleteActivity adds isTargetedActivity param when isTargetedActivity=true', async () => {
       await client.deleteActivity('conv-id', 'act-id', true)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.deepStrictEqual(config.params, { isTargetedActivity: 'true' })
     })
 
     it('deleteActivity does NOT add param when isTargetedActivity=false', async () => {
       await client.deleteActivity('conv-id', 'act-id', false)
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
 
     it('deleteActivity does NOT add param when isTargetedActivity is omitted', async () => {
       await client.deleteActivity('conv-id', 'act-id')
 
-      sinon.assert.calledOnce(mockAxios)
-      const config = mockAxios.getCall(0).args[0]
+      sinon.assert.calledOnce(mockRequest)
+      const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
     })
   })

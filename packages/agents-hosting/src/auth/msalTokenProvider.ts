@@ -4,7 +4,6 @@
  */
 
 import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
-import axios from 'axios'
 import { AuthConfiguration, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
@@ -257,22 +256,31 @@ export class MsalTokenProvider implements AuthProvider {
       data.client_info = '2'
     }
 
-    const token = await axios.post(
+    const token = await fetch(
       url,
-      data,
       {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
-        }
+        },
+        body: new URLSearchParams(data as Record<string, string>).toString()
       }
-    ).catch((error) => {
-      logger.error('Error acquiring token: ', error.toJSON())
+    ).then(async (response) => {
+      if (!response.ok) {
+        const errorBody = await response.text()
+        const error = new Error(`Token request failed with status ${response.status}: ${errorBody}`)
+        ;(error as any).toJSON = () => ({ status: response.status, body: errorBody })
+        throw error
+      }
+      return response.json()
+    }).catch((error) => {
+      logger.error('Error acquiring token: ', error.toJSON ? error.toJSON() : error)
       throw error
     })
 
     // capture token, expire local cache 5 minutes early
-    this._agenticTokenCache.set(cacheKey, token.data.access_token, token.data.expires_in - 300)
-    return token.data.access_token
+    this._agenticTokenCache.set(cacheKey, token.access_token, token.expires_in - 300)
+    return token.access_token
   }
 
   public async getAgenticUserToken (tenantId: string, agentAppInstanceId: string, agenticUserId: string, scopes: string[]): Promise<string> {
