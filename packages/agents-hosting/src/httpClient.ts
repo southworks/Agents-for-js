@@ -180,7 +180,6 @@ export class HttpClient {
 export class HttpError extends Error {
   public readonly response: HttpResponse
   public readonly config: HttpRequestConfig
-  public readonly code?: string
   public readonly status: number
 
   constructor (message: string, response: HttpResponse, config: HttpRequestConfig) {
@@ -194,7 +193,6 @@ export class HttpError extends Error {
   toJSON (): Record<string, unknown> {
     return {
       message: this.message,
-      code: this.code,
       status: this.status,
       config: {
         url: this.config.url,

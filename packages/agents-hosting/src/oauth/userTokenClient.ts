@@ -15,6 +15,20 @@ import { UserTokenClientTraceDefinitions } from '../observability'
 
 const logger = debug('agents:user-token-client')
 
+function formatHttpErrorMessage (error: HttpError): string {
+  const responseData = error.response?.data
+  if (responseData === undefined) {
+    return error.message
+  }
+
+  try {
+    const serializedResponseData = JSON.stringify(responseData)
+    return serializedResponseData === undefined ? error.message : `${error.message}${serializedResponseData}`
+  } catch {
+    return error.message
+  }
+}
+
 /**
  * Client for managing user tokens.
  */
@@ -273,17 +287,26 @@ export class UserTokenClient {
       return response
     } catch (error: any) {
       if (error instanceof HttpError) {
+        const message = formatHttpErrorMessage(error)
         const errorDetails = {
-          code: error.code,
           host: this.client.baseURL,
           url: error.config.url,
           method: error.config.method,
           data: error.config.data,
-          message: error.message + JSON.stringify(error.response?.data),
+          message,
           headers: error.response?.headers,
           stack: error.stack,
         }
         logger.debug('Response error: ', errorDetails)
+
+        Object.assign(error, {
+          host: this.client.baseURL,
+          url: error.config.url,
+          method: error.config.method,
+          data: error.config.data,
+          headers: error.response?.headers,
+          message,
+        })
       }
       throw error
     }

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import http from 'node:http'
 import { describe, it } from 'node:test'
-import { HttpClient } from '../../src'
+import { HttpClient, HttpError } from '../../src'
 
 describe('HttpClient', () => {
   it('merges content-type headers without sending duplicates', async () => {
@@ -52,5 +52,40 @@ describe('HttpClient', () => {
 
     assert.strictEqual(requestHeaders?.['content-type'], 'application/json')
     assert.strictEqual(requestBody, '{"text":"hello"}')
+  })
+
+  it('does not include an undefined code in serialized HttpError output', () => {
+    const error = new HttpError(
+      'Request failed with status 415',
+      {
+        data: { error: 'unsupported media type' },
+        status: 415,
+        statusText: 'Unsupported Media Type',
+        headers: new Headers(),
+        config: {
+          method: 'post',
+          url: '/activities'
+        }
+      },
+      {
+        method: 'post',
+        url: '/activities'
+      }
+    )
+
+    assert.deepStrictEqual(error.toJSON(), {
+      message: 'Request failed with status 415',
+      status: 415,
+      config: {
+        url: '/activities',
+        method: 'post',
+        data: undefined,
+      },
+      response: {
+        status: 415,
+        statusText: 'Unsupported Media Type',
+        data: { error: 'unsupported media type' },
+      }
+    })
   })
 })

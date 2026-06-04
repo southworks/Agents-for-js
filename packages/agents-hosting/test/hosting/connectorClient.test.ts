@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import { strict as assert } from 'assert'
-import { ConnectorClient } from '../../src'
+import { ConnectorClient, HttpError } from '../../src'
 import { Activity, RoleTypes, Channels } from '@microsoft/agents-activity'
 import sinon from 'sinon'
 
@@ -326,6 +326,43 @@ describe('ConnectorClient', () => {
       sinon.assert.calledOnce(mockRequest)
       const config = mockRequest.getCall(0).args[0]
       assert.strictEqual(config.params, undefined)
+    })
+  })
+
+  describe('error propagation', () => {
+    it('rethrows HttpError without appending undefined to the message', async () => {
+      const httpError = new HttpError(
+        'Request failed with status 500',
+        {
+          data: undefined,
+          status: 500,
+          statusText: 'Internal Server Error',
+          headers: new Headers(),
+          config: {
+            method: 'post',
+            url: 'v3/conversations/conv-id/activities'
+          }
+        },
+        {
+          method: 'post',
+          url: 'v3/conversations/conv-id/activities',
+          data: {
+            type: 'message'
+          }
+        }
+      )
+
+      mockRequest.rejects(httpError)
+
+      await assert.rejects(
+        client.sendToConversation('conv-id', Activity.fromObject({ type: 'message', channelId: Channels.Msteams })),
+        (error: unknown) => {
+          assert.ok(error instanceof HttpError)
+          assert.strictEqual(error.message, 'Request failed with status 500')
+          assert.strictEqual((error as any).host, 'https://test.com')
+          return true
+        }
+      )
     })
   })
 })

@@ -21,6 +21,10 @@ function getFetchBody (fetchStub: sinon.SinonStub): Record<string, string> {
   return Object.fromEntries(new URLSearchParams(body))
 }
 
+function getFetchOptions (fetchStub: sinon.SinonStub): RequestInit {
+  return fetchStub.getCall(0).args[1] as RequestInit
+}
+
 describe('MsalTokenProvider', () => {
   let msalTokenProvider: MsalTokenProvider
   let authConfig: AuthConfiguration
@@ -135,6 +139,67 @@ describe('MsalTokenProvider', () => {
       // @ts-ignore
       tokenProvider._agenticTokenCache.destroy()
       fetchStub.restore()
+    }
+  })
+
+  it('should attach an abort signal to agentic token fetch requests', async () => {
+    const tokenProvider = new MsalTokenProvider({
+      clientId: 'client-id',
+      tenantId: 'common',
+      clientSecret: 'client-secret'
+    })
+
+    const fetchStub = mockFetchResponse({ access_token: 'test-access-token', expires_in: 3600 })
+
+    try {
+      await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
+
+      assert.strictEqual(fetchStub.called, true)
+      const options = getFetchOptions(fetchStub)
+      assert.ok(options.signal instanceof AbortSignal)
+    } finally {
+      // @ts-ignore
+      tokenProvider._agenticTokenCache.destroy()
+      fetchStub.restore()
+    }
+  })
+
+  it('should timeout agentic token fetch requests', async () => {
+    const clock = sinon.useFakeTimers()
+    const tokenProvider = new MsalTokenProvider({
+      clientId: 'client-id',
+      tenantId: 'common',
+      clientSecret: 'client-secret'
+    })
+
+    const fetchStub = sinon.stub(global, 'fetch').callsFake(async (_url, init) => {
+      return await new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal as AbortSignal | undefined
+        signal?.addEventListener('abort', () => {
+          const error = new Error('The operation was aborted')
+          error.name = 'AbortError'
+          reject(error)
+        }, { once: true })
+      })
+    })
+
+    try {
+      const tokenPromise = tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
+      const rejection = assert.rejects(tokenPromise, (error: unknown) => {
+        assert.ok(error instanceof Error)
+        assert.strictEqual(error.message, 'Token request timed out after 30000ms')
+        return true
+      })
+
+      await clock.tickAsync(30000)
+
+      await rejection
+      assert.strictEqual(fetchStub.called, true)
+    } finally {
+      // @ts-ignore
+      tokenProvider._agenticTokenCache.destroy()
+      fetchStub.restore()
+      clock.restore()
     }
   })
 

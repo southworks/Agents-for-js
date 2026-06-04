@@ -22,6 +22,20 @@ import { HttpClient, HttpRequestConfig, HttpResponse, HttpError } from '../httpC
 
 const logger = debug('agents:connector-client')
 
+function formatHttpErrorMessage (error: HttpError): string {
+  const responseData = error.response?.data
+  if (responseData === undefined) {
+    return error.message
+  }
+
+  try {
+    const serializedResponseData = JSON.stringify(responseData)
+    return serializedResponseData === undefined ? error.message : `${error.message}${serializedResponseData}`
+  } catch {
+    return error.message
+  }
+}
+
 export { getProductInfo }
 
 /**
@@ -430,16 +444,25 @@ export class ConnectorClient {
       return response
     } catch (error) {
       if (error instanceof HttpError) {
-        const errorDetails = {
-          code: error.code,
+        const message = formatHttpErrorMessage(error)
+        logger.debug('Response error: ', {
           host: this._httpClient.baseURL,
           url: error.config.url,
           method: error.config.method,
           data: error.config.data,
-          message: error.message + JSON.stringify(error.response?.data),
+          message,
           stack: error.stack,
-        }
-        return Promise.reject(errorDetails)
+        })
+
+        Object.assign(error, {
+          host: this._httpClient.baseURL,
+          url: error.config.url,
+          method: error.config.method,
+          data: error.config.data,
+          message,
+        })
+
+        throw error
       }
       throw error
     }

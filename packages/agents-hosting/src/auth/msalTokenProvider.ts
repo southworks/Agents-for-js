@@ -17,6 +17,17 @@ import { AuthenticationTraceDefinitions } from '../observability'
 
 const audience = 'api://AzureADTokenExchange'
 const logger = debug('agents:msal')
+const agenticTokenRequestTimeoutMs = 30000
+
+function isAbortError (error: unknown): error is Error {
+  return error instanceof Error && error.name === 'AbortError'
+}
+
+function createTokenRequestTimeoutError (timeoutMs: number): Error & { toJSON: () => Record<string, unknown> } {
+  const error = new Error(`Token request timed out after ${timeoutMs}ms`) as Error & { toJSON: () => Record<string, unknown> }
+  error.toJSON = () => ({ timeoutMs })
+  return error
+}
 
 /**
  * Provides tokens using MSAL.
@@ -256,6 +267,11 @@ export class MsalTokenProvider implements AuthProvider {
       data.client_info = '2'
     }
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      controller.abort(createTokenRequestTimeoutError(agenticTokenRequestTimeoutMs))
+    }, agenticTokenRequestTimeoutMs)
+
     const token = await fetch(
       url,
       {
@@ -263,7 +279,8 @@ export class MsalTokenProvider implements AuthProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
         },
-        body: new URLSearchParams(data as Record<string, string>).toString()
+        body: new URLSearchParams(data as Record<string, string>).toString(),
+        signal: controller.signal
       }
     ).then(async (response) => {
       if (!response.ok) {
@@ -274,8 +291,13 @@ export class MsalTokenProvider implements AuthProvider {
       }
       return response.json()
     }).catch((error) => {
-      logger.error('Error acquiring token: ', error.toJSON ? error.toJSON() : error)
-      throw error
+      const resolvedError = isAbortError(error)
+        ? (controller.signal.reason instanceof Error ? controller.signal.reason : createTokenRequestTimeoutError(agenticTokenRequestTimeoutMs))
+        : error
+      logger.error('Error acquiring token: ', resolvedError.toJSON ? resolvedError.toJSON() : resolvedError)
+      throw resolvedError
+    }).finally(() => {
+      clearTimeout(timeoutId)
     })
 
     // capture token, expire local cache 5 minutes early
