@@ -25,9 +25,26 @@ function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<stri
       certPemFile: redactString(config.certPemFile),
       certKeyFile: redactString(config.certKeyFile),
       WIDAssertionFile: redactString(config.WIDAssertionFile),
+      federatedTokenFile: config.federatedTokenFile ? redactString(config.federatedTokenFile) : undefined,
+      authType: config.authType ?? undefined,
+      idpmResource: config.idpmResource ? redactUrl(config.idpmResource) : undefined,
     } satisfies AuthConfiguration)
     return summary
   }, {} as Record<string, AuthConfiguration>)
+}
+
+/**
+ * Supported authentication types for agent connections.
+ */
+export enum AuthType {
+  Certificate = 'Certificate',
+  CertificateSubjectName = 'CertificateSubjectName',
+  ClientSecret = 'ClientSecret',
+  UserManagedIdentity = 'UserManagedIdentity',
+  SystemManagedIdentity = 'SystemManagedIdentity',
+  FederatedCredentials = 'FederatedCredentials',
+  WorkloadIdentity = 'WorkloadIdentity',
+  IdentityProxyManager = 'IdentityProxyManager'
 }
 
 /**
@@ -108,8 +125,29 @@ export interface AuthConfiguration {
 
   /**
    * The path to K8s provided token.
+   * @deprecated Use `authType` set to `'WorkloadIdentity'` and `federatedTokenFile` instead.
    */
   WIDAssertionFile?: string
+
+  /**
+   * The authentication type for the connection.
+   */
+  authType?: AuthType | string
+
+  /**
+   * The path to the federated token file used for Workload Identity authentication.
+   */
+  federatedTokenFile?: string
+
+  /**
+   * Sets the resource URL for Identity Proxy Manager (IDPM).
+   *
+   * @remarks
+   * Set this to the appropriate resource identifier when the application is running in an environment,
+   * such as a Foundry container, that exposes Managed Identity through a container-specific IMDS endpoint.
+   * This setting is only meaningful when using Identity Proxy Manager (AuthType.IdentityProxyManager) for authentication.
+   */
+  idpmResource?: string
 
   /**
    * The Azure region for ESTS-R regional token acquisition (e.g. 'westus', 'eastus').
@@ -227,6 +265,9 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
       issuers: getDefaultIssuers(process.env.MicrosoftAppTenantId ?? '', authority),
       altBlueprintConnectionName: process.env.altBlueprintConnectionName,
       WIDAssertionFile: process.env.WIDAssertionFile,
+      authType: process.env.authType,
+      federatedTokenFile: process.env.federatedTokenFile,
+      idpmResource: process.env.idpmResource,
       azureRegion: process.env.azureRegion,
     }
     envConnections.connections.set(DEFAULT_CONNECTION, authConfig)
@@ -388,6 +429,9 @@ function buildLegacyAuthConfig (envPrefix: string = '', customConfig?: AuthConfi
     issuers: customConfig?.issuers ?? getDefaultIssuers(tenantId as string, authority),
     altBlueprintConnectionName: customConfig?.altBlueprintConnectionName ?? process.env[`${prefix}altBlueprintConnectionName`],
     WIDAssertionFile: customConfig?.WIDAssertionFile ?? process.env[`${prefix}WIDAssertionFile`],
+    authType: customConfig?.authType ?? process.env[`${prefix}authType`],
+    federatedTokenFile: customConfig?.federatedTokenFile ?? process.env[`${prefix}federatedTokenFile`],
+    idpmResource: customConfig?.idpmResource ?? process.env[`${prefix}idpmResource`],
     azureRegion: customConfig?.azureRegion ?? process.env[`${prefix}azureRegion`]
   }
 }
