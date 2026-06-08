@@ -254,6 +254,8 @@ export interface AuthConfiguration {
   altBlueprintConnectionName?: string
 
   /**
+   * @deprecated Use `authType` set to `'WorkloadIdentity'` and `federatedTokenFile` instead.
+   *
    * The path to K8s provided token.
    */
   WIDAssertionFile?: string
@@ -264,6 +266,26 @@ export interface AuthConfiguration {
    * See https://learn.microsoft.com/en-us/entra/msal/javascript/node/regional-authorities for details.
    */
   azureRegion?: string
+
+  /**
+   * The authentication type for the connection.
+   */
+  authType?: AuthType | string
+
+  /**
+   * The path to the federated token file used for Workload Identity authentication.
+   */
+  federatedTokenFile?: string
+
+  /**
+   * Sets the resource URL for Identity Proxy Manager (IDPM).
+   *
+   * @remarks
+   * Set this to the appropriate resource identifier when the application is running in an environment,
+   * such as a Foundry container, that exposes Managed Identity through a container-specific IMDS endpoint.
+   * This setting is only meaningful when using Identity Proxy Manager (AuthType.IdentityProxyManager) for authentication.
+   */
+  idpmResource?: string
 
   /**
    * Entra Authentication Endpoint to use.
@@ -284,4 +306,18 @@ export interface AuthConfiguration {
    * The scopes for the authentication configuration.
    */
   scopes?: string[]
+}
+
+/**
+ * Supported authentication types for agent connections.
+ */
+export enum AuthType {
+  Certificate = 'Certificate',
+  CertificateSubjectName = 'CertificateSubjectName',
+  ClientSecret = 'ClientSecret',
+  UserManagedIdentity = 'UserManagedIdentity',
+  SystemManagedIdentity = 'SystemManagedIdentity',
+  FederatedCredentials = 'FederatedCredentials',
+  WorkloadIdentity = 'WorkloadIdentity',
+  IdentityProxyManager = 'IdentityProxyManager'
 }

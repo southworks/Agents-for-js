@@ -12,15 +12,20 @@ import { prune } from '../utils'
 
 const logger = debug('agents:authConfiguration')
 
-function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<string, unknown> {
+type NonOptional<T> = { [K in keyof Required<T>]: T[K] }
+
+/**
+ * Summarizes the authentication configuration for logging by redacting sensitive information and pruning undefined values. This is used to log the loaded authentication settings without exposing secrets or personally identifiable information.
+ * @remarks AuthConfiguration properties can change its shape, since this function is intended for logging, e.g. `scopes` will be a string instead of an array.
+ */
+function summarizeAuthConfiguration (authConfig: AuthConfiguration) {
   return [...authConfig.connections?.entries() ?? []].reduce((summary, [name, config]) => {
     summary[name] = prune({
-      ...config,
       clientId: redactString(config.clientId, true),
       tenantId: redactString(config.tenantId, true),
       clientSecret: redactString(config.clientSecret),
       authorityEndpoint: config.authorityEndpoint ? redactUrl(config.authorityEndpoint) : undefined,
-      scopes: config.scopes ? [redactScopes(config.scopes)] as string[] : undefined,
+      scopes: (config.scopes ? redactScopes(config.scopes) : undefined) as any,
       issuers: config.issuers?.map(redactUrl).filter(e => e !== undefined),
       federatedClientId: redactString(config.federatedClientId, true),
       certPemFile: redactString(config.certPemFile),
@@ -29,7 +34,17 @@ function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<stri
       federatedTokenFile: config.federatedTokenFile ? redactString(config.federatedTokenFile) : undefined,
       authType: config.authType ?? undefined,
       idpmResource: config.idpmResource ? redactUrl(config.idpmResource) : undefined,
-    } satisfies AuthConfiguration)
+      connectionName: config.connectionName,
+      altBlueprintConnectionName: config.altBlueprintConnectionName,
+      azureRegion: config.azureRegion,
+      sendX5C: config.sendX5C,
+      // Don't log the following properties
+      authority: undefined, // Deprecated, same as authorityEndpoint, avoid logging duplicate info
+      FICClientId: undefined, // Deprecated, same as federatedClientId, avoid logging duplicate info
+      scope: undefined, // Deprecated, same as scopes, avoid logging duplicate info
+      connections: undefined, // Avoid logging nested connections
+      connectionsMap: undefined, // Avoid logging nested connections map
+    } satisfies NonOptional<AuthConfiguration>)
     return summary
   }, {} as Record<string, AuthConfiguration>)
 }
@@ -382,16 +397,16 @@ export function getAuthConfigWithDefaults (config?: AuthConfiguration): AuthConf
     globalEnv = loadEnv()
   }
 
-  if (!config) {
-    return loadAuthConfigFromEnv()
-  }
-
-  const { connections, connectionsMap } = config.connections?.size ? config : { connections: connectionsEnv.connections, connectionsMap: connectionsMapEnv.connectionsMap }
   let result: AuthConfiguration
-  if (connections?.size) {
-    result = { ...globalEnv.legacyPrefixSettings, ...connectionsEnv.default(connections, connectionsMap) }
+  if (!config) {
+    result = loadAuthConfigFromEnv()
   } else {
-    result = applyDefaultSettings({ ...globalEnv.legacyPrefixSettings, ...config })
+    const { connections, connectionsMap } = config.connections?.size ? config : { connections: connectionsEnv.connections, connectionsMap: connectionsMapEnv.connectionsMap }
+    if (connections?.size) {
+      result = { ...globalEnv.legacyPrefixSettings, ...connectionsEnv.default(connections, connectionsMap) }
+    } else {
+      result = applyDefaultSettings({ ...globalEnv.legacyPrefixSettings, ...config })
+    }
   }
 
   logger.info('Auth settings loaded from runtime configuration', summarizeAuthConfiguration(result), result.connectionsMap)
