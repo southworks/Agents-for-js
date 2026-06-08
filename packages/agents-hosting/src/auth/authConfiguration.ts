@@ -3,13 +3,36 @@
  * Licensed under the MIT License.
  */
 
-import { debug } from '@microsoft/agents-telemetry'
 import type { ConnectionMapItem } from './msalConnectionManager'
+import { debug, redactString, redactScopes, redactUrl } from '@microsoft/agents-telemetry'
 import { loadEnvSettings, AuthConfiguration, envParser, envParserUtils, LoadEnv, applyDefaultSettings, DEFAULT_CONNECTION_MAP, ConnectionKeys, ConnectionMapKeys } from './settings'
 
-export { AuthConfiguration, resolveAuthority } from './settings'
+export { type AuthConfiguration, AuthType, resolveAuthority } from './settings'
+import { prune } from '../utils'
 
 const logger = debug('agents:authConfiguration')
+
+function summarizeAuthConfiguration (authConfig: AuthConfiguration): Record<string, unknown> {
+  return [...authConfig.connections?.entries() ?? []].reduce((summary, [name, config]) => {
+    summary[name] = prune({
+      ...config,
+      clientId: redactString(config.clientId, true),
+      tenantId: redactString(config.tenantId, true),
+      clientSecret: redactString(config.clientSecret),
+      authorityEndpoint: config.authorityEndpoint ? redactUrl(config.authorityEndpoint) : undefined,
+      scopes: config.scopes ? [redactScopes(config.scopes)] as string[] : undefined,
+      issuers: config.issuers?.map(redactUrl).filter(e => e !== undefined),
+      federatedClientId: redactString(config.federatedClientId, true),
+      certPemFile: redactString(config.certPemFile),
+      certKeyFile: redactString(config.certKeyFile),
+      WIDAssertionFile: redactString(config.WIDAssertionFile),
+      federatedTokenFile: config.federatedTokenFile ? redactString(config.federatedTokenFile) : undefined,
+      authType: config.authType ?? undefined,
+      idpmResource: config.idpmResource ? redactUrl(config.idpmResource) : undefined,
+    } satisfies AuthConfiguration)
+    return summary
+  }, {} as Record<string, AuthConfiguration>)
+}
 
 /**
  * Latest authentication configuration loaded from environment variables, with support for hot-reloading in test mode.
@@ -19,6 +42,7 @@ const logger = debug('agents:authConfiguration')
 const connectionsEnv = {
   connections: new Map<string, AuthConfiguration>(),
   parser: envParser<ConnectionKeys>({
+    authType: envParserUtils.bypass,
     tenantId: envParserUtils.bypass,
     clientId: envParserUtils.bypass,
     clientSecret: envParserUtils.bypass,
@@ -44,6 +68,8 @@ const connectionsEnv = {
     },
     altBlueprintConnectionName: envParserUtils.bypass,
     WIDAssertionFile: envParserUtils.bypass,
+    federatedTokenFile: envParserUtils.bypass,
+    idpmResource: envParserUtils.bypass,
     azureRegion: envParserUtils.bypass,
     sendX5C: (value) => ({ value: value === 'true' }),
     issuers (value) {
@@ -167,6 +193,9 @@ const legacyBotFrameworkEnv = {
     WIDAssertionFile: envParserUtils.redirect(connectionsEnv.parser, 'WIDAssertionFile'),
     azureRegion: envParserUtils.redirect(connectionsEnv.parser, 'azureRegion'),
     sendX5C: envParserUtils.redirect(connectionsEnv.parser, 'sendX5C'),
+    authType: envParserUtils.redirect(connectionsEnv.parser, 'authType'),
+    federatedTokenFile: envParserUtils.redirect(connectionsEnv.parser, 'federatedTokenFile'),
+    idpmResource: envParserUtils.redirect(connectionsEnv.parser, 'idpmResource'),
   }),
   process (env: LoadEnv) {
     return legacyPrefixEnv.process.call(this, env)
@@ -192,6 +221,9 @@ const legacyPrefixEnv = {
     WIDAssertionFile: envParserUtils.redirect(connectionsEnv.parser, 'WIDAssertionFile'),
     azureRegion: envParserUtils.redirect(connectionsEnv.parser, 'azureRegion'),
     sendX5C: envParserUtils.redirect(connectionsEnv.parser, 'sendX5C'),
+    authType: envParserUtils.redirect(connectionsEnv.parser, 'authType'),
+    federatedTokenFile: envParserUtils.redirect(connectionsEnv.parser, 'federatedTokenFile'),
+    idpmResource: envParserUtils.redirect(connectionsEnv.parser, 'idpmResource'),
   }),
   process (env: LoadEnv, prefix?: string) {
     const settings: Partial<AuthConfiguration> = {}
@@ -282,6 +314,11 @@ export const loadAuthConfigFromEnv = (cnxName?: string): AuthConfiguration => {
     throw new Error(`ClientId not found for connection: ${cnxName}`)
   }
 
+  logger.info('Auth settings loaded from environment', {
+    connections: summarizeAuthConfiguration(result),
+    connectionsMap: result.connectionsMap?.map(e => ({ ...e, serviceUrl: e.serviceUrl !== '*' ? redactUrl(e.serviceUrl) : e.serviceUrl })),
+  })
+
   return result
 }
 
@@ -304,12 +341,16 @@ export const loadPrevAuthConfigFromEnv: () => AuthConfiguration = () => {
     globalEnv = loadEnv()
   }
 
+  let result: AuthConfiguration
   if (connectionsEnv.connections.size > 0) {
-    return connectionsEnv.default()
+    result = connectionsEnv.default()
+  } else {
+    // No connections provided, we need to populate the connection map with the old config settings
+    result = applyDefaultSettings(globalEnv.legacyBotFrameworkSettings)
   }
 
-  // No connections provided, we need to populate the connection map with the old config settings
-  return applyDefaultSettings(globalEnv.legacyBotFrameworkSettings)
+  logger.info('Legacy auth settings loaded from environment', summarizeAuthConfiguration(result), result.connectionsMap)
+  return result
 }
 
 /**
@@ -346,9 +387,13 @@ export function getAuthConfigWithDefaults (config?: AuthConfiguration): AuthConf
   }
 
   const { connections, connectionsMap } = config.connections?.size ? config : { connections: connectionsEnv.connections, connectionsMap: connectionsMapEnv.connectionsMap }
+  let result: AuthConfiguration
   if (connections?.size) {
-    return { ...globalEnv.legacyPrefixSettings, ...connectionsEnv.default(connections, connectionsMap) }
+    result = { ...globalEnv.legacyPrefixSettings, ...connectionsEnv.default(connections, connectionsMap) }
+  } else {
+    result = applyDefaultSettings({ ...globalEnv.legacyPrefixSettings, ...config })
   }
 
-  return applyDefaultSettings({ ...globalEnv.legacyPrefixSettings, ...config })
+  logger.info('Auth settings loaded from runtime configuration', summarizeAuthConfiguration(result), result.connectionsMap)
+  return result
 }

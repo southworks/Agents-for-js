@@ -22,6 +22,7 @@ describe('AuthConfiguration', () => {
     process.env.connectionName = 'test-connection'
     process.env.FICClientId = 'test-fic-client-id'
     process.env.authorityEndpoint = 'https://login.microsoftonline.com'
+    process.env.idpmResource = 'https://test.uri.com'
     process.env.NODE_ENV = 'development'
   })
 
@@ -52,6 +53,7 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/test-tenant-id/v2.0'
       ])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, 'https://test.uri.com')
     })
 
     it('should throw an error if clientId is not provided in production', () => {
@@ -75,6 +77,7 @@ describe('AuthConfiguration', () => {
       delete process.env.connectionName
       delete process.env.FICClientId
       delete process.env.authorityEndpoint
+      delete process.env.idpmResource
 
       const config = loadAuthConfigFromEnv()
       assert.strictEqual(config.tenantId, undefined)
@@ -89,6 +92,7 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/botframework.com/v2.0'
       ])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, undefined)
     })
   })
 
@@ -102,6 +106,7 @@ describe('AuthConfiguration', () => {
       process.env.myconn_certKeyFile = 'conn-cert.key'
       process.env.myconn_connectionName = 'conn-connection-name'
       process.env.myconn_authorityEndpoint = 'https://login.microsoftonline.com'
+      process.env.myconn_idpmResource = 'https://test.uri.com'
     })
 
     it('should load configuration from connection-specific environment variables', () => {
@@ -119,6 +124,7 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/conn-tenant-id/v2.0'
       ])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, 'https://test.uri.com')
     })
 
     it('should throw an error if connection-specific clientId is not found', () => {
@@ -142,6 +148,7 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/botframework.com/v2.0'
       ])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, undefined)
     })
   })
 
@@ -152,6 +159,7 @@ describe('AuthConfiguration', () => {
       process.env.MicrosoftAppPassword = 'microsoft-app-password'
       process.env.MicrosoftAppTenantId = 'microsoft-tenant-id'
       process.env.MicrosoftAppClientId = 'microsoft-app-client-id'
+      process.env.idpmResource = 'https://test.uri.com'
     })
 
     it('should load configuration from Microsoft App environment variables', () => {
@@ -169,6 +177,7 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/microsoft-tenant-id/v2.0'
       ])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, 'https://test.uri.com')
     })
 
     it('should throw an error if MicrosoftAppId is not provided in production', () => {
@@ -192,6 +201,7 @@ describe('AuthConfiguration', () => {
       delete process.env.certKeyFile
       delete process.env.connectionName
       delete process.env.authorityEndpoint
+      delete process.env.idpmResource
 
       const config = loadPrevAuthConfigFromEnv()
       assert.strictEqual(config.tenantId, undefined)
@@ -206,12 +216,14 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/botframework.com/v2.0'
       ])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, undefined)
     })
   })
 
   describe('getAuthConfigWithDefaults', () => {
     it('should load configuration with defaults', () => {
       delete process.env.authorityEndpoint
+      delete process.env.idpmResource
 
       const customConfig: AuthConfiguration = {
         clientId: 'custom-test-client',
@@ -231,6 +243,7 @@ describe('AuthConfiguration', () => {
       assert.deepStrictEqual(config.issuers, ['https://example.com'])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
       assert.strictEqual(config.altBlueprintConnectionName, 'blue-connection')
+      assert.strictEqual(config.idpmResource, undefined)
       assert.strictEqual(config.connections?.size, 1)
       assert.strictEqual(config.connectionsMap?.length, 1)
       assert.notStrictEqual(config.connections?.get('serviceConnection'), config)
@@ -239,6 +252,7 @@ describe('AuthConfiguration', () => {
 
     it('should load configuration with connections', () => {
       delete process.env.authorityEndpoint
+      delete process.env.idpmResource
 
       const connections = new Map<string, AuthConfiguration>()
       connections.set('test-conn', { clientId: 'custom-test-client', clientSecret: 'custom-test-secret', tenantId: 'custom-test-tenant' })
@@ -257,6 +271,7 @@ describe('AuthConfiguration', () => {
       assert.strictEqual(config.federatedClientId, 'test-fic-client-id')
       assert.deepStrictEqual(config.issuers?.length, 3)
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.com')
+      assert.strictEqual(config.idpmResource, undefined)
       assert.strictEqual(config.altBlueprintConnectionName, undefined)
       assert.strictEqual(config.connections?.size, 1)
       assert.strictEqual(config.connectionsMap?.length, 1)
@@ -265,6 +280,7 @@ describe('AuthConfiguration', () => {
 
     it('should load from env with defaults', () => {
       delete process.env.authorityEndpoint
+      delete process.env.idpmResource
 
       const config: AuthConfiguration = getAuthConfigWithDefaults()
       assert.strictEqual(config.tenantId, 'test-tenant-id')
@@ -281,6 +297,7 @@ describe('AuthConfiguration', () => {
         'https://login.microsoftonline.com/test-tenant-id/v2.0'
       ])
       assert.strictEqual(config.altBlueprintConnectionName, undefined)
+      assert.strictEqual(config.idpmResource, undefined)
       assert.strictEqual(config.connections?.size, 1)
       assert.strictEqual(config.connectionsMap?.length, 1)
     })
@@ -495,7 +512,8 @@ describe('AuthConfiguration', () => {
         federatedClientId: 'fic-client',
         issuers: ['https://example.com'],
         authorityEndpoint: 'https://login.microsoftonline.us',
-        scopes: ['https://api.botframework.com']
+        scopes: ['https://api.botframework.com'],
+        idpmResource: 'https://test.uri.com'
       }
 
       assert.strictEqual(config.tenantId, 'test-tenant')
@@ -508,6 +526,7 @@ describe('AuthConfiguration', () => {
       assert.deepStrictEqual(config.issuers, ['https://example.com'])
       assert.strictEqual(config.authorityEndpoint, 'https://login.microsoftonline.us')
       assert.deepStrictEqual(config.scopes, ['https://api.botframework.com'])
+      assert.strictEqual(config.idpmResource, 'https://test.uri.com')
     })
 
     it('should allow creating minimal AuthConfiguration with only required fields', () => {
