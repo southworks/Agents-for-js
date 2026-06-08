@@ -3,7 +3,9 @@
  * Licensed under the MIT License.
  */
 
+import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Readable } from 'node:stream'
+import { Errors } from './errorHelper'
 
 /**
  * Configuration for an HTTP request.
@@ -157,6 +159,10 @@ export class HttpClient {
     if (path.startsWith('http://') || path.startsWith('https://')) {
       url = path
     } else {
+      if (!this._baseURL) {
+        throw ExceptionHelper.generateException(Error, Errors.HttpClientRelativeUrlRequiresBaseUrl, undefined, { url: path })
+      }
+
       const base = this._baseURL.endsWith('/') ? this._baseURL.slice(0, -1) : this._baseURL
       const cleanPath = path.startsWith('/') ? path : `/${path}`
       url = `${base}${cleanPath}`

@@ -30,7 +30,7 @@ function formatHttpErrorMessage (error: HttpError): string {
 
   try {
     const serializedResponseData = JSON.stringify(responseData)
-    return serializedResponseData === undefined ? error.message : `${error.message}${serializedResponseData}`
+    return serializedResponseData === undefined ? error.message : `${error.message}: ${serializedResponseData}`
   } catch {
     return error.message
   }

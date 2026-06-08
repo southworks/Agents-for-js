@@ -211,4 +211,17 @@ describe('HttpClient', () => {
       })
     }
   })
+
+  it('throws a clear error when given a relative URL without a baseURL', async () => {
+    const client = new HttpClient()
+
+    await assert.rejects(
+      client.get('/v3/conversations'),
+      (error: unknown) => {
+        assert.ok(error instanceof Error)
+        assert.match(error.message, /HttpClient requires baseURL when using a relative URL: \/v3\/conversations/)
+        return true
+      }
+    )
+  })
 })
