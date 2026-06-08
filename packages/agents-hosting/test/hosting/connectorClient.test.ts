@@ -381,4 +381,16 @@ describe('ConnectorClient', () => {
       )
     })
   })
+
+  it('getAttachment requests a stream response', async () => {
+    mockRequest.resolves({ data: {} as NodeJS.ReadableStream, status: 200, statusText: 'OK', headers: new Headers(), config: {} })
+
+    await client.getAttachment('attachment-id', 'view-id')
+
+    sinon.assert.calledOnce(mockRequest)
+    const config = mockRequest.getCall(0).args[0]
+    assert.equal(config.method, 'get')
+    assert.equal(config.url, 'v3/attachments/attachment-id/views/view-id')
+    assert.equal(config.responseType, 'stream')
+  })
 })

@@ -413,7 +413,8 @@ export class ConnectorClient {
         url: `v3/attachments/${attachmentId}/views/${viewId}`,
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        responseType: 'stream'
       }
       const response = await this.executeRequest<NodeJS.ReadableStream>(config)
       record({ httpStatusCode: response.status?.toString() })

@@ -3,6 +3,8 @@
  * Licensed under the MIT License.
  */
 
+import { Readable } from 'node:stream'
+
 /**
  * Configuration for an HTTP request.
  */
@@ -12,7 +14,7 @@ export interface HttpRequestConfig {
   headers?: Record<string, string>
   data?: unknown
   params?: Record<string, string | undefined>
-  responseType?: 'json' | 'arraybuffer'
+  responseType?: 'json' | 'arraybuffer' | 'stream'
 }
 
 /**
@@ -79,9 +81,17 @@ export class HttpClient {
       const contentType = requestHeaders.get('content-type') ?? ''
       if (contentType.includes('application/x-www-form-urlencoded')) {
         fetchOptions.body = new URLSearchParams(config.data as Record<string, string>).toString()
-      } else if (typeof config.data === 'string' || config.data instanceof URLSearchParams) {
+      } else if (config.data instanceof URLSearchParams) {
+        if (!contentType) {
+          requestHeaders.set('content-type', 'application/x-www-form-urlencoded;charset=utf-8')
+        }
+        fetchOptions.body = config.data.toString()
+      } else if (typeof config.data === 'string') {
         fetchOptions.body = config.data
       } else {
+        if (!contentType) {
+          requestHeaders.set('content-type', 'application/json')
+        }
         fetchOptions.body = JSON.stringify(config.data)
       }
     }
@@ -89,7 +99,13 @@ export class HttpClient {
     const response = await fetch(url, fetchOptions)
 
     let data: T
-    if (config.responseType === 'arraybuffer') {
+    if (config.responseType === 'stream') {
+      if (!response.ok) {
+        data = await response.text() as T
+      } else {
+        data = Readable.fromWeb(response.body ?? new ReadableStream()) as T
+      }
+    } else if (config.responseType === 'arraybuffer') {
       data = await response.arrayBuffer() as T
     } else {
       const text = await response.text()
