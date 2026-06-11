@@ -196,6 +196,21 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'missing context.activity.channelId'
   },
 
+  MissingContextActivityRecipientId: {
+    code: -120221,
+    description: 'missing context.activity.recipient.id'
+  },
+
+  MissingContextActivityConversationId: {
+    code: -120222,
+    description: 'missing context.activity.conversation.id'
+  },
+
+  MissingContextActivityFromId: {
+    code: -120223,
+    description: 'missing context.activity.from.id'
+  },
+
   /**
      * Error thrown when both channelId and from.id are required for operation.
      */
@@ -330,6 +345,76 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   ConnectionSettingsRequired: {
     code: -120380,
     description: 'Connection settings must be provided for this operation.'
+  },
+
+  ConnectionSettingsRequiredForGetAccessTokenScope: {
+    code: -120381,
+    description: 'Connection settings must be provided to constructor when calling getAccessToken(scope)'
+  },
+
+  ConnectionSettingsRequiredForAcquireTokenOnBehalfOf: {
+    code: -120382,
+    description: 'Connection settings must be provided to constructor when calling acquireTokenOnBehalfOf(scopes, oboAssertion)'
+  },
+
+  FailedToAcquireTokenOnBehalfOf: {
+    code: -120383,
+    description: 'Failed to acquire token on behalf of user'
+  },
+
+  ConnectionSettingsRequiredForGetAgenticInstanceToken: {
+    code: -120384,
+    description: 'Connection settings must be provided when calling getAgenticInstanceToken'
+  },
+
+  FailedToAcquireInstanceTokenForAgentInstance: {
+    code: -120385,
+    description: 'Failed to acquire instance token for agent instance: {agentAppInstanceId}'
+  },
+
+  FailedToAcquireInstanceTokenForUserToken: {
+    code: -120386,
+    description: 'Failed to acquire instance token for user token: {agentAppInstanceId}'
+  },
+
+  ConnectionSettingsRequiredForGetAgenticApplicationToken: {
+    code: -120387,
+    description: 'Connection settings must be provided when calling getAgenticApplicationToken'
+  },
+
+  IdpmResourceAbsoluteUriRequired: {
+    code: -120388,
+    description: 'idpmResource must be a valid absolute URI'
+  },
+
+  FailedToAcquireTokenViaIdentityProxyManagerForAgentInstance: {
+    code: -120389,
+    description: 'Failed to acquire token via IdentityProxyManager for agent instance: {agentAppInstanceId}'
+  },
+
+  FailedToAcquireTokenUsingCertificate: {
+    code: -120395,
+    description: 'Failed to acquire token using certificate'
+  },
+
+  FailedToAcquireTokenUsingClientSecret: {
+    code: -120396,
+    description: 'Failed to acquire token using client secret'
+  },
+
+  FailedToAcquireTokenUsingFICClientAssertion: {
+    code: -120397,
+    description: 'Failed to acquire token using FIC client assertion'
+  },
+
+  FailedToAcquireTokenUsingWIDClientAssertion: {
+    code: -120398,
+    description: 'Failed to acquire token using WID client assertion'
+  },
+
+  FailedToAcquireExternalTokenForFICClientAssertion: {
+    code: -120399,
+    description: 'Failed to acquire external token for FIC client assertion'
   },
 
   /**
@@ -600,6 +685,11 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'logic must be defined'
   },
 
+  ContinueConversationBotAppIdOrIdentityRequired: {
+    code: -120631,
+    description: 'continueConversation: botAppIdOrIdentity is required'
+  },
+
   // ============================================================================
   // Storage and State Errors (-120700 to -120730)
   // ============================================================================
@@ -610,6 +700,22 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   StorageETagConflict: {
     code: -120700,
     description: 'Storage: error writing "{key}" due to eTag conflict.'
+  },
+
+  /**
+     * Error thrown when keys are required for storage read operations.
+     */
+  StorageReadKeysRequired: {
+    code: -120701,
+    description: 'Keys are required when reading.'
+  },
+
+  /**
+     * Error thrown when changes are required for storage write operations.
+     */
+  StorageWriteChangesRequired: {
+    code: -120702,
+    description: 'Changes are required when writing.'
   },
 
   /**
@@ -634,6 +740,16 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   InvalidStateScope: {
     code: -120730,
     description: 'Invalid state scope: {scope}'
+  },
+
+  InvalidStatePath: {
+    code: -120731,
+    description: 'Invalid state path: {path}'
+  },
+
+  TurnStateMissingStateScope: {
+    code: -120732,
+    description: 'TurnState missing state scope named "{scope}".'
   },
 
   // ============================================================================
@@ -686,6 +802,16 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   StreamAlreadyEnded: {
     code: -120900,
     description: 'The stream has already ended.'
+  },
+
+  ConversationUpdateHandlerMustBeFunction: {
+    code: -120901,
+    description: "ConversationUpdate 'handler' for {event} is {handlerType}. Type of 'handler' must be a function."
+  },
+
+  ContinueConversationAdapterRequired: {
+    code: -120902,
+    description: "You must configure the Application with an 'adapter' before calling Application.continueConversationAsync()"
   },
 
   // ============================================================================

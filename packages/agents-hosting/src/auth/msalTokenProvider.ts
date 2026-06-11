@@ -54,7 +54,7 @@ export class MsalTokenProvider implements AuthProvider {
       if (typeof authConfigOrScope === 'string') {
       // Called as getAccessToken(scope)
         if (!this.connectionSettings) {
-          throw new Error('Connection settings must be provided to constructor when calling getAccessToken(scope)')
+          throw ExceptionHelper.generateException(Error, Errors.ConnectionSettingsRequiredForGetAccessTokenScope)
         }
         authConfig = this.connectionSettings
         actualScope = authConfigOrScope
@@ -164,7 +164,7 @@ export class MsalTokenProvider implements AuthProvider {
       if (Array.isArray(authConfigOrScopes)) {
       // Called as acquireTokenOnBehalfOf(scopes, oboAssertion)
         if (!this.connectionSettings) {
-          throw new Error('Connection settings must be provided to constructor when calling acquireTokenOnBehalfOf(scopes, oboAssertion)')
+          throw ExceptionHelper.generateException(Error, Errors.ConnectionSettingsRequiredForAcquireTokenOnBehalfOf)
         }
         authConfig = this.connectionSettings
         actualScopes = authConfigOrScopes
@@ -192,7 +192,7 @@ export class MsalTokenProvider implements AuthProvider {
         scopes: actualScopes
       })
       if (!token?.accessToken) {
-        throw new Error('Failed to acquire token on behalf of user')
+        throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireTokenOnBehalfOf)
       }
 
       return token.accessToken
@@ -205,7 +205,7 @@ export class MsalTokenProvider implements AuthProvider {
       record({ agenticInstanceId: agentAppInstanceId })
 
       if (!this.connectionSettings) {
-        throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
+        throw ExceptionHelper.generateException(Error, Errors.ConnectionSettingsRequiredForGetAgenticInstanceToken)
       }
       const appToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
       const cca = new ConfidentialClientApplication({
@@ -224,7 +224,7 @@ export class MsalTokenProvider implements AuthProvider {
       })
 
       if (!token?.accessToken) {
-        throw new Error(`Failed to acquire instance token for agent instance: ${agentAppInstanceId}`)
+        throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireInstanceTokenForAgentInstance, undefined, { agentAppInstanceId })
       }
 
       return token.accessToken
@@ -273,7 +273,7 @@ export class MsalTokenProvider implements AuthProvider {
    */
   private async acquireTokenForAgenticScenarios (tenantId: string, clientId: string, clientAssertion: string | undefined, scopes: string[], tokenBodyParameters: { [key: string]: any }): Promise<string | null> {
     if (!this.connectionSettings) {
-      throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
+      throw ExceptionHelper.generateException(Error, Errors.ConnectionSettingsRequiredForGetAgenticInstanceToken)
     }
 
     logger.debug('acquireTokenForAgenticScenarios clientId=%s tenantId=%s scopes=%o grant_type=%s', clientId, tenantId, scopes, tokenBodyParameters.grant_type)
@@ -335,7 +335,7 @@ export class MsalTokenProvider implements AuthProvider {
       })
 
       if (!token) {
-        throw new Error(`Failed to acquire instance token for user token: ${agentAppInstanceId}`)
+        throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireInstanceTokenForUserToken, undefined, { agentAppInstanceId })
       }
 
       return token
@@ -344,7 +344,7 @@ export class MsalTokenProvider implements AuthProvider {
 
   public async getAgenticApplicationToken (tenantId: string, agentAppInstanceId: string): Promise<string> {
     if (!this.connectionSettings?.clientId) {
-      throw new Error('Connection settings must be provided when calling getAgenticApplicationToken')
+      throw ExceptionHelper.generateException(Error, Errors.ConnectionSettingsRequiredForGetAgenticApplicationToken)
     }
     logger.debug('getAgenticApplicationToken clientId=%s tenantId=%s agentAppInstanceId=%s', this.connectionSettings.clientId, tenantId, agentAppInstanceId)
 
@@ -353,7 +353,7 @@ export class MsalTokenProvider implements AuthProvider {
       if (!this.connectionSettings.idpmResource) {
         resource = 'api://AzureAdTokenExchange/.default'
       } else if (!URL.canParse(this.connectionSettings.idpmResource)) {
-        throw new Error('idpmResource must be a valid absolute URI')
+        throw ExceptionHelper.generateException(Error, Errors.IdpmResourceAbsoluteUriRequired)
       } else {
         resource = this.connectionSettings.idpmResource
       }
@@ -365,7 +365,7 @@ export class MsalTokenProvider implements AuthProvider {
       })
       const tokenResult = await msiApp.acquireToken({ resource })
       if (!tokenResult?.accessToken) {
-        throw new Error(`Failed to acquire token via IdentityProxyManager for agent instance: ${agentAppInstanceId}`)
+        throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireTokenViaIdentityProxyManagerForAgentInstance, undefined, { agentAppInstanceId })
       }
       logger.debug('getAgenticApplicationToken via IdentityProxyManager clientId=%s resource=%s', this.connectionSettings.clientId, resource)
       return tokenResult.accessToken
@@ -413,7 +413,7 @@ export class MsalTokenProvider implements AuthProvider {
     })
 
     if (!token) {
-      throw new Error(`Failed to acquire token for agent instance: ${agentAppInstanceId}`)
+      throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireInstanceTokenForAgentInstance, undefined, { agentAppInstanceId })
     }
 
     return token
@@ -564,7 +564,7 @@ export class MsalTokenProvider implements AuthProvider {
       azureRegion: authConfig.azureRegion
     })
     if (!token?.accessToken) {
-      throw new Error('Failed to acquire token using certificate')
+      throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireTokenUsingCertificate)
     }
     return token.accessToken
   }
@@ -590,7 +590,7 @@ export class MsalTokenProvider implements AuthProvider {
       azureRegion: authConfig.azureRegion
     })
     if (!token?.accessToken) {
-      throw new Error('Failed to acquire token using client secret')
+      throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireTokenUsingClientSecret)
     }
     return token.accessToken
   }
@@ -615,7 +615,7 @@ export class MsalTokenProvider implements AuthProvider {
     const token = await cca.acquireTokenByClientCredential({ scopes, azureRegion: authConfig.azureRegion })
     logger.debug('got token using FIC client assertion')
     if (!token?.accessToken) {
-      throw new Error('Failed to acquire token using FIC client assertion')
+      throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireTokenUsingFICClientAssertion)
     }
     return token.accessToken
   }
@@ -641,7 +641,7 @@ export class MsalTokenProvider implements AuthProvider {
     const token = await cca.acquireTokenByClientCredential({ scopes, azureRegion: authConfig.azureRegion })
     logger.debug('got token using WID client assertion')
     if (!token?.accessToken) {
-      throw new Error('Failed to acquire token using WID client assertion')
+      throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireTokenUsingWIDClientAssertion)
     }
     return token.accessToken
   }
@@ -665,7 +665,7 @@ export class MsalTokenProvider implements AuthProvider {
     })
     logger.debug('got token for FIC')
     if (!response?.accessToken) {
-      throw new Error('Failed to acquire external token for FIC client assertion')
+      throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireExternalTokenForFICClientAssertion)
     }
     return response.accessToken
   }
