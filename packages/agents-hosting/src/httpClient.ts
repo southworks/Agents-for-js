@@ -17,6 +17,8 @@ export interface HttpRequestConfig {
   data?: unknown
   params?: Record<string, string | undefined>
   responseType?: 'json' | 'arraybuffer' | 'stream'
+  timeout?: number
+  signal?: AbortSignal
 }
 
 /**
@@ -66,10 +68,6 @@ export class HttpClient {
     this._defaultHeaders[name.toLowerCase()] = value
   }
 
-  removeHeader (name: string): void {
-    delete this._defaultHeaders[name.toLowerCase()]
-  }
-
   async request<T = unknown> (config: HttpRequestConfig): Promise<HttpResponse<T>> {
     const url = this.buildUrl(config.url, config.params)
     const headers = this.normalizeHeaders({ ...this._defaultHeaders, ...config.headers })
@@ -77,6 +75,8 @@ export class HttpClient {
     const fetchOptions: RequestInit = {
       method: config.method.toUpperCase(),
       headers: requestHeaders,
+      signal: config.signal ??
+    (config.timeout ? AbortSignal.timeout(config.timeout) : undefined)
     }
 
     if (config.data !== undefined && config.data !== null) {
@@ -89,6 +89,10 @@ export class HttpClient {
         }
         fetchOptions.body = config.data.toString()
       } else if (typeof config.data === 'string') {
+        fetchOptions.body = config.data
+      } else if (config.data instanceof Uint8Array || config.data instanceof ArrayBuffer ||
+            config.data instanceof Blob || config.data instanceof FormData ||
+            config.data instanceof ReadableStream) {
         fetchOptions.body = config.data
       } else {
         if (!contentType) {
@@ -140,18 +144,6 @@ export class HttpClient {
 
   async get<T = unknown> (url: string, options?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>> {
     return this.request<T>({ method: 'get', url, ...options })
-  }
-
-  async post<T = unknown> (url: string, data?: unknown, options?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>> {
-    return this.request<T>({ method: 'post', url, data, ...options })
-  }
-
-  async put<T = unknown> (url: string, data?: unknown, options?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>> {
-    return this.request<T>({ method: 'put', url, data, ...options })
-  }
-
-  async delete<T = unknown> (url: string, options?: Partial<HttpRequestConfig>): Promise<HttpResponse<T>> {
-    return this.request<T>({ method: 'delete', url, ...options })
   }
 
   private buildUrl (path: string, params?: Record<string, string | undefined>): string {

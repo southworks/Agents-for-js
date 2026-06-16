@@ -572,6 +572,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'UserManagedIdentity authentication requires `clientId` to be configured'
   },
 
+  /**
+   * Error thrown when there's a timeout during a token request.
+   */
+  TokenRequestTimeout: {
+    code: -120599,
+    description: 'Token request timed out after {timeoutMs} ms'
+  },
+
   // ============================================================================
   // Agent and Client Errors (-120600 to -120650)
   // ============================================================================

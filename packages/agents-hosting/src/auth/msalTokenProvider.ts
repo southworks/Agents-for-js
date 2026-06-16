@@ -25,10 +25,8 @@ function isAbortError (error: unknown): error is Error {
   return error instanceof Error && error.name === 'AbortError'
 }
 
-function createTokenRequestTimeoutError (timeoutMs: number): Error & { toJSON: () => Record<string, unknown> } {
-  const error = new Error(`Token request timed out after ${timeoutMs}ms`) as Error & { toJSON: () => Record<string, unknown> }
-  error.toJSON = () => ({ timeoutMs })
-  return error
+function createTokenRequestTimeoutError (timeoutMs: number): Error {
+  return ExceptionHelper.generateException(Error, Errors.TokenRequestTimeout, undefined, { timeoutMs: timeoutMs.toString() })
 }
 
 /**

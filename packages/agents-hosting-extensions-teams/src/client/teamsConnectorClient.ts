@@ -8,7 +8,24 @@ import { MeetingNotificationResponse } from '../meeting/meetingNotificationRespo
 import { ChannelInfo } from '../activity-extensions/channelInfo'
 import { TeamsChannelData } from '../activity-extensions'
 import { BatchFailedEntriesResponse, BatchOperationStateResponse, CancelOperationResponse, TeamDetails, TeamsBatchOperationResponse, TeamsMember, TeamsPagedMembersResult } from './teamsConnectorClient.types'
-import { ConnectorClient, HttpClient, HttpRequestConfig, HttpResponse } from '@microsoft/agents-hosting'
+import { ConnectorClient, HttpClient, HttpError, HttpRequestConfig, HttpResponse } from '@microsoft/agents-hosting'
+import { debug } from '@microsoft/agents-telemetry'
+
+const logger = debug('agents:connector-client')
+
+function formatHttpErrorMessage (error: HttpError): string {
+  const responseData = error.response?.data
+  if (responseData === undefined) {
+    return error.message
+  }
+
+  try {
+    const serializedResponseData = JSON.stringify(responseData)
+    return serializedResponseData === undefined ? error.message : `${error.message}: ${serializedResponseData}`
+  } catch {
+    return error.message
+  }
+}
 
 interface ConversationList {
   conversations?: ChannelInfo[]
@@ -89,7 +106,7 @@ export class TeamsConnectorClient {
         'Content-Type': 'application/json'
       }
     }
-    const response: HttpResponse<ChannelAccount> = await this._httpClient.request<ChannelAccount>(config)
+    const response: HttpResponse<ChannelAccount> = await this.executeRequest<ChannelAccount>(config)
     return response.data
   }
 
@@ -133,7 +150,7 @@ export class TeamsConnectorClient {
         continuationToken
       }
     }
-    const response = await this._httpClient.request<TeamsPagedMembersResult>(config)
+    const response = await this.executeRequest<TeamsPagedMembersResult>(config)
     return response.data
   }
 
@@ -147,7 +164,7 @@ export class TeamsConnectorClient {
       method: 'get',
       url: `v3/teams/${teamId}/conversations`
     }
-    const response = await this._httpClient.request<ConversationList>(config)
+    const response = await this.executeRequest<ConversationList>(config)
     const convList: ConversationList = response.data
     return convList.conversations || []
   }
@@ -162,7 +179,7 @@ export class TeamsConnectorClient {
       method: 'get',
       url: `v3/teams/${teamId}`
     }
-    const response = await this._httpClient.request<TeamDetails>(config)
+    const response = await this.executeRequest<TeamDetails>(config)
     return response.data
   }
 
@@ -179,7 +196,7 @@ export class TeamsConnectorClient {
       url: `v1/meetings/${meetingId}/participants/${participantId}`,
       params: { tenantId }
     }
-    const response = await this._httpClient.request<string>(config)
+    const response = await this.executeRequest<string>(config)
     return response.data
   }
 
@@ -193,7 +210,7 @@ export class TeamsConnectorClient {
       method: 'get',
       url: `v1/meetings/${meetingId}`
     }
-    const response = await this._httpClient.request<MeetingInfo>(config)
+    const response = await this.executeRequest<MeetingInfo>(config)
     return response.data
   }
 
@@ -209,7 +226,7 @@ export class TeamsConnectorClient {
       url: `v1/meetings/${meetingId}/notification`,
       data: notification
     }
-    const response = await this._httpClient.request<MeetingNotificationResponse>(config)
+    const response = await this.executeRequest<MeetingNotificationResponse>(config)
     return response.data
   }
 
@@ -231,7 +248,7 @@ export class TeamsConnectorClient {
       url: 'v3/batch/conversation/users',
       data: content
     }
-    const response = await this._httpClient.request<TeamsBatchOperationResponse>(config)
+    const response = await this.executeRequest<TeamsBatchOperationResponse>(config)
     return response.data
   }
 
@@ -251,7 +268,7 @@ export class TeamsConnectorClient {
       url: 'v3/batch/conversation/tenant',
       data: content
     }
-    const response = await this._httpClient.request<TeamsBatchOperationResponse>(config)
+    const response = await this.executeRequest<TeamsBatchOperationResponse>(config)
     return response.data
   }
 
@@ -273,7 +290,7 @@ export class TeamsConnectorClient {
       url: 'v3/batch/conversation/team',
       data: content
     }
-    const response = await this._httpClient.request<TeamsBatchOperationResponse>(config)
+    const response = await this.executeRequest<TeamsBatchOperationResponse>(config)
     return response.data
   }
 
@@ -295,7 +312,7 @@ export class TeamsConnectorClient {
       url: 'v3/batch/conversation/channels',
       data: content
     }
-    const response = await this._httpClient.request<TeamsBatchOperationResponse>(config)
+    const response = await this.executeRequest<TeamsBatchOperationResponse>(config)
     return response.data
   }
 
@@ -309,7 +326,7 @@ export class TeamsConnectorClient {
       method: 'get',
       url: `v3/batch/conversation/${operationId}`
     }
-    const response = await this._httpClient.request<BatchOperationStateResponse>(config)
+    const response = await this.executeRequest<BatchOperationStateResponse>(config)
     return response.data
   }
 
@@ -323,7 +340,7 @@ export class TeamsConnectorClient {
       method: 'get',
       url: `v3/batch/conversation/failedentries/${operationId}`
     }
-    const response = await this._httpClient.request<BatchFailedEntriesResponse>(config)
+    const response = await this.executeRequest<BatchFailedEntriesResponse>(config)
     return response.data
   }
 
@@ -338,7 +355,56 @@ export class TeamsConnectorClient {
       url: `v3/batch/conversation/${operationId}`
     }
 
-    const response = await this._httpClient.request<CancelOperationResponse>(config)
+    const response = await this.executeRequest<CancelOperationResponse>(config)
     return response.data
+  }
+
+  private async executeRequest<T = unknown> (config: HttpRequestConfig): Promise<HttpResponse<T>> {
+    const { method, url, data, headers, params } = config
+    const { Authorization, authorization, ...headersToLog } = { ...this._httpClient.defaultHeaders, ...headers } as Record<string, string>
+    logger.debug('Request: ', {
+      host: this._httpClient.baseURL,
+      url,
+      data,
+      method,
+      params,
+      headers: headersToLog
+    })
+
+    try {
+      const response = await this._httpClient.request<T>(config)
+      logger.debug('Response: ', {
+        status: response.status,
+        statusText: response.statusText,
+        host: this._httpClient.baseURL,
+        url: response.config?.url,
+        data: response.config?.data,
+        method: response.config?.method,
+      })
+      return response
+    } catch (error) {
+      if (error instanceof HttpError) {
+        const message = formatHttpErrorMessage(error)
+        logger.debug('Response error: ', {
+          host: this._httpClient.baseURL,
+          url: error.config.url,
+          method: error.config.method,
+          data: error.config.data,
+          message,
+          stack: error.stack,
+        })
+
+        Object.assign(error, {
+          host: this._httpClient.baseURL,
+          url: error.config.url,
+          method: error.config.method,
+          data: error.config.data,
+          message,
+        })
+
+        throw error
+      }
+      throw error
+    }
   }
 }
