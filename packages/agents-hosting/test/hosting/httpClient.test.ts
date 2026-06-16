@@ -34,7 +34,10 @@ describe('HttpClient', () => {
     })
 
     try {
-      await client.post(`http://127.0.0.1:${port}/activities`, { text: 'hello' }, {
+      await client.request({
+        method: 'post',
+        url: `http://127.0.0.1:${port}/activities`,
+        data: { text: 'hello' },
         headers: {
           'Content-Type': 'application/json'
         }
@@ -114,7 +117,11 @@ describe('HttpClient', () => {
     const client = new HttpClient()
 
     try {
-      await client.post(`http://127.0.0.1:${port}/json`, { hello: 'world' })
+      await client.request({
+        method: 'post',
+        url: `http://127.0.0.1:${port}/json`,
+        data: { hello: 'world' }
+      })
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -155,7 +162,11 @@ describe('HttpClient', () => {
     const client = new HttpClient()
 
     try {
-      await client.post(`http://127.0.0.1:${port}/form`, new URLSearchParams({ hello: 'world', foo: 'bar baz' }))
+      await client.request({
+        method: 'post',
+        url: `http://127.0.0.1:${port}/form`,
+        data: new URLSearchParams({ hello: 'world', foo: 'bar baz' })
+      })
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {

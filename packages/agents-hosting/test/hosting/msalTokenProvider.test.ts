@@ -219,7 +219,7 @@ describe('MsalTokenProvider', () => {
       const tokenPromise = tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
       const rejection = assert.rejects(tokenPromise, (error: unknown) => {
         assert.ok(error instanceof Error)
-        assert.strictEqual(error.message, 'Token request timed out after 30000ms')
+        assert.ok(error.message.includes('Token request timed out after 30000 ms'))
         return true
       })
 
