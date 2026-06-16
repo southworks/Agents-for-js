@@ -557,11 +557,11 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   /**
-   * Error thrown when FederatedCredentials authentication is specified but `FICClientId` is not configured.
+   * Error thrown when FederatedCredentials authentication is specified but `federatedClientId` or the deprecated `FICClientId` is not configured.
    */
   FICClientIdRequired: {
     code: -120597,
-    description: 'FederatedCredentials authentication requires `FICClientId` to be configured'
+    description: 'FederatedCredentials authentication requires `federatedClientId` or the deprecated `FICClientId` to be configured'
   },
 
   /**
@@ -573,7 +573,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Agent and Client Errors (-120600 to -120630)
+  // Agent and Client Errors (-120600 to -120650)
   // ============================================================================
 
   /**
@@ -593,18 +593,34 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   /**
-     * Error thrown when failed to post activity to agent.
-     */
-  FailedToPostActivityToAgent: {
+   * Error thrown when agent ID is required.
+   */
+  AgentIdRequired: {
     code: -120620,
+    description: 'Agent ID is required to apply outbound agent headers'
+  },
+
+  /**
+   * Error thrown when agent name contains invalid characters.
+   */
+  AgentNameInvalid: {
+    code: -120630,
+    description: 'Agent name contains invalid characters: {agentName}'
+  },
+
+  /**
+   * Error thrown when failed to post activity to agent.
+   */
+  FailedToPostActivityToAgent: {
+    code: -120640,
     description: 'Failed to post activity to agent: {statusText}'
   },
 
   /**
-     * Error thrown when logic parameter must be defined.
-     */
+   * Error thrown when logic parameter must be defined.
+   */
   LogicParameterRequired: {
-    code: -120630,
+    code: -120650,
     description: 'logic must be defined'
   },
 

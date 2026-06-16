@@ -14,10 +14,11 @@ import { ResourceResponse } from './resourceResponse'
 import { AttachmentInfo } from './attachmentInfo'
 import { AttachmentData } from './attachmentData'
 import { normalizeOutgoingActivity } from '../activityWireCompat'
-import { getProductInfo } from '../getProductInfo'
+import { applyUserAgentHeader, getProductInfo } from '../getProductInfo'
 import { HeaderPropagation, HeaderPropagationCollection } from '../headerPropagation'
 import { trace } from '@microsoft/agents-telemetry'
 import { ConnectorClientTraceDefinitions } from '../observability'
+import { parseIntEnv } from '../utils/env'
 import { HttpClient, HttpRequestConfig, HttpResponse, HttpError } from '../httpClient'
 
 const logger = debug('agents:connector-client')
@@ -89,13 +90,7 @@ export class ConnectorClient {
     headers?: HeaderPropagationCollection
   ): ConnectorClient {
     const headerPropagation = headers ?? new HeaderPropagation({})
-    const userAgent = headerPropagation.outgoing['user-agent']
-    const productInfo = getProductInfo()
-    if (!userAgent) {
-      headerPropagation.add({ 'User-Agent': productInfo })
-    } else if (!userAgent.includes(productInfo)) {
-      headerPropagation.concat({ 'User-Agent': productInfo })
-    }
+    applyUserAgentHeader(headerPropagation)
     headerPropagation.override({
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -223,10 +218,7 @@ export class ConnectorClient {
     if (
       activity.channelIdChannel === Channels.Agents &&
       (activity.from?.role === RoleTypes.AgenticIdentity || activity.from?.role === RoleTypes.AgenticUser)) {
-      let maxLength = 150
-      if (process.env.MAX_APX_CONVERSATION_ID_LENGTH && !isNaN(parseInt(process.env.MAX_APX_CONVERSATION_ID_LENGTH, 10))) {
-        maxLength = parseInt(process.env.MAX_APX_CONVERSATION_ID_LENGTH, 10)
-      }
+      const maxLength = parseIntEnv(process.env.MAX_APX_CONVERSATION_ID_LENGTH, 150)
       const trimmedConversationId = conversationId.length > maxLength ? conversationId.substring(0, maxLength) : conversationId
 
       return trimmedConversationId.replace(/[/\\#?]/g, '_')
