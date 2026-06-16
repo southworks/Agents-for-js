@@ -280,7 +280,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
      */
   ConnectionNotFoundInEnvironment: {
     code: -120300,
-    description: 'Connection "{connectionName}" not found in environment.'
+    description: 'Connection "{connectionName}" not found in environment connections.'
   },
 
   /**
