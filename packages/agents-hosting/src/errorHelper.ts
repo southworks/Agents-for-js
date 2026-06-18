@@ -228,7 +228,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Attachment Errors (-120250 to -120290)
+  // Attachment Errors (-120250 to -120291)
   // ============================================================================
 
   /**
@@ -280,7 +280,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Connection and Authentication Errors (-120300 to -120590)
+  // Connection and Authentication Errors (-120300 to -120599)
   // ============================================================================
 
   /**
@@ -400,6 +400,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'Failed to acquire token via IdentityProxyManager for agent instance: {agentAppInstanceId}'
   },
 
+  /**
+     * Error thrown when identity is required to get token provider.
+     */
+  IdentityRequiredForTokenProvider: {
+    code: -120390,
+    description: 'Identity is required to get the token provider.'
+  },
+
   FailedToAcquireTokenUsingCertificate: {
     code: -120395,
     description: 'Failed to acquire token using certificate'
@@ -423,14 +431,6 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   FailedToAcquireExternalTokenForFICClientAssertion: {
     code: -120399,
     description: 'Failed to acquire external token for FIC client assertion'
-  },
-
-  /**
-     * Error thrown when identity is required to get token provider.
-     */
-  IdentityRequiredForTokenProvider: {
-    code: -120390,
-    description: 'Identity is required to get the token provider.'
   },
 
   /**
@@ -701,6 +701,11 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'Agent name contains invalid characters: {agentName}'
   },
 
+  ContinueConversationBotAppIdOrIdentityRequired: {
+    code: -120631,
+    description: 'continueConversation: botAppIdOrIdentity is required'
+  },
+
   /**
    * Error thrown when failed to post activity to agent.
    */
@@ -717,13 +722,8 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'logic must be defined'
   },
 
-  ContinueConversationBotAppIdOrIdentityRequired: {
-    code: -120631,
-    description: 'continueConversation: botAppIdOrIdentity is required'
-  },
-
   // ============================================================================
-  // Storage and State Errors (-120700 to -120730)
+  // Storage and State Errors (-120700 to -120732)
   // ============================================================================
 
   /**
@@ -785,105 +785,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Application Configuration Errors (-120850 to -120900)
-  // ============================================================================
-
-  /**
-     * Error thrown when longRunningMessages property is unavailable.
-     */
-  LongRunningMessagesPropertyUnavailable: {
-    code: -120850,
-    description: 'The Application.longRunningMessages property is unavailable because no adapter was configured in the app.'
-  },
-
-  /**
-     * Error thrown when transcriptLogger property is unavailable.
-     */
-  TranscriptLoggerPropertyUnavailable: {
-    code: -120860,
-    description: 'The Application.transcriptLogger property is unavailable because no adapter was configured in the app.'
-  },
-
-  /**
-     * Error thrown when TranscriptLoggerMiddleware requires a TranscriptLogger instance.
-     */
-  TranscriptLoggerInstanceRequired: {
-    code: -120870,
-    description: 'TranscriptLoggerMiddleware requires a TranscriptLogger instance.'
-  },
-
-  /**
-     * Error thrown when extension is already registered.
-     */
-  ExtensionAlreadyRegistered: {
-    code: -120880,
-    description: 'Extension already registered'
-  },
-
-  /**
-     * Error thrown when invalid plugin type is added to MiddlewareSet.
-     */
-  InvalidMiddlewarePluginType: {
-    code: -120890,
-    description: 'MiddlewareSet.use(): invalid plugin type being added.'
-  },
-
-  /**
-     * Error thrown when the stream has already ended.
-     */
-  StreamAlreadyEnded: {
-    code: -120900,
-    description: 'The stream has already ended.'
-  },
-
-  ConversationUpdateHandlerMustBeFunction: {
-    code: -120901,
-    description: "ConversationUpdate 'handler' for {event} is {handlerType}. Type of 'handler' must be a function."
-  },
-
-  ContinueConversationAdapterRequired: {
-    code: -120902,
-    description: "You must configure the Application with an 'adapter' before calling Application.continueConversationAsync()"
-  },
-
-  // ============================================================================
-  // Adaptive Cards Errors (-120950 to -120980)
-  // ============================================================================
-
-  /**
-     * Error thrown when unexpected AdaptiveCards.actionExecute() is triggered.
-     */
-  UnexpectedActionExecute: {
-    code: -120950,
-    description: 'Unexpected AdaptiveCards.actionExecute() triggered for activity type: {activityType}'
-  },
-
-  /**
-     * Error thrown when unexpected AdaptiveCards.actionSubmit() is triggered.
-     */
-  UnexpectedActionSubmit: {
-    code: -120960,
-    description: 'Unexpected AdaptiveCards.actionSubmit() triggered for activity type: {activityType}'
-  },
-
-  /**
-     * Error thrown when unexpected AdaptiveCards.search() is triggered.
-     */
-  UnexpectedSearchAction: {
-    code: -120970,
-    description: 'Unexpected AdaptiveCards.search() triggered for activity type: {activityType}'
-  },
-
-  /**
-     * Error thrown when invalid action value is provided.
-     */
-  InvalidActionValue: {
-    code: -120980,
-    description: 'Invalid action value: {error}'
-  },
-
-  // ============================================================================
-  // Proactive Messaging Errors (-120740 to -120799)
+  // Proactive Messaging Errors (-120740 to -120753)
   // ============================================================================
 
   /**
@@ -997,6 +899,104 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   CreateConversationBuilderChannelActivityRequired: {
     code: -120753,
     description: 'CreateConversationOptionsBuilder: Teams channel conversations require an initial activity. Call withActivity() before build().'
+  },
+
+  // ============================================================================
+  // Application Configuration Errors (-120850 to -120902)
+  // ============================================================================
+
+  /**
+     * Error thrown when longRunningMessages property is unavailable.
+     */
+  LongRunningMessagesPropertyUnavailable: {
+    code: -120850,
+    description: 'The Application.longRunningMessages property is unavailable because no adapter was configured in the app.'
+  },
+
+  /**
+     * Error thrown when transcriptLogger property is unavailable.
+     */
+  TranscriptLoggerPropertyUnavailable: {
+    code: -120860,
+    description: 'The Application.transcriptLogger property is unavailable because no adapter was configured in the app.'
+  },
+
+  /**
+     * Error thrown when TranscriptLoggerMiddleware requires a TranscriptLogger instance.
+     */
+  TranscriptLoggerInstanceRequired: {
+    code: -120870,
+    description: 'TranscriptLoggerMiddleware requires a TranscriptLogger instance.'
+  },
+
+  /**
+     * Error thrown when extension is already registered.
+     */
+  ExtensionAlreadyRegistered: {
+    code: -120880,
+    description: 'Extension already registered'
+  },
+
+  /**
+     * Error thrown when invalid plugin type is added to MiddlewareSet.
+     */
+  InvalidMiddlewarePluginType: {
+    code: -120890,
+    description: 'MiddlewareSet.use(): invalid plugin type being added.'
+  },
+
+  /**
+     * Error thrown when the stream has already ended.
+     */
+  StreamAlreadyEnded: {
+    code: -120900,
+    description: 'The stream has already ended.'
+  },
+
+  ConversationUpdateHandlerMustBeFunction: {
+    code: -120901,
+    description: "ConversationUpdate 'handler' for {event} is {handlerType}. Type of 'handler' must be a function."
+  },
+
+  ContinueConversationAdapterRequired: {
+    code: -120902,
+    description: "You must configure the Application with an 'adapter' before calling Application.continueConversationAsync()"
+  },
+
+  // ============================================================================
+  // Adaptive Cards Errors (-120950 to -120980)
+  // ============================================================================
+
+  /**
+     * Error thrown when unexpected AdaptiveCards.actionExecute() is triggered.
+     */
+  UnexpectedActionExecute: {
+    code: -120950,
+    description: 'Unexpected AdaptiveCards.actionExecute() triggered for activity type: {activityType}'
+  },
+
+  /**
+     * Error thrown when unexpected AdaptiveCards.actionSubmit() is triggered.
+     */
+  UnexpectedActionSubmit: {
+    code: -120960,
+    description: 'Unexpected AdaptiveCards.actionSubmit() triggered for activity type: {activityType}'
+  },
+
+  /**
+     * Error thrown when unexpected AdaptiveCards.search() is triggered.
+     */
+  UnexpectedSearchAction: {
+    code: -120970,
+    description: 'Unexpected AdaptiveCards.search() triggered for activity type: {activityType}'
+  },
+
+  /**
+     * Error thrown when invalid action value is provided.
+     */
+  InvalidActionValue: {
+    code: -120980,
+    description: 'Invalid action value: {error}'
   },
 
   // ============================================================================
