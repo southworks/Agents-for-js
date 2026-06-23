@@ -509,14 +509,6 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   /**
-     * Error thrown when the azureBotOAuthConnectionName option is missing for AzureBot authorization.
-     */
-  AzureBotOAuthConnectionNameRequired: {
-    code: -120591,
-    description: "The 'azureBotOAuthConnectionName' option is not available in the app options. Ensure that the app is properly configured."
-  },
-
-  /**
      * Error thrown when the AzureBot connection token is not exchangeable for an OBO flow.
      */
   AzureBotConnectionTokenNotExchangeable: {
@@ -589,6 +581,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
      */
   MissingAgentClientConfig: {
     code: -120600,
+    description: 'Missing agent client config for agent {agentName}'
+  },
+
+  /**
+     * Error thrown when missing agent client config for specified agent.
+     */
+  MissingAgentClientConfig2: {
+    code: -120601,
     description: 'Missing agent client config for agent {agentName}'
   },
 
