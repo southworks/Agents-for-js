@@ -609,6 +609,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   /**
+   * Error thrown when missing agent client config for specified agent.
+   */
+  MissingAgentClientConfig4: {
+    code: -120604,
+    description: 'Missing agent client config for agent {agentName}'
+  },
+
+  /**
      * Error thrown when agent name is required.
      */
   AgentNameRequired: {

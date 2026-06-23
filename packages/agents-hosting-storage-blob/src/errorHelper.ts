@@ -33,13 +33,5 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   EmptyKeyProvided: {
     code: -160001,
     description: 'Please provide a non-empty key'
-  },
-
-  /**
-   * Error thrown when there is an eTag conflict during storage write.
-   */
-  ETagConflict: {
-    code: -160002,
-    description: 'Storage: error writing "{key}" due to eTag conflict.'
   }
 }

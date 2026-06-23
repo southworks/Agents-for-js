@@ -22,8 +22,8 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   /**
    * Error thrown when ActivityType is undefined.
    */
-  InvalidActivityTypeUndefined: {
-    code: -110000,
+  InvalidActivityTypeUndefined2: {
+    code: -1100002,
     description: 'Invalid ActivityType: undefined'
   },
 
