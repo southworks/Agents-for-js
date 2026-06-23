@@ -29,18 +29,50 @@ jobs:
         run: |
           set -euo pipefail
 
+          event_name="${{ github.event_name }}"
           base_sha="${{ github.event.before }}"
           head_sha="${{ github.sha }}"
+          empty_tree="$(git hash-object -t tree /dev/null)"
 
-          if [[ -z "$base_sha" || "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
+          if [[ "$event_name" == "workflow_dispatch" ]]; then
             if git rev-parse HEAD^ >/dev/null 2>&1; then
-              base_sha="HEAD^"
+              base_ref="HEAD^"
             else
-              base_sha="$(git hash-object -t tree /dev/null)"
+              base_ref="$empty_tree"
+            fi
+          elif [[ -z "$base_sha" || "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              base_ref="HEAD^"
+            else
+              base_ref="$empty_tree"
+            fi
+          else
+            base_ref="$base_sha"
+
+            if ! git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
+              git fetch --no-tags --depth=1 origin "$base_ref" || true
+            fi
+
+            if ! git cat-file -e "$base_ref^{commit}" 2>/dev/null; then
+              echo "::warning::Base commit $base_ref is not available in the checkout. Falling back to HEAD^."
+
+              if git rev-parse HEAD^ >/dev/null 2>&1; then
+                base_ref="HEAD^"
+              else
+                base_ref="$empty_tree"
+              fi
             fi
           fi
 
-          changed_files="$(git diff --name-only "$base_sha" "$head_sha" | grep -E '^packages/[^/]+/src/[Ee]rrorHelper\.ts$' || true)"
+          if git cat-file -e "$head_sha^{commit}" 2>/dev/null; then
+            head_ref="$head_sha"
+          else
+            echo "::warning::Head commit $head_sha is not available in the checkout. Falling back to HEAD."
+            head_ref="HEAD"
+          fi
+
+          echo "Comparing $base_ref..$head_ref"
+          changed_files="$(git diff --name-only "$base_ref" "$head_ref" | grep -E '^packages/[^/]+/src/[Ee]rrorHelper\.ts$' || true)"
 
           {
             echo 'files<<EOF'
