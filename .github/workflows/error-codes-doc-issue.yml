@@ -73,12 +73,22 @@ jobs:
 
           echo "Comparing $base_ref..$head_ref"
           changed_files="$(git diff --name-only "$base_ref" "$head_ref" | grep -E '^packages/[^/]+/src/[Ee]rrorHelper\.ts$' || true)"
+          changed_count="$(printf '%s\n' "$changed_files" | grep -c . || true)"
+
+          echo "Changed error helper file count: $changed_count"
+
+          if [[ "$changed_count" != "0" ]]; then
+            echo "Changed error helper files:"
+            printf '%s\n' "$changed_files"
+          else
+            echo "No changed error helper files matched packages/**/src/[Ee]rrorHelper.ts."
+          fi
 
           {
             echo 'files<<EOF'
             printf '%s\n' "$changed_files"
             echo 'EOF'
-            echo "count=$(printf '%s\n' "$changed_files" | grep -c . || true)"
+            echo "count=$changed_count"
           } >> "$GITHUB_OUTPUT"
 
       # - name: Create or update Agents issue
