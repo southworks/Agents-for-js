@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'assert'
 import { ExceptionHelper } from '@microsoft/agents-activity'
-import { Errors } from '../src/errorHelper'
+import { Errors } from './errorHelper'
 
 describe('TeamsExtensionErrors', () => {
   it('should have correct error codes', () => {

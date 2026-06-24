@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@microsoft/agents-hosting-extensions-teams",
+  "name": "@microsoft/agents-hosting-extensions-msteams",
   "version": "0.1.0",
   "homepage": "https://github.com/microsoft/Agents-for-js",
   "repository": {
@@ -12,7 +12,7 @@
     "email": "agentssdk@microsoft.com",
     "url": "https://aka.ms/Agents"
   },
-  "description": "Microsoft 365 Agents SDK for JavaScript. Teams extensions",
+  "description": "Microsoft 365 Agents SDK for JavaScript. MS Teams extensions",
   "keywords": [
     "Agents"
   ],

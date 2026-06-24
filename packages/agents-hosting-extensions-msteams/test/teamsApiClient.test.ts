@@ -2,8 +2,8 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { TurnContext } from '@microsoft/agents-hosting'
 import { Activity } from '@microsoft/agents-activity'
-import { getTeamsClient, setTeamsApiClient, TeamsApiClientKey } from '../src/teamsApiClient'
-import { SetTeamsApiClientMiddleware } from '../src/compat/setTeamsApiClientMiddleware'
+import { getTeamsClient, setTeamsApiClient, TeamsApiClientKey } from './teamsApiClient'
+import { SetTeamsApiClientMiddleware } from './compat/setTeamsApiClientMiddleware'
 
 function createContext (channelId: string = 'msteams', withConnectorClient: boolean = true, serviceUrl: string = 'https://service.example.com'): TurnContext {
   const context = new TurnContext(

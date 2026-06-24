@@ -2,7 +2,7 @@ import assert from 'assert'
 import { beforeEach, describe, it } from 'node:test'
 import { AgentApplication, TurnContext, TurnState, INVOKE_RESPONSE_KEY, CloudAdapter } from '@microsoft/agents-hosting'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
-import { TeamsAgentExtension } from '../src/teamsAgentExtension'
+import { TeamsAgentExtension } from './teamsAgentExtension'
 import type { MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
 
 interface InvokeValue {

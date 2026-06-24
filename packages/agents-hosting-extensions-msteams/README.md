@@ -1,11 +1,11 @@
-# @microsoft/agents-hosting-extensions-teams
+# @microsoft/agents-hosting-extensions-msteams
 
 Microsoft Teams extension for the Microsoft 365 Agents SDK for JavaScript.
 
 ## Installation
 
 ```bash
-npm install @microsoft/agents-hosting-extensions-teams
+npm install @microsoft/agents-hosting-extensions-msteams
 ```
 
 ## Overview
@@ -25,7 +25,7 @@ This package provides Teams-specific functionality for building agents in Micros
 ```typescript
 import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-teams'
+import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-msteams'
 
 // Create the agent application
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })

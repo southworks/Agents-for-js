@@ -2,8 +2,8 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, TurnContext } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension } from '../src/teamsAgentExtension'
-import { TeamsApiClientKey } from '../src/teamsApiClient'
+import { TeamsAgentExtension } from './teamsAgentExtension'
+import { TeamsApiClientKey } from './teamsApiClient'
 
 function createContext (channelId: string = 'msteams'): TurnContext {
   const adapter = {

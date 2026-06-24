@@ -1,6 +1,6 @@
 import { AgentApplication, MemoryStorage, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { SetTeamsApiClientMiddleware, TeamsInfo } from '@microsoft/agents-hosting-extensions-teams'
+import { SetTeamsApiClientMiddleware, TeamsInfo } from '@microsoft/agents-hosting-extensions-msteams'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 

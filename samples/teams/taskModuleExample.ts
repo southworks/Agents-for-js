@@ -1,5 +1,5 @@
 import { AdaptiveCard, AgentApplication, CardFactory, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-teams'
+import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import type { TaskModuleRequest, TaskModuleResponse } from '@microsoft/teams.api'
 

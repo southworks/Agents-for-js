@@ -1,4 +1,4 @@
-import { TeamsActivityHandler, SetTeamsApiClientMiddleware } from '@microsoft/agents-hosting-extensions-teams'
+import { TeamsActivityHandler, SetTeamsApiClientMiddleware } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 
 class TeamsEchoBot extends TeamsActivityHandler {

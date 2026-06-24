@@ -31,7 +31,7 @@ and for `AgentApplication` scenarios where you want to reuse the application's a
 
  ```ts
  import { startServer } from '@microsoft/agents-hosting-express';
- import { SetTeamsApiClientMiddleware, TeamsActivityHandler } from '@microsoft/agents-hosting-extensions-teams';
+ import { SetTeamsApiClientMiddleware, TeamsActivityHandler } from '@microsoft/agents-hosting-extensions-msteams';
 
  class TeamsBot extends TeamsActivityHandler {}
 

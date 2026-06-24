@@ -1,6 +1,6 @@
 import { ActionTypes, Channels, Entity, RoleTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CardFactory, CreateConversationOptionsBuilder, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension, teamsGetTeamInfo, TeamsInfo } from '@microsoft/agents-hosting-extensions-teams'
+import { TeamsAgentExtension, teamsGetTeamInfo, TeamsInfo } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { ChannelInfo, TeamInfo } from '@microsoft/teams.api'
 

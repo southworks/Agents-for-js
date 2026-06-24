@@ -1,6 +1,6 @@
 import { ActionTypes, Channels, ConversationParameters } from '@microsoft/agents-activity'
 import { CardFactory, CloudAdapter, MessageFactory, TurnContext } from '@microsoft/agents-hosting'
-import { SetTeamsApiClientMiddleware, TeamsActivityHandler, TeamsInfo } from '@microsoft/agents-hosting-extensions-teams'
+import { SetTeamsApiClientMiddleware, TeamsActivityHandler, TeamsInfo } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { ChannelInfo, TeamInfo, TeamsChannelAccount } from '@microsoft/teams.api'
 import UserMentionCardTemplate from '../../_resources/UserMentionCardTemplate.json'

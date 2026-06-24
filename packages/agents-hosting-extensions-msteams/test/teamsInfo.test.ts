@@ -2,8 +2,8 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { TurnContext } from '@microsoft/agents-hosting'
-import { TeamsInfo } from '../src/teamsInfo'
-import { TeamsApiClientKey } from '../src/teamsApiClient'
+import { TeamsInfo } from './teamsInfo'
+import { TeamsApiClientKey } from './teamsApiClient'
 
 function createContext (channelData?: unknown, from?: { id?: string, aadObjectId?: string }): TurnContext {
   const adapter = { ConnectorClientKey: Symbol('ConnectorClient') } as any

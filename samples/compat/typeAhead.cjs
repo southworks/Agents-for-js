@@ -1,5 +1,5 @@
 const { CardFactory, MessageFactory } = require('@microsoft/agents-hosting')
-const { TeamsActivityHandler, SetTeamsApiClientMiddleware } = require('@microsoft/agents-hosting-extensions-teams')
+const { TeamsActivityHandler, SetTeamsApiClientMiddleware } = require('@microsoft/agents-hosting-extensions-msteams')
 const axios = require('axios')
 const querystring = require('querystring')
 const { startServer } = require('@microsoft/agents-hosting-express')

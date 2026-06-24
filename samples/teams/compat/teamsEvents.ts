@@ -1,6 +1,6 @@
 import { MessageFactory, TurnContext } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { TeamsActivityHandler, SetTeamsApiClientMiddleware } from '@microsoft/agents-hosting-extensions-teams'
+import { TeamsActivityHandler, SetTeamsApiClientMiddleware } from '@microsoft/agents-hosting-extensions-msteams'
 
 class TeamsEventsBot extends TeamsActivityHandler {
   constructor () {
