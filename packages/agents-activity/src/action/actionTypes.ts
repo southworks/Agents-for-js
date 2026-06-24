@@ -63,6 +63,11 @@ export enum ActionTypes {
    * Opens an application.
    */
   OpenApp = 'openApp',
+
+  /**
+   * Opens an application.
+   */
+  OpenApp2 = 'openApp2',
 }
 
 /**
