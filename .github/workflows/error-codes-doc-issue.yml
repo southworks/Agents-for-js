@@ -121,13 +121,88 @@ jobs:
             const commitUrl = `${context.serverUrl}/${sourceRepo}/commit/${context.sha}`;
             const runUrl = `${context.serverUrl}/${sourceRepo}/actions/runs/${context.runId}`;
             const docUrl = `${context.serverUrl}/${targetOwner}/${targetRepo}/blob/main/AgentErrorCodesJS.md`;
-            const fileList = changedFiles.map((file) => `- \`${file}\``).join('\n');
             const marker = '<!-- agents-for-js-error-codes-doc-reminder -->';
+            const pendingChangesStart = '<!-- pending-error-helper-changes';
+            const pendingChangesEnd = 'pending-error-helper-changes -->';
+            const currentChange = {
+              sha: context.sha,
+              sourceRepo,
+              commitUrl,
+              runUrl,
+              changedFiles,
+            };
 
-            const updateBody = [
+            function getPendingChanges(issueBody) {
+              const body = issueBody || '';
+              const startIndex = body.indexOf(pendingChangesStart);
+              const endIndex = body.indexOf(pendingChangesEnd);
+
+              if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+                return [];
+              }
+
+              const jsonStart = startIndex + pendingChangesStart.length;
+              const pendingChangesJson = body.slice(jsonStart, endIndex).trim();
+
+              try {
+                const pendingChanges = JSON.parse(pendingChangesJson);
+                return Array.isArray(pendingChanges) ? pendingChanges : [];
+              } catch (error) {
+                core.warning(`Could not parse existing pending changes: ${error.message}`);
+                return [];
+              }
+            }
+
+            function mergePendingChanges(existingChanges, newChange) {
+              const changesBySha = new Map();
+
+              for (const change of existingChanges) {
+                if (change?.sha) {
+                  changesBySha.set(change.sha, {
+                    sha: change.sha,
+                    sourceRepo: change.sourceRepo || sourceRepo,
+                    commitUrl: change.commitUrl || '',
+                    runUrl: change.runUrl || '',
+                    changedFiles: Array.isArray(change.changedFiles) ? change.changedFiles : [],
+                  });
+                }
+              }
+
+              changesBySha.set(newChange.sha, newChange);
+              return [...changesBySha.values()];
+            }
+
+            function formatPendingChangeList(pendingChanges) {
+              return pendingChanges
+                .map((change) => {
+                  const files = change.changedFiles.map((file) => `  - \`${file}\``).join('\n');
+                  return [
+                    `- Source commit: ${change.commitUrl}`,
+                    `  Workflow run: ${change.runUrl}`,
+                    '  Changed error helper files:',
+                    files,
+                  ].join('\n');
+                })
+                .join('\n');
+            }
+
+            function formatAllChangedFiles(pendingChanges) {
+              const files = [...new Set(pendingChanges.flatMap((change) => change.changedFiles))].sort();
+              return files.map((file) => `- \`${file}\``).join('\n');
+            }
+
+            function buildIssueBody(pendingChanges) {
+              const pendingChangeList = formatPendingChangeList(pendingChanges);
+              const allChangedFiles = formatAllChangedFiles(pendingChanges);
+              const pendingChangesJson = JSON.stringify(pendingChanges, null, 2);
+
+              return [
               marker,
+              pendingChangesStart,
+              pendingChangesJson,
+              pendingChangesEnd,
               '## Summary',
-              `Implement documentation updates for JavaScript agent error code changes from \`${sourceRepo}\`.`,
+              `Implement documentation updates for pending JavaScript agent error code changes from \`${sourceRepo}\`.`,
               '',
               '## Goal',
               'The goal is to:',
@@ -138,11 +213,14 @@ jobs:
               '## Context',
               'Relevant context:',
               `- Source repository: \`${sourceRepo}\``,
-              `- Source commit: ${commitUrl}`,
-              `- Workflow run: ${runUrl}`,
               `- Documentation file: [AgentErrorCodesJS.md](${docUrl})`,
+              `- Pending source commits: ${pendingChanges.length}`,
+              '',
+              'Pending changes:',
+              pendingChangeList,
+              '',
               '- Affected area/package:',
-              fileList,
+              allChangedFiles,
               '- Current behavior: one or more JavaScript error helper definitions changed.',
               '- Expected behavior: the error code documentation reflects those source changes.',
               '',
@@ -163,10 +241,10 @@ jobs:
               '- `AgentErrorCodesJS.md`',
               '',
               'Changed source files:',
-              fileList,
+              allChangedFiles,
               '',
               'Implementation guidance:',
-              '- Use the linked source commit to inspect the exact `errorHelper.ts` changes.',
+              '- Use the linked source commits to inspect the exact `errorHelper.ts` changes.',
               '- Keep the documentation change minimal and focused on the affected error codes.',
               '- Follow existing wording, heading, and table conventions in `AgentErrorCodesJS.md`.',
               '- Do not invent new error codes; source definitions in `Agents-for-js` are authoritative.',
@@ -185,7 +263,8 @@ jobs:
               '# Markdown-only change; run repository-specific docs validation if available.',
               '# Otherwise, inspect the rendered markdown and verify changed codes against the source commit.',
               '```',
-            ].join('\n');
+              ].join('\n');
+            }
 
             async function addDocumentationLabel(issueNumber) {
               try {
@@ -209,11 +288,18 @@ jobs:
             const existingIssue = searchResult.data.items.find((item) => item.title === title);
 
             if (existingIssue) {
+              const existingIssueResponse = await github.rest.issues.get({
+                owner: targetOwner,
+                repo: targetRepo,
+                issue_number: existingIssue.number,
+              });
+              const pendingChanges = mergePendingChanges(getPendingChanges(existingIssueResponse.data.body), currentChange);
+
               await github.rest.issues.update({
                 owner: targetOwner,
                 repo: targetRepo,
                 issue_number: existingIssue.number,
-                body: updateBody,
+                body: buildIssueBody(pendingChanges),
               });
 
               await addDocumentationLabel(existingIssue.number);
@@ -225,7 +311,7 @@ jobs:
               owner: targetOwner,
               repo: targetRepo,
               title,
-              body: updateBody,
+              body: buildIssueBody([currentChange]),
             });
 
             await addDocumentationLabel(createdIssue.data.number);
