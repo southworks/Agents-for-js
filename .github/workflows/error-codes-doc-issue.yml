@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: error-codes-doc-issue
+  cancel-in-progress: false
+
 jobs:
   create-doc-issue:
     name: Create documentation issue
