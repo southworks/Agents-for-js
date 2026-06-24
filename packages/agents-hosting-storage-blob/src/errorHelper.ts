@@ -41,5 +41,12 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   ETagConflict: {
     code: -160002,
     description: 'Storage: error writing "{key}" due to eTag conflict.'
+  },
+  /**
+   * Error thrown when there is an eTag conflict during storage write.
+   */
+  ETagConflict3: {
+    code: -160003,
+    description: 'Storage: error writing "{key}" due to eTag conflict.'
   }
 }
