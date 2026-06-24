@@ -40,5 +40,13 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   EmptyKeyProvided2: {
     code: -160002,
     description: 'Please provide a non-empty key'
+  },
+
+  /**
+   * Error thrown when an empty key is provided.
+   */
+  EmptyKeyProvided3: {
+    code: -160003,
+    description: 'Please provide a non-empty key'
   }
 }
