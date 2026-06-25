@@ -4,8 +4,9 @@
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import type { FileConsentCardResponse } from '@microsoft/teams.api'
+import { TeamsTurnContext } from '../teamsTurnContext'
 
-type FileConsentHandler<TState extends TurnState> = (context: TurnContext, state: TState, response: FileConsentCardResponse) => Promise<void>
+type FileConsentHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, response: FileConsentCardResponse) => Promise<void>
 
 export class FileConsent<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -25,7 +26,7 @@ export class FileConsent<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const cardResponse = context.activity.value as FileConsentCardResponse
-      await handler(context, state, cardResponse)
+      await handler(new TeamsTurnContext(context), state, cardResponse)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200 }
       await context.sendActivity(invokeResponse)
@@ -45,7 +46,7 @@ export class FileConsent<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const cardResponse = context.activity.value as FileConsentCardResponse
-      await handler(context, state, cardResponse)
+      await handler(new TeamsTurnContext(context), state, cardResponse)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200 }
       await context.sendActivity(invokeResponse)

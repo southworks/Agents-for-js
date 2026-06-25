@@ -4,6 +4,7 @@
 import { ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import type { MeetingDetails, TeamsChannelAccount } from '@microsoft/teams.api'
+import { TeamsTurnContext } from '../teamsTurnContext'
 
 export interface MeetingParticipantsEventDetails {
   members: {
@@ -15,9 +16,9 @@ export interface MeetingParticipantsEventDetails {
   }[]
 }
 
-type MeetingStartHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingDetails) => Promise<void>
-type MeetingEndHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingDetails) => Promise<void>
-type MeetingParticipantsHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingParticipantsEventDetails) => Promise<void>
+type MeetingStartHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, details: MeetingDetails) => Promise<void>
+type MeetingEndHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, details: MeetingDetails) => Promise<void>
+type MeetingParticipantsHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, details: MeetingParticipantsEventDetails) => Promise<void>
 
 export class Meeting<TState extends TurnState> {
   private _app: AgentApplication<TState>
@@ -36,7 +37,7 @@ export class Meeting<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const details = context.activity.value as MeetingDetails
-      await handler(context, state, details)
+      await handler(new TeamsTurnContext(context), state, details)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -52,7 +53,7 @@ export class Meeting<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const details = context.activity.value as MeetingDetails
-      await handler(context, state, details)
+      await handler(new TeamsTurnContext(context), state, details)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -68,7 +69,7 @@ export class Meeting<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const details = context.activity.value as MeetingParticipantsEventDetails
-      await handler(context, state, details)
+      await handler(new TeamsTurnContext(context), state, details)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -84,7 +85,7 @@ export class Meeting<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const details = context.activity.value as MeetingParticipantsEventDetails
-      await handler(context, state, details)
+      await handler(new TeamsTurnContext(context), state, details)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this

@@ -11,12 +11,9 @@ import { MessageExtension } from './messageExtensions/messageExtension'
 import { TaskModule } from './taskModules/taskModule'
 import { TeamsChannel } from './channels/teamsChannel'
 import { TeamsTeam } from './teams/teamsTeam'
-import { Client as TeamsClient } from '@microsoft/teams.api'
-import { getTeamsClient, setTeamsApiClient, TeamsApiClientKey } from './teamsApiClient'
+import { setTeamsApiClient } from './teamsApiClientExtensions'
 
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
-  static readonly TeamsApiClientKey = TeamsApiClientKey
-
   private _app: AgentApplication<TState>
   private _meetings: Meeting<TState>
   private _messageExtensions: MessageExtension<TState>
@@ -38,6 +35,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     this._messages = new Message(app)
     this._fileConsent = new FileConsent(app)
     this._configuration = new Configuration(app)
+
     this._app.onTurn('beforeTurn', async (context) => {
       if (context.activity.channelId === this.channelId) {
         setTeamsApiClient(context, this.channelId)
@@ -81,9 +79,5 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
 
   public get configuration (): Configuration<TState> {
     return this._configuration
-  }
-
-  public static getTeamsClient (context: import('@microsoft/agents-hosting').TurnContext): TeamsClient {
-    return getTeamsClient(context)
   }
 }

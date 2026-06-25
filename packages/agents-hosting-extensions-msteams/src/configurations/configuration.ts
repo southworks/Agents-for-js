@@ -4,8 +4,9 @@
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import type { ConfigResponse } from '@microsoft/teams.api'
+import { TeamsTurnContext } from '../teamsTurnContext'
 
-type ConfigurationHandler<TState extends TurnState> = (context: TurnContext, state: TState, configData: unknown) => Promise<ConfigResponse>
+type ConfigurationHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, configData: unknown) => Promise<ConfigResponse>
 
 export class Configuration<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -23,7 +24,7 @@ export class Configuration<TState extends TurnState = TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const response: ConfigResponse = await handler(context, state, context.activity.value)
+      const response: ConfigResponse = await handler(new TeamsTurnContext(context), state, context.activity.value)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
@@ -41,7 +42,7 @@ export class Configuration<TState extends TurnState = TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const response: ConfigResponse = await handler(context, state, context.activity.value)
+      const response: ConfigResponse = await handler(new TeamsTurnContext(context), state, context.activity.value)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)

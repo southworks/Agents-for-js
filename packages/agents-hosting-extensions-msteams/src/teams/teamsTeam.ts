@@ -5,10 +5,11 @@ import { ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { parseTeamsChannelData } from '../activity-extensions'
 import { TeamInfo } from '@microsoft/teams.api'
+import { TeamsTurnContext } from '../teamsTurnContext'
 
 const TEAM_EVENT_TYPES = ['teamArchived', 'teamUnarchived', 'teamRenamed', 'teamRestored', 'teamDeleted', 'teamHardDeleted']
 
-type TeamUpdateHandler<TState extends TurnState> = (context: TurnContext, state: TState, data: TeamInfo) => Promise<void>
+type TeamUpdateHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: TeamInfo) => Promise<void>
 
 export class TeamsTeam<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -29,7 +30,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -46,7 +47,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -63,7 +64,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -80,7 +81,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -97,7 +98,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -114,7 +115,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -131,7 +132,7 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const teamInfo = parseTeamsChannelData(context.activity.channelData)?.team
-      await handler(context, state, teamInfo ?? {} as TeamInfo)
+      await handler(new TeamsTurnContext(context), state, teamInfo ?? {} as TeamInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this

@@ -4,6 +4,7 @@
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import type { TaskModuleRequest, TaskModuleResponse } from '@microsoft/teams.api'
+import { TeamsTurnContext } from '../teamsTurnContext'
 
 const DEFAULT_TASK_DATA_KEY = 'task'
 
@@ -15,8 +16,8 @@ function matchesTaskKeyValue (context: TurnContext, value: string | RegExp, key:
   return typeof value === 'string' ? dataValue === value : value.test(dataValue)
 }
 
-type FetchHandler<TState extends TurnState> = (context: TurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
-type SubmitHandler<TState extends TurnState> = (context: TurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
+type FetchHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
+type SubmitHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
 
 export class TaskModule<TState extends TurnState> {
   _app: AgentApplication<TState>
@@ -36,7 +37,7 @@ export class TaskModule<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const request = context.activity.value as TaskModuleRequest
-      const response: TaskModuleResponse = await handler(context, state, request)
+      const response: TaskModuleResponse = await handler(new TeamsTurnContext(context), state, request)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)
@@ -63,7 +64,7 @@ export class TaskModule<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const request = context.activity.value as TaskModuleRequest
-      const response: TaskModuleResponse = await handler(context, state, request)
+      const response: TaskModuleResponse = await handler(new TeamsTurnContext(context), state, request)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
       await context.sendActivity(invokeResponse)

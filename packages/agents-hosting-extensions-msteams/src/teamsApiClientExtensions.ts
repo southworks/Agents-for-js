@@ -1,12 +1,15 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { ConnectorClient, TurnContext } from '@microsoft/agents-hosting'
 import { Client as TeamsClient } from '@microsoft/teams.api'
 import { Errors } from './errorHelper'
 
-export const TeamsApiClientKey = Symbol('TeamsApiClient')
+export const TeamsClientKey = Symbol('TeamsClient')
 
 export function setTeamsApiClient (context: TurnContext, channelId: string = 'msteams'): void {
-  if (context.activity.channelId !== channelId || context.turnState.has(TeamsApiClientKey)) {
+  if (context.activity.channelId !== channelId || context.turnState.has(TeamsClientKey)) {
     return
   }
 
@@ -22,26 +25,13 @@ export function setTeamsApiClient (context: TurnContext, channelId: string = 'ms
   }
 
   context.turnState.set(
-    TeamsApiClientKey,
+    TeamsClientKey,
     new TeamsClient(serviceUrl, {
       headers: getClientHeaders(connectorClient)
     })
   )
 }
 
-export function getTeamsClient (context: TurnContext): TeamsClient {
-  const teamsClient = context.turnState.get<TeamsClient>(TeamsApiClientKey)
-
-  if (!teamsClient) {
-    throw ExceptionHelper.generateException(Error, Errors.TeamsApiClientNotAvailable)
-  }
-
-  return teamsClient
-}
-
 function getClientHeaders (connectorClient: ConnectorClient): Record<string, string> {
-  const commonHeaders = connectorClient.httpClient.defaultHeaders.common
-  const headers = Object.entries(commonHeaders ?? {}).filter(([, value]) => typeof value === 'string')
-
-  return Object.fromEntries(headers) as Record<string, string>
+  return { ...connectorClient.httpClient.defaultHeaders }
 }

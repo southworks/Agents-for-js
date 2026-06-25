@@ -5,9 +5,11 @@ import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { parseTeamsChannelData } from '../activity-extensions'
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api'
+import { TeamsTurnContext } from '../teamsTurnContext'
+import { createTeamsRouteHandler, type TeamsRouteHandler } from '../teamsRouteHandler'
 
-type O365ConnectorCardActionHandler<TState extends TurnState> = (context: TurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
-type ReadReceiptHandler<TState extends TurnState> = (context: TurnContext, state: TState, data: unknown) => Promise<void>
+type O365ConnectorCardActionHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
+type ReadReceiptHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: unknown) => Promise<void>
 
 export class Message<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -16,7 +18,7 @@ export class Message<TState extends TurnState = TurnState> {
     this._app = app
   }
 
-  onMessageEdit (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageEdit (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -25,11 +27,11 @@ export class Message<TState extends TurnState = TurnState> {
         channelData?.eventType === 'editMessage'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
     return this
   }
 
-  onMessageDelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageDelete (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -38,11 +40,11 @@ export class Message<TState extends TurnState = TurnState> {
         channelData?.eventType === 'softDeleteMessage'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
     return this
   }
 
-  onMessageUndelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageUndelete (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -51,7 +53,7 @@ export class Message<TState extends TurnState = TurnState> {
         channelData?.eventType === 'undeleteMessage'
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
     return this
   }
 
@@ -64,7 +66,7 @@ export class Message<TState extends TurnState = TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      await handler(context, state, context.activity.value)
+      await handler(new TeamsTurnContext(context), state, context.activity.value)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -80,7 +82,7 @@ export class Message<TState extends TurnState = TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = (context.activity.value ?? {}) as O365ConnectorCardActionQuery
-      await handler(context, state, query)
+      await handler(new TeamsTurnContext(context), state, query)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200 }
       await context.sendActivity(invokeResponse)

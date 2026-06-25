@@ -7,10 +7,10 @@ import type { ConfigResponse } from '@microsoft/teams.api'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
   context.turnState.set(context.adapter.ConnectorClientKey, {
-    axiosInstance: {
-      defaults: {
-        baseURL: 'https://service.example.com',
-        headers: { common: { Authorization: 'Bearer token' } }
+    httpClient: {
+      baseURL: 'https://service.example.com',
+      defaultHeaders: {
+        Authorization: 'Bearer token'
       }
     }
   })

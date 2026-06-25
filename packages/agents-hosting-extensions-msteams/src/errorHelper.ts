@@ -34,7 +34,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
    */
   TeamsApiClientNotAvailable: {
     code: -150010,
-    description: 'Teams API client is not available in the context. Add TeamsAgentExtension to populate it, or call setTeamsApiClient before use.'
+    description: 'Teams API client is not available in the context. Add TeamsAgentExtension to populate it before use.'
   },
 
   /**

@@ -3,37 +3,36 @@ import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, TurnContext } from '@microsoft/agents-hosting'
 import { TeamsAgentExtension } from './teamsAgentExtension'
-import { TeamsApiClientKey } from './teamsApiClient'
+import { TeamsTurnContext } from './teamsTurnContext'
 
-function createContext (channelId: string = 'msteams'): TurnContext {
+function createContext (channelId: string = 'msteams', type: string = ActivityTypes.Message): TurnContext {
   const adapter = {
-    ConnectorClientKey: Symbol('ConnectorClient')
+    ConnectorClientKey: Symbol('ConnectorClient'),
+    async sendActivities (_context: TurnContext, activities: Activity[]) {
+      return activities.map((_activity, index) => ({ id: `activity-${index}` }))
+    }
   } as any
 
   const context = new TurnContext(
     adapter,
     Activity.fromObject({
-      type: ActivityTypes.Message,
+      type,
       channelId,
       serviceUrl: 'https://service.example.com',
       conversation: { id: 'conversation-id' },
       recipient: { id: 'bot' },
       from: { id: 'user' },
+      channelData: { eventType: 'editMessage' },
       text: 'hello'
     })
   )
 
   context.turnState.set(adapter.ConnectorClientKey, {
-    axiosInstance: {
-      defaults: {
-        baseURL: 'https://service.example.com',
-        headers: {
-          common: {
-            Authorization: 'Bearer token',
-            'User-Agent': 'test-agent',
-            'X-Trace': 123
-          }
-        }
+    httpClient: {
+      baseURL: 'https://service.example.com',
+      defaultHeaders: {
+        Authorization: 'Bearer token',
+        'User-Agent': 'test-agent'
       }
     }
   })
@@ -42,7 +41,7 @@ function createContext (channelId: string = 'msteams'): TurnContext {
 }
 
 describe('TeamsAgentExtension', () => {
-  it('sets the Teams client in turnState during beforeTurn for Teams activities', async () => {
+  it('creates a Teams turn context during Teams turns', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
 
@@ -51,13 +50,13 @@ describe('TeamsAgentExtension', () => {
 
     const context = createContext()
     const handled = await app.runInternal(context)
+    const teamsContext = new TeamsTurnContext(context)
 
     assert.strictEqual(handled, true)
-    assert.ok(context.turnState.has(TeamsApiClientKey))
-    assert.strictEqual(TeamsAgentExtension.getTeamsClient(context).serviceUrl, 'https://service.example.com')
+    assert.strictEqual(teamsContext.client.serviceUrl, 'https://service.example.com')
   })
 
-  it('does not set the Teams client during beforeTurn for non-Teams activities', async () => {
+  it('does not create a Teams turn context for non-Teams activities', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
 
@@ -68,23 +67,27 @@ describe('TeamsAgentExtension', () => {
     const handled = await app.runInternal(context)
 
     assert.strictEqual(handled, true)
-    assert.strictEqual(context.turnState.has(TeamsApiClientKey), false)
+    assert.throws(() => new TeamsTurnContext(context).client, /Teams API client is not available/)
   })
 
-  it('does not overwrite an existing Teams client in turnState', async () => {
+  it('passes TeamsTurnContext to Teams handlers', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
+    let handlerContext: TeamsTurnContext | undefined
 
-    app.registerExtension(extension, () => {})
-    app.onActivity(ActivityTypes.Message, async () => {})
+    app.registerExtension(extension, (teams) => {
+      teams.messages.onMessageEdit(async (context) => {
+        handlerContext = context
+      })
+    })
 
-    const context = createContext()
-    const existingClient = { serviceUrl: 'https://existing.example.com' }
-    context.turnState.set(TeamsApiClientKey, existingClient)
-
+    const context = createContext('msteams', ActivityTypes.MessageUpdate)
     const handled = await app.runInternal(context)
 
     assert.strictEqual(handled, true)
-    assert.strictEqual(context.turnState.get(TeamsApiClientKey), existingClient)
+    assert.ok(handlerContext)
+    assert.strictEqual(handlerContext.client.serviceUrl, 'https://service.example.com')
+    assert.strictEqual(typeof handlerContext.sendTargetedActivity, 'function')
+    assert.strictEqual(typeof handlerContext.sendTargetedActivities, 'function')
   })
 })
