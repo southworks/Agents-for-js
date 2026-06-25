@@ -2,12 +2,9 @@
 
 This directory contains sample agents that demonstrate Microsoft Teams integration features using the Microsoft 365 Agents SDK for JavaScript/TypeScript.
 
-Samples are organized into two groups:
+Samples use the modern `AgentApplication` + `TeamsAgentExtension` API.
 
-- **Root-level samples** — use the modern `AgentApplication` + `TeamsAgentExtension` API.
-- **`compat/` samples** — use the legacy `TeamsActivityHandler` API (compatible with the BotFramework v4 handler pattern).
-
-Both approaches use `startServer()` from `@microsoft/agents-hosting-express` which starts an Express server on port `3978` (or the `PORT` env variable).
+Samples use `startServer()` from `@microsoft/agents-hosting-express` which starts an Express server on port `3978` (or the `PORT` env variable).
 
 ---
 
@@ -41,7 +38,6 @@ npx tsx --env-file .env samples/teams/<sampleFile>.ts
 
 # Examples
 npx tsx --env-file .env samples/teams/teamsConversationExample.ts
-npx tsx --env-file .env samples/teams/compat/echo.ts
 ```
 
 The server will start on `http://localhost:3978` and listen for POST requests at `/api/messages`.
@@ -64,7 +60,7 @@ Comprehensive sample demonstrating core Teams conversation features using `Agent
 - Proactive messaging to all team members (`messageall`) via `CreateConversationOptionsBuilder`
 - Targeted messages visible only to specific users (`targeted`) via `makeTargetedActivity()`
 - @mention a user (`mentionme` / `atmention`)
-- Identify the current user via `TeamsInfo.getMember` (`whoami`)
+- Identify the current user via the Teams API client (`whoami`)
 - Update an existing card in-place (`update`)
 - Delete a card (`delete`)
 - Channel lifecycle events: channel created, renamed, deleted
@@ -286,166 +282,6 @@ Set `"supportsFiles": true` on the bot entry in the base manifest:
 
 ---
 
-### `teamsInfoExample.ts` — TeamsInfo API
-
-Demonstrates using `TeamsInfo` static methods to query Teams-specific information. Uses `SetTeamsApiClientMiddleware` (required when not using `TeamsAgentExtension`) to initialize the Teams API client on each turn.
-
-**Features illustrated:**
-- `TeamsInfo.getMember(context, id)` — get details for a specific team member.
-- `TeamsInfo.getTeamDetails(context)` — get the current team's details.
-- `TeamsInfo.getTeamChannels(context)` — list channels in the current team.
-- `TeamsInfo.getMeetingInfo(context)` — get meeting info (when in a meeting context).
-- `TeamsInfo.getPagedMembers(context)` — list team members with paging support.
-- `SetTeamsApiClientMiddleware` wired via `startServer`'s `configureAdapter` option.
-
-**How to test:**
-1. Start the sample and sideload the app into a team.
-2. Send any message — the bot replies with available commands.
-3. Send `getMember` — the bot returns your member details as JSON.
-4. Send `getTeamDetails` — the bot returns team name, ID, etc. (must be in a team channel, not personal chat).
-5. Send `getTeamChannels` — the bot lists all channels.
-6. Send `getPagedMembers` — the bot lists all team members.
-7. Send `getMeetingInfo` — returns meeting details (only works during a meeting).
-
-**Manifest — additional sections:**
-
-The base manifest already includes everything needed. No additional sections required.
-
----
-
-## Compat Samples (`compat/`)
-
-These samples use the `TeamsActivityHandler` class (BotFramework v4 handler-style API). They require `SetTeamsApiClientMiddleware` to be wired via `startServer`'s `configureAdapter` option.
-
-### `compat/echo.ts` — Echo Bot
-
-Minimal Teams echo bot.
-
-**Features illustrated:**
-- `TeamsActivityHandler` subclass with `onMessage` and `onMembersAdded`.
-- `SetTeamsApiClientMiddleware` wiring pattern.
-
-**How to test:**
-1. Start the sample and sideload the app.
-2. Send any message — the bot echoes it back: "You said: \<your message\>".
-3. Add the bot to a conversation — it sends "Welcome to the Teams bot!".
-
-**Manifest — additional sections:**
-
-The base manifest already includes everything needed. No additional sections required.
-
----
-
-### `compat/msgExtension.ts` — NuGet Search Message Extension
-
-A search-based message extension that queries the NuGet package registry using the `TeamsActivityHandler` override pattern.
-
-**Features illustrated:**
-- `handleTeamsMessagingExtensionQuery` — overrides the base handler to search NuGet packages and return thumbnail card results.
-- `handleTeamsMessagingExtensionSelectItem` — overrides the base handler to return a detailed card when a search result is selected.
-- Building `MessagingExtensionAttachment` objects with preview cards.
-- Using `CardFactory.contentTypes.heroCard` for card content types.
-
-**How to test:**
-1. Start the sample and sideload the app with compose extension manifest entries.
-2. In the compose box, click the **"+"** (Actions and Apps) and find your extension.
-3. Type a NuGet package name (e.g., "Newtonsoft") — the bot returns matching packages as thumbnail cards.
-4. Click a result — a detailed card is inserted into the compose box with links to the NuGet page and project URL.
-
-**Manifest — additional sections:**
-
-Add `composeExtensions` to the base manifest:
-
-```json
-{
-  "composeExtensions": [
-    {
-      "botId": "<your-app-id>",
-      "commands": [
-        {
-          "id": "searchQuery",
-          "type": "query",
-          "title": "Search NuGet",
-          "description": "Search NuGet packages",
-          "initialRun": true,
-          "parameters": [
-            {
-              "name": "query",
-              "title": "Search query",
-              "description": "NuGet package name",
-              "inputType": "text"
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
-
----
-
-### `compat/teamsConversation.ts` — Teams Conversation (Compat)
-
-Full-featured conversation bot using `TeamsActivityHandler` — the compat equivalent of `teamsConversationExample.ts`.
-
-**Features illustrated:**
-- Proactive messaging to all team members via `CloudAdapter.createConversationAsync` and `continueConversation`.
-- @mention a user in a plain text reply.
-- @mention a user in an Adaptive Card using the `UserMentionCardTemplate.json` template.
-- Identify the current user via `TeamsInfo.getMember`.
-- Update a Hero Card in-place with an incrementing counter.
-- Delete a card from the conversation.
-- `onTeamsMembersAddedEvent` / `onTeamsMembersRemovedEvent` — member lifecycle events.
-- `onTeamsChannelCreatedEvent` / `onTeamsChannelRenamedEvent` / `onTeamsChannelDeletedEvent` — channel lifecycle events.
-- `onTeamsTeamRenamedEvent` — team renamed event.
-
-**How to test:**
-1. Start the sample and sideload the app into a team.
-2. Send any message — the bot replies with a Welcome Hero Card with action buttons.
-3. Click **"Message all members"** — the bot sends a 1:1 proactive message to every member.
-4. Click **"Who am I?"** — the bot replies with your member name.
-5. Click **"Find me in Adaptive Card"** — the bot sends an Adaptive Card with your name, UPN, and AAD ID as an @mention.
-6. Send `mention` — the bot replies with a plain-text @mention of your name.
-7. Click **"Update Card"** — the card is updated in-place with an incrementing counter.
-8. Click **"Delete card"** — the card is removed from the conversation.
-9. Add/remove members, create/rename/delete channels, or rename the team to observe event handling.
-
-**Manifest — additional sections:**
-
-The base manifest already includes everything needed. No additional sections required.
-
----
-
-### `compat/teamsEvents.ts` — Teams Events
-
-Demonstrates handling a wide range of Teams lifecycle events using `TeamsActivityHandler` method overrides.
-
-**Features illustrated:**
-- **Message events:** `onTeamsMessageEdit`, `onTeamsMessageUndelete`, `onTeamsMessageSoftDelete`
-- **Member events:** `onTeamsMembersAdded`, `onTeamsMembersRemoved`
-- **Team events:** `onTeamsTeamRenamed`, `onTeamsTeamArchived`, `onTeamsTeamDeleted`, `onTeamsTeamHardDeleted`, `onTeamsTeamRestored`, `onTeamsTeamUnarchived`
-- **Channel events:** `onTeamsChannelCreated`, `onTeamsChannelDeleted`, `onTeamsChannelRenamed`, `onTeamsChannelRestored`
-
-**How to test:**
-1. Start the sample and sideload the app into a team.
-2. Send any message — the bot echoes it.
-3. **Edit** a message in the conversation — the bot replies "You edited a message".
-4. **Delete** a message — the bot replies "You deleted a message".
-5. **Undo delete** (undelete) a message — the bot replies "You undeleted a message".
-6. **Add** a member to the team — the bot announces the new member.
-7. **Remove** a member — the bot announces the removal.
-8. **Rename** the team — the bot announces the name change.
-9. **Archive/restore/delete** the team — the bot announces each event.
-10. **Create/rename/delete/restore** a channel — the bot announces each event.
-
-
-**Manifest — additional sections:**
-
-The base manifest already includes everything needed. No additional sections required.
-
----
-
 ## Sample Summary
 
 | Sample | API Style | Key Features |
@@ -456,8 +292,3 @@ The base manifest already includes everything needed. No additional sections req
 | `msgExtensionExample.ts` | AgentApplication | Search query, link unfurling, item select, action submit, settings URL |
 | `taskModuleExample.ts` | AgentApplication | Task module fetch/submit, multi-step form dialogs |
 | `teamsAttachments.ts` | AgentApplication | File attachment download and counting |
-| `teamsInfoExample.ts` | AgentApplication | TeamsInfo API queries (member, team, channels, meeting, paged members) |
-| `compat/echo.ts` | TeamsActivityHandler | Minimal echo bot |
-| `compat/msgExtension.ts` | TeamsActivityHandler | NuGet package search message extension |
-| `compat/teamsConversation.ts` | TeamsActivityHandler | Full conversation features, proactive messaging, @mentions, card actions, lifecycle events |
-| `compat/teamsEvents.ts` | TeamsActivityHandler | Comprehensive Teams lifecycle event handlers |

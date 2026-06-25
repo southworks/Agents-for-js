@@ -1,8 +1,8 @@
 import { ActionTypes, Channels, Entity, RoleTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CardFactory, CreateConversationOptionsBuilder, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension, teamsGetTeamInfo, TeamsInfo } from '@microsoft/agents-hosting-extensions-msteams'
+import { parseTeamsChannelData, TeamsAgentExtension, teamsGetTeamInfo } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { ChannelInfo, TeamInfo } from '@microsoft/teams.api'
+import { ChannelInfo, PagedMembersResult, TeamInfo, TeamsChannelAccount } from '@microsoft/teams.api'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 
@@ -70,7 +70,7 @@ app
 
     let continuationToken: string | undefined
     do {
-      const currentPage = await TeamsInfo.getPagedMembers(context, 100, continuationToken)
+      const currentPage = await getPagedMembers(context, 100, continuationToken)
       continuationToken = currentPage.continuationToken ?? undefined
 
       for (const member of currentPage.members) {
@@ -99,7 +99,7 @@ app
       return
     }
 
-    const currentPage = await TeamsInfo.getPagedMembers(context)
+    const currentPage = await getPagedMembers(context)
     for (const member of currentPage.members) {
       if (member.id === context.activity.recipient?.id) {
         continue
@@ -138,7 +138,7 @@ app
     }
 
     try {
-      const member = await TeamsInfo.getMember(context, context.activity.from.id)
+      const member = await getMember(context, context.activity.from.id)
       await context.sendActivity(`You are: ${member.name}.`)
     } catch (error) {
       if (error instanceof Error && error.message.includes('Member not found')) {
@@ -163,7 +163,7 @@ app
     }
 
     try {
-      const member = await TeamsInfo.getMember(context, context.activity.from.id)
+      const member = await getMember(context, context.activity.from.id)
       const mentionText = `<at>${member.name}</at>`
       const mention: Entity = {
         mentioned: {
@@ -227,6 +227,26 @@ function createConversationCard (title: string, text: string, count: number) {
 function getCardCount (value: unknown): number {
   const cardValue = value as CardValue | undefined
   return typeof cardValue?.count === 'number' ? cardValue.count : 0
+}
+
+async function getPagedMembers (context: TurnContext, pageSize?: number, continuationToken?: string): Promise<PagedMembersResult> {
+  const conversationId = getMembersConversationId(context)
+  return await TeamsAgentExtension.getTeamsClient(context).conversations.members(conversationId).getPaged(pageSize, continuationToken)
+}
+
+async function getMember (context: TurnContext, userId: string): Promise<TeamsChannelAccount> {
+  const conversationId = getMembersConversationId(context)
+  return await TeamsAgentExtension.getTeamsClient(context).conversations.members(conversationId).getById(userId)
+}
+
+function getMembersConversationId (context: TurnContext): string {
+  const teamsChannelData = parseTeamsChannelData(context.activity.channelData)
+  const conversationId = teamsChannelData.team?.id ?? context.activity.conversation?.id
+  if (!conversationId) {
+    throw new Error('Teams conversation id is required to query members.')
+  }
+
+  return conversationId
 }
 
 startServer(app)

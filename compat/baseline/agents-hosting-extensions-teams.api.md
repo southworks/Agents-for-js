@@ -5,7 +5,6 @@
 ```ts
 
 import { Activity } from '@microsoft/agents-activity';
-import { ActivityHandler } from '@microsoft/agents-hosting';
 import { AgentApplication } from '@microsoft/agents-hosting';
 import { AgentErrorDefinition } from '@microsoft/agents-activity';
 import { AgentExtension } from '@microsoft/agents-hosting';
@@ -17,23 +16,16 @@ import type { ConfigResponse } from '@microsoft/teams.api';
 import type { FileConsentCardResponse } from '@microsoft/teams.api';
 import { InvokeResponse } from '@microsoft/agents-hosting';
 import type { MeetingDetails } from '@microsoft/teams.api';
-import { MeetingInfo } from '@microsoft/teams.api';
-import { MeetingNotificationParams } from '@microsoft/teams.api';
-import { MeetingNotificationResponse } from '@microsoft/teams.api';
-import { MeetingParticipant } from '@microsoft/teams.api';
 import type { MessagingExtensionAction } from '@microsoft/teams.api';
 import type { MessagingExtensionActionResponse } from '@microsoft/teams.api';
 import type { MessagingExtensionQuery } from '@microsoft/teams.api';
 import type { MessagingExtensionResponse } from '@microsoft/teams.api';
 import type { MessagingExtensionResult } from '@microsoft/teams.api';
-import { Middleware } from '@microsoft/agents-hosting';
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api';
 import type { OnBehalfOf } from '@microsoft/teams.api';
-import { PagedMembersResult } from '@microsoft/teams.api';
 import { RouteHandler } from '@microsoft/agents-hosting';
 import type { TaskModuleRequest } from '@microsoft/teams.api';
 import type { TaskModuleResponse } from '@microsoft/teams.api';
-import { TeamDetails } from '@microsoft/teams.api';
 import { TeamInfo } from '@microsoft/teams.api';
 import { TeamsChannelAccount } from '@microsoft/teams.api';
 import { TurnContext } from '@microsoft/agents-hosting';
@@ -212,13 +204,6 @@ export function parseValueMessagingExtensionQuery(value: unknown): MessagingExte
 export function setTeamsApiClient(context: TurnContext, channelId?: string): void;
 
 // @public (undocumented)
-export class SetTeamsApiClientMiddleware implements Middleware {
-    constructor(channelId?: string);
-    // (undocumented)
-    onTurn(context: TurnContext, next: () => Promise<void>): Promise<void>;
-}
-
-// @public (undocumented)
 export class TaskModule<TState extends TurnState> {
     constructor(app: AgentApplication<TState>);
     // (undocumented)
@@ -227,75 +212,6 @@ export class TaskModule<TState extends TurnState> {
     onFetch(value: string | RegExp, handler: FetchHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onSubmit(value: string | RegExp | null, handler: SubmitHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
-}
-
-// @public
-export class TeamsActivityHandler extends ActivityHandler {
-    protected dispatchConversationUpdateActivity(context: TurnContext): Promise<void>;
-    protected dispatchEventActivity(context: TurnContext): Promise<void>;
-    protected dispatchMessageDeleteActivity(context: TurnContext): Promise<void>;
-    protected dispatchMessageUpdateActivity(context: TurnContext): Promise<void>;
-    protected handleTeamsAnonymousAppBasedLinkQuery(_context: TurnContext, _query: AppBasedLinkQuery): Promise<MessagingExtensionResponse>;
-    protected handleTeamsAppBasedLinkQuery(_context: TurnContext, _query: AppBasedLinkQuery): Promise<MessagingExtensionResponse>;
-    protected handleTeamsCardActionInvoke(_context: TurnContext): Promise<InvokeResponse>;
-    protected handleTeamsConfigFetch(_context: TurnContext, _configData: any): Promise<any>;
-    protected handleTeamsConfigSubmit(_context: TurnContext, _configData: any): Promise<any>;
-    protected handleTeamsFileConsent(context: TurnContext, fileConsentCardResponse: FileConsentCardResponse): Promise<void>;
-    protected handleTeamsFileConsentAccept(_context: TurnContext, _fileConsentCardResponse: FileConsentCardResponse): Promise<void>;
-    protected handleTeamsFileConsentDecline(_context: TurnContext, _fileConsentCardResponse: FileConsentCardResponse): Promise<void>;
-    protected handleTeamsMessagingExtensionCardButtonClicked(_context: TurnContext, _cardData: any): Promise<void>;
-    protected handleTeamsMessagingExtensionConfigurationQuerySettingUrl(_context: TurnContext, _query: MessagingExtensionQuery): Promise<MessagingExtensionResponse>;
-    protected handleTeamsMessagingExtensionConfigurationSetting(_context: TurnContext, _settings: any): Promise<void>;
-    protected handleTeamsMessagingExtensionFetchTask(_context: TurnContext, _action: MessagingExtensionAction): Promise<MessagingExtensionActionResponse>;
-    protected handleTeamsMessagingExtensionMessagePreviewEdit(_context: TurnContext, _action: MessagingExtensionAction): Promise<MessagingExtensionActionResponse>;
-    protected handleTeamsMessagingExtensionMessagePreviewSend(_context: TurnContext, _action: MessagingExtensionAction): Promise<MessagingExtensionActionResponse>;
-    protected handleTeamsMessagingExtensionQuery(_context: TurnContext, _query: MessagingExtensionQuery): Promise<MessagingExtensionResponse>;
-    protected handleTeamsMessagingExtensionSelectItem(_context: TurnContext, _query: any): Promise<MessagingExtensionResponse>;
-    protected handleTeamsMessagingExtensionSubmitAction(_context: TurnContext, _action: MessagingExtensionAction): Promise<MessagingExtensionActionResponse>;
-    protected handleTeamsMessagingExtensionSubmitActionDispatch(context: TurnContext, action: MessagingExtensionAction): Promise<MessagingExtensionActionResponse>;
-    protected handleTeamsTaskModuleFetch(_context: TurnContext, _taskModuleRequest: TaskModuleRequest): Promise<TaskModuleResponse>;
-    protected handleTeamsTaskModuleSubmit(_context: TurnContext, _taskModuleRequest: TaskModuleRequest): Promise<TaskModuleResponse>;
-    protected onInvokeActivity(context: TurnContext): Promise<InvokeResponse>;
-    protected onTeamsChannelCreated(context: TurnContext): Promise<void>;
-    onTeamsChannelCreatedEvent(handler: (channelInfo: ChannelInfo, teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsChannelDeleted(context: TurnContext): Promise<void>;
-    onTeamsChannelDeletedEvent(handler: (channelInfo: ChannelInfo, teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsChannelRenamed(context: TurnContext): Promise<void>;
-    onTeamsChannelRenamedEvent(handler: (channelInfo: ChannelInfo, teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsChannelRestored(context: TurnContext): Promise<void>;
-    onTeamsChannelRestoredEvent(handler: (channelInfo: ChannelInfo, teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMeetingEnd(context: TurnContext): Promise<void>;
-    onTeamsMeetingEndEvent(handler: (meeting: MeetingDetails, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMeetingParticipantsJoin(context: TurnContext): Promise<void>;
-    onTeamsMeetingParticipantsJoinEvent(handler: (meeting: MeetingParticipant[], context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMeetingParticipantsLeave(context: TurnContext): Promise<void>;
-    onTeamsMeetingParticipantsLeaveEvent(handler: (meeting: MeetingParticipant[], context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMeetingStart(context: TurnContext): Promise<void>;
-    onTeamsMeetingStartEvent(handler: (meeting: MeetingDetails, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMembersAdded(context: TurnContext): Promise<void>;
-    onTeamsMembersAddedEvent(handler: (membersAdded: TeamsChannelAccount[], teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMembersRemoved(context: TurnContext): Promise<void>;
-    onTeamsMembersRemovedEvent(handler: (membersRemoved: TeamsChannelAccount[], teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMessageEdit(context: TurnContext): Promise<void>;
-    onTeamsMessageEditEvent(handler: (context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMessageSoftDelete(context: TurnContext): Promise<void>;
-    onTeamsMessageSoftDeleteEvent(handler: (context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsMessageUndelete(context: TurnContext): Promise<void>;
-    onTeamsMessageUndeleteEvent(handler: (context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsReadReceipt(context: TurnContext): Promise<void>;
-    onTeamsReadReceiptEvent(handler: (receiptInfo: ReadReceiptInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsTeamArchived(context: TurnContext): Promise<void>;
-    onTeamsTeamArchivedEvent(handler: (teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsTeamDeleted(context: TurnContext): Promise<void>;
-    onTeamsTeamDeletedEvent(handler: (teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsTeamHardDeleted(context: TurnContext): Promise<void>;
-    onTeamsTeamHardDeletedEvent(handler: (teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsTeamRenamed(context: TurnContext): Promise<void>;
-    onTeamsTeamRenamedEvent(handler: (teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsTeamRestored(context: TurnContext): Promise<void>;
-    onTeamsTeamRestoredEvent(handler: (teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
-    protected onTeamsTeamUnarchived(context: TurnContext): Promise<void>;
-    onTeamsTeamUnarchivedEvent(handler: (teamInfo: TeamInfo, context: TurnContext, next: () => Promise<void>) => Promise<void>): this;
 }
 
 // @public (undocumented)
@@ -371,19 +287,6 @@ export function teamsGetTeamInfo(activity: Activity): ChannelData['team'] | unde
 
 // @public
 export function teamsGetTeamOnBehalfOf(activity: Activity): OnBehalfOf[] | undefined;
-
-// @public
-export class TeamsInfo {
-    static getMeetingInfo(context: TurnContext, meetingId?: string): Promise<MeetingInfo>;
-    static getMeetingParticipant(context: TurnContext, meetingId?: string, participantId?: string, tenantId?: string): Promise<MeetingParticipant>;
-    static getMember(context: TurnContext, userId: string): Promise<TeamsChannelAccount>;
-    static getPagedMembers(context: TurnContext, pageSize?: number, continuationToken?: string): Promise<PagedMembersResult>;
-    static getPagedTeamMembers(context: TurnContext, teamId?: string, pageSize?: number, continuationToken?: string): Promise<PagedMembersResult>;
-    static getTeamChannels(context: TurnContext, teamId?: string): Promise<ChannelInfo[]>;
-    static getTeamDetails(context: TurnContext, teamId?: string): Promise<TeamDetails>;
-    static getTeamMember(context: TurnContext, teamId: string, userId: string): Promise<TeamsChannelAccount>;
-    static sendMeetingNotification(context: TurnContext, notification: MeetingNotificationParams, meetingId?: string): Promise<MeetingNotificationResponse | undefined>;
-}
 
 // @public
 export function teamsNotifyUser(activity: Activity, alertInMeeting?: boolean, externalResourceUrl?: string): void;

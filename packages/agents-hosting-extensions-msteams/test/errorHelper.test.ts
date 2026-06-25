@@ -5,25 +5,14 @@ import { Errors } from './errorHelper'
 
 describe('TeamsExtensionErrors', () => {
   it('should have correct error codes', () => {
-    assert.strictEqual(Errors.ContextRequired.code, -150000)
-    assert.strictEqual(Errors.MeetingIdRequired.code, -150001)
-    assert.strictEqual(Errors.ParticipantIdRequired.code, -150002)
-    assert.strictEqual(Errors.TeamIdRequired.code, -150003)
-    assert.strictEqual(Errors.TurnContextCannotBeNull.code, -150004)
-    assert.strictEqual(Errors.ActivityCannotBeNull.code, -150005)
-    assert.strictEqual(Errors.TeamsChannelIdRequired.code, -150006)
     assert.strictEqual(Errors.UnexpectedTaskModuleSubmit.code, -150016)
-    assert.strictEqual(Errors.NotImplemented.code, -150017)
-    assert.strictEqual(Errors.BadRequest.code, -150018)
     assert.strictEqual(Errors.TeamsApiClientNotAvailable.code, -150010)
     assert.strictEqual(Errors.TeamsApiClientSetupFailed.code, -150011)
   })
 
   it('should contain error message in description', () => {
-    assert.ok(Errors.ContextRequired.description.includes('context'))
-    assert.ok(Errors.MeetingIdRequired.description.includes('meetingId'))
-    assert.ok(Errors.TeamIdRequired.description.includes('teamId'))
-    assert.ok(Errors.NotImplemented.description.includes('NotImplemented'))
+    assert.ok(Errors.UnexpectedTaskModuleSubmit.description.includes('TaskModules'))
+    assert.ok(Errors.TeamsApiClientNotAvailable.description.includes('Teams API client'))
   })
 
   it('should support parameter substitution in error messages', () => {

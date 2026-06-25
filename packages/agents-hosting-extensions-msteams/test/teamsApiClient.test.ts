@@ -3,7 +3,6 @@ import { describe, it } from 'node:test'
 import { TurnContext } from '@microsoft/agents-hosting'
 import { Activity } from '@microsoft/agents-activity'
 import { getTeamsClient, setTeamsApiClient, TeamsApiClientKey } from './teamsApiClient'
-import { SetTeamsApiClientMiddleware } from './compat/setTeamsApiClientMiddleware'
 
 function createContext (channelId: string = 'msteams', withConnectorClient: boolean = true, serviceUrl: string = 'https://service.example.com'): TurnContext {
   const context = new TurnContext(
@@ -53,19 +52,6 @@ describe('teamsApiClient', () => {
     setTeamsApiClient(context)
 
     assert.strictEqual(context.turnState.has(TeamsApiClientKey), false)
-  })
-
-  it('middleware populates the teams client before continuing', async () => {
-    const context = createContext()
-    const middleware = new SetTeamsApiClientMiddleware()
-    let nextCalled = false
-
-    await middleware.onTurn(context, async () => {
-      nextCalled = true
-      assert.ok(context.turnState.has(TeamsApiClientKey))
-    })
-
-    assert.strictEqual(nextCalled, true)
   })
 
   it('throws a setup error when running on Teams channel without ConnectorClient', () => {

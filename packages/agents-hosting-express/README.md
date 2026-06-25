@@ -29,15 +29,18 @@ Use `configureAdapter` to customize the `CloudAdapter` used by `startServer`.
 This is useful for `ActivityHandler` scenarios where `startServer` creates the adapter internally,
 and for `AgentApplication` scenarios where you want to reuse the application's adapter and add middleware.
 
- ```ts
+```ts
  import { startServer } from '@microsoft/agents-hosting-express';
- import { SetTeamsApiClientMiddleware, TeamsActivityHandler } from '@microsoft/agents-hosting-extensions-msteams';
+ import { AgentApplication, TurnState } from '@microsoft/agents-hosting';
 
- class TeamsBot extends TeamsActivityHandler {}
+ const app = new AgentApplication<TurnState>();
 
- startServer(new TeamsBot(), {
+ startServer(app, {
    configureAdapter: (adapter) => {
-     adapter.use(new SetTeamsApiClientMiddleware())
+     adapter.use(async (context, next) => {
+       console.log(`Received ${context.activity.type}`)
+       await next()
+     })
    }
  })
  ```

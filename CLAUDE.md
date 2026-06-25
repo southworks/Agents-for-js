@@ -126,11 +126,8 @@ The `agents-hosting-extensions-msteams` package has been updated to align with t
   - `getTeamsClient(context)`
 - **Turn setup requirements**:
   - `TeamsAgentExtension` registers `beforeTurn` and calls `setTeamsApiClient(...)` for `AgentApplication` scenarios.
-  - `TeamsActivityHandler` scenarios require middleware: `SetTeamsApiClientMiddleware`.
-  - `startServer` supports `configureAdapter` to wire middleware for compat handlers.
-- **TeamsInfo behavior**:
-  - `TeamsInfo` uses `getTeamsClient(context)` and Teams SDK methods (`teams`, `meetings`, `conversations.members`).
-  - Member paging methods (`getPagedMembers`, `getPagedTeamMembers`) return a single page result and honor continuation tokens.
+  - Legacy `TeamsActivityHandler`, `SetTeamsApiClientMiddleware`, and `TeamsInfo` APIs have been removed.
+  - Use `TeamsAgentExtension.getTeamsClient(context)` or `getTeamsClient(context)` for Teams SDK client access.
 - **Error handling**:
   - Missing client access throws `TeamsApiClientNotAvailable`.
   - Teams client setup prerequisites throw `TeamsApiClientSetupFailed` (for easier misconfiguration diagnosis).
