@@ -11,7 +11,7 @@ export function setTeamsApiClient (context: TurnContext, channelId: string = 'ms
   }
 
   const connectorClient = context.turnState.get<ConnectorClient>(context.adapter.ConnectorClientKey)
-  const serviceUrl = context.activity.serviceUrl ?? connectorClient?.axiosInstance.defaults.baseURL
+  const serviceUrl = context.activity.serviceUrl ?? connectorClient?.httpClient.baseURL
 
   if (!connectorClient) {
     throw ExceptionHelper.generateException(Error, Errors.TeamsApiClientSetupFailed, undefined, { missing: 'ConnectorClient in turnState' })
@@ -40,7 +40,7 @@ export function getTeamsClient (context: TurnContext): TeamsClient {
 }
 
 function getClientHeaders (connectorClient: ConnectorClient): Record<string, string> {
-  const commonHeaders = connectorClient.axiosInstance.defaults.headers.common
+  const commonHeaders = connectorClient.httpClient.defaultHeaders.common
   const headers = Object.entries(commonHeaders ?? {}).filter(([, value]) => typeof value === 'string')
 
   return Object.fromEntries(headers) as Record<string, string>
