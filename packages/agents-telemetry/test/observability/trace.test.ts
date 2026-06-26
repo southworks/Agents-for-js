@@ -286,6 +286,40 @@ describe('traceFactory', () => {
     })
   })
 
+  it('record preserves class instances by reference', () => {
+    class TraceValue {
+      constructor (public readonly value: string) {}
+
+      get displayValue () {
+        return `value:${this.value}`
+      }
+
+      isTraceValue () {
+        return true
+      }
+    }
+
+    const { otel } = createMockOTel()
+    const trace = traceFactory(otel)
+    const value = new TraceValue('test')
+    let captured: any
+
+    trace(
+      {
+        name: SpanNames.ADAPTER_PROCESS,
+        record: { value: new TraceValue('default') },
+        end: (ctx) => { captured = ctx.record },
+      },
+      (ctx) => {
+        ctx.record({ value })
+      }
+    )
+
+    assert.strictEqual(captured.value, value)
+    assert.strictEqual(captured.value.displayValue, 'value:test')
+    assert.strictEqual(captured.value.isTraceValue(), true)
+  })
+
   it('record initializes with default values from definition', () => {
     const { otel } = createMockOTel()
     const trace = traceFactory(otel)
