@@ -2,8 +2,8 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
-import type { ReadReceiptInfo } from './models/readReceiptInfo'
-import { TeamsAgentExtension } from './teamsAgentExtension'
+import type { ReadReceiptInfo } from '../src/models/readReceiptInfo'
+import { TeamsAgentExtension } from '../src/teamsAgentExtension'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
   context.turnState.set(context.adapter.ConnectorClientKey, {

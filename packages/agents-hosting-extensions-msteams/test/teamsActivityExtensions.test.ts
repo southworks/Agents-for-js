@@ -9,7 +9,7 @@ import {
   teamsNotifyUser,
   teamsGetTeamOnBehalfOf,
   teamsEnableFeedbackLoop
-} from './teamsActivityExtensions'
+} from '../src/teamsActivityExtensions'
 
 describe('teamsActivityExtensions', () => {
   describe('teamsGetSelectedChannelId', () => {

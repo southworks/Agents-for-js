@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension } from './teamsAgentExtension'
+import { TeamsAgentExtension } from '../src/teamsAgentExtension'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
   context.turnState.set(context.adapter.ConnectorClientKey, {
@@ -48,7 +48,8 @@ describe('FileConsent', () => {
 
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onDecline fires for file consent decline and sends InvokeResponse', async () => {
@@ -75,7 +76,8 @@ describe('FileConsent', () => {
     assert.strictEqual(handled, true)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onAccept does not fire for decline action', async () => {

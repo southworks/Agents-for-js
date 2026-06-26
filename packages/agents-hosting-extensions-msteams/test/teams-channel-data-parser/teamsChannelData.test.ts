@@ -1,7 +1,7 @@
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import assert from 'assert'
 import { describe, it } from 'node:test'
-import { parseTeamsChannelData } from '../activity-extensions'
+import { parseTeamsChannelData } from '../../src/activity-extensions'
 import type { ChannelInfo } from '@microsoft/teams.api'
 
 describe('parseTeamsChannelData test', () => {

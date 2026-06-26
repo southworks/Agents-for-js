@@ -2,8 +2,8 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity } from '@microsoft/agents-activity'
 import { TurnContext } from '@microsoft/agents-hosting'
-import { setTeamsApiClient } from './teamsApiClientExtensions'
-import { TeamsTurnContext } from './teamsTurnContext'
+import { setTeamsApiClient } from '../src/teamsApiClientExtensions'
+import { TeamsTurnContext } from '../src/teamsTurnContext'
 
 function createContext (channelId: string = 'msteams', withConnectorClient: boolean = true, serviceUrl: string | undefined = 'https://service.example.com'): TurnContext {
   const context = new TurnContext(
@@ -17,7 +17,9 @@ function createContext (channelId: string = 'msteams', withConnectorClient: bool
       type: 'message',
       channelId,
       serviceUrl,
-      conversation: { id: 'conversation-id', isGroup: true }
+      conversation: { id: 'conversation-id', isGroup: true },
+      recipient: { id: 'bot' },
+      from: { id: 'user' }
     })
   )
 
@@ -47,7 +49,8 @@ describe('TeamsTurnContext', () => {
   })
 
   it('falls back to ConnectorClient baseURL when activity serviceUrl is missing', () => {
-    const context = createContext('msteams', true, undefined)
+    const context = createContext()
+    context.activity.serviceUrl = undefined
 
     setTeamsApiClient(context)
     const teamsContext = new TeamsTurnContext(context)
@@ -72,7 +75,8 @@ describe('TeamsTurnContext', () => {
   })
 
   it('throws a setup error when serviceUrl and connector baseURL are both missing', () => {
-    const context = createContext('msteams', true, undefined)
+    const context = createContext()
+    context.activity.serviceUrl = undefined
     const connectorClient = context.turnState.get<any>(context.adapter.ConnectorClientKey)
     connectorClient.httpClient.baseURL = ''
 
@@ -138,7 +142,7 @@ describe('TeamsTurnContext', () => {
 
     await assert.rejects(
       () => teamsContext.sendTargetedActivity(activity),
-      /Targeted Activity is only supported for Group chat/
+      /Targeted activities can only be sent in a group chat or channel/
     )
   })
 

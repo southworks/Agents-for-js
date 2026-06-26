@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension } from './teamsAgentExtension'
+import { TeamsAgentExtension } from '../src/teamsAgentExtension'
 import type { ConfigResponse } from '@microsoft/teams.api'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
@@ -80,7 +80,8 @@ describe('Configuration', () => {
     assert.strictEqual(handled, true)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = ((invokeResp.value) as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onConfigFetch does not fire for config/submit', async () => {

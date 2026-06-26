@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
-import { ReadReceiptInfo } from './models/readReceiptInfo'
+import { ReadReceiptInfo } from '../src/models/readReceiptInfo'
 
 describe('ReadReceiptInfo', () => {
   describe('constructor', () => {
