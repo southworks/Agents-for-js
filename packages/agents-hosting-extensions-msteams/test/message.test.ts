@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
+import type { ReadReceiptInfo } from './models/readReceiptInfo'
 import { TeamsAgentExtension } from './teamsAgentExtension'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
@@ -86,7 +87,7 @@ describe('Message', () => {
 
   it('onReadReceipt fires for readReceipt event', async () => {
     let handled = false
-    let receivedData: unknown
+    let receivedData: ReadReceiptInfo | undefined
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
@@ -111,6 +112,7 @@ describe('Message', () => {
     await app.run(context)
     assert.strictEqual(handled, true)
     assert.deepStrictEqual(receivedData, receiptValue)
+    assert.strictEqual(receivedData?.lastReadMessageId, '42')
   })
 
   it('onO365ConnectorCardAction fires and sends InvokeResponse', async () => {

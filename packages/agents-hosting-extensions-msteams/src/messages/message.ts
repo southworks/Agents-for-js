@@ -7,9 +7,10 @@ import { parseTeamsChannelData } from '../activity-extensions'
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api'
 import { TeamsTurnContext } from '../teamsTurnContext'
 import { createTeamsRouteHandler, type TeamsRouteHandler } from '../teamsRouteHandler'
+import type { ReadReceiptInfo } from '../models/readReceiptInfo'
 
 type O365ConnectorCardActionHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
-type ReadReceiptHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: unknown) => Promise<void>
+type ReadReceiptHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: ReadReceiptInfo) => Promise<void>
 
 export class Message<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -66,7 +67,7 @@ export class Message<TState extends TurnState = TurnState> {
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      await handler(new TeamsTurnContext(context), state, context.activity.value)
+      await handler(new TeamsTurnContext(context), state, context.activity.value as ReadReceiptInfo)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
