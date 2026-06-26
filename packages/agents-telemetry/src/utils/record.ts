@@ -54,6 +54,6 @@ export function cloneRecordValue<T> (value: T): T {
  * @remarks
  * Arrays and class instances are not considered plain objects.
  */
-export function isPlainObject (value: unknown): value is Record<string, unknown> {
+function isPlainObject (value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
