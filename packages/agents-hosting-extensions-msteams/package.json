@@ -19,9 +19,9 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "dependencies": {
-    "@microsoft/agents-hosting": "file:../agents-hosting",
     "@microsoft/agents-activity": "file:../agents-activity",
-    "@microsoft/teams.api": "2.0.8",
+    "@microsoft/agents-hosting": "file:../agents-hosting",
+    "@microsoft/teams.api": "^2.0.13",
     "zod": "3.25.75"
   },
   "license": "MIT",
@@ -37,7 +37,7 @@
     },
     "./package.json": "./package.json"
   },
-   "engines": {
+  "engines": {
     "node": ">=20.0.0"
   }
 }
