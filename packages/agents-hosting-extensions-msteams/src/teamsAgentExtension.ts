@@ -12,6 +12,7 @@ import { TaskModule } from './taskModules/taskModule'
 import { TeamsChannel } from './channels/teamsChannel'
 import { TeamsTeam } from './teams/teamsTeam'
 import { setTeamsApiClient } from './teamsApiClientExtensions'
+import { applyTeamsHeaderPropagation } from './teamsHeaderPropagation'
 
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
   private _app: AgentApplication<TState>
@@ -35,6 +36,12 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     this._messages = new Message(app)
     this._fileConsent = new FileConsent(app)
     this._configuration = new Configuration(app)
+
+    const headerPropagation = this._app.options.headerPropagation
+    this._app.options.headerPropagation = (headers) => {
+      headerPropagation?.(headers)
+      applyTeamsHeaderPropagation(headers)
+    }
 
     this._app.onTurn('beforeTurn', async (context) => {
       if (context.activity.channelId === this.channelId) {
