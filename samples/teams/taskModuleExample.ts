@@ -1,5 +1,5 @@
 import { AdaptiveCard, AgentApplication, CardFactory, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-msteams'
+import { TeamsAgentExtension, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import type { TaskModuleRequest, TaskModuleResponse } from '@microsoft/teams.api'
 
@@ -9,7 +9,7 @@ const teamsExt = new TeamsAgentExtension<TurnState>(app)
 
 app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
   console.log('Teams extension registered')
-  tae.taskModules.onFetch('simple_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
+  tae.taskModules.onFetch('simple_form', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
     const formCard = {
       type: 'AdaptiveCard',
       body: [
@@ -51,7 +51,7 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
       }
     }
   })
-    .onSubmit('simple_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
+    .onSubmit('simple_form', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
       const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
       console.log('Task module submit:', request.data)
       await context.sendActivity(`Task module submitted successfully for ${name}!`)
@@ -63,7 +63,7 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
         }
       }
     })
-    .onFetch('multi_step_form', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
+    .onFetch('multi_step_form', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
       const formCard = {
         type: 'AdaptiveCard',
         body: [
@@ -105,7 +105,7 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
         }
       }
     })
-    .onSubmit('multi_step_form_submit_name', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
+    .onSubmit('multi_step_form_submit_name', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
       const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
 
       const formCard = {
@@ -151,7 +151,7 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
         }
       }
     })
-    .onSubmit('multi_step_form_submit_email', async (context: TurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
+    .onSubmit('multi_step_form_submit_email', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
       const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
       const email = typeof request.data?.email === 'string' ? request.data.email : 'No email provided'
 

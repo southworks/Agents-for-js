@@ -1,6 +1,6 @@
 import { ActionTypes, Channels, Entity, RoleTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CardFactory, CreateConversationOptionsBuilder, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { parseTeamsChannelData, TeamsAgentExtension, teamsGetTeamInfo } from '@microsoft/agents-hosting-extensions-msteams'
+import { parseTeamsChannelData, TeamsAgentExtension, teamsGetTeamInfo, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { ChannelInfo, PagedMembersResult, TeamInfo, TeamsChannelAccount } from '@microsoft/teams.api'
 
@@ -11,7 +11,7 @@ type CardValue = {
 }
 
 app.registerExtension<TeamsAgentExtension>(new TeamsAgentExtension(app), (tae) => {
-  tae.channels.onMemberAdded(async (context: TurnContext) => {
+  tae.channels.onMemberAdded(async (context: TeamsTurnContext) => {
     if (context.activity.conversation?.conversationType === 'personal') {
       return
     }
@@ -23,7 +23,7 @@ app.registerExtension<TeamsAgentExtension>(new TeamsAgentExtension(app), (tae) =
     }
   })
 
-  tae.channels.onMemberRemoved(async (context: TurnContext) => {
+  tae.channels.onMemberRemoved(async (context: TeamsTurnContext) => {
     for (const member of context.activity.membersRemoved ?? []) {
       if (member.id === context.activity.recipient?.id) {
         // the bot was removed.
@@ -36,22 +36,22 @@ app.registerExtension<TeamsAgentExtension>(new TeamsAgentExtension(app), (tae) =
     }
   })
 
-  tae.channels.onCreated(async (context: TurnContext, state: TurnState, channelInfo: ChannelInfo) => {
+  tae.channels.onCreated(async (context: TeamsTurnContext, state: TurnState, channelInfo: ChannelInfo) => {
     const card = CardFactory.heroCard('', `${channelInfo.name} is the Channel created`)
     await context.sendActivity(MessageFactory.attachment(card))
   })
 
-  tae.channels.onRenamed(async (context: TurnContext, state: TurnState, channelInfo: ChannelInfo) => {
+  tae.channels.onRenamed(async (context: TeamsTurnContext, state: TurnState, channelInfo: ChannelInfo) => {
     const card = CardFactory.heroCard('', `${channelInfo.name} is the new Channel name`)
     await context.sendActivity(MessageFactory.attachment(card))
   })
 
-  tae.channels.onDeleted(async (context: TurnContext, state: TurnState, channelInfo: ChannelInfo) => {
+  tae.channels.onDeleted(async (context: TeamsTurnContext, state: TurnState, channelInfo: ChannelInfo) => {
     const card = CardFactory.heroCard('', `${channelInfo.name} is the Channel deleted`)
     await context.sendActivity(MessageFactory.attachment(card))
   })
 
-  tae.teams.onRenamed(async (context: TurnContext, state: TurnState, teamInfo: TeamInfo) => {
+  tae.teams.onRenamed(async (context: TeamsTurnContext, state: TurnState, teamInfo: TeamInfo) => {
     const card = CardFactory.heroCard('', `${teamInfo.name} is the new Team name`)
     await context.sendActivity(MessageFactory.attachment(card))
   })
@@ -231,12 +231,16 @@ function getCardCount (value: unknown): number {
 
 async function getPagedMembers (context: TurnContext, pageSize?: number, continuationToken?: string): Promise<PagedMembersResult> {
   const conversationId = getMembersConversationId(context)
-  return await TeamsAgentExtension.getTeamsClient(context).conversations.members(conversationId).getPaged(pageSize, continuationToken)
+  const teamsContext = new TeamsTurnContext(context)
+
+  return await teamsContext.client.conversations.members(conversationId).getPaged(pageSize, continuationToken)
 }
 
 async function getMember (context: TurnContext, userId: string): Promise<TeamsChannelAccount> {
   const conversationId = getMembersConversationId(context)
-  return await TeamsAgentExtension.getTeamsClient(context).conversations.members(conversationId).getById(userId)
+  const teamsContext = new TeamsTurnContext(context)
+
+  return await teamsContext.client.conversations.members(conversationId).getById(userId)
 }
 
 function getMembersConversationId (context: TurnContext): string {

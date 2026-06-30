@@ -1,6 +1,6 @@
 import { AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { TeamsAgentExtension, MeetingParticipantsEventDetails } from '@microsoft/agents-hosting-extensions-msteams'
+import { TeamsAgentExtension, MeetingParticipantsEventDetails, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
 import { MeetingDetails } from '@microsoft/teams.api'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
@@ -9,20 +9,20 @@ const teamsExt = new TeamsAgentExtension(app)
 
 app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
   tae.meetings
-    .onStart(async (context: TurnContext, state: TurnState, details: MeetingDetails) => {
+    .onStart(async (context: TeamsTurnContext, state: TurnState, details: MeetingDetails) => {
       console.log('Meeting started:', details)
       await context.sendActivity('Welcome to the meeting! I\'m your meeting assistant.')
     })
-    .onEnd(async (context: TurnContext, state: TurnState, details: MeetingDetails) => {
+    .onEnd(async (context: TeamsTurnContext, state: TurnState, details: MeetingDetails) => {
       console.log('Meeting ended:', details)
       await context.sendActivity('The meeting has ended. Thanks for participating!')
     })
-    .onParticipantsJoin(async (context: TurnContext, state: TurnState, details: MeetingParticipantsEventDetails) => {
+    .onParticipantsJoin(async (context: TeamsTurnContext, state: TurnState, details: MeetingParticipantsEventDetails) => {
       const participantInfo = details
       console.log('Participants joined:', participantInfo)
       await context.sendActivity('Welcome to the meeting!')
     })
-    .onParticipantsLeave(async (context: TurnContext, state: TurnState, details: MeetingParticipantsEventDetails) => {
+    .onParticipantsLeave(async (context: TeamsTurnContext, state: TurnState, details: MeetingParticipantsEventDetails) => {
       const participantInfo = details
       console.log('Participants left:', participantInfo)
       await context.sendActivity('Goodbye from the meeting!')

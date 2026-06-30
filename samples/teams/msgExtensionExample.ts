@@ -1,6 +1,6 @@
 import { AdaptiveCard, AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
-import { TeamsAgentExtension } from '@microsoft/agents-hosting-extensions-msteams'
+import { TeamsAgentExtension, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
 import { MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
@@ -11,7 +11,7 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
   console.log('Teams extension registered')
 
   tae.messageExtensions
-    .onQueryLink(async (context: TurnContext, state: TurnState, link: string) : Promise<MessagingExtensionResponse> => {
+    .onQueryLink(async (context: TeamsTurnContext, state: TurnState, link: string) : Promise<MessagingExtensionResponse> => {
       await context.sendActivity(`Received a message with the link: ${link}`)
       return {
         composeExtension: {
@@ -36,7 +36,7 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
         }
       }
     })
-    .onQuery('searchQuery', async (context: TurnContext, state: TurnState, query: MessagingExtensionQuery) : Promise<MessagingExtensionResponse> => {
+    .onQuery('searchQuery', async (context: TeamsTurnContext, state: TurnState, query: MessagingExtensionQuery) : Promise<MessagingExtensionResponse> => {
       console.log('Received message extension query:', query)
 
       const initialRun = query.parameters?.find(p => p.name === 'initialRun')?.value?.toString() === 'true'
@@ -107,7 +107,7 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
       return Promise.resolve(msgExtResponse)
     })
 
-    .onSelectItem(async (context: TurnContext, state: TurnState, item: any) : Promise<MessagingExtensionResponse> => {
+    .onSelectItem(async (context: TeamsTurnContext, state: TurnState, item: any) : Promise<MessagingExtensionResponse> => {
       console.log('Item selected:', JSON.stringify(item))
 
       const card = {
@@ -143,7 +143,7 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
       return Promise.resolve(msgExtResponse)
     })
 
-    .onSubmitAction('createCard', async (context: TurnContext, state: TurnState, action: MessagingExtensionAction) : Promise<MessagingExtensionActionResponse> => {
+    .onSubmitAction('createCard', async (context: TeamsTurnContext, state: TurnState, action: MessagingExtensionAction) : Promise<MessagingExtensionActionResponse> => {
       const title = action.data.title || 'No Title'
       const description = action.data.description || 'No Description'
       console.log(`Creating card with Title: ${title} and Description: ${description}`)
@@ -185,7 +185,7 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
       return Promise.resolve(msgExtActionResponse)
     })
 
-  tae.messageExtensions.onQueryUrlSetting(async (context: TurnContext, state: TurnState): Promise<MessagingExtensionResponse> => {
+  tae.messageExtensions.onQueryUrlSetting(async (context: TeamsTurnContext, state: TurnState): Promise<MessagingExtensionResponse> => {
     console.log('Query settings URL requested')
 
     const msgExtResponse: MessagingExtensionResponse = {
