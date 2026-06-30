@@ -185,7 +185,7 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
       return Promise.resolve(msgExtActionResponse)
     })
 
-  tae.messageExtensions.onQueryUrlSetting(async (context: TeamsTurnContext, state: TurnState): Promise<MessagingExtensionResponse> => {
+  tae.messageExtensions.OnQuerySettingUrl(async (context: TeamsTurnContext, state: TurnState): Promise<MessagingExtensionResponse> => {
     console.log('Query settings URL requested')
 
     const msgExtResponse: MessagingExtensionResponse = {

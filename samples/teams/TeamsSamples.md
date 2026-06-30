@@ -161,7 +161,7 @@ Demonstrates search-based and action-based message extensions using `TeamsAgentE
 - `onQueryLink(...)` — handles link unfurling, returning a preview card for pasted URLs.
 - `onSelectItem(...)` — handles item selection from query results, returning a detailed Adaptive Card.
 - `onSubmitAction('createCard', ...)` — handles action-based compose extension submissions, creating cards from user input.
-- `onQueryUrlSetting(...)` — provides a configuration URL when the extension settings are requested.
+- `OnQuerySettingUrl(...)` — provides a configuration URL when the extension settings are requested.
 
 **How to test:**
 1. Start the sample and sideload the app with the compose extension manifest entries (see below).

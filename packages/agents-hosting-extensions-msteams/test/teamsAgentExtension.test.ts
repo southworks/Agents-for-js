@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, HeaderPropagation, TurnContext } from '@microsoft/agents-hosting'
+import { Client as GraphClient, type ClientOptions } from '@microsoft/microsoft-graph-client'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
 import { TEAMS_USER_AGENT_PRODUCT } from '../src/teamsHeaderPropagation'
 import { TeamsTurnContext } from '../src/teamsTurnContext'
@@ -39,6 +40,26 @@ function createContext (channelId: string = 'msteams', type: string = ActivityTy
   })
 
   return context
+}
+
+async function withCapturedGraphClientOptions (
+  callback: (getOptions: () => ClientOptions | undefined, expectedClient: GraphClient) => Promise<void>
+): Promise<void> {
+  const graph = GraphClient as unknown as { initWithMiddleware: (options: ClientOptions) => GraphClient }
+  const originalInitWithMiddleware = graph.initWithMiddleware
+  const expectedClient = {} as GraphClient
+  let graphOptions: ClientOptions | undefined
+
+  graph.initWithMiddleware = (options) => {
+    graphOptions = options
+    return expectedClient
+  }
+
+  try {
+    await callback(() => graphOptions, expectedClient)
+  } finally {
+    graph.initWithMiddleware = originalInitWithMiddleware
+  }
 }
 
 describe('TeamsAgentExtension', () => {
@@ -175,6 +196,77 @@ describe('TeamsAgentExtension', () => {
     const teamsContext = new TeamsTurnContext(context)
 
     assert.strictEqual((teamsContext.client as any).http.options.headers['User-Agent'], TEAMS_USER_AGENT_PRODUCT)
+  })
+
+  it('creates a Graph client that uses the configured authorization handler', async () => {
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    const context = createContext()
+    let requestedContext: TurnContext | undefined
+    let requestedHandlerName: string | undefined
+
+    Object.defineProperty(app, 'authorization', {
+      configurable: true,
+      value: {
+        async getToken (turnContext: TurnContext, handlerName: string) {
+          requestedContext = turnContext
+          requestedHandlerName = handlerName
+          return { token: 'graph-token' }
+        }
+      }
+    })
+
+    await withCapturedGraphClientOptions(async (getOptions, expectedClient) => {
+      const client = teamsExt.getGraphClient(context, 'graph', 'https://graph.example.com/v1.0')
+      const graphOptions = getOptions()
+      const authProvider = graphOptions?.authProvider
+
+      assert.strictEqual(client, expectedClient)
+      assert.strictEqual(graphOptions?.baseUrl, 'https://graph.example.com/v1.0')
+      assert.strictEqual(graphOptions?.defaultVersion, '')
+      assert.deepStrictEqual(graphOptions?.customHosts, new Set(['graph.example.com']))
+      assert.ok(authProvider)
+      assert.strictEqual(await authProvider.getAccessToken(), 'graph-token')
+      assert.strictEqual(requestedContext, context)
+      assert.strictEqual(requestedHandlerName, 'graph')
+    })
+  })
+
+  it('creates a Graph client with the default authorization handler and Graph base URL', async () => {
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    const context = createContext()
+    let requestedContext: TurnContext | undefined
+    let requestedHandlerName: string | undefined
+
+    Object.defineProperty(app, 'authorization', {
+      configurable: true,
+      value: {
+        manager: {
+          handlers: [{ id: 'defaultGraph' }]
+        },
+        async getToken (turnContext: TurnContext, handlerName: string) {
+          requestedContext = turnContext
+          requestedHandlerName = handlerName
+          return { token: 'default-token' }
+        }
+      }
+    })
+
+    await withCapturedGraphClientOptions(async (getOptions, expectedClient) => {
+      const client = teamsExt.getGraphClient(context)
+      const graphOptions = getOptions()
+      const authProvider = graphOptions?.authProvider
+
+      assert.strictEqual(client, expectedClient)
+      assert.strictEqual(graphOptions?.baseUrl, 'https://graph.microsoft.com/v1.0')
+      assert.strictEqual(graphOptions?.defaultVersion, '')
+      assert.deepStrictEqual(graphOptions?.customHosts, new Set(['graph.microsoft.com']))
+      assert.ok(authProvider)
+      assert.strictEqual(await authProvider.getAccessToken(), 'default-token')
+      assert.strictEqual(requestedContext, context)
+      assert.strictEqual(requestedHandlerName, 'defaultGraph')
+    })
   })
 })
 

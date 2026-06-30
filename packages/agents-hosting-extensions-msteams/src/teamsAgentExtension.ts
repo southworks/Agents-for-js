@@ -1,7 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { AgentApplication, AgentExtension, TurnState } from '@microsoft/agents-hosting'
+import { Client as GraphClient, type AuthenticationProvider, type ClientOptions } from '@microsoft/microsoft-graph-client'
+import { AgentApplication, AgentExtension, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { parseTeamsChannelData } from './activity-extensions'
 import { TeamsConfig } from './config/config'
 import { FileConsent } from './fileConsents/fileConsent'
@@ -13,6 +14,67 @@ import { TeamsChannel } from './channels/teamsChannel'
 import { TeamsTeam } from './teams/teamsTeam'
 import { setTeamsApiClient } from './teamsApiClientExtensions'
 import { applyTeamsHeaderPropagation } from './teamsHeaderPropagation'
+
+const DEFAULT_GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
+
+class GraphAuthenticationProvider implements AuthenticationProvider {
+  constructor (
+    private readonly app: AgentApplication<any>,
+    private readonly context: TurnContext,
+    private readonly handlerName?: string
+  ) {}
+
+  async getAccessToken (): Promise<string> {
+    const handlerName = this.handlerName ?? this.getDefaultHandlerName()
+    const { token } = await this.app.authorization.getToken(this.context, handlerName)
+
+    if (!token?.trim()) {
+      throw new Error(`Unable to acquire a Graph access token using authorization handler '${handlerName}'.`)
+    }
+
+    return token
+  }
+
+  private getDefaultHandlerName (): string {
+    const authorization = this.app.authorization as unknown as {
+      manager?: { handlers?: Array<{ id: string }> }
+    }
+    const handlerIds = authorization.manager?.handlers?.map((handler) => handler.id) ?? Object.keys(this.app.options.authorization ?? {})
+
+    if (handlerIds.length === 1) {
+      return handlerIds[0]
+    }
+
+    if (handlerIds.length === 0) {
+      throw new Error('A Graph client requires at least one configured authorization handler.')
+    }
+
+    throw new Error('A Graph client requires handlerName when multiple authorization handlers are configured.')
+  }
+}
+
+function createGraphClientOptions (authProvider: AuthenticationProvider, graphBaseUrl: string): ClientOptions {
+  const options: ClientOptions = {
+    authProvider,
+    baseUrl: graphBaseUrl,
+    defaultVersion: ''
+  }
+  const graphHost = getHost(graphBaseUrl)
+
+  if (graphHost) {
+    options.customHosts = new Set([graphHost])
+  }
+
+  return options
+}
+
+function getHost (url: string): string | undefined {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return undefined
+  }
+}
 
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
   private _app: AgentApplication<TState>
@@ -86,5 +148,12 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
 
   public get configuration (): TeamsConfig<TState> {
     return this._configuration
+  }
+
+  public getGraphClient (context: TurnContext, handlerName?: string, graphBaseUrl: string = DEFAULT_GRAPH_BASE_URL): GraphClient {
+    return GraphClient.initWithMiddleware(createGraphClientOptions(
+      new GraphAuthenticationProvider(this._app, context, handlerName),
+      graphBaseUrl
+    ))
   }
 }

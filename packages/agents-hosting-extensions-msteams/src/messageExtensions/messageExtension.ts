@@ -31,8 +31,8 @@ type FetchActionHandler<TState extends TurnState> = (context: TeamsTurnContext, 
 type SubmitActionHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, action: MessagingExtensionAction) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewEditHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, activity: Activity) => Promise<MessagingExtensionActionResponse>
 type MessagePreviewSendHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, activity: Activity) => Promise<void>
-type QueryUrlSettingHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState) => Promise<MessagingExtensionResponse>
-type ConfigureSettingsHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, settings: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
+type QuerySettingUrlHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState) => Promise<MessagingExtensionResponse>
+type SettingHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, settings: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
 type CardButtonClickedHandler<TState extends TurnState, TData = unknown> = (context: TeamsTurnContext, state: TState, cardData: TData) => Promise<void>
 
 export class MessageExtension<TState extends TurnState> {
@@ -197,7 +197,7 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
-  onQueryUrlSetting (handler: QueryUrlSettingHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  OnQuerySettingUrl (handler: QuerySettingUrlHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -215,7 +215,7 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
-  onConfigureSettings (handler: ConfigureSettingsHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  OnSetting (handler: SettingHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&

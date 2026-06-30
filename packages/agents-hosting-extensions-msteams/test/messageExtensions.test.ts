@@ -38,12 +38,12 @@ describe('MessageExtension', function () {
     })
   })
 
-  it('onQueryUrlSetting sets an InvokeResponse with status and body when handler returns a response', async function () {
+  it('OnQuerySettingUrl sets an InvokeResponse with status and body when handler returns a response', async function () {
     let handled = false
     const teamsExt = new TeamsAgentExtension(app)
 
     app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
-      tae.messageExtensions.onQueryUrlSetting(async (_context: TurnContext, _state: TurnState): Promise<MessagingExtensionResponse> => {
+      tae.messageExtensions.OnQuerySettingUrl(async (_context: TurnContext, _state: TurnState): Promise<MessagingExtensionResponse> => {
         handled = true
         return {
           composeExtension: {
@@ -70,12 +70,12 @@ describe('MessageExtension', function () {
     assert.strictEqual(invokeValue.body.composeExtension.text, 'url configured')
   })
 
-  it('onConfigureSettings sets an InvokeResponse with status 200 when handler returns a response', async function () {
+  it('OnSetting sets an InvokeResponse with status 200 when handler returns a response', async function () {
     const teamsExt = new TeamsAgentExtension(app)
     let handled = false
 
     app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
-      tae.messageExtensions.onConfigureSettings(async (_context: TurnContext, _state: TurnState, _settings: MessagingExtensionQuery): Promise<MessagingExtensionResponse> => {
+      tae.messageExtensions.OnSetting(async (_context: TurnContext, _state: TurnState, _settings: MessagingExtensionQuery): Promise<MessagingExtensionResponse> => {
         handled = true
         return {
           composeExtension: {

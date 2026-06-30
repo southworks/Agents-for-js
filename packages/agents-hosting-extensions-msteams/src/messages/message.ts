@@ -9,7 +9,7 @@ import { TeamsTurnContext } from '../teamsTurnContext'
 import { createTeamsRouteHandler, type TeamsRouteHandler } from '../teamsRouteHandler'
 import type { ReadReceiptInfo } from '../models/readReceiptInfo'
 
-type O365ConnectorCardActionHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
+type ExecuteActionRouteHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
 type ReadReceiptHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: ReadReceiptInfo) => Promise<void>
 
 export class Message<TState extends TurnState = TurnState> {
@@ -73,7 +73,7 @@ export class Message<TState extends TurnState = TurnState> {
     return this
   }
 
-  onO365ConnectorCardAction (handler: O365ConnectorCardActionHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onExecuteAction (handler: ExecuteActionRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
