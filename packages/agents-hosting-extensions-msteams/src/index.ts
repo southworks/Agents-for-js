@@ -1,6 +1,6 @@
 export * from './activity-extensions'
 export * from './channels'
-export * from './configurations'
+export * from './config'
 export { Errors as TeamsExtensionErrors } from './errorHelper'
 export * from './fileConsents'
 export * from './meetings'

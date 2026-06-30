@@ -3,7 +3,7 @@
 
 import { AgentApplication, AgentExtension, TurnState } from '@microsoft/agents-hosting'
 import { parseTeamsChannelData } from './activity-extensions'
-import { Configuration } from './configurations/configuration'
+import { TeamsConfig } from './config/config'
 import { FileConsent } from './fileConsents/fileConsent'
 import { Meeting } from './meetings/meeting'
 import { Message } from './messages/message'
@@ -23,7 +23,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
   private _teams: TeamsTeam<TState>
   private _messages: Message<TState>
   private _fileConsent: FileConsent<TState>
-  private _configuration: Configuration<TState>
+  private _configuration: TeamsConfig<TState>
 
   constructor (app: AgentApplication<TState>) {
     super('msteams')
@@ -35,7 +35,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     this._teams = new TeamsTeam(app)
     this._messages = new Message(app)
     this._fileConsent = new FileConsent(app)
-    this._configuration = new Configuration(app)
+    this._configuration = new TeamsConfig(app)
 
     const headerPropagation = this._app.options.headerPropagation
     this._app.options.headerPropagation = (headers) => {
@@ -84,7 +84,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     return this._fileConsent
   }
 
-  public get configuration (): Configuration<TState> {
+  public get configuration (): TeamsConfig<TState> {
     return this._configuration
   }
 }

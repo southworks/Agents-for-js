@@ -6,16 +6,16 @@ import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, 
 import type { ConfigResponse } from '@microsoft/teams.api'
 import { TeamsTurnContext } from '../teamsTurnContext'
 
-type ConfigurationHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, configData: unknown) => Promise<ConfigResponse>
+type ConfigHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, configData: unknown) => Promise<ConfigResponse>
 
-export class Configuration<TState extends TurnState = TurnState> {
+export class TeamsConfig<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
 
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
-  onConfigFetch (handler: ConfigurationHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onConfigFetch (handler: ConfigHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -33,7 +33,7 @@ export class Configuration<TState extends TurnState = TurnState> {
     return this
   }
 
-  onConfigSubmit (handler: ConfigurationHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onConfigSubmit (handler: ConfigHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
