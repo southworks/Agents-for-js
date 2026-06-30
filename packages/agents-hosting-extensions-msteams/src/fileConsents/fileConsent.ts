@@ -8,6 +8,18 @@ import { TeamsTurnContext } from '../teamsTurnContext'
 
 type FileConsentHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, response: FileConsentCardResponse) => Promise<void>
 
+function isFileConsentAction (context: TurnContext, action: 'accept' | 'decline'): boolean {
+  const activityAction = (context.activity.value as any)?.action
+  return (
+    context.activity.type === ActivityTypes.Invoke &&
+    context.activity.channelId === 'msteams' &&
+    typeof context.activity.name === 'string' &&
+    context.activity.name.toLowerCase() === 'fileconsent/invoke' &&
+    typeof activityAction === 'string' &&
+    activityAction.toLowerCase() === action
+  )
+}
+
 export class FileConsent<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
 
@@ -17,12 +29,7 @@ export class FileConsent<TState extends TurnState = TurnState> {
 
   onAccept (handler: FileConsentHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
-      return Promise.resolve(
-        context.activity.type === ActivityTypes.Invoke &&
-        context.activity.channelId === 'msteams' &&
-        context.activity.name === 'fileConsent/invoke' &&
-        (context.activity.value as any)?.action === 'accept'
-      )
+      return Promise.resolve(isFileConsentAction(context, 'accept'))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const cardResponse = context.activity.value as FileConsentCardResponse
@@ -37,12 +44,7 @@ export class FileConsent<TState extends TurnState = TurnState> {
 
   onDecline (handler: FileConsentHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
-      return Promise.resolve(
-        context.activity.type === ActivityTypes.Invoke &&
-        context.activity.channelId === 'msteams' &&
-        context.activity.name === 'fileConsent/invoke' &&
-        (context.activity.value as any)?.action === 'decline'
-      )
+      return Promise.resolve(isFileConsentAction(context, 'decline'))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const cardResponse = context.activity.value as FileConsentCardResponse

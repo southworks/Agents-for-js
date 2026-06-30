@@ -6,11 +6,14 @@ import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, 
 import { parseTeamsChannelData } from '../activity-extensions'
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api'
 import { TeamsTurnContext } from '../teamsTurnContext'
-import { createTeamsRouteHandler, type TeamsRouteHandler } from '../teamsRouteHandler'
 import type { ReadReceiptInfo } from '../models/readReceiptInfo'
 
 type ExecuteActionRouteHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
 type ReadReceiptHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: ReadReceiptInfo) => Promise<void>
+
+function equalsIgnoreCase (actual: unknown, expected: string): boolean {
+  return typeof actual === 'string' && actual.toLowerCase() === expected.toLowerCase()
+}
 
 export class Message<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
@@ -19,42 +22,42 @@ export class Message<TState extends TurnState = TurnState> {
     this._app = app
   }
 
-  onMessageEdit (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageEdit (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
         context.activity.type === ActivityTypes.MessageUpdate &&
         context.activity.channelId === 'msteams' &&
-        channelData?.eventType === 'editMessage'
+        equalsIgnoreCase(channelData?.eventType, 'editMessage')
       )
     }
-    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
+    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
     return this
   }
 
-  onMessageDelete (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageDelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
         context.activity.type === ActivityTypes.MessageDelete &&
         context.activity.channelId === 'msteams' &&
-        channelData?.eventType === 'softDeleteMessage'
+        equalsIgnoreCase(channelData?.eventType, 'softDeleteMessage')
       )
     }
-    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
+    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
     return this
   }
 
-  onMessageUndelete (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageUndelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
         context.activity.type === ActivityTypes.MessageUpdate &&
         context.activity.channelId === 'msteams' &&
-        channelData?.eventType === 'undeleteMessage'
+        equalsIgnoreCase(channelData?.eventType, 'undeleteMessage')
       )
     }
-    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
+    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
     return this
   }
 
@@ -63,7 +66,7 @@ export class Message<TState extends TurnState = TurnState> {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Event &&
         context.activity.channelId === 'msteams' &&
-        context.activity.name === 'application/vnd.microsoft.readReceipt'
+        equalsIgnoreCase(context.activity.name, 'application/vnd.microsoft.readReceipt')
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
@@ -78,7 +81,7 @@ export class Message<TState extends TurnState = TurnState> {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
-        context.activity.name === 'actionableMessage/executeAction'
+        equalsIgnoreCase(context.activity.name, 'actionableMessage/executeAction')
       )
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {

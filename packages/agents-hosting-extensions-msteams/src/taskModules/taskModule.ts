@@ -11,9 +11,34 @@ const DEFAULT_TASK_DATA_KEY = 'task'
 function matchesTaskKeyValue (context: TurnContext, value: string | RegExp, key: string): boolean {
   const taskData = (context.activity.value as any)?.data
   if (!taskData || typeof taskData !== 'object') return false
-  const dataValue = taskData[key]
+  const dataValue = taskData[normalizeTaskDataKey(key)]
   if (typeof dataValue !== 'string') return false
   return typeof value === 'string' ? dataValue === value : value.test(dataValue)
+}
+
+function isTaskInvoke (context: TurnContext, name: string): boolean {
+  return (
+    context.activity.type === ActivityTypes.Invoke &&
+    context.activity.channelId === 'msteams' &&
+    context.activity.name === name &&
+    context.activity.value != null
+  )
+}
+
+function normalizeTaskDataKey (key: string): string {
+  return key.trim() || DEFAULT_TASK_DATA_KEY
+}
+
+function matchesTaskInvoke (context: TurnContext, name: string, value: string | RegExp | null, key: string): boolean {
+  if (!isTaskInvoke(context, name)) {
+    return false
+  }
+
+  if (value == null || (typeof value === 'string' && value.trim() === '')) {
+    return true
+  }
+
+  return matchesTaskKeyValue(context, value, key)
 }
 
 type FetchHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
@@ -26,14 +51,9 @@ export class TaskModule<TState extends TurnState> {
     this._app = app
   }
 
-  onFetch (value: string | RegExp, handler: FetchHandler<TState>, key: string = DEFAULT_TASK_DATA_KEY, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onFetch (value: string | RegExp | null, handler: FetchHandler<TState>, key: string = DEFAULT_TASK_DATA_KEY, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
-      return Promise.resolve(
-        context.activity.type === ActivityTypes.Invoke &&
-        context.activity.channelId === 'msteams' &&
-        context.activity.name === 'task/fetch' &&
-        matchesTaskKeyValue(context, value, key)
-      )
+      return Promise.resolve(matchesTaskInvoke(context, 'task/fetch', value, key))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const request = context.activity.value as TaskModuleRequest
@@ -48,19 +68,7 @@ export class TaskModule<TState extends TurnState> {
 
   onSubmit (value: string | RegExp | null, handler: SubmitHandler<TState>, key: string = DEFAULT_TASK_DATA_KEY, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
-      if (value === null) {
-        return Promise.resolve(
-          context.activity.type === ActivityTypes.Invoke &&
-          context.activity.channelId === 'msteams' &&
-          context.activity.name === 'task/submit'
-        )
-      }
-      return Promise.resolve(
-        context.activity.type === ActivityTypes.Invoke &&
-        context.activity.channelId === 'msteams' &&
-        context.activity.name === 'task/submit' &&
-        matchesTaskKeyValue(context, value, key)
-      )
+      return Promise.resolve(matchesTaskInvoke(context, 'task/submit', value, key))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const request = context.activity.value as TaskModuleRequest

@@ -24,7 +24,7 @@ describe('Configuration', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.configuration.onConfigFetch(async (_ctx: TurnContext, _state: TurnState, configData: unknown): Promise<ConfigResponse> => {
+      tae.config.onConfigFetch(async (_ctx: TurnContext, _state: TurnState, configData: unknown): Promise<ConfigResponse> => {
         handled = true
         assert.deepStrictEqual(configData, { settingsKey: 'value' })
         return { responseType: 'config', config: { type: 'continue', value: { title: 'Config' } } } as ConfigResponse
@@ -58,7 +58,7 @@ describe('Configuration', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.configuration.onConfigSubmit(async (): Promise<ConfigResponse> => {
+      tae.config.onConfigSubmit(async (): Promise<ConfigResponse> => {
         handled = true
         return { responseType: 'config', config: { type: 'continue', value: { title: 'Saved' } } } as ConfigResponse
       })
@@ -89,7 +89,7 @@ describe('Configuration', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.configuration.onConfigFetch(async (): Promise<ConfigResponse> => {
+      tae.config.onConfigFetch(async (): Promise<ConfigResponse> => {
         handled = true
         return { responseType: 'config', config: { type: 'continue' } } as ConfigResponse
       })
@@ -115,7 +115,7 @@ describe('Configuration', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.configuration.onConfigFetch(async (): Promise<ConfigResponse> => {
+      tae.config.onConfigFetch(async (): Promise<ConfigResponse> => {
         handled = true
         return { responseType: 'config', config: { type: 'continue' } } as ConfigResponse
       })

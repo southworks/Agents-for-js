@@ -43,7 +43,7 @@ describe('Meeting', () => {
     })
 
     const meetingDetails = { id: 'meeting-1', title: 'Standup' }
-    const activity = createMeetingActivity('application/vnd.microsoft.meetingStart', meetingDetails)
+    const activity = createMeetingActivity('APPLICATION/VND.MICROSOFT.MEETINGSTART', meetingDetails)
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -60,7 +60,7 @@ describe('Meeting', () => {
       tae.meetings.onEnd(async () => { handled = true })
     })
 
-    const activity = createMeetingActivity('application/vnd.microsoft.meetingEnd', { id: 'meeting-1' })
+    const activity = createMeetingActivity('APPLICATION/VND.MICROSOFT.MEETINGEND', { id: 'meeting-1' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -80,7 +80,7 @@ describe('Meeting', () => {
     })
 
     const participantsData = { members: [{ user: { id: 'user-1' }, meeting: { inMeeting: true, role: 'presenter' } }] }
-    const activity = createMeetingActivity('application/vnd.microsoft.meetingParticipantJoin', participantsData)
+    const activity = createMeetingActivity('APPLICATION/VND.MICROSOFT.MEETINGPARTICIPANTJOIN', participantsData)
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -97,7 +97,7 @@ describe('Meeting', () => {
       tae.meetings.onParticipantsLeave(async () => { handled = true })
     })
 
-    const activity = createMeetingActivity('application/vnd.microsoft.meetingParticipantLeave', { members: [] })
+    const activity = createMeetingActivity('APPLICATION/VND.MICROSOFT.MEETINGPARTICIPANTLEAVE', { members: [] })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)

@@ -3,17 +3,19 @@
 
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import type { MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
+import type { AppBasedLinkQuery, MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
 import { z } from 'zod'
 import { messagingExtensionQueryZodSchema } from './messagingExtensionQuery'
 import { TeamsTurnContext } from '../teamsTurnContext'
 
 const appBasedLinkQuerySchema = z.object({
-  url: z.string().url()
-})
+  url: z.string().optional(),
+  state: z.string().optional()
+}).passthrough()
 
-function parseAppBasedLinkQuery (value: unknown): { url: string } {
-  return appBasedLinkQuerySchema.parse(value)
+function parseAppBasedLinkQuery (value: unknown): AppBasedLinkQuery | undefined {
+  if (value == null) return undefined
+  return appBasedLinkQuerySchema.parse(value) as AppBasedLinkQuery
 }
 
 function matchesCommandId (context: TurnContext, commandId: string | RegExp): boolean {
@@ -24,13 +26,25 @@ function matchesCommandId (context: TurnContext, commandId: string | RegExp): bo
     : commandId.test(activityCommandId)
 }
 
+function matchesPreviewAction (context: TurnContext, previewAction: 'edit' | 'send'): boolean {
+  const activityPreviewAction = (context.activity.value as any)?.botMessagePreviewAction
+  return typeof activityPreviewAction !== 'string' ||
+    activityPreviewAction.length === 0 ||
+    activityPreviewAction.toLowerCase() === previewAction
+}
+
+function getActivityPreview (action: MessagingExtensionAction): Activity | undefined {
+  const activityPreview = action.botActivityPreview?.[0]
+  return activityPreview != null ? Activity.fromObject(activityPreview) : undefined
+}
+
 type RouteQueryHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
 type SelectItemHandler<TState extends TurnState, TData = unknown> = (context: TeamsTurnContext, state: TState, item: TData) => Promise<MessagingExtensionResponse>
-type QueryLinkHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, url: string) => Promise<MessagingExtensionResponse>
+type QueryLinkHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: AppBasedLinkQuery | undefined) => Promise<MessagingExtensionResponse>
 type FetchActionHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, action: MessagingExtensionAction) => Promise<MessagingExtensionActionResponse>
 type SubmitActionHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, action: MessagingExtensionAction) => Promise<MessagingExtensionActionResponse>
-type MessagePreviewEditHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, activity: Activity) => Promise<MessagingExtensionActionResponse>
-type MessagePreviewSendHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, activity: Activity) => Promise<void>
+type MessagePreviewEditHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, activity: Activity | undefined) => Promise<MessagingExtensionActionResponse>
+type MessagePreviewSendHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, activity: Activity | undefined) => Promise<void>
 type QuerySettingUrlHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState) => Promise<MessagingExtensionResponse>
 type SettingHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, settings: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
 type CardButtonClickedHandler<TState extends TurnState, TData = unknown> = (context: TeamsTurnContext, state: TState, cardData: TData) => Promise<void>
@@ -90,7 +104,7 @@ export class MessageExtension<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = parseAppBasedLinkQuery(context.activity.value)
-      const response: MessagingExtensionResponse = await handler(new TeamsTurnContext(context), state, query.url)
+      const response: MessagingExtensionResponse = await handler(new TeamsTurnContext(context), state, query)
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
       await context.sendActivity(invokeResponse)
     }
@@ -108,7 +122,7 @@ export class MessageExtension<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const query = parseAppBasedLinkQuery(context.activity.value)
-      const response: MessagingExtensionResponse = await handler(new TeamsTurnContext(context), state, query.url)
+      const response: MessagingExtensionResponse = await handler(new TeamsTurnContext(context), state, query)
       const invokeResponse = Activity.fromObject({ type: ActivityTypes.InvokeResponse, value: { status: 200, body: response } })
       await context.sendActivity(invokeResponse)
     }
@@ -141,7 +155,6 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
         context.activity.name === 'composeExtension/submitAction' &&
-        !(context.activity.value as any)?.botMessagePreviewAction &&
         matchesCommandId(context, commandId)
       )
     }
@@ -161,12 +174,12 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
         context.activity.name === 'composeExtension/submitAction' &&
-        (context.activity.value as any)?.botMessagePreviewAction === 'edit' &&
+        matchesPreviewAction(context, 'edit') &&
         matchesCommandId(context, commandId)
       ))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      const activity = context.activity.value as Activity
+      const activity = getActivityPreview(context.activity.value as MessagingExtensionAction)
       const response: MessagingExtensionActionResponse = await handler(new TeamsTurnContext(context), state, activity)
       const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
       invokeResponse.value = { status: 200, body: response }
@@ -182,16 +195,17 @@ export class MessageExtension<TState extends TurnState> {
         context.activity.type === ActivityTypes.Invoke &&
         context.activity.channelId === 'msteams' &&
         context.activity.name === 'composeExtension/submitAction' &&
-        (context.activity.value as any)?.botMessagePreviewAction === 'send' &&
+        matchesPreviewAction(context, 'send') &&
         matchesCommandId(context, commandId)
       ))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const msgExtensionAction = context.activity.value as MessagingExtensionAction
-      const activityPreview: Activity = msgExtensionAction.botActivityPreview?.length! > 0
-        ? Activity.fromObject(msgExtensionAction.botActivityPreview![0])
-        : new Activity(ActivityTypes.Message)
+      const activityPreview = getActivityPreview(msgExtensionAction)
       await handler(new TeamsTurnContext(context), state, activityPreview)
+      const invokeResponse = new Activity(ActivityTypes.InvokeResponse)
+      invokeResponse.value = { status: 200, body: {} }
+      await context.sendActivity(invokeResponse)
     }
     this._app.addRoute(routeSel, routeHandler, true, rank, authHandlers)
     return this

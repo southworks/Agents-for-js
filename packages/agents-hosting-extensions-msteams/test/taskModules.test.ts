@@ -21,6 +21,18 @@ function addConnectorClientToTurnState (context: TurnContext): void {
   })
 }
 
+function createTaskInvokeActivity (name: 'task/fetch' | 'task/submit', value: unknown): Activity {
+  return Activity.fromObject({
+    type: ActivityTypes.Invoke,
+    channelId: 'msteams',
+    name,
+    value,
+    from: { id: 'user', name: 'User' },
+    conversation: { id: 'conv' },
+    recipient: { id: 'bot' }
+  })
+}
+
 describe('TaskModule', function () {
   let app: AgentApplication<TurnState>
   let adapter: CloudAdapter
@@ -122,5 +134,93 @@ describe('TaskModule', function () {
     assert.strictEqual(invokeValue.status, 200)
     assert.strictEqual(invokeValue.body.task.type, 'message')
     assert.strictEqual(invokeValue.body.task.value, 'task module submitted')
+  })
+
+  it('onFetch with null value matches any fetch request with activity value', async function () {
+    let handled = false
+    const teamsExt = new TeamsAgentExtension(app)
+
+    app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
+      tae.taskModules.onFetch(null, async (_context: TurnContext, _state: TurnState, request): Promise<TaskModuleResponse> => {
+        handled = true
+        assert.strictEqual(request.data?.action, 'open-any')
+        return {
+          task: {
+            type: 'message',
+            value: 'wildcard fetch'
+          }
+        }
+      })
+    })
+
+    const activity = createTaskInvokeActivity('task/fetch', {
+      data: {
+        action: 'open-any'
+      }
+    })
+
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+
+    assert.strictEqual(handled, true)
+  })
+
+  it('onSubmit with null value matches any submit request with activity value', async function () {
+    let handled = false
+    const teamsExt = new TeamsAgentExtension(app)
+
+    app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
+      tae.taskModules.onSubmit(null, async (_context: TurnContext, _state: TurnState, request): Promise<TaskModuleResponse> => {
+        handled = true
+        assert.strictEqual(request.data?.name, 'Ada')
+        return {
+          task: {
+            type: 'message',
+            value: 'wildcard submit'
+          }
+        }
+      })
+    })
+
+    const activity = createTaskInvokeActivity('task/submit', {
+      data: {
+        name: 'Ada'
+      }
+    })
+
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+
+    assert.strictEqual(handled, true)
+  })
+
+  it('wildcard task routes do not match when activity value is null', async function () {
+    let fetchHandled = false
+    let submitHandled = false
+    const teamsExt = new TeamsAgentExtension(app)
+
+    app.registerExtension<TeamsAgentExtension>(teamsExt, (tae) => {
+      tae.taskModules.onFetch(null, async (): Promise<TaskModuleResponse> => {
+        fetchHandled = true
+        return { task: { type: 'message', value: 'fetch' } }
+      })
+      tae.taskModules.onSubmit(null, async (): Promise<TaskModuleResponse> => {
+        submitHandled = true
+        return { task: { type: 'message', value: 'submit' } }
+      })
+    })
+
+    const fetchContext = new TurnContext(adapter, createTaskInvokeActivity('task/fetch', null))
+    addConnectorClientToTurnState(fetchContext)
+    await app.run(fetchContext)
+
+    const submitContext = new TurnContext(adapter, createTaskInvokeActivity('task/submit', null))
+    addConnectorClientToTurnState(submitContext)
+    await app.run(submitContext)
+
+    assert.strictEqual(fetchHandled, false)
+    assert.strictEqual(submitHandled, false)
   })
 })

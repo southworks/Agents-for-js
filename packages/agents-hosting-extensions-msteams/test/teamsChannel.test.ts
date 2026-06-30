@@ -79,6 +79,24 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
+  it('onChannelEventReceived fires for channel member events', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.channels.onChannelEventReceived(async (_ctx, _state, data) => {
+        handled = true
+        assert.strictEqual(data.id, 'ch-member')
+      })
+    })
+
+    const activity = createChannelActivity('channelMemberAdded', { id: 'ch-member' })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, true)
+  })
+
   it('onChannelEventReceived does not fire for non-channel events', async () => {
     let handled = false
     const app = new AgentApplication()
@@ -122,7 +140,7 @@ describe('TeamsChannel', () => {
       tae.channels.onDeleted(async () => { handled = true })
     })
 
-    const activity = createChannelActivity('channelDeleted')
+    const activity = createChannelActivity('channelDeleted', { id: 'ch-deleted' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -137,7 +155,7 @@ describe('TeamsChannel', () => {
       tae.channels.onRenamed(async () => { handled = true })
     })
 
-    const activity = createChannelActivity('channelRenamed')
+    const activity = createChannelActivity('channelRenamed', { id: 'ch-renamed' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -152,7 +170,7 @@ describe('TeamsChannel', () => {
       tae.channels.onRestored(async () => { handled = true })
     })
 
-    const activity = createChannelActivity('channelRestored')
+    const activity = createChannelActivity('channelRestored', { id: 'ch-restored' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -167,7 +185,7 @@ describe('TeamsChannel', () => {
       tae.channels.onShared(async () => { handled = true })
     })
 
-    const activity = createChannelActivity('channelShared')
+    const activity = createChannelActivity('channelShared', { id: 'ch-shared' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -182,14 +200,32 @@ describe('TeamsChannel', () => {
       tae.channels.onUnshared(async () => { handled = true })
     })
 
-    const activity = createChannelActivity('channelUnshared')
+    const activity = createChannelActivity('channelUnshared', { id: 'ch-unshared' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
     assert.strictEqual(handled, true)
   })
 
-  it('onMemberAdded fires when membersAdded is present', async () => {
+  it('onMemberAdded fires for channelMemberAdded event', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.channels.onMemberAdded(async (_ctx, _state, data) => {
+        handled = true
+        assert.strictEqual(data.id, 'ch-member-added')
+      })
+    })
+
+    const activity = createChannelActivity('channelMemberAdded', { id: 'ch-member-added' })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, true)
+  })
+
+  it('onMemberAdded does not fire for conversation member changes without channel event data', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -201,33 +237,21 @@ describe('TeamsChannel', () => {
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
-    assert.strictEqual(handled, true)
-  })
-
-  it('onMemberAdded does not fire when membersAdded is empty', async () => {
-    let handled = false
-    const app = new AgentApplication()
-    const teamsExt = new TeamsAgentExtension(app)
-    app.registerExtension(teamsExt, (tae) => {
-      tae.channels.onMemberAdded(async () => { handled = true })
-    })
-
-    const activity = createMemberActivity([])
-    const context = new TurnContext(adapter, activity)
-    addConnectorClientToTurnState(context)
-    await app.run(context)
     assert.strictEqual(handled, false)
   })
 
-  it('onMemberRemoved fires when membersRemoved is present', async () => {
+  it('onMemberRemoved fires for channelMemberRemoved event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.channels.onMemberRemoved(async () => { handled = true })
+      tae.channels.onMemberRemoved(async (_ctx, _state, data) => {
+        handled = true
+        assert.strictEqual(data.id, 'ch-member-removed')
+      })
     })
 
-    const activity = createMemberActivity(undefined, [{ id: 'user-left' }])
+    const activity = createChannelActivity('channelMemberRemoved', { id: 'ch-member-removed' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
@@ -244,6 +268,21 @@ describe('TeamsChannel', () => {
 
     const activity = createChannelActivity('channelCreated', { id: 'ch-1' })
     activity.channelId = 'emulator'
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, false)
+  })
+
+  it('channel handlers do not fire when channel data is missing', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.channels.onCreated(async () => { handled = true })
+    })
+
+    const activity = createChannelActivity('channelCreated')
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)

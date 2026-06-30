@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
-import type { MessagingExtensionActionResponse, MessagingExtensionResponse, TaskModuleResponse } from '@microsoft/teams.api'
+import type { AppBasedLinkQuery, MessagingExtensionActionResponse, MessagingExtensionResponse, TaskModuleResponse } from '@microsoft/teams.api'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
   context.turnState.set(context.adapter.ConnectorClientKey, {
@@ -129,24 +129,24 @@ describe('MessageExtension - additional handlers', () => {
 
   it('onQueryLink fires for composeExtension/queryLink with valid URL', async () => {
     let handled = false
-    let receivedUrl: string = ''
+    let receivedQuery: AppBasedLinkQuery | undefined
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onQueryLink(async (_ctx, _state, url): Promise<MessagingExtensionResponse> => {
+      tae.messageExtensions.onQueryLink(async (_ctx, _state, query): Promise<MessagingExtensionResponse> => {
         handled = true
-        receivedUrl = url
+        receivedQuery = query
         return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
 
-    const activity = createInvokeActivity('composeExtension/queryLink', { url: 'https://example.com/page' })
+    const activity = createInvokeActivity('composeExtension/queryLink', { url: 'https://example.com/page', state: 'magic-code' })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
 
     assert.strictEqual(handled, true)
-    assert.strictEqual(receivedUrl, 'https://example.com/page')
+    assert.deepStrictEqual(receivedQuery, { url: 'https://example.com/page', state: 'magic-code' })
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
     assert.strictEqual((invokeResp.value as any).status, 200)
@@ -154,13 +154,13 @@ describe('MessageExtension - additional handlers', () => {
 
   it('onAnonymousQueryLink fires for composeExtension/anonymousQueryLink', async () => {
     let handled = false
-    let receivedUrl: string = ''
+    let receivedQuery: AppBasedLinkQuery | undefined
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onAnonymousQueryLink(async (_ctx, _state, url): Promise<MessagingExtensionResponse> => {
+      tae.messageExtensions.onAnonymousQueryLink(async (_ctx, _state, query): Promise<MessagingExtensionResponse> => {
         handled = true
-        receivedUrl = url
+        receivedQuery = query
         return { composeExtension: { type: 'result', attachmentLayout: 'list', attachments: [] } }
       })
     })
@@ -171,7 +171,7 @@ describe('MessageExtension - additional handlers', () => {
     await app.run(context)
 
     assert.strictEqual(handled, true)
-    assert.strictEqual(receivedUrl, 'https://example.com/anon')
+    assert.deepStrictEqual(receivedQuery, { url: 'https://example.com/anon' })
   })
 
   it('onFetchAction fires for composeExtension/fetchTask with matching commandId', async () => {
@@ -225,13 +225,15 @@ describe('MessageExtension - additional handlers', () => {
     assert.strictEqual((invokeResp.value as any).status, 200)
   })
 
-  it('onSubmitAction does not fire when botMessagePreviewAction is set', async () => {
+  it('onSubmitAction fires when botMessagePreviewAction is set', async () => {
     let handled = false
+    let receivedPreviewAction: string | undefined
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onSubmitAction('createCard', async (): Promise<MessagingExtensionActionResponse> => {
+      tae.messageExtensions.onSubmitAction('createCard', async (_ctx, _state, action): Promise<MessagingExtensionActionResponse> => {
         handled = true
+        receivedPreviewAction = action.botMessagePreviewAction
         return { composeExtension: { type: 'result', attachments: [] } }
       })
     })
@@ -243,29 +245,34 @@ describe('MessageExtension - additional handlers', () => {
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
-    assert.strictEqual(handled, false)
+    assert.strictEqual(handled, true)
+    assert.strictEqual(receivedPreviewAction, 'edit')
   })
 
   it('onMessagePreviewEdit fires for submitAction with botMessagePreviewAction=edit', async () => {
     let handled = false
+    let receivedActivity: Activity | undefined
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messageExtensions.onMessagePreviewEdit('createCard', async (): Promise<MessagingExtensionActionResponse> => {
+      tae.messageExtensions.onMessagePreviewEdit('createCard', async (_ctx, _state, previewActivity): Promise<MessagingExtensionActionResponse> => {
         handled = true
+        receivedActivity = previewActivity
         return { composeExtension: { type: 'result', attachments: [] } }
       })
     })
 
     const activity = createInvokeActivity('composeExtension/submitAction', {
       commandId: 'createCard',
-      botMessagePreviewAction: 'edit'
+      botMessagePreviewAction: 'edit',
+      botActivityPreview: [{ type: ActivityTypes.Message, text: 'Edit preview' }]
     })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
 
     assert.strictEqual(handled, true)
+    assert.strictEqual(receivedActivity!.text, 'Edit preview')
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
     assert.strictEqual((invokeResp.value as any).status, 200)
@@ -291,9 +298,13 @@ describe('MessageExtension - additional handlers', () => {
     addConnectorClientToTurnState(context)
     await app.run(context)
     assert.strictEqual(handled, true)
+    const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
+    assert.ok(invokeResp)
+    assert.strictEqual((invokeResp.value as any).status, 200)
+    assert.deepStrictEqual((invokeResp.value as any).body, {})
   })
 
-  it('onMessagePreviewSend creates empty message when botActivityPreview is empty', async () => {
+  it('onMessagePreviewSend passes undefined when botActivityPreview is empty', async () => {
     let handled = false
     let receivedActivity: Activity | undefined
     const app = new AgentApplication()
@@ -315,7 +326,7 @@ describe('MessageExtension - additional handlers', () => {
     await app.run(context)
 
     assert.strictEqual(handled, true)
-    assert.strictEqual(receivedActivity!.type, ActivityTypes.Message)
+    assert.strictEqual(receivedActivity, undefined)
   })
 
   it('onCardButtonClicked fires and sends InvokeResponse', async () => {

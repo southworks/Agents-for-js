@@ -1,5 +1,5 @@
 import { AdaptiveCard, AgentApplication, CardFactory, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { TeamsAgentExtension, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
+import { TeamsAgentExtension, teamsGetDataString, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import type { TaskModuleRequest, TaskModuleResponse } from '@microsoft/teams.api'
 
@@ -52,7 +52,7 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
     }
   })
     .onSubmit('simple_form', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
-      const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
+      const name = teamsGetDataString(request, 'name', 'Unknown')
       console.log('Task module submit:', request.data)
       await context.sendActivity(`Task module submitted successfully for ${name}!`)
 
@@ -106,7 +106,7 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
       }
     })
     .onSubmit('multi_step_form_submit_name', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
-      const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
+      const name = teamsGetDataString(request, 'name', 'Unknown')
 
       const formCard = {
         type: 'AdaptiveCard',
@@ -152,8 +152,8 @@ app.registerExtension<TeamsAgentExtension<TurnState>>(teamsExt, (tae) => {
       }
     })
     .onSubmit('multi_step_form_submit_email', async (context: TeamsTurnContext, state: TurnState, request: TaskModuleRequest): Promise<TaskModuleResponse> => {
-      const name = typeof request.data?.name === 'string' ? request.data.name : 'Unknown'
-      const email = typeof request.data?.email === 'string' ? request.data.email : 'No email provided'
+      const name = teamsGetDataString(request, 'name', 'Unknown')
+      const email = teamsGetDataString(request, 'email', 'No email provided')
 
       await context.sendActivity(`Hi ${name}, thanks for submitting the form! We got that your email is ${email}`)
 

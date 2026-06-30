@@ -4,6 +4,7 @@ import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
 import type { ReadReceiptInfo } from '../src/models/readReceiptInfo'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
+import { TeamsTurnContext } from '../src/teamsTurnContext'
 
 function addConnectorClientToTurnState (context: TurnContext): void {
   context.turnState.set(context.adapter.ConnectorClientKey, {
@@ -19,12 +20,15 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 describe('Message', () => {
   const adapter = new CloudAdapter()
 
-  it('onMessageEdit fires for editMessage event', async () => {
+  it('onMessageEdit fires for editMessage event with base TurnContext', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messages.onMessageEdit(async () => { handled = true })
+      tae.messages.onMessageEdit(async (context) => {
+        handled = true
+        assert.strictEqual(context instanceof TeamsTurnContext, false)
+      })
     })
 
     const activity = Activity.fromObject({
@@ -33,7 +37,7 @@ describe('Message', () => {
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },
-      channelData: { eventType: 'editMessage' }
+      channelData: { eventType: 'EDITMESSAGE' }
     })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
@@ -55,7 +59,7 @@ describe('Message', () => {
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },
-      channelData: { eventType: 'softDeleteMessage' }
+      channelData: { eventType: 'SOFTDELETEMESSAGE' }
     })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
@@ -77,7 +81,7 @@ describe('Message', () => {
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },
-      channelData: { eventType: 'undeleteMessage' }
+      channelData: { eventType: 'UNDELETEMESSAGE' }
     })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
@@ -101,7 +105,7 @@ describe('Message', () => {
     const activity = Activity.fromObject({
       type: ActivityTypes.Event,
       channelId: 'msteams',
-      name: 'application/vnd.microsoft.readReceipt',
+      name: 'APPLICATION/VND.MICROSOFT.READRECEIPT',
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },
@@ -115,12 +119,12 @@ describe('Message', () => {
     assert.strictEqual(receivedData?.lastReadMessageId, '42')
   })
 
-  it('onO365ConnectorCardAction fires and sends InvokeResponse', async () => {
+  it('onExecuteAction fires and sends InvokeResponse', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messages.onO365ConnectorCardAction(async (_ctx, _state, query) => {
+      tae.messages.onExecuteAction(async (_ctx, _state, query) => {
         handled = true
         assert.strictEqual(query.actionId, 'action-1')
       })
@@ -129,7 +133,7 @@ describe('Message', () => {
     const activity = Activity.fromObject({
       type: ActivityTypes.Invoke,
       channelId: 'msteams',
-      name: 'actionableMessage/executeAction',
+      name: 'ACTIONABLEMESSAGE/EXECUTEACTION',
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },

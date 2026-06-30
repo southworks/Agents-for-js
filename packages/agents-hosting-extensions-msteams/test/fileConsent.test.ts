@@ -33,18 +33,18 @@ describe('FileConsent', () => {
     const activity = Activity.fromObject({
       type: ActivityTypes.Invoke,
       channelId: 'msteams',
-      name: 'fileConsent/invoke',
+      name: 'FILECONSENT/INVOKE',
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },
-      value: { action: 'accept', context: { filename: 'test.txt' }, uploadInfo: { uploadUrl: 'https://example.com' } }
+      value: { action: 'ACCEPT', context: { filename: 'test.txt' }, uploadInfo: { uploadUrl: 'https://example.com' } }
     })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)
     await app.run(context)
 
     assert.strictEqual(handled, true)
-    assert.strictEqual((receivedResponse as any).action, 'accept')
+    assert.strictEqual((receivedResponse as any).action, 'ACCEPT')
 
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
@@ -63,11 +63,11 @@ describe('FileConsent', () => {
     const activity = Activity.fromObject({
       type: ActivityTypes.Invoke,
       channelId: 'msteams',
-      name: 'fileConsent/invoke',
+      name: 'FILECONSENT/INVOKE',
       from: { id: 'user' },
       conversation: { id: 'conv' },
       recipient: { id: 'bot' },
-      value: { action: 'decline' }
+      value: { action: 'DECLINE' }
     })
     const context = new TurnContext(adapter, activity)
     addConnectorClientToTurnState(context)

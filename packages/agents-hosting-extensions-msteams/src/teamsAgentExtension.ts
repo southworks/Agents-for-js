@@ -3,6 +3,7 @@
 
 import { Client as GraphClient, type AuthenticationProvider, type ClientOptions } from '@microsoft/microsoft-graph-client'
 import { AgentApplication, AgentExtension, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { Client as TeamsClient } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
 import { TeamsConfig } from './config/config'
 import { FileConsent } from './fileConsents/fileConsent'
@@ -14,6 +15,7 @@ import { TeamsChannel } from './channels/teamsChannel'
 import { TeamsTeam } from './teams/teamsTeam'
 import { setTeamsApiClient } from './teamsApiClientExtensions'
 import { applyTeamsHeaderPropagation } from './teamsHeaderPropagation'
+import { TeamsTurnContext } from './teamsTurnContext'
 
 const DEFAULT_GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
 
@@ -85,7 +87,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
   private _teams: TeamsTeam<TState>
   private _messages: Message<TState>
   private _fileConsent: FileConsent<TState>
-  private _configuration: TeamsConfig<TState>
+  private _config: TeamsConfig<TState>
 
   constructor (app: AgentApplication<TState>) {
     super('msteams')
@@ -97,7 +99,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     this._teams = new TeamsTeam(app)
     this._messages = new Message(app)
     this._fileConsent = new FileConsent(app)
-    this._configuration = new TeamsConfig(app)
+    this._config = new TeamsConfig(app)
 
     const headerPropagation = this._app.options.headerPropagation
     this._app.options.headerPropagation = (headers) => {
@@ -146,8 +148,12 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     return this._fileConsent
   }
 
-  public get configuration (): TeamsConfig<TState> {
-    return this._configuration
+  public get config (): TeamsConfig<TState> {
+    return this._config
+  }
+
+  public getTeamsClient (context: TurnContext): TeamsClient {
+    return new TeamsTurnContext(context).client
   }
 
   public getGraphClient (context: TurnContext, handlerName?: string, graphBaseUrl: string = DEFAULT_GRAPH_BASE_URL): GraphClient {

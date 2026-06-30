@@ -92,18 +92,45 @@ describe('TeamsAgentExtension', () => {
     assert.throws(() => new TeamsTurnContext(context).client, /Teams API client is not available/)
   })
 
-  it('passes TeamsTurnContext to Teams handlers', async () => {
+  it('gets the Teams client for a Teams turn', async () => {
+    const app = new AgentApplication()
+    const extension = new TeamsAgentExtension(app)
+
+    app.registerExtension(extension, () => {})
+    app.onActivity(ActivityTypes.Message, async () => {})
+
+    const context = createContext()
+    const handled = await app.runInternal(context)
+    const teamsClient = extension.getTeamsClient(context)
+
+    assert.strictEqual(handled, true)
+    assert.strictEqual(teamsClient.serviceUrl, 'https://service.example.com')
+  })
+
+  it('throws when getting the Teams client before it is available', () => {
+    const app = new AgentApplication()
+    const extension = new TeamsAgentExtension(app)
+    const context = createContext('emulator')
+
+    assert.throws(() => extension.getTeamsClient(context), /Teams API client is not available/)
+  })
+
+  it('passes TeamsTurnContext to Teams channel handlers', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
     let handlerContext: TeamsTurnContext | undefined
 
     app.registerExtension(extension, (teams) => {
-      teams.messages.onMessageEdit(async (context) => {
+      teams.channels.onCreated(async (context) => {
         handlerContext = context
       })
     })
 
-    const context = createContext('msteams', ActivityTypes.MessageUpdate)
+    const context = createContext('msteams', ActivityTypes.ConversationUpdate)
+    context.activity.channelData = {
+      eventType: 'channelCreated',
+      channel: { id: 'channel-id' }
+    }
     const handled = await app.runInternal(context)
 
     assert.strictEqual(handled, true)
