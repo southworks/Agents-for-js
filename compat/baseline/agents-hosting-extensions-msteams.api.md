@@ -10,35 +10,46 @@ import { AgentErrorDefinition } from '@microsoft/agents-activity';
 import { AgentExtension } from '@microsoft/agents-hosting';
 import type { AppBasedLinkQuery } from '@microsoft/teams.api';
 import type { ChannelData } from '@microsoft/teams.api';
-import { ChannelInfo } from '@microsoft/teams.api';
+import type { ChannelInfo } from '@microsoft/teams.api';
 import { Client } from '@microsoft/teams.api';
+import { Client as Client_2 } from '@microsoft/microsoft-graph-client';
 import type { ConfigResponse } from '@microsoft/teams.api';
+import { ConversationUpdateEvents } from '@microsoft/agents-hosting';
 import type { FileConsentCardResponse } from '@microsoft/teams.api';
-import { InvokeResponse } from '@microsoft/agents-hosting';
 import type { MeetingDetails } from '@microsoft/teams.api';
 import type { MessagingExtensionAction } from '@microsoft/teams.api';
 import type { MessagingExtensionActionResponse } from '@microsoft/teams.api';
 import type { MessagingExtensionQuery } from '@microsoft/teams.api';
 import type { MessagingExtensionResponse } from '@microsoft/teams.api';
-import type { MessagingExtensionResult } from '@microsoft/teams.api';
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api';
 import type { OnBehalfOf } from '@microsoft/teams.api';
+import { ResourceResponse } from '@microsoft/agents-hosting';
 import { RouteHandler } from '@microsoft/agents-hosting';
+import { RouteSelector } from '@microsoft/agents-hosting';
 import type { TaskModuleRequest } from '@microsoft/teams.api';
 import type { TaskModuleResponse } from '@microsoft/teams.api';
-import { TeamInfo } from '@microsoft/teams.api';
-import { TeamsChannelAccount } from '@microsoft/teams.api';
+import type { TeamInfo } from '@microsoft/teams.api';
+import type { TeamsChannelAccount } from '@microsoft/teams.api';
 import { TurnContext } from '@microsoft/agents-hosting';
 import { TurnState } from '@microsoft/agents-hosting';
 import { z } from 'zod';
 
 // @public (undocumented)
-export class Configuration<TState extends TurnState = TurnState> {
-    constructor(app: AgentApplication<TState>);
+export interface FeedbackActionValue {
     // (undocumented)
-    onConfigFetch(handler: ConfigurationHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    feedback?: string | Record<string, unknown>;
     // (undocumented)
-    onConfigSubmit(handler: ConfigurationHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    reaction?: string;
+}
+
+// @public (undocumented)
+export interface FeedbackData {
+    // (undocumented)
+    actionName?: string;
+    // (undocumented)
+    actionValue?: FeedbackActionValue;
+    // (undocumented)
+    replyToId?: string;
 }
 
 // @public (undocumented)
@@ -49,9 +60,6 @@ export class FileConsent<TState extends TurnState = TurnState> {
     // (undocumented)
     onDecline(handler: FileConsentHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
-
-// @public (undocumented)
-export function getTeamsClient(context: TurnContext): Client;
 
 // @public (undocumented)
 export class Meeting<TState extends TurnState> {
@@ -82,13 +90,13 @@ export interface MeetingParticipantsEventDetails {
 export class Message<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
     // (undocumented)
+    onExecuteAction(handler: ExecuteActionRouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    // (undocumented)
     onMessageDelete(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onMessageEdit(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onMessageUndelete(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
-    onO365ConnectorCardAction(handler: O365ConnectorCardActionHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onReadReceipt(handler: ReadReceiptHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
@@ -101,9 +109,7 @@ export class MessageExtension<TState extends TurnState> {
     // (undocumented)
     onAnonymousQueryLink(handler: QueryLinkHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
-    onCardButtonClicked(handler: CardButtonClickedHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
-    onConfigureSettings(handler: ConfigureSettingsHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    onCardButtonClicked<TData = unknown>(handler: CardButtonClickedHandler<TState, TData>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onFetchAction(commandId: string | RegExp, handler: FetchActionHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
@@ -115,9 +121,11 @@ export class MessageExtension<TState extends TurnState> {
     // (undocumented)
     onQueryLink(handler: QueryLinkHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
-    onQueryUrlSetting(handler: QueryUrlSettingHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    OnQuerySettingUrl(handler: QuerySettingUrlHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
-    onSelectItem(handler: SelectItemHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    onSelectItem<TData = unknown>(handler: SelectItemHandler<TState, TData>, rank?: number, authHandlers?: string[]): this;
+    // (undocumented)
+    OnSetting(handler: SettingHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onSubmitAction(commandId: string | RegExp, handler: SubmitActionHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
@@ -194,14 +202,46 @@ export const messagingExtensionQueryZodSchema: z.ZodObject<{
     state: z.ZodOptional<z.ZodString>;
 }, z.ZodTypeAny, "passthrough">>;
 
+// @public (undocumented)
+export function onTeamsActivity<TState extends TurnState>(app: AgentApplication<TState>, type: string | RegExp, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsConversationUpdate<TState extends TurnState>(app: AgentApplication<TState>, event: ConversationUpdateEvents | string, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsEvent<TState extends TurnState>(app: AgentApplication<TState>, name: string | RegExp, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsEvent<TState extends TurnState>(app: AgentApplication<TState>, selector: RouteSelector, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsFeedbackLoop<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsFeedbackLoopHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsHandoff<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsHandoffHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsMessage<TState extends TurnState>(app: AgentApplication<TState>, text: string | RegExp, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsMessageReactionsAdded<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
+// @public (undocumented)
+export function onTeamsMessageReactionsRemoved<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
+
 // @public
 export function parseTeamsChannelData(o: unknown): ChannelData;
 
 // @public
 export function parseValueMessagingExtensionQuery(value: unknown): MessagingExtensionQuery;
 
-// @public (undocumented)
-export function setTeamsApiClient(context: TurnContext, channelId?: string): void;
+// @public
+export class ReadReceiptInfo {
+    constructor(lastReadMessageId?: string);
+    static isMessageRead(compareMessageId: string, lastReadMessageId: string): boolean;
+    isMessageRead(compareMessageId: string): boolean;
+    lastReadMessageId: string;
+}
 
 // @public (undocumented)
 export class TaskModule<TState extends TurnState> {
@@ -209,7 +249,7 @@ export class TaskModule<TState extends TurnState> {
     // (undocumented)
     _app: AgentApplication<TState>;
     // (undocumented)
-    onFetch(value: string | RegExp, handler: FetchHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
+    onFetch(value: string | RegExp | null, handler: FetchHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onSubmit(value: string | RegExp | null, handler: SubmitHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
 }
@@ -220,11 +260,13 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     // (undocumented)
     get channels(): TeamsChannel<TState>;
     // (undocumented)
-    get configuration(): Configuration<TState>;
+    get config(): TeamsConfig<TState>;
     // (undocumented)
     get fileConsent(): FileConsent<TState>;
     // (undocumented)
-    static getTeamsClient(context: TurnContext): Client;
+    getGraphClient(context: TurnContext, handlerName?: string, graphBaseUrl?: string): Client_2;
+    // (undocumented)
+    getTeamsClient(context: TurnContext): Client;
     // (undocumented)
     get meetings(): Meeting<TState>;
     // (undocumented)
@@ -235,12 +277,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     get taskModules(): TaskModule<TState>;
     // (undocumented)
     get teams(): TeamsTeam<TState>;
-    // (undocumented)
-    static readonly TeamsApiClientKey: symbol;
 }
-
-// @public (undocumented)
-export const TeamsApiClientKey: unique symbol;
 
 // @public (undocumented)
 export class TeamsChannel<TState extends TurnState = TurnState> {
@@ -265,6 +302,15 @@ export class TeamsChannel<TState extends TurnState = TurnState> {
     onUnshared(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
+// @public (undocumented)
+export class TeamsConfig<TState extends TurnState = TurnState> {
+    constructor(app: AgentApplication<TState>);
+    // (undocumented)
+    onConfigFetch(handler: ConfigHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    // (undocumented)
+    onConfigSubmit(handler: ConfigHandler<TState>, rank?: number, authHandlers?: string[]): this;
+}
+
 // @public
 export function teamsEnableFeedbackLoop(activity: Activity, feedbackLoopType?: string): boolean;
 
@@ -273,8 +319,17 @@ export const TeamsExtensionErrors: {
     [key: string]: AgentErrorDefinition;
 };
 
+// @public (undocumented)
+export type TeamsFeedbackLoopHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, feedbackData: FeedbackData) => Promise<void>;
+
 // @public
 export function teamsGetChannelId(activity: Activity): string | undefined;
+
+// @public
+export function teamsGetDataAs<T = unknown>(request: TeamsDataContainer): T | undefined;
+
+// @public
+export function teamsGetDataString(source: TeamsDataContainer | unknown, key: string, defaultValue?: string): string;
 
 // @public
 export function teamsGetMeetingInfo(activity: Activity): ChannelData['meeting'] | undefined;
@@ -288,6 +343,9 @@ export function teamsGetTeamInfo(activity: Activity): ChannelData['team'] | unde
 // @public
 export function teamsGetTeamOnBehalfOf(activity: Activity): OnBehalfOf[] | undefined;
 
+// @public (undocumented)
+export type TeamsHandoffHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, continuation: string) => Promise<void>;
+
 // @public
 export function teamsNotifyUser(activity: Activity, alertInMeeting?: boolean, externalResourceUrl?: string): void;
 
@@ -298,6 +356,9 @@ export const TeamsProactiveServiceEndpoints: {
     readonly gccHigh: "https://smba.infra.gov.teams.microsoft.us/teams";
     readonly dod: "https://smba.infra.dod.teams.microsoft.us/teams";
 };
+
+// @public (undocumented)
+export type TeamsRouteHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState) => Promise<void>;
 
 // @public (undocumented)
 export class TeamsTeam<TState extends TurnState = TurnState> {
@@ -316,6 +377,16 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
     onTeamEventReceived(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
     // (undocumented)
     onUnarchived(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
+}
+
+// @public (undocumented)
+export class TeamsTurnContext extends TurnContext {
+    // (undocumented)
+    get client(): Client;
+    // (undocumented)
+    sendTargetedActivities(activities: Activity[]): Promise<ResourceResponse[]>;
+    // (undocumented)
+    sendTargetedActivity(activity: Activity): Promise<ResourceResponse | undefined>;
 }
 
 // (No @packageDocumentation comment for this package)

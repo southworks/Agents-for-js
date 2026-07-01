@@ -1,0 +1,173 @@
+import assert from 'node:assert'
+import { describe, it } from 'node:test'
+import { Activity, ActivityTypes } from '@microsoft/agents-activity'
+import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
+import type { ReadReceiptInfo } from '../src/models/readReceiptInfo'
+import { TeamsAgentExtension } from '../src/teamsAgentExtension'
+import { TeamsTurnContext } from '../src/teamsTurnContext'
+
+function addConnectorClientToTurnState (context: TurnContext): void {
+  context.turnState.set(context.adapter.ConnectorClientKey, {
+    httpClient: {
+      baseURL: 'https://service.example.com',
+      defaultHeaders: {
+        Authorization: 'Bearer token'
+      }
+    }
+  })
+}
+
+describe('Message', () => {
+  const adapter = new CloudAdapter()
+
+  it('onMessageEdit fires for editMessage event with base TurnContext', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.messages.onMessageEdit(async (context) => {
+        handled = true
+        assert.strictEqual(context instanceof TeamsTurnContext, false)
+      })
+    })
+
+    const activity = Activity.fromObject({
+      type: ActivityTypes.MessageUpdate,
+      channelId: 'msteams',
+      from: { id: 'user' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' },
+      channelData: { eventType: 'EDITMESSAGE' }
+    })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, true)
+  })
+
+  it('onMessageDelete fires for softDeleteMessage event', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.messages.onMessageDelete(async () => { handled = true })
+    })
+
+    const activity = Activity.fromObject({
+      type: ActivityTypes.MessageDelete,
+      channelId: 'msteams',
+      from: { id: 'user' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' },
+      channelData: { eventType: 'SOFTDELETEMESSAGE' }
+    })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, true)
+  })
+
+  it('onMessageUndelete fires for undeleteMessage event', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.messages.onMessageUndelete(async () => { handled = true })
+    })
+
+    const activity = Activity.fromObject({
+      type: ActivityTypes.MessageUpdate,
+      channelId: 'msteams',
+      from: { id: 'user' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' },
+      channelData: { eventType: 'UNDELETEMESSAGE' }
+    })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, true)
+  })
+
+  it('onReadReceipt fires for readReceipt event', async () => {
+    let handled = false
+    let receivedData: ReadReceiptInfo | undefined
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.messages.onReadReceipt(async (_ctx, _state, data) => {
+        handled = true
+        receivedData = data
+      })
+    })
+
+    const receiptValue = { lastReadMessageId: '42' }
+    const activity = Activity.fromObject({
+      type: ActivityTypes.Event,
+      channelId: 'msteams',
+      name: 'APPLICATION/VND.MICROSOFT.READRECEIPT',
+      from: { id: 'user' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' },
+      value: receiptValue
+    })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, true)
+    assert.deepStrictEqual(receivedData, receiptValue)
+    assert.strictEqual(receivedData?.lastReadMessageId, '42')
+  })
+
+  it('onExecuteAction fires and sends InvokeResponse', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.messages.onExecuteAction(async (_ctx, _state, query) => {
+        handled = true
+        assert.strictEqual(query.actionId, 'action-1')
+      })
+    })
+
+    const activity = Activity.fromObject({
+      type: ActivityTypes.Invoke,
+      channelId: 'msteams',
+      name: 'ACTIONABLEMESSAGE/EXECUTEACTION',
+      from: { id: 'user' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' },
+      value: { actionId: 'action-1' }
+    })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+
+    assert.strictEqual(handled, true)
+    const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
+    assert.ok(invokeResp)
+    assert.strictEqual((invokeResp.value as any).status, 200)
+  })
+
+  it('message handlers do not fire for non-msteams channel', async () => {
+    let handled = false
+    const app = new AgentApplication()
+    const teamsExt = new TeamsAgentExtension(app)
+    app.registerExtension(teamsExt, (tae) => {
+      tae.messages.onMessageEdit(async () => { handled = true })
+    })
+
+    const activity = Activity.fromObject({
+      type: ActivityTypes.MessageUpdate,
+      channelId: 'emulator',
+      from: { id: 'user' },
+      conversation: { id: 'conv' },
+      recipient: { id: 'bot' },
+      channelData: { eventType: 'editMessage' }
+    })
+    const context = new TurnContext(adapter, activity)
+    addConnectorClientToTurnState(context)
+    await app.run(context)
+    assert.strictEqual(handled, false)
+  })
+})

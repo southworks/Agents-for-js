@@ -16,7 +16,7 @@ The repository is a **monorepo** using npm workspaces with multiple interconnect
 - **agents-hosting**: Core hosting components including ActivityHandler, TurnContext, CloudAdapter, authentication, and state management. Replaces `botbuilder`.
 - **agents-hosting-express**: Express.js integration for hosting agents.
 - **agents-hosting-dialogs**: Dialog system for building conversational flows. Replaces `botbuilder-dialogs`.
-- **agents-hosting-extensions-teams**: Teams-specific features (TaskModules, Messaging Extensions).
+- **agents-hosting-extensions-msteams**: Teams-specific features (TaskModules, Messaging Extensions).
 - **agents-hosting-storage-blob**: Azure Blob Storage adapter. Replaces `botbuilder-azure`.
 - **agents-hosting-storage-cosmos**: CosmosDB storage adapter. Replaces `botbuilder-azure`.
 - **agents-copilotstudio-client**: Direct-to-Engine client for interacting with Copilot Studio agents.
@@ -113,6 +113,27 @@ The package dependency hierarchy (simplified):
 **CloudAdapter**: Processes incoming HTTP requests, authenticates them, and creates TurnContext. Handles the communication with channels.
 
 **Storage**: Abstraction for persisting state (conversation, user, private). Implementations exist for Memory, Blob, and Cosmos.
+
+### Teams Extension (Teams SDK Migration)
+
+The `agents-hosting-extensions-msteams` package has been updated to align with the Teams SDK-based architecture used in .NET.
+
+- **Teams SDK dependency**: Uses `@microsoft/teams.api` (`2.0.8`) for Teams models and client operations.
+- **Removed legacy wrapper**: `TeamsConnectorClient` and most Teams-specific local model wrappers were removed from the JS extension layer.
+- **Shared Teams client setup**: Teams client setup/retrieval is centralized in `packages/agents-hosting-extensions-msteams/src/teamsApiClient.ts`:
+  - `TeamsApiClientKey`
+  - `setTeamsApiClient(context, channelId?)`
+  - `getTeamsClient(context)`
+- **Turn setup requirements**:
+  - `TeamsAgentExtension` registers `beforeTurn` and calls `setTeamsApiClient(...)` for `AgentApplication` scenarios.
+  - Legacy `TeamsActivityHandler`, `SetTeamsApiClientMiddleware`, and `TeamsInfo` APIs have been removed.
+  - Use `TeamsAgentExtension.getTeamsClient(context)` or `getTeamsClient(context)` for Teams SDK client access.
+- **Error handling**:
+  - Missing client access throws `TeamsApiClientNotAvailable`.
+  - Teams client setup prerequisites throw `TeamsApiClientSetupFailed` (for easier misconfiguration diagnosis).
+- **Parsing simplification**:
+  - Teams channel data parsing was simplified to root-object validation/pass-through (`activity-extensions/teamsChannelData.ts`).
+  - Messaging extension query parsing remains validated via Zod schema (`messageExtension/messagingExtensionQuery.ts`).
 
 ### Authentication
 

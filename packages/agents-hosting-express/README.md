@@ -23,6 +23,28 @@ app.onActivity('message', async (context) => {
 startServer(app);
 ```
 
+### Adapter Configuration
+
+Use `configureAdapter` to customize the `CloudAdapter` used by `startServer`.
+This is useful for `ActivityHandler` scenarios where `startServer` creates the adapter internally,
+and for `AgentApplication` scenarios where you want to reuse the application's adapter and add middleware.
+
+```ts
+ import { startServer } from '@microsoft/agents-hosting-express';
+ import { AgentApplication, TurnState } from '@microsoft/agents-hosting';
+
+ const app = new AgentApplication<TurnState>();
+
+ startServer(app, {
+   configureAdapter: (adapter) => {
+     adapter.use(async (context, next) => {
+       console.log(`Received ${context.activity.type}`)
+       await next()
+     })
+   }
+ })
+ ```
+
 ### Custom routes alongside the agent endpoint
 
 Use the `beforeListen` hook to add routes before the server starts listening:
