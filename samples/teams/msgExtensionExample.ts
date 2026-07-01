@@ -1,7 +1,7 @@
 import { AdaptiveCard, AgentApplication, MemoryStorage, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { TeamsAgentExtension, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
-import { MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
+import { AppBasedLinkQuery, MessagingExtensionAction, MessagingExtensionActionResponse, MessagingExtensionQuery, MessagingExtensionResponse } from '@microsoft/teams.api'
 
 const app = new AgentApplication<TurnState>({ storage: new MemoryStorage() })
 
@@ -11,8 +11,8 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
   console.log('Teams extension registered')
 
   tae.messageExtensions
-    .onQueryLink(async (context: TeamsTurnContext, state: TurnState, link: string) : Promise<MessagingExtensionResponse> => {
-      await context.sendActivity(`Received a message with the link: ${link}`)
+    .onQueryLink(async (context: TeamsTurnContext, state: TurnState, query: AppBasedLinkQuery | undefined) : Promise<MessagingExtensionResponse> => {
+      await context.sendActivity(`Received a message with the link: ${query?.url}`)
       return {
         composeExtension: {
           attachmentLayout: 'list',
@@ -22,12 +22,12 @@ app.registerExtension<TeamsAgentExtension>(teamsExt, tae => {
               contentType: 'application/vnd.microsoft.card.thumbnail',
               content: {
                 title: 'Link Preview',
-                text: `You clicked on a link: ${link}`,
+                text: `You clicked on a link: ${query?.url}`,
                 tap: {
                   type: 'invoke',
                   value: {
                     title: 'Link Clicked',
-                    text: `You clicked on the link: ${link}`
+                    text: `You clicked on the link: ${query?.url}`
                   }
                 }
               }

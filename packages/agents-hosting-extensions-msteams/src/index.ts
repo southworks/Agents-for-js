@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
 export * from './activity-extensions'
 export * from './channels'
 export * from './config'
@@ -11,6 +14,7 @@ export * from './models/readReceiptInfo'
 export * from './taskModules'
 export * from './teams'
 export * from './teamsActivityExtensions'
+export * from './app'
 export * from './teamsAgentExtension'
 export * from './teamsModelExtensions'
 export * from './teamsTurnContext'
