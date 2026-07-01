@@ -10,7 +10,9 @@ type CardValue = {
   count?: number
 }
 
-app.registerExtension<TeamsAgentExtension>(new TeamsAgentExtension(app), (tae) => {
+const teamsAgentExtension = new TeamsAgentExtension(app)
+
+app.registerExtension<TeamsAgentExtension>(teamsAgentExtension, (tae) => {
   tae.channels.onMemberAdded(async (context: TeamsTurnContext) => {
     if (context.activity.conversation?.conversationType === 'personal') {
       return
@@ -147,7 +149,12 @@ app
         throw error
       }
     }
-  })
+    const graphClient = teamsAgentExtension.getGraphClient(context, 'graph')
+    if (graphClient) {
+      const me = await graphClient.api('/me').get()
+      await context.sendActivity(`Graph thinks you are: ${me.displayName}.`)
+    }
+  }, ['graph'])
   .onMessage('delete', async (context: TurnContext) => {
     if (!context.activity.replyToId) {
       await context.sendActivity('This card cannot be deleted because there is no reply target.')
@@ -231,16 +238,16 @@ function getCardCount (value: unknown): number {
 
 async function getPagedMembers (context: TurnContext, pageSize?: number, continuationToken?: string): Promise<PagedMembersResult> {
   const conversationId = getMembersConversationId(context)
-  const teamsContext = new TeamsTurnContext(context)
+  const api = teamsAgentExtension.getTeamsClient(context)
 
-  return await teamsContext.client.conversations.members(conversationId).getPaged(pageSize, continuationToken)
+  return await api.conversations.members(conversationId).getPaged(pageSize, continuationToken)
 }
 
 async function getMember (context: TurnContext, userId: string): Promise<TeamsChannelAccount> {
   const conversationId = getMembersConversationId(context)
-  const teamsContext = new TeamsTurnContext(context)
+  const api = teamsAgentExtension.getTeamsClient(context)
 
-  return await teamsContext.client.conversations.members(conversationId).getById(userId)
+  return await api.conversations.members(conversationId).getById(userId)
 }
 
 function getMembersConversationId (context: TurnContext): string {

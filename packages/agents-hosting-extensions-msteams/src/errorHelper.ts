@@ -19,6 +19,31 @@ import { AgentErrorDefinition } from '@microsoft/agents-activity'
  * ```
  */
 export const Errors: { [key: string]: AgentErrorDefinition } = {
+  // Teams Graph Errors (-150012 to -150014)
+  /**
+   * Error thrown when a Graph authorization handler returns an empty token.
+   */
+  TeamsGraphTokenUnavailable: {
+    code: -150012,
+    description: 'Unable to acquire a Graph access token using authorization handler {handlerName}.'
+  },
+
+  /**
+   * Error thrown when no Graph authorization handlers are configured.
+   */
+  TeamsGraphAuthorizationHandlerRequired: {
+    code: -150013,
+    description: 'A Graph client requires at least one configured authorization handler.'
+  },
+
+  /**
+   * Error thrown when multiple Graph authorization handlers are configured and no handler name is provided.
+   */
+  TeamsGraphAuthorizationHandlerNameRequired: {
+    code: -150014,
+    description: 'A Graph client requires handlerName when multiple authorization handlers are configured.'
+  },
+
   // TaskModule Errors (-150016)
   /**
    * Error thrown when unexpected TaskModules.submit() is triggered.

@@ -8,16 +8,23 @@ describe('TeamsExtensionErrors', () => {
     assert.strictEqual(Errors.UnexpectedTaskModuleSubmit.code, -150016)
     assert.strictEqual(Errors.TeamsApiClientNotAvailable.code, -150010)
     assert.strictEqual(Errors.TeamsApiClientSetupFailed.code, -150011)
+    assert.strictEqual(Errors.TeamsGraphTokenUnavailable.code, -150012)
+    assert.strictEqual(Errors.TeamsGraphAuthorizationHandlerRequired.code, -150013)
+    assert.strictEqual(Errors.TeamsGraphAuthorizationHandlerNameRequired.code, -150014)
   })
 
   it('should contain error message in description', () => {
     assert.ok(Errors.UnexpectedTaskModuleSubmit.description.includes('TaskModules'))
     assert.ok(Errors.TeamsApiClientNotAvailable.description.includes('Teams API client'))
+    assert.ok(Errors.TeamsGraphTokenUnavailable.description.includes('Graph access token'))
   })
 
   it('should support parameter substitution in error messages', () => {
     const error = ExceptionHelper.generateException(Error, Errors.UnexpectedTaskModuleSubmit, undefined, { activityType: 'testType' })
     assert.ok(error.message.includes('testType'))
+
+    const graphError = ExceptionHelper.generateException(Error, Errors.TeamsGraphTokenUnavailable, undefined, { handlerName: 'graph' })
+    assert.ok(graphError.message.includes('graph'))
   })
 
   it('should have all required properties', () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
-import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext } from '@microsoft/agents-hosting'
+import { AgentApplication, CloudAdapter, INVOKE_RESPONSE_KEY, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import {
   onTeamsActivity,
   onTeamsConversationUpdate,
@@ -35,8 +35,8 @@ function createContext (activity: Partial<Activity>): TurnContext {
   return context
 }
 
-function createApp<TState = any> (): AgentApplication<TState> {
-  const app = new AgentApplication<TState>()
+function createApp (): AgentApplication<TurnState> {
+  const app = new AgentApplication<TurnState>()
   app.registerExtension(new TeamsAgentExtension(app), () => {})
   return app
 }
@@ -135,7 +135,7 @@ describe('TeamsAppExtensions', () => {
     onTeamsEvent(app, 'application/vnd.microsoft.readReceipt', async () => {
       handled.push('name')
     })
-    onTeamsEvent(app, async (context) => context.activity.value?.kind === 'custom', async () => {
+    onTeamsEvent(app, async (context) => (context.activity.value as Record<string, unknown> | undefined)?.['kind'] === 'custom', async () => {
       handled.push('selector')
     })
 

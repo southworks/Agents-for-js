@@ -1,11 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Client as GraphClient, type AuthenticationProvider, type ClientOptions } from '@microsoft/microsoft-graph-client'
 import { AgentApplication, AgentExtension, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { Client as TeamsClient } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
 import { TeamsConfig } from './config/config'
+import { Errors } from './errorHelper'
 import { FileConsent } from './fileConsents/fileConsent'
 import { Meeting } from './meetings/meeting'
 import { Message } from './messages/message'
@@ -31,7 +33,7 @@ class GraphAuthenticationProvider implements AuthenticationProvider {
     const { token } = await this.app.authorization.getToken(this.context, handlerName)
 
     if (!token?.trim()) {
-      throw new Error(`Unable to acquire a Graph access token using authorization handler '${handlerName}'.`)
+      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphTokenUnavailable, undefined, { handlerName })
     }
 
     return token
@@ -48,10 +50,10 @@ class GraphAuthenticationProvider implements AuthenticationProvider {
     }
 
     if (handlerIds.length === 0) {
-      throw new Error('A Graph client requires at least one configured authorization handler.')
+      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphAuthorizationHandlerRequired)
     }
 
-    throw new Error('A Graph client requires handlerName when multiple authorization handlers are configured.')
+    throw ExceptionHelper.generateException(Error, Errors.TeamsGraphAuthorizationHandlerNameRequired)
   }
 }
 
