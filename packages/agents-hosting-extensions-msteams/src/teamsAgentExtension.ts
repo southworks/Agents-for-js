@@ -80,6 +80,14 @@ function getHost (url: string): string | undefined {
   }
 }
 
+/**
+ * Adds Microsoft Teams-specific routing, context helpers, and API clients to an agent application.
+ *
+ * Register an instance with `AgentApplication.registerExtension` to configure handlers for Teams
+ * events, message extensions, task modules, file consent flows, and related Teams capabilities.
+ *
+ * @typeParam TState - The turn state type used by the agent application.
+ */
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
   private _app: AgentApplication<TState>
   private _meetings: Meeting<TState>
@@ -91,6 +99,14 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
   private _fileConsent: FileConsent<TState>
   private _config: TeamsConfig<TState>
 
+  /**
+   * Creates a new Teams extension for the provided agent application.
+   *
+   * The extension configures Teams header propagation and prepares a Teams API client for each
+   * incoming Teams turn.
+   *
+   * @param app - The agent application to extend with Teams capabilities.
+   */
   constructor (app: AgentApplication<TState>) {
     super('msteams')
     this._app = app
@@ -122,42 +138,81 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     })
   }
 
+  /**
+   * Gets the route registration helper for Teams meeting events.
+   */
   public get meetings (): Meeting<TState> {
     return this._meetings
   }
 
+  /**
+   * Gets the route registration helper for Teams message extension activities.
+   */
   public get messageExtensions (): MessageExtension<TState> {
     return this._messageExtensions
   }
 
+  /**
+   * Gets the route registration helper for Teams task module invoke activities.
+   */
   public get taskModules (): TaskModule<TState> {
     return this._taskModules
   }
 
+  /**
+   * Gets the route registration helper for Teams channel events.
+   */
   public get channels (): TeamsChannel<TState> {
     return this._channels
   }
 
+  /**
+   * Gets the route registration helper for Teams team events.
+   */
   public get teams (): TeamsTeam<TState> {
     return this._teams
   }
 
+  /**
+   * Gets the route registration helper for Teams message lifecycle events.
+   */
   public get messages (): Message<TState> {
     return this._messages
   }
 
+  /**
+   * Gets the route registration helper for Teams file consent card actions.
+   */
   public get fileConsent (): FileConsent<TState> {
     return this._fileConsent
   }
 
+  /**
+   * Gets the route registration helper for Teams app configuration invokes.
+   */
   public get config (): TeamsConfig<TState> {
     return this._config
   }
 
+  /**
+   * Gets the Teams API client associated with the current turn.
+   *
+   * @param context - The turn context for the current Teams activity.
+   * @returns The Teams API client stored on the turn.
+   * @throws If the current turn has not been initialized with a Teams API client.
+   */
   public getTeamsClient (context: TurnContext): TeamsClient {
     return new TeamsTurnContext(context).client
   }
 
+  /**
+   * Creates a Microsoft Graph client that obtains access tokens through the agent authorization system.
+   *
+   * @param context - The turn context used to acquire the user token.
+   * @param handlerName - Optional authorization handler name. Required when multiple handlers are configured.
+   * @param graphBaseUrl - Optional Graph base URL. Defaults to Microsoft Graph v1.0.
+   * @returns A Microsoft Graph client configured with the resolved authentication provider.
+   */
   public getGraphClient (context: TurnContext, handlerName?: string, graphBaseUrl: string = DEFAULT_GRAPH_BASE_URL): GraphClient {
     return GraphClient.initWithMiddleware(createGraphClientOptions(
       new GraphAuthenticationProvider(this._app, context, handlerName),

@@ -6,11 +6,29 @@ import { AgentApplication, RouteHandler, RouteRank, RouteSelector, TurnContext, 
 import type { MeetingDetails, TeamsChannelAccount } from '@microsoft/teams.api'
 import { TeamsTurnContext } from '../teamsTurnContext'
 
+/**
+ * Details provided by Teams meeting participant join and leave events.
+ */
 export interface MeetingParticipantsEventDetails {
+  /**
+   * Participants included in the meeting event.
+   */
   members: {
+    /**
+     * The Teams user account for the participant.
+     */
     user: TeamsChannelAccount
+    /**
+     * Meeting-specific participant state.
+     */
     meeting: {
+      /**
+       * Indicates whether the participant is currently in the meeting.
+       */
       inMeeting: boolean
+      /**
+       * Participant role in the meeting.
+       */
       role: string
     }
   }[]
@@ -29,13 +47,31 @@ function isMeetingEvent (context: TurnContext, eventName: string): boolean {
   )
 }
 
+/**
+ * Registers handlers for Microsoft Teams meeting events.
+ *
+ * @typeParam TState - The turn state type used by the agent application.
+ */
 export class Meeting<TState extends TurnState> {
   private _app: AgentApplication<TState>
 
+  /**
+   * Creates a Teams meeting route helper.
+   *
+   * @param app - The agent application that receives the registered routes.
+   */
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
+  /**
+   * Registers a handler for Teams meeting start events.
+   *
+   * @param handler - Handler invoked with meeting details.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This meeting helper for chaining.
+   */
   onStart (handler: MeetingStartHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(isMeetingEvent(context, 'application/vnd.microsoft.meetingStart'))
@@ -48,6 +84,14 @@ export class Meeting<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams meeting end events.
+   *
+   * @param handler - Handler invoked with meeting details.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This meeting helper for chaining.
+   */
   onEnd (handler: MeetingEndHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(isMeetingEvent(context, 'application/vnd.microsoft.meetingEnd'))
@@ -60,6 +104,14 @@ export class Meeting<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams meeting participant join events.
+   *
+   * @param handler - Handler invoked with participant event details.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This meeting helper for chaining.
+   */
   onParticipantsJoin (handler: MeetingParticipantsHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(isMeetingEvent(context, 'application/vnd.microsoft.meetingParticipantJoin'))
@@ -72,6 +124,14 @@ export class Meeting<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams meeting participant leave events.
+   *
+   * @param handler - Handler invoked with participant event details.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This meeting helper for chaining.
+   */
   onParticipantsLeave (handler: MeetingParticipantsHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(isMeetingEvent(context, 'application/vnd.microsoft.meetingParticipantLeave'))

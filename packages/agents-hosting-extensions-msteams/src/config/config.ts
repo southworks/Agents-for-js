@@ -8,13 +8,31 @@ import { TeamsTurnContext } from '../teamsTurnContext'
 
 type ConfigHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, configData: unknown) => Promise<ConfigResponse>
 
+/**
+ * Registers handlers for Microsoft Teams app configuration invokes.
+ *
+ * @typeParam TState - The turn state type used by the agent application.
+ */
 export class TeamsConfig<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
 
+  /**
+   * Creates a Teams configuration route helper.
+   *
+   * @param app - The agent application that receives the registered routes.
+   */
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
+  /**
+   * Registers a handler for Teams config/fetch invokes.
+   *
+   * @param handler - Handler invoked with the config fetch payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This config helper for chaining.
+   */
   onConfigFetch (handler: ConfigHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -33,6 +51,14 @@ export class TeamsConfig<TState extends TurnState = TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams config/submit invokes.
+   *
+   * @param handler - Handler invoked with the config submit payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This config helper for chaining.
+   */
   onConfigSubmit (handler: ConfigHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(

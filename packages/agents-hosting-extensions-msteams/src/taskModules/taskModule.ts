@@ -44,13 +44,33 @@ function matchesTaskInvoke (context: TurnContext, name: string, value: string | 
 type FetchHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
 type SubmitHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, request: TaskModuleRequest) => Promise<TaskModuleResponse>
 
+/**
+ * Registers handlers for Microsoft Teams task module invoke activities.
+ *
+ * @typeParam TState - The turn state type used by the agent application.
+ */
 export class TaskModule<TState extends TurnState> {
   _app: AgentApplication<TState>
 
+  /**
+   * Creates a Teams task module route helper.
+   *
+   * @param app - The agent application that receives the registered routes.
+   */
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
+  /**
+   * Registers a handler for Teams task/fetch invokes.
+   *
+   * @param value - Optional task data value or regular expression used to match the invoke.
+   * @param handler - Handler invoked with the task module request.
+   * @param key - Task data key to inspect when matching `value`. Defaults to `task`.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This task module helper for chaining.
+   */
   onFetch (value: string | RegExp | null, handler: FetchHandler<TState>, key: string = DEFAULT_TASK_DATA_KEY, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(matchesTaskInvoke(context, 'task/fetch', value, key))
@@ -66,6 +86,16 @@ export class TaskModule<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams task/submit invokes.
+   *
+   * @param value - Optional task data value or regular expression used to match the invoke.
+   * @param handler - Handler invoked with the task module request.
+   * @param key - Task data key to inspect when matching `value`. Defaults to `task`.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This task module helper for chaining.
+   */
   onSubmit (value: string | RegExp | null, handler: SubmitHandler<TState>, key: string = DEFAULT_TASK_DATA_KEY, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(matchesTaskInvoke(context, 'task/submit', value, key))

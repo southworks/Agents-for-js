@@ -49,13 +49,32 @@ type QuerySettingUrlHandler<TState extends TurnState> = (context: TeamsTurnConte
 type SettingHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, settings: MessagingExtensionQuery) => Promise<MessagingExtensionResponse>
 type CardButtonClickedHandler<TState extends TurnState, TData = unknown> = (context: TeamsTurnContext, state: TState, cardData: TData) => Promise<void>
 
+/**
+ * Registers handlers for Microsoft Teams message extension invokes.
+ *
+ * @typeParam TState - The turn state type used by the agent application.
+ */
 export class MessageExtension<TState extends TurnState> {
   _app: AgentApplication<TState>
 
+  /**
+   * Creates a Teams message extension route helper.
+   *
+   * @param app - The agent application that receives the registered routes.
+   */
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
+  /**
+   * Registers a handler for compose extension query invokes.
+   *
+   * @param commandId - Command ID or regular expression used to match the query command.
+   * @param handler - Handler invoked with the parsed messaging extension query.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onQuery (commandId: string | RegExp, handler: RouteQueryHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -76,6 +95,14 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for compose extension select item invokes.
+   *
+   * @param handler - Handler invoked with the selected item payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onSelectItem<TData = unknown> (handler: SelectItemHandler<TState, TData>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -94,6 +121,14 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for app-based link query invokes.
+   *
+   * @param handler - Handler invoked with the app-based link query payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onQueryLink (handler: QueryLinkHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -112,6 +147,14 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for anonymous app-based link query invokes.
+   *
+   * @param handler - Handler invoked with the app-based link query payload, when present.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onAnonymousQueryLink (handler: QueryLinkHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -130,6 +173,15 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for compose extension fetch task invokes.
+   *
+   * @param commandId - Command ID or regular expression used to match the action command.
+   * @param handler - Handler invoked with the messaging extension action payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onFetchAction (commandId: string | RegExp, handler: FetchActionHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -149,6 +201,15 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for compose extension submit action invokes.
+   *
+   * @param commandId - Command ID or regular expression used to match the action command.
+   * @param handler - Handler invoked with the messaging extension action payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onSubmitAction (commandId: string | RegExp, handler: SubmitActionHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -168,6 +229,15 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for message preview edit submit action invokes.
+   *
+   * @param commandId - Command ID or regular expression used to match the action command.
+   * @param handler - Handler invoked with the preview activity, when present.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onMessagePreviewEdit (commandId: string | RegExp, handler: MessagePreviewEditHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(!!(
@@ -189,6 +259,15 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for message preview send submit action invokes.
+   *
+   * @param commandId - Command ID or regular expression used to match the action command.
+   * @param handler - Handler invoked with the preview activity, when present.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onMessagePreviewSend (commandId: string | RegExp, handler: MessagePreviewSendHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(!!(
@@ -211,6 +290,14 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for compose extension query setting URL invokes.
+   *
+   * @param handler - Handler invoked when Teams requests a settings URL.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onQuerySettingUrl (handler: QuerySettingUrlHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -229,6 +316,14 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for compose extension setting invokes.
+   *
+   * @param handler - Handler invoked with the messaging extension settings payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onSetting (handler: SettingHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -247,6 +342,14 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for card button clicked invokes from message extension cards.
+   *
+   * @param handler - Handler invoked with the card action payload.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message extension helper for chaining.
+   */
   onCardButtonClicked<TData = unknown> (handler: CardButtonClickedHandler<TState, TData>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(

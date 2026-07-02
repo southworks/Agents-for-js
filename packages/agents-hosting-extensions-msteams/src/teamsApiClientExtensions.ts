@@ -6,8 +6,18 @@ import { ConnectorClient, TurnContext } from '@microsoft/agents-hosting'
 import { Client as TeamsClient } from '@microsoft/teams.api'
 import { Errors } from './errorHelper'
 
+/**
+ * Turn state key used to store the Teams API client for the current turn.
+ */
 export const TeamsClientKey = Symbol('TeamsClient')
 
+/**
+ * Creates and stores a Teams API client for the current Teams turn.
+ *
+ * @param context - Turn context whose turn state should receive the Teams client.
+ * @param channelId - Teams channel ID to match before creating the client. Defaults to `msteams`.
+ * @throws If the connector client or service URL required to create the Teams client is missing.
+ */
 export function setTeamsApiClient (context: TurnContext, channelId: string = 'msteams'): void {
   if (context.activity.channelId !== channelId || context.turnState.has(TeamsClientKey)) {
     return

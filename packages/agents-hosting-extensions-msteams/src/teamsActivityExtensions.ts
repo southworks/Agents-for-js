@@ -7,6 +7,9 @@ import { parseTeamsChannelData } from './activity-extensions'
 
 /**
  * Gets the Teams selected channel ID from the activity's channel data settings.
+ *
+ * @param activity - Activity containing Teams channel data.
+ * @returns The selected channel ID, if present.
  */
 export function teamsGetSelectedChannelId (activity: Activity): string | undefined {
   const channelData = parseTeamsChannelData(activity.channelData)
@@ -15,6 +18,9 @@ export function teamsGetSelectedChannelId (activity: Activity): string | undefin
 
 /**
  * Gets the Teams channel ID from the activity's channel data.
+ *
+ * @param activity - Activity containing Teams channel data.
+ * @returns The Teams channel ID, if present.
  */
 export function teamsGetChannelId (activity: Activity): string | undefined {
   const channelData = parseTeamsChannelData(activity.channelData)
@@ -23,6 +29,9 @@ export function teamsGetChannelId (activity: Activity): string | undefined {
 
 /**
  * Gets the Teams meeting info from the activity's channel data.
+ *
+ * @param activity - Activity containing Teams channel data.
+ * @returns Teams meeting information, if present.
  */
 export function teamsGetMeetingInfo (activity: Activity): ChannelData['meeting'] | undefined {
   const channelData = parseTeamsChannelData(activity.channelData)
@@ -31,6 +40,9 @@ export function teamsGetMeetingInfo (activity: Activity): ChannelData['meeting']
 
 /**
  * Gets the Teams team info from the activity's channel data.
+ *
+ * @param activity - Activity containing Teams channel data.
+ * @returns Teams team information, if present.
  */
 export function teamsGetTeamInfo (activity: Activity): ChannelData['team'] | undefined {
   const channelData = parseTeamsChannelData(activity.channelData)
@@ -57,6 +69,9 @@ export function teamsNotifyUser (activity: Activity, alertInMeeting: boolean = f
 
 /**
  * Gets the Teams OnBehalfOf list from the activity's channel data.
+ *
+ * @param activity - Activity containing Teams channel data.
+ * @returns The Teams on-behalf-of entries, if present.
  */
 export function teamsGetTeamOnBehalfOf (activity: Activity): OnBehalfOf[] | undefined {
   const channelData = parseTeamsChannelData(activity.channelData)
@@ -66,8 +81,10 @@ export function teamsGetTeamOnBehalfOf (activity: Activity): OnBehalfOf[] | unde
 /**
  * Adds the Teams feedback loop flag to the activity's channel data.
  * Returns false if channel data is already set.
+ *
  * @param activity - The activity to configure.
  * @param feedbackLoopType - The feedback loop type value. Defaults to "default".
+ * @returns True when feedback loop channel data was added; otherwise false.
  */
 export function teamsEnableFeedbackLoop (activity: Activity, feedbackLoopType: string = 'default'): boolean {
   if (activity.channelData != null) {

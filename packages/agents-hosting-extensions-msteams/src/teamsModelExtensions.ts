@@ -15,6 +15,9 @@ function getSourceData (source: TeamsDataContainer | unknown): unknown {
 
 /**
  * Gets the data payload from a Teams task module request or message extension action as the specified type.
+ *
+ * @param request - Teams request or action that contains a `data` payload.
+ * @returns The data payload cast to the requested type, or undefined when no data is present.
  */
 export function teamsGetDataAs<T = unknown> (request: TeamsDataContainer): T | undefined {
   return request?.data == null ? undefined : request.data as T
@@ -22,6 +25,11 @@ export function teamsGetDataAs<T = unknown> (request: TeamsDataContainer): T | u
 
 /**
  * Gets a string property from a Teams task module request, message extension action, or raw data object.
+ *
+ * @param source - Teams request, Teams action, or raw data object to inspect.
+ * @param key - Property name to read from the data object.
+ * @param defaultValue - Value returned when the property is missing or is not a string.
+ * @returns The string property value, the default value, or an empty string.
  */
 export function teamsGetDataString (source: TeamsDataContainer | unknown, key: string, defaultValue?: string): string {
   const data = getSourceData(source)

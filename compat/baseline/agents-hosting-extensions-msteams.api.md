@@ -34,49 +34,37 @@ import { TurnContext } from '@microsoft/agents-hosting';
 import { TurnState } from '@microsoft/agents-hosting';
 import { z } from 'zod';
 
-// @public (undocumented)
+// @public
 export interface FeedbackActionValue {
-    // (undocumented)
     feedback?: string | Record<string, unknown>;
-    // (undocumented)
     reaction?: string;
 }
 
-// @public (undocumented)
+// @public
 export interface FeedbackData {
-    // (undocumented)
     actionName?: string;
-    // (undocumented)
     actionValue?: FeedbackActionValue;
-    // (undocumented)
     replyToId?: string;
 }
 
-// @public (undocumented)
+// @public
 export class FileConsent<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     onAccept(handler: FileConsentHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onDecline(handler: FileConsentHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
-// @public (undocumented)
+// @public
 export class Meeting<TState extends TurnState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     onEnd(handler: MeetingEndHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onParticipantsJoin(handler: MeetingParticipantsHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onParticipantsLeave(handler: MeetingParticipantsHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onStart(handler: MeetingStartHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
-// @public (undocumented)
+// @public
 export interface MeetingParticipantsEventDetails {
-    // (undocumented)
     members: {
         user: TeamsChannelAccount;
         meeting: {
@@ -86,47 +74,31 @@ export interface MeetingParticipantsEventDetails {
     }[];
 }
 
-// @public (undocumented)
+// @public
 export class Message<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     onExecuteAction(handler: ExecuteActionRouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMessageDelete(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMessageEdit(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMessageUndelete(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onReadReceipt(handler: ReadReceiptHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
-// @public (undocumented)
+// @public
 export class MessageExtension<TState extends TurnState> {
     constructor(app: AgentApplication<TState>);
     // (undocumented)
     _app: AgentApplication<TState>;
-    // (undocumented)
     onAnonymousQueryLink(handler: QueryLinkHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onCardButtonClicked<TData = unknown>(handler: CardButtonClickedHandler<TState, TData>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onFetchAction(commandId: string | RegExp, handler: FetchActionHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMessagePreviewEdit(commandId: string | RegExp, handler: MessagePreviewEditHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMessagePreviewSend(commandId: string | RegExp, handler: MessagePreviewSendHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onQuery(commandId: string | RegExp, handler: RouteQueryHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onQueryLink(handler: QueryLinkHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
-    OnQuerySettingUrl(handler: QuerySettingUrlHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
+    onQuerySettingUrl(handler: QuerySettingUrlHandler<TState>, rank?: number, authHandlers?: string[]): this;
     onSelectItem<TData = unknown>(handler: SelectItemHandler<TState, TData>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
-    OnSetting(handler: SettingHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
+    onSetting(handler: SettingHandler<TState>, rank?: number, authHandlers?: string[]): this;
     onSubmitAction(commandId: string | RegExp, handler: SubmitActionHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
@@ -202,31 +174,31 @@ export const messagingExtensionQueryZodSchema: z.ZodObject<{
     state: z.ZodOptional<z.ZodString>;
 }, z.ZodTypeAny, "passthrough">>;
 
-// @public (undocumented)
+// @public
 export function onTeamsActivity<TState extends TurnState>(app: AgentApplication<TState>, type: string | RegExp, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsConversationUpdate<TState extends TurnState>(app: AgentApplication<TState>, event: ConversationUpdateEvents | string, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsEvent<TState extends TurnState>(app: AgentApplication<TState>, name: string | RegExp, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsEvent<TState extends TurnState>(app: AgentApplication<TState>, selector: RouteSelector, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsFeedbackLoop<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsFeedbackLoopHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsHandoff<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsHandoffHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsMessage<TState extends TurnState>(app: AgentApplication<TState>, text: string | RegExp, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsMessageReactionsAdded<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
-// @public (undocumented)
+// @public
 export function onTeamsMessageReactionsRemoved<TState extends TurnState>(app: AgentApplication<TState>, handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[], isAgenticRoute?: boolean): AgentApplication<TState>;
 
 // @public
@@ -243,71 +215,48 @@ export class ReadReceiptInfo {
     lastReadMessageId: string;
 }
 
-// @public (undocumented)
+// @public
 export class TaskModule<TState extends TurnState> {
     constructor(app: AgentApplication<TState>);
     // (undocumented)
     _app: AgentApplication<TState>;
-    // (undocumented)
     onFetch(value: string | RegExp | null, handler: FetchHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onSubmit(value: string | RegExp | null, handler: SubmitHandler<TState>, key?: string, rank?: number, authHandlers?: string[]): this;
 }
 
-// @public (undocumented)
+// @public
 export class TeamsAgentExtension<TState extends TurnState = TurnState> extends AgentExtension<TState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     get channels(): TeamsChannel<TState>;
-    // (undocumented)
     get config(): TeamsConfig<TState>;
-    // (undocumented)
     get fileConsent(): FileConsent<TState>;
-    // (undocumented)
     getGraphClient(context: TurnContext, handlerName?: string, graphBaseUrl?: string): Client_2;
-    // (undocumented)
     getTeamsClient(context: TurnContext): Client;
-    // (undocumented)
     get meetings(): Meeting<TState>;
-    // (undocumented)
     get messageExtensions(): MessageExtension<TState>;
-    // (undocumented)
     get messages(): Message<TState>;
-    // (undocumented)
     get taskModules(): TaskModule<TState>;
-    // (undocumented)
     get teams(): TeamsTeam<TState>;
 }
 
-// @public (undocumented)
+// @public
 export class TeamsChannel<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     onChannelEventReceived(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onCreated(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onDeleted(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMemberAdded(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onMemberRemoved(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onRenamed(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onRestored(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onShared(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onUnshared(handler: ChannelUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
-// @public (undocumented)
+// @public
 export class TeamsConfig<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     onConfigFetch(handler: ConfigHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onConfigSubmit(handler: ConfigHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
@@ -319,7 +268,7 @@ export const TeamsExtensionErrors: {
     [key: string]: AgentErrorDefinition;
 };
 
-// @public (undocumented)
+// @public
 export type TeamsFeedbackLoopHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, feedbackData: FeedbackData) => Promise<void>;
 
 // @public
@@ -343,7 +292,7 @@ export function teamsGetTeamInfo(activity: Activity): ChannelData['team'] | unde
 // @public
 export function teamsGetTeamOnBehalfOf(activity: Activity): OnBehalfOf[] | undefined;
 
-// @public (undocumented)
+// @public
 export type TeamsHandoffHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, continuation: string) => Promise<void>;
 
 // @public
@@ -357,35 +306,25 @@ export const TeamsProactiveServiceEndpoints: {
     readonly dod: "https://smba.infra.dod.teams.microsoft.us/teams";
 };
 
-// @public (undocumented)
+// @public
 export type TeamsRouteHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState) => Promise<void>;
 
-// @public (undocumented)
+// @public
 export class TeamsTeam<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
-    // (undocumented)
     onArchived(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onDeleted(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onHardDeleted(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onRenamed(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onRestored(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onTeamEventReceived(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    // (undocumented)
     onUnarchived(handler: TeamUpdateHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
-// @public (undocumented)
+// @public
 export class TeamsTurnContext extends TurnContext {
-    // (undocumented)
     get client(): Client;
-    // (undocumented)
     sendTargetedActivities(activities: Activity[]): Promise<ResourceResponse[]>;
-    // (undocumented)
     sendTargetedActivity(activity: Activity): Promise<ResourceResponse | undefined>;
 }
 

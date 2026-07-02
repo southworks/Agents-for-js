@@ -6,18 +6,45 @@ import { AgentApplication, ConversationUpdateEvents, RouteHandler, RouteRank, Ro
 import { createTeamsRouteHandler, TeamsRouteHandler } from '../teamsRouteHandler'
 import { TeamsTurnContext } from '../teamsTurnContext'
 
+/**
+ * Value submitted by a Teams feedback loop action.
+ */
 export interface FeedbackActionValue {
+  /**
+   * Feedback reaction selected by the user.
+   */
   reaction?: string;
+  /**
+   * Optional feedback text or structured feedback data.
+   */
   feedback?: string | Record<string, unknown>;
 }
 
+/**
+ * Payload supplied to Teams feedback loop handlers.
+ */
 export interface FeedbackData {
+  /**
+   * Name of the submitted action.
+   */
   actionName?: string;
+  /**
+   * Value submitted with the feedback action.
+   */
   actionValue?: FeedbackActionValue;
+  /**
+   * ID of the activity that the feedback applies to.
+   */
   replyToId?: string;
 }
 
+/**
+ * Handler for Teams handoff invoke activities.
+ */
 export type TeamsHandoffHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, continuation: string) => Promise<void>
+/**
+ * Handler for Teams feedback loop invoke activities.
+ */
 export type TeamsFeedbackLoopHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, feedbackData: FeedbackData) => Promise<void>
 
 function isTeamsRouteContext (context: TurnContext, isAgenticRoute: boolean): boolean {
@@ -62,6 +89,17 @@ function createInvokeResponse (): Activity {
   return invokeResponse
 }
 
+/**
+ * Registers a route that handles Teams activities by activity type.
+ *
+ * @param app - The agent application that receives the route.
+ * @param type - Activity type or regular expression to match.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsActivity<TState extends TurnState> (
   app: AgentApplication<TState>,
   type: string | RegExp,
@@ -77,6 +115,17 @@ export function onTeamsActivity<TState extends TurnState> (
   return addTeamsRouteHandler(app, selector, handler, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams conversation update activities.
+ *
+ * @param app - The agent application that receives the route.
+ * @param event - Conversation update event name to match.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsConversationUpdate<TState extends TurnState> (
   app: AgentApplication<TState>,
   event: ConversationUpdateEvents | string,
@@ -105,6 +154,17 @@ export function onTeamsConversationUpdate<TState extends TurnState> (
   return addTeamsRouteHandler(app, selector, handler, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams message activities by text.
+ *
+ * @param app - The agent application that receives the route.
+ * @param text - Message text or regular expression to match.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsMessage<TState extends TurnState> (
   app: AgentApplication<TState>,
   text: string | RegExp,
@@ -121,6 +181,17 @@ export function onTeamsMessage<TState extends TurnState> (
   return addTeamsRouteHandler(app, selector, handler, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams event activities by event name.
+ *
+ * @param app - The agent application that receives the route.
+ * @param name - Event name or regular expression to match.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsEvent<TState extends TurnState> (
   app: AgentApplication<TState>,
   name: string | RegExp,
@@ -129,6 +200,17 @@ export function onTeamsEvent<TState extends TurnState> (
   authHandlers?: string[],
   isAgenticRoute?: boolean
 ): AgentApplication<TState>
+/**
+ * Registers a route that handles Teams event activities by custom selector.
+ *
+ * @param app - The agent application that receives the route.
+ * @param selector - Selector used to decide whether the route should run.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsEvent<TState extends TurnState> (
   app: AgentApplication<TState>,
   selector: RouteSelector,
@@ -161,6 +243,16 @@ export function onTeamsEvent<TState extends TurnState> (
   return addTeamsRouteHandler(app, selector, handler, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams message reaction added activities.
+ *
+ * @param app - The agent application that receives the route.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsMessageReactionsAdded<TState extends TurnState> (
   app: AgentApplication<TState>,
   handler: TeamsRouteHandler<TState>,
@@ -177,6 +269,16 @@ export function onTeamsMessageReactionsAdded<TState extends TurnState> (
   return addTeamsRouteHandler(app, selector, handler, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams message reaction removed activities.
+ *
+ * @param app - The agent application that receives the route.
+ * @param handler - Handler invoked with a Teams turn context and turn state.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsMessageReactionsRemoved<TState extends TurnState> (
   app: AgentApplication<TState>,
   handler: TeamsRouteHandler<TState>,
@@ -193,6 +295,16 @@ export function onTeamsMessageReactionsRemoved<TState extends TurnState> (
   return addTeamsRouteHandler(app, selector, handler, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams handoff invoke activities.
+ *
+ * @param app - The agent application that receives the route.
+ * @param handler - Handler invoked with the handoff continuation value.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsHandoff<TState extends TurnState> (
   app: AgentApplication<TState>,
   handler: TeamsHandoffHandler<TState>,
@@ -218,6 +330,16 @@ export function onTeamsHandoff<TState extends TurnState> (
   return addTeamsRoute(app, selector, routeHandler, true, rank, authHandlers, isAgenticRoute)
 }
 
+/**
+ * Registers a route that handles Teams feedback loop invoke activities.
+ *
+ * @param app - The agent application that receives the route.
+ * @param handler - Handler invoked with feedback loop data.
+ * @param rank - Optional route rank used for route ordering.
+ * @param authHandlers - Optional authorization handlers required by the route.
+ * @param isAgenticRoute - Indicates whether the route should handle agentic requests only.
+ * @returns The agent application for chaining.
+ */
 export function onTeamsFeedbackLoop<TState extends TurnState> (
   app: AgentApplication<TState>,
   handler: TeamsFeedbackLoopHandler<TState>,

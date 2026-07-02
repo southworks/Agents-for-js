@@ -15,13 +15,31 @@ function equalsIgnoreCase (actual: unknown, expected: string): boolean {
   return typeof actual === 'string' && actual.toLowerCase() === expected.toLowerCase()
 }
 
+/**
+ * Registers handlers for Microsoft Teams message lifecycle events.
+ *
+ * @typeParam TState - The turn state type used by the agent application.
+ */
 export class Message<TState extends TurnState = TurnState> {
   private _app: AgentApplication<TState>
 
+  /**
+   * Creates a Teams message route helper.
+   *
+   * @param app - The agent application that receives the registered routes.
+   */
   constructor (app: AgentApplication<TState>) {
     this._app = app
   }
 
+  /**
+   * Registers a handler for Teams message edit events.
+   *
+   * @param handler - Handler invoked for matching message edit activities.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message helper for chaining.
+   */
   onMessageEdit (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
@@ -35,6 +53,14 @@ export class Message<TState extends TurnState = TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams soft-delete message events.
+   *
+   * @param handler - Handler invoked for matching message delete activities.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message helper for chaining.
+   */
   onMessageDelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
@@ -48,6 +74,14 @@ export class Message<TState extends TurnState = TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams message undelete events.
+   *
+   * @param handler - Handler invoked for matching message update activities.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message helper for chaining.
+   */
   onMessageUndelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
@@ -61,6 +95,14 @@ export class Message<TState extends TurnState = TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Teams read receipt events.
+   *
+   * @param handler - Handler invoked with read receipt information.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message helper for chaining.
+   */
   onReadReceipt (handler: ReadReceiptHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
@@ -76,6 +118,14 @@ export class Message<TState extends TurnState = TurnState> {
     return this
   }
 
+  /**
+   * Registers a handler for Office 365 connector card execute action invokes.
+   *
+   * @param handler - Handler invoked with the connector card action query.
+   * @param rank - Optional route rank used for route ordering.
+   * @param authHandlers - Optional authorization handlers required by the route.
+   * @returns This message helper for chaining.
+   */
   onExecuteAction (handler: ExecuteActionRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
