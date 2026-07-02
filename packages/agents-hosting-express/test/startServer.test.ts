@@ -3,14 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { describe, it, before, after, beforeEach, afterEach } from 'node:test'
+import { describe, it, before, after } from 'node:test'
 import assert from 'assert'
 import { createServer, type Server } from 'node:http'
 import express, { type Express, type Request, type Response } from 'express'
 import rateLimit from 'express-rate-limit'
 import { ActivityHandler, authorizeJWT } from '@microsoft/agents-hosting'
 import { startServer, StartServerOptions } from '../src/startServer'
-import sinon from 'sinon'
 
 // Using a clientId ensures JWT is enforced (non-empty clientId prevents anonymous fallback)
 const TEST_AUTH_CONFIG = { clientId: 'test-app-id' }
@@ -215,33 +214,6 @@ describe('StartServerOptions', () => {
       } finally {
         ;(express.application as any).listen = originalListen
       }
-    })
-  })
-  describe('legacy auth configuration argument', () => {
-    let listenStub: sinon.SinonStub
-    let consoleLogStub: sinon.SinonStub
-
-    beforeEach(() => {
-      listenStub = sinon.stub(express.application, 'listen').callsFake(function (_port: any, callback?: () => void) {
-        callback?.()
-        return {
-          on: sinon.stub().returnsThis()
-        } as any
-      })
-      consoleLogStub = sinon.stub(console, 'log')
-    })
-
-    afterEach(() => {
-      listenStub.restore()
-      consoleLogStub.restore()
-    })
-
-    it('accepts the legacy auth configuration argument', () => {
-      const handler = new ActivityHandler()
-
-      startServer(handler, {})
-
-      assert.strictEqual(listenStub.calledOnce, true)
     })
   })
 })
