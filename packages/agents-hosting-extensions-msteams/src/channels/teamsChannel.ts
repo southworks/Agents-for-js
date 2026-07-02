@@ -20,16 +20,17 @@ type ChannelUpdateHandler<TState extends TurnState> = (context: TeamsTurnContext
 
 function isChannelUpdateEvent (context: TurnContext, eventType?: string): boolean {
   const channelData = parseTeamsChannelData(context.activity.channelData)
-  const actualEventType = channelData?.eventType
+  const actualEventType = typeof channelData?.eventType === 'string' ? channelData.eventType.toLowerCase() : undefined
+  const expectedEventType = eventType?.toLowerCase()
 
   return (
     context.activity.type === ActivityTypes.ConversationUpdate &&
     context.activity.channelId === 'msteams' &&
     channelData?.channel != null &&
     (
-      eventType != null
-        ? actualEventType === eventType
-        : typeof actualEventType === 'string' && actualEventType.startsWith('channel')
+      expectedEventType != null
+        ? actualEventType === expectedEventType
+        : actualEventType?.startsWith('channel') === true
     )
   )
 }

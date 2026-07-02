@@ -8,11 +8,9 @@ import assert from 'assert'
 import { createServer, type Server } from 'node:http'
 import express, { type Express, type Request, type Response } from 'express'
 import rateLimit from 'express-rate-limit'
-import { ActivityHandler, AgentApplication, authorizeJWT, CloudAdapter } from '@microsoft/agents-hosting'
+import { ActivityHandler, authorizeJWT } from '@microsoft/agents-hosting'
 import { startServer, StartServerOptions } from '../src/startServer'
 import sinon from 'sinon'
-
-class TestActivityHandler extends ActivityHandler {}
 
 // Using a clientId ensures JWT is enforced (non-empty clientId prevents anonymous fallback)
 const TEST_AUTH_CONFIG = { clientId: 'test-app-id' }
@@ -219,7 +217,7 @@ describe('StartServerOptions', () => {
       }
     })
   })
-  describe('configureAdapter callback', () => {
+  describe('legacy auth configuration argument', () => {
     let listenStub: sinon.SinonStub
     let consoleLogStub: sinon.SinonStub
 
@@ -237,38 +235,9 @@ describe('StartServerOptions', () => {
       listenStub.restore()
       consoleLogStub.restore()
     })
-    it('configures the created adapter for ActivityHandler instances', () => {
-      const handler = new TestActivityHandler()
-      let configuredAdapter: CloudAdapter | undefined
-
-      startServer(handler, {
-        authConfig: {},
-        configureAdapter: (adapter) => {
-          configuredAdapter = adapter
-        }
-      })
-
-      assert.ok(configuredAdapter instanceof CloudAdapter)
-      assert.strictEqual(listenStub.calledOnce, true)
-    })
-
-    it('configures the existing application adapter when provided', () => {
-      const adapter = new CloudAdapter()
-      const app = new AgentApplication({ adapter })
-      let configuredAdapter: CloudAdapter | undefined
-
-      startServer(app, {
-        configureAdapter: (value) => {
-          configuredAdapter = value
-        }
-      })
-
-      assert.strictEqual(configuredAdapter, adapter)
-      assert.strictEqual(listenStub.calledOnce, true)
-    })
 
     it('accepts the legacy auth configuration argument', () => {
-      const handler = new TestActivityHandler()
+      const handler = new ActivityHandler()
 
       startServer(handler, {})
 

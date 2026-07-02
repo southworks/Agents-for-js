@@ -211,7 +211,7 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
-  OnQuerySettingUrl (handler: QuerySettingUrlHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onQuerySettingUrl (handler: QuerySettingUrlHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
@@ -229,7 +229,7 @@ export class MessageExtension<TState extends TurnState> {
     return this
   }
 
-  OnSetting (handler: SettingHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onSetting (handler: SettingHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(
         context.activity.type === ActivityTypes.Invoke &&
