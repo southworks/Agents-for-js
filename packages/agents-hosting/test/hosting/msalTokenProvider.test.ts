@@ -25,11 +25,16 @@ function getFetchOptions (fetchStub: sinon.SinonStub): RequestInit {
   return fetchStub.getCall(0).args[1] as RequestInit
 }
 
+function createExpiringJwtToken (expiresInSeconds = 3600): string {
+  return jwt.sign({ exp: Math.floor(Date.now() / 1000) + expiresInSeconds }, 'secret')
+}
+
 describe('MsalTokenProvider', () => {
   let msalTokenProvider: MsalTokenProvider
   let authConfig: AuthConfiguration
 
   beforeEach(() => {
+    MsalTokenProvider.clearSharedCaches()
     msalTokenProvider = new MsalTokenProvider()
     authConfig = {
       clientId: 'test-client-id',
@@ -42,6 +47,7 @@ describe('MsalTokenProvider', () => {
   })
 
   afterEach(() => {
+    MsalTokenProvider.clearSharedCaches()
     sinon.restore()
   })
 
@@ -56,6 +62,42 @@ describe('MsalTokenProvider', () => {
     sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').resolves({ accessToken: 'test-token' })
     const token = await msalTokenProvider.getAccessToken(authConfig, 'scope')
     assert.strictEqual(token, 'test-token')
+  })
+
+  it('should share cached access tokens across token provider instances', async () => {
+    const accessToken = createExpiringJwtToken()
+    const acquireTokenStub = sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').resolves({ accessToken } as any)
+    const connectionSettings: AuthConfiguration = {
+      clientId: 'shared-client-id',
+      clientSecret: 'shared-secret',
+      tenantId: 'shared-tenant-id'
+    }
+
+    const firstProvider = new MsalTokenProvider(connectionSettings)
+    const secondProvider = new MsalTokenProvider({ ...connectionSettings })
+
+    assert.strictEqual(await firstProvider.getAccessToken('scope'), accessToken)
+    assert.strictEqual(await secondProvider.getAccessToken('scope'), accessToken)
+    assert.strictEqual(acquireTokenStub.calledOnce, true)
+  })
+
+  it('should reuse confidential clients across token provider instances', async () => {
+    const clientInstances = new Set<unknown>()
+    const acquireTokenStub = sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').callsFake(async function (this: unknown) {
+      clientInstances.add(this)
+      return { accessToken: 'opaque-token' } as any
+    })
+    const connectionSettings: AuthConfiguration = {
+      clientId: 'shared-client-id',
+      clientSecret: 'shared-secret',
+      tenantId: 'shared-tenant-id'
+    }
+
+    await new MsalTokenProvider(connectionSettings).getAccessToken('scope-one')
+    await new MsalTokenProvider({ ...connectionSettings }).getAccessToken('scope-two')
+
+    assert.strictEqual(acquireTokenStub.calledTwice, true)
+    assert.strictEqual(clientInstances.size, 1)
   })
 
   it('should acquire token with certificate', async () => {
@@ -313,6 +355,53 @@ describe('MsalTokenProvider', () => {
       tokenProvider._agenticTokenCache.destroy()
       fetchStub.restore()
     }
+  })
+
+  it('should isolate agentic application token cache by tenant authority', async () => {
+    const tokenProvider = new MsalTokenProvider({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      authority: 'https://login.microsoftonline.com',
+      tenantId: 'common',
+    })
+
+    const fetchStub = sinon.stub(global, 'fetch')
+    fetchStub.onFirstCall().resolves(new Response(JSON.stringify({ access_token: 'tenant-a-token', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    fetchStub.onSecondCall().resolves(new Response(JSON.stringify({ access_token: 'tenant-b-token', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    const tenantAToken = await tokenProvider.getAgenticApplicationToken('tenant-a', 'agent-app-instance-id')
+    const tenantBToken = await tokenProvider.getAgenticApplicationToken('tenant-b', 'agent-app-instance-id')
+
+    assert.strictEqual(tenantAToken, 'tenant-a-token')
+    assert.strictEqual(tenantBToken, 'tenant-b-token')
+    assert.strictEqual(fetchStub.calledTwice, true)
+    assert.strictEqual(getFetchUrl(fetchStub), 'https://login.microsoftonline.com/tenant-a/oauth2/v2.0/token')
+    assert.strictEqual(fetchStub.getCall(1).args[0], 'https://login.microsoftonline.com/tenant-b/oauth2/v2.0/token')
+  })
+
+  it('should return cached agentic user token before reacquiring prerequisite tokens', async () => {
+    const tokenProvider = new MsalTokenProvider({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      tenantId: 'common',
+    })
+
+    const fetchStub = sinon.stub(global, 'fetch')
+    fetchStub.onFirstCall().resolves(new Response(JSON.stringify({ access_token: 'agent-app-token', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    fetchStub.onSecondCall().resolves(new Response(JSON.stringify({ access_token: 'agentic-user-token', expires_in: 3600 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+
+    const acquireTokenStub = sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').resolves({
+      accessToken: 'agentic-instance-token',
+      expiresOn: new Date(Date.now() + 3600 * 1000)
+    } as any)
+
+    const firstToken = await tokenProvider.getAgenticUserToken('tenant-id', 'agent-app-instance-id', 'agentic-user-id', ['scope.read'])
+    const secondToken = await tokenProvider.getAgenticUserToken('tenant-id', 'agent-app-instance-id', 'agentic-user-id', ['scope.read'])
+
+    assert.strictEqual(firstToken, 'agentic-user-token')
+    assert.strictEqual(secondToken, 'agentic-user-token')
+    assert.strictEqual(fetchStub.calledTwice, true)
+    assert.strictEqual(acquireTokenStub.calledOnce, true)
   })
 
   it('should call the right authority for multi-tenant setups based on incoming message', async () => {

@@ -22,11 +22,16 @@ export class MemoryCache<T> {
     }
   }
 
+  clear (): void {
+    this.cache.clear()
+  }
+
   set (key: string, value: T, ttlSeconds: number): void {
     const validUntil = Date.now() + (ttlSeconds * 1000)
     this.cache.set(key, { value, validUntil })
     if (!this.purgeInterval) {
       this.purgeInterval = setInterval(() => this.purge(), CACHE_PURGE_INTERVAL)
+      this.purgeInterval.unref?.()
     }
   }
 

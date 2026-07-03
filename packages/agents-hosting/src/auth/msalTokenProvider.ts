@@ -3,13 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
+import { AuthenticationResult, ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
 import { AuthConfiguration, AuthType, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { randomUUID } from 'crypto'
 import { MemoryCache } from './MemoryCache'
-import jwt from 'jsonwebtoken'
+import jwt, { JwtPayload } from 'jsonwebtoken'
 
 import fs from 'fs'
 import crypto from 'crypto'
@@ -33,12 +33,251 @@ function createTokenRequestTimeoutError (timeoutMs: number): Error {
  * Provides tokens using MSAL.
  */
 export class MsalTokenProvider implements AuthProvider {
-  private readonly _agenticTokenCache: MemoryCache<string>
+  private static readonly _accessTokenCache = new MemoryCache<string>()
+  private static readonly _agenticTokenCache = new MemoryCache<string>()
+  private static readonly _confidentialClients = new Map<string, ConfidentialClientApplication>()
   public readonly connectionSettings?: AuthConfiguration
 
   constructor (connectionSettings?: AuthConfiguration) {
-    this._agenticTokenCache = new MemoryCache<string>()
     this.connectionSettings = connectionSettings
+  }
+
+  /**
+   * Clears process-wide auth caches.
+   */
+  public static clearSharedCaches (): void {
+    MsalTokenProvider._accessTokenCache.clear()
+    MsalTokenProvider._agenticTokenCache.clear()
+    MsalTokenProvider._confidentialClients.clear()
+  }
+
+  private static cacheKey (...parts: Array<string | number | boolean | undefined | null>): string {
+    return JSON.stringify(parts.map(part => part ?? ''))
+  }
+
+  private static digest (value: string | Buffer | undefined): string {
+    return value ? crypto.createHash('sha256').update(value).digest('base64url') : ''
+  }
+
+  private getOrCreateConfidentialClient (
+    cacheKey: string,
+    createClient: () => ConfidentialClientApplication
+  ): ConfidentialClientApplication {
+    const existing = MsalTokenProvider._confidentialClients.get(cacheKey)
+    if (existing) {
+      return existing
+    }
+
+    const created = createClient()
+    MsalTokenProvider._confidentialClients.set(cacheKey, created)
+    return created
+  }
+
+  private resolveConfiguredAuthority (authConfig: AuthConfiguration): string {
+    return `${authConfig.authorityEndpoint ?? authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`
+  }
+
+  private getResolvedAuthType (authConfig: AuthConfiguration): AuthType | string {
+    if (authConfig.authType) {
+      return authConfig.authType
+    }
+    if (authConfig.WIDAssertionFile !== undefined) {
+      return AuthType.WorkloadIdentity
+    }
+    if (authConfig.federatedClientId !== undefined || authConfig.FICClientId !== undefined) {
+      return AuthType.FederatedCredentials
+    }
+    if (authConfig.clientSecret !== undefined) {
+      return AuthType.ClientSecret
+    }
+    if (authConfig.certPemFile !== undefined && authConfig.certKeyFile !== undefined) {
+      return AuthType.Certificate
+    }
+    if (authConfig.clientSecret === undefined && authConfig.certPemFile === undefined && authConfig.certKeyFile === undefined) {
+      return AuthType.UserManagedIdentity
+    }
+    return 'unknown'
+  }
+
+  private getFileCacheIdentity (path?: string): string {
+    if (!path) {
+      return ''
+    }
+
+    try {
+      const stat = fs.statSync(path)
+      return `${path}:${stat.size}:${stat.mtimeMs}`
+    } catch {
+      return path
+    }
+  }
+
+  private getAccessTokenCacheKey (authConfig: AuthConfiguration, scope: string): string {
+    const authType = this.getResolvedAuthType(authConfig)
+    let authority = this.resolveConfiguredAuthority(authConfig)
+    let credentialIdentity = ''
+
+    switch (authType) {
+      case AuthType.ClientSecret:
+        credentialIdentity = MsalTokenProvider.digest(authConfig.clientSecret)
+        break
+      case AuthType.Certificate:
+      case AuthType.CertificateSubjectName:
+        credentialIdentity = MsalTokenProvider.cacheKey(
+          this.getFileCacheIdentity(authConfig.certPemFile),
+          this.getFileCacheIdentity(authConfig.certKeyFile),
+          authConfig.sendX5C
+        )
+        break
+      case AuthType.WorkloadIdentity:
+        authority = `https://login.microsoftonline.com/${authConfig.tenantId}`
+        credentialIdentity = this.getFileCacheIdentity(authConfig.federatedTokenFile ?? authConfig.WIDAssertionFile)
+        break
+      case AuthType.FederatedCredentials:
+        credentialIdentity = authConfig.federatedClientId ?? authConfig.FICClientId ?? ''
+        break
+      case AuthType.UserManagedIdentity:
+        authority = 'managed-identity'
+        credentialIdentity = authConfig.clientId ?? ''
+        break
+      case AuthType.SystemManagedIdentity:
+        authority = 'managed-identity'
+        credentialIdentity = 'system'
+        break
+      default:
+        credentialIdentity = 'unknown'
+    }
+
+    return MsalTokenProvider.cacheKey(
+      'access-token',
+      authType,
+      authority,
+      authConfig.clientId,
+      scope,
+      authConfig.azureRegion,
+      credentialIdentity
+    )
+  }
+
+  private cacheAccessToken (cacheKey: string, token: string, expiresOn?: Date | null): void {
+    const ttlSeconds = this.getTokenCacheTtlSeconds(token, expiresOn)
+    if (ttlSeconds > 0) {
+      MsalTokenProvider._accessTokenCache.set(cacheKey, token, ttlSeconds)
+    }
+  }
+
+  private cacheAgenticToken (cacheKey: string, token: string, ttlSeconds: number): void {
+    const safeTtlSeconds = Math.floor(ttlSeconds) - 300
+    if (safeTtlSeconds > 0) {
+      MsalTokenProvider._agenticTokenCache.set(cacheKey, token, safeTtlSeconds)
+    }
+  }
+
+  private cacheAgenticAuthenticationResult (cacheKey: string, token: AuthenticationResult): void {
+    const ttlSeconds = this.getTokenCacheTtlSeconds(token.accessToken, token.expiresOn)
+    if (ttlSeconds > 0) {
+      MsalTokenProvider._agenticTokenCache.set(cacheKey, token.accessToken, ttlSeconds)
+    }
+  }
+
+  private getAgenticTokenCacheKey (
+    tenantId: string,
+    clientId: string,
+    scopes: string[],
+    tokenBodyParameters: { [key: string]: any }
+  ): string {
+    const bodyKey = Object.keys(tokenBodyParameters)
+      .sort()
+      .filter(key => key !== 'user_federated_identity_credential')
+      .map(key => `${key}=${MsalTokenProvider.digest(String(tokenBodyParameters[key]))}`)
+      .join('&')
+
+    return MsalTokenProvider.cacheKey(
+      'agentic-token',
+      this.resolveAuthority(tenantId),
+      clientId,
+      scopes.join(' '),
+      bodyKey
+    )
+  }
+
+  private getTokenCacheTtlSeconds (token: string, expiresOn?: Date | null): number {
+    const expiresAtMs = expiresOn?.getTime() ?? this.getJwtExpiresAtMs(token)
+    if (!expiresAtMs) {
+      return 0
+    }
+
+    return Math.floor((expiresAtMs - Date.now()) / 1000) - 300
+  }
+
+  private getJwtExpiresAtMs (token: string): number | undefined {
+    const payload = jwt.decode(token) as JwtPayload | string | null
+    if (!payload || typeof payload === 'string' || typeof payload.exp !== 'number') {
+      return undefined
+    }
+
+    return payload.exp * 1000
+  }
+
+  private getClientSecretClient (authConfig: AuthConfiguration): ConfidentialClientApplication {
+    const cacheKey = MsalTokenProvider.cacheKey(
+      'confidential-client',
+      AuthType.ClientSecret,
+      authConfig.clientId,
+      this.resolveConfiguredAuthority(authConfig),
+      MsalTokenProvider.digest(authConfig.clientSecret)
+    )
+
+    return this.getOrCreateConfidentialClient(cacheKey, () => new ConfidentialClientApplication({
+      auth: {
+        clientId: authConfig.clientId as string,
+        authority: this.resolveConfiguredAuthority(authConfig),
+        clientSecret: authConfig.clientSecret
+      },
+      system: this.sysOptions
+    }))
+  }
+
+  private getCertificateClient (authConfig: AuthConfiguration): ConfidentialClientApplication {
+    const cacheKey = MsalTokenProvider.cacheKey(
+      'confidential-client',
+      authConfig.authType ?? AuthType.Certificate,
+      authConfig.clientId,
+      this.resolveConfiguredAuthority(authConfig),
+      this.getFileCacheIdentity(authConfig.certPemFile),
+      this.getFileCacheIdentity(authConfig.certKeyFile),
+      authConfig.sendX5C
+    )
+
+    return this.getOrCreateConfidentialClient(cacheKey, () => {
+      const privateKeySource = fs.readFileSync(authConfig.certKeyFile as string)
+
+      const privateKeyObject = crypto.createPrivateKey({
+        key: privateKeySource,
+        format: 'pem'
+      })
+
+      const privateKey = privateKeyObject.export({
+        format: 'pem',
+        type: 'pkcs8'
+      })
+
+      const pemFile = fs.readFileSync(authConfig.certPemFile as string)
+      const pubKeyObject = new crypto.X509Certificate(pemFile)
+
+      return new ConfidentialClientApplication({
+        auth: {
+          clientId: authConfig.clientId || '',
+          authority: this.resolveConfiguredAuthority(authConfig),
+          clientCertificate: {
+            privateKey: privateKey as string,
+            thumbprint: pubKeyObject.fingerprint.replaceAll(':', ''),
+            x5c: pemFile.toString()
+          }
+        },
+        system: this.sysOptions
+      })
+    })
   }
 
   /**
@@ -77,6 +316,13 @@ export class MsalTokenProvider implements AuthProvider {
       if (!authConfig.clientId && process.env.NODE_ENV !== 'production') {
         record({ method: 'unknown' })
         return ''
+      }
+
+      const accessTokenCacheKey = this.getAccessTokenCacheKey(authConfig, actualScope)
+      const cachedAccessToken = MsalTokenProvider._accessTokenCache.get(accessTokenCacheKey)
+      if (cachedAccessToken) {
+        logger.debug('getAccessToken cache hit clientId=%s scope=%s', authConfig.clientId, actualScope)
+        return cachedAccessToken
       }
 
       let token
@@ -153,6 +399,7 @@ export class MsalTokenProvider implements AuthProvider {
         throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireToken)
       }
 
+      this.cacheAccessToken(accessTokenCacheKey, token)
       return token
     })
   }
@@ -187,14 +434,7 @@ export class MsalTokenProvider implements AuthProvider {
       record({ scopes: actualScopes })
       logger.debug('acquireTokenOnBehalfOf clientId=%s scopes=%o', authConfig.clientId, actualScopes)
 
-      const cca = new ConfidentialClientApplication({
-        auth: {
-          clientId: authConfig.clientId as string,
-          authority: `${authConfig.authorityEndpoint ?? authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
-          clientSecret: authConfig.clientSecret
-        },
-        system: this.sysOptions
-      })
+      const cca = this.getClientSecretClient(authConfig)
       const token = await cca.acquireTokenOnBehalfOf({
         oboAssertion: actualOboAssertion,
         scopes: actualScopes
@@ -215,6 +455,19 @@ export class MsalTokenProvider implements AuthProvider {
       if (!this.connectionSettings) {
         throw new Error('Connection settings must be provided when calling getAgenticInstanceToken')
       }
+
+      const instanceTokenCacheKey = MsalTokenProvider.cacheKey(
+        'agentic-instance-token',
+        this.resolveAuthority(tenantId),
+        agentAppInstanceId,
+        this.connectionSettings.clientId,
+        this.connectionSettings.azureRegion
+      )
+      const cachedInstanceToken = MsalTokenProvider._agenticTokenCache.get(instanceTokenCacheKey)
+      if (cachedInstanceToken) {
+        return cachedInstanceToken
+      }
+
       const appToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
       const cca = new ConfidentialClientApplication({
         auth: {
@@ -235,6 +488,7 @@ export class MsalTokenProvider implements AuthProvider {
         throw new Error(`Failed to acquire instance token for agent instance: ${agentAppInstanceId}`)
       }
 
+      this.cacheAgenticAuthenticationResult(instanceTokenCacheKey, token)
       return token.accessToken
     })
   }
@@ -286,9 +540,9 @@ export class MsalTokenProvider implements AuthProvider {
 
     logger.debug('acquireTokenForAgenticScenarios clientId=%s tenantId=%s scopes=%o grant_type=%s', clientId, tenantId, scopes, tokenBodyParameters.grant_type)
     // Check cache first
-    const cacheKey = `${clientId}/${Object.keys(tokenBodyParameters).map(key => key !== 'user_federated_identity_credential' ? `${key}=${tokenBodyParameters[key]}` : '').join('&')}/${scopes.join(';')}`
-    if (this._agenticTokenCache.get(cacheKey)) {
-      return this._agenticTokenCache.get(cacheKey) as string
+    const cacheKey = this.getAgenticTokenCacheKey(tenantId, clientId, scopes, tokenBodyParameters)
+    if (MsalTokenProvider._agenticTokenCache.get(cacheKey)) {
+      return MsalTokenProvider._agenticTokenCache.get(cacheKey) as string
     }
 
     const url = `${this.resolveAuthority(tenantId)}/oauth2/v2.0/token`
@@ -344,7 +598,7 @@ export class MsalTokenProvider implements AuthProvider {
     })
 
     // capture token, expire local cache 5 minutes early
-    this._agenticTokenCache.set(cacheKey, token.access_token, token.expires_in - 300)
+    this.cacheAgenticToken(cacheKey, token.access_token, token.expires_in)
     return token.access_token
   }
 
@@ -353,13 +607,22 @@ export class MsalTokenProvider implements AuthProvider {
       logger.debug('getAgenticUserToken tenantId=%s agentAppInstanceId=%s scopes=%o', tenantId, agentAppInstanceId, scopes)
       record({ agenticInstanceId: agentAppInstanceId, agenticUserId, scopes })
 
+      const userTokenParameters = {
+        user_id: agenticUserId,
+        grant_type: 'user_fic',
+      }
+      const userTokenCacheKey = this.getAgenticTokenCacheKey(tenantId, agentAppInstanceId, scopes, userTokenParameters)
+      const cachedUserToken = MsalTokenProvider._agenticTokenCache.get(userTokenCacheKey)
+      if (cachedUserToken) {
+        return cachedUserToken
+      }
+
       const agentToken = await this.getAgenticApplicationToken(tenantId, agentAppInstanceId)
       const instanceToken = await this.getAgenticInstanceToken(tenantId, agentAppInstanceId)
 
       const token = await this.acquireTokenForAgenticScenarios(tenantId, agentAppInstanceId, agentToken, scopes, {
-        user_id: agenticUserId,
+        ...userTokenParameters,
         user_federated_identity_credential: instanceToken,
-        grant_type: 'user_fic',
       })
 
       if (!token) {
@@ -559,33 +822,7 @@ export class MsalTokenProvider implements AuthProvider {
    * @returns A promise that resolves to the access token.
    */
   private async acquireTokenWithCertificate (authConfig: AuthConfiguration, scope: string) {
-    const privateKeySource = fs.readFileSync(authConfig.certKeyFile as string)
-
-    const privateKeyObject = crypto.createPrivateKey({
-      key: privateKeySource,
-      format: 'pem'
-    })
-
-    const privateKey = privateKeyObject.export({
-      format: 'pem',
-      type: 'pkcs8'
-    })
-
-    const pemFile = fs.readFileSync(authConfig.certPemFile as string)
-    const pubKeyObject = new crypto.X509Certificate(pemFile)
-
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId: authConfig.clientId || '',
-        authority: `${authConfig.authorityEndpoint ?? authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
-        clientCertificate: {
-          privateKey: privateKey as string,
-          thumbprint: pubKeyObject.fingerprint.replaceAll(':', ''),
-          x5c: pemFile.toString()
-        }
-      },
-      system: this.sysOptions
-    })
+    const cca = this.getCertificateClient(authConfig)
     const token = await cca.acquireTokenByClientCredential({
       scopes: [`${scope}/.default`],
       correlationId: randomUUID(),
@@ -604,14 +841,7 @@ export class MsalTokenProvider implements AuthProvider {
    * @returns A promise that resolves to the access token.
    */
   private async acquireAccessTokenViaSecret (authConfig: AuthConfiguration, scope: string) {
-    const cca = new ConfidentialClientApplication({
-      auth: {
-        clientId: authConfig.clientId as string,
-        authority: `${authConfig.authorityEndpoint ?? authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`,
-        clientSecret: authConfig.clientSecret
-      },
-      system: this.sysOptions
-    })
+    const cca = this.getClientSecretClient(authConfig)
     const token = await cca.acquireTokenByClientCredential({
       scopes: [`${scope}/.default`],
       correlationId: randomUUID(),
