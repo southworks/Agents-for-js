@@ -680,7 +680,7 @@ export class AgentApplication<TState extends TurnState> {
 
     if (!authorized) {
       const managed = trace(AgentApplicationTraceDefinitions.run)
-      managed.record({ authorized, activity: context.activity })
+      managed.record({ authorized, activity: Activity.fromObject(context.activity) })
       managed.end()
       // We don't log a message here because it is handled by the authorization manager and could cause confusion during mid sign-in operations.
       return false
@@ -722,7 +722,7 @@ export class AgentApplication<TState extends TurnState> {
    */
   private async runTurn (context: TurnContext): Promise<boolean> {
     const managed = trace(AgentApplicationTraceDefinitions.run)
-    managed.record({ authorized: true, activity: context.activity })
+    managed.record({ authorized: true, activity: Activity.fromObject(context.activity) })
 
     try {
       if (this._options.startTypingTimer) {
@@ -761,12 +761,18 @@ export class AgentApplication<TState extends TurnState> {
       }
 
       if (this._beforeTurn.length > 0) {
-        await managed.child(AgentApplicationTraceDefinitions.beforeTurn, async () => {
+        const continueTurn = await managed.child(AgentApplicationTraceDefinitions.beforeTurn, async () => {
           if (!(await this.callEventHandlers(context, state, this._beforeTurn))) {
             await state.save(context, storage)
             return false
           }
+
+          return true
         })
+
+        if (!continueTurn) {
+          return false
+        }
       }
 
       await managed.child(AgentApplicationTraceDefinitions.routeHandler, async ({ record }) => {
