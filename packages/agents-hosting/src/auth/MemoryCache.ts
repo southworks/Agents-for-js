@@ -24,6 +24,7 @@ export class MemoryCache<T> {
 
   clear (): void {
     this.cache.clear()
+    this.destroy()
   }
 
   set (key: string, value: T, ttlSeconds: number): void {

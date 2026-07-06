@@ -240,9 +240,7 @@ describe('MsalTokenProvider', () => {
       assert.ok(url === 'https://foo.bar.com/agentic-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'tenant-id', got: ${url}`)
       assert.ok(!url.includes('common'), `Expected URL to NOT contain 'common', got: ${url}`)
     } finally {
-      // stop caching
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
       fetchStub.restore()
     }
   })
@@ -263,8 +261,7 @@ describe('MsalTokenProvider', () => {
       const options = getFetchOptions(fetchStub)
       assert.ok(options.signal instanceof AbortSignal)
     } finally {
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
       fetchStub.restore()
     }
   })
@@ -301,8 +298,7 @@ describe('MsalTokenProvider', () => {
       await rejection
       assert.strictEqual(fetchStub.called, true)
     } finally {
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
       fetchStub.restore()
       clock.restore()
     }
@@ -328,9 +324,7 @@ describe('MsalTokenProvider', () => {
       assert.ok(url === 'https://login.microsoftonline.com/A0000009-0000-0000-0000-0000000000AF/oauth2/v2.0/token', `Expected URL to contain 'A0000009-0000-0000-0000-0000000000AF', got: ${url}`)
       assert.ok(!url.includes('common'), `Expected URL to NOT contain 'common', got: ${url}`)
     } finally {
-      // stop caching
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
       fetchStub.restore()
     }
   })
@@ -355,9 +349,7 @@ describe('MsalTokenProvider', () => {
       const url = getFetchUrl(fetchStub)
       assert.ok(url === 'http://foo.bar/original-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'foo.bar', got: ${url}`)
     } finally {
-      // stop caching
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
       fetchStub.restore()
     }
   })
@@ -381,9 +373,7 @@ describe('MsalTokenProvider', () => {
       const url = getFetchUrl(fetchStub)
       assert.ok(url === 'https://login.microsoftonline.com/original-tenant-id/oauth2/v2.0/token', `Expected URL to contain 'https://login.microsoftonline.com/original-tenant-id/oauth2/v2.0/token', got: ${url}`)
     } finally {
-      // stop caching
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
       fetchStub.restore()
     }
   })
@@ -698,8 +688,7 @@ describe('MsalTokenProvider', () => {
       assert.strictEqual(signOptions.header.typ, 'JWT')
       assert.ok(signOptions.header['x5t#S256'], 'x5t#S256 thumbprint should be present')
     } finally {
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
     }
   })
 
@@ -737,8 +726,7 @@ describe('MsalTokenProvider', () => {
       const signOptions = jwtSignStub.getCall(0).args[2] as jwt.SignOptions & { header: any }
       assert.strictEqual(signOptions.header.x5c, undefined, 'x5c header should not be set when sendX5C is false')
     } finally {
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
     }
   })
 
@@ -775,8 +763,7 @@ describe('MsalTokenProvider', () => {
       const signOptions = jwtSignStub.getCall(0).args[2] as jwt.SignOptions & { header: any }
       assert.strictEqual(signOptions.header.x5c, undefined, 'x5c header should not be set when sendX5C is not provided')
     } finally {
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
     }
   })
 
@@ -832,8 +819,7 @@ describe('MsalTokenProvider', () => {
       assert.strictEqual(postData.client_assertion, 'fake-jwt-with-x5c', 'client_assertion should be the JWT signed with x5c')
       assert.strictEqual(postData.client_assertion_type, 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer')
     } finally {
-      // @ts-ignore
-      tokenProvider._agenticTokenCache.destroy()
+      MsalTokenProvider.clearSharedCaches()
     }
   })
 
