@@ -329,8 +329,8 @@ export class UserTokenClient {
         .then((token) => {
           if (token && token.length > 1) {
             this.client.setHeader('Authorization', `Bearer ${token}`)
+            this.authInitialized = true
           }
-          this.authInitialized = true
         })
         .finally(() => {
           this.authInitialization = undefined

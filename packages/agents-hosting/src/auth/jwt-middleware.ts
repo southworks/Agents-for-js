@@ -29,14 +29,7 @@ function getJwksClient (jwksUri: string): JwksClient {
   // Check if a client for this JWKS URI already exists in the cache.
   let client = jwksClients.get(jwksUri)
   if (!client) {
-    client = jwksRsa({
-      jwksUri,
-      cache: true,
-      cacheMaxEntries: 10,
-      cacheMaxAge: 600000,
-      rateLimit: true,
-      jwksRequestsPerMinute: 10
-    })
+    client = jwksRsa({ jwksUri })
     jwksClients.set(jwksUri, client)
   }
   return client
