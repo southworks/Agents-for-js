@@ -123,7 +123,7 @@ export class AdaptiveCardsActions<TState extends TurnState> {
             throw ExceptionHelper.generateException(Error, Errors.UnexpectedActionExecute, undefined, { activityType: invokeAction?.action.type ?? 'unknown' })
           }
 
-          if (invokeAction.action.verb !== v) {
+          if (typeof v === 'string' && invokeAction.action.verb !== v) {
             logger.warn(`AdaptiveCards.actionExecute() triggered for verb: ${invokeAction.action.verb} does not match expected verb: ${v}`)
           }
 
@@ -270,12 +270,15 @@ function createActionExecuteSelector (verb: string | RegExp | RouteSelector): Ro
   } else if (verb instanceof RegExp) {
     return (context: TurnContext) => {
       const a = context?.activity
-      const valueAction = parseValueActionExecuteSelector(a.value)
       const isInvoke =
                 a?.type === ActivityTypes.Invoke &&
-                a?.name === ACTION_INVOKE_NAME &&
-                valueAction?.action?.type === ACTION_EXECUTE_TYPE
-      if (isInvoke && typeof valueAction.action.verb === 'string') {
+                a?.name === ACTION_INVOKE_NAME
+      if (!isInvoke) {
+        return Promise.resolve(false)
+      }
+
+      const valueAction = tryParseActionExecuteSelectorValue(a.value)
+      if (valueAction?.action?.type === ACTION_EXECUTE_TYPE && typeof valueAction.action.verb === 'string') {
         return Promise.resolve(verb.test(valueAction.action.verb))
       } else {
         return Promise.resolve(false)
@@ -284,17 +287,28 @@ function createActionExecuteSelector (verb: string | RegExp | RouteSelector): Ro
   } else {
     return (context: TurnContext) => {
       const a = context?.activity
-      const valueAction = parseValueActionExecuteSelector(a.value)
       const isInvoke =
                 a?.type === ActivityTypes.Invoke &&
-                a?.name === ACTION_INVOKE_NAME &&
-                valueAction?.action?.type === ACTION_EXECUTE_TYPE
-      if (isInvoke && valueAction.action?.verb === verb) {
+                a?.name === ACTION_INVOKE_NAME
+      if (!isInvoke) {
+        return Promise.resolve(false)
+      }
+
+      const valueAction = tryParseActionExecuteSelectorValue(a.value)
+      if (valueAction?.action?.type === ACTION_EXECUTE_TYPE && valueAction.action?.verb === verb) {
         return Promise.resolve(true)
       } else {
         return Promise.resolve(false)
       }
     }
+  }
+}
+
+function tryParseActionExecuteSelectorValue (value: unknown): ReturnType<typeof parseValueActionExecuteSelector> {
+  try {
+    return parseValueActionExecuteSelector(value)
+  } catch {
+    return undefined
   }
 }
 
