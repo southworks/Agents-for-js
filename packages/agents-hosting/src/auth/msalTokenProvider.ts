@@ -36,6 +36,7 @@ export class MsalTokenProvider implements AuthProvider {
   private static readonly _accessTokenCache = new MemoryCache<string>()
   private static readonly _agenticTokenCache = new MemoryCache<string>()
   private static readonly _confidentialClients = new Map<string, ConfidentialClientApplication>()
+  private static readonly _maxConfidentialClients = 100
   public readonly connectionSettings?: AuthConfiguration
 
   constructor (connectionSettings?: AuthConfiguration) {
@@ -65,11 +66,20 @@ export class MsalTokenProvider implements AuthProvider {
   ): ConfidentialClientApplication {
     const existing = MsalTokenProvider._confidentialClients.get(cacheKey)
     if (existing) {
+      MsalTokenProvider._confidentialClients.delete(cacheKey)
+      MsalTokenProvider._confidentialClients.set(cacheKey, existing)
       return existing
     }
 
     const created = createClient()
     MsalTokenProvider._confidentialClients.set(cacheKey, created)
+    while (MsalTokenProvider._confidentialClients.size > MsalTokenProvider._maxConfidentialClients) {
+      const oldestKey = MsalTokenProvider._confidentialClients.keys().next().value
+      if (oldestKey === undefined) {
+        break
+      }
+      MsalTokenProvider._confidentialClients.delete(oldestKey)
+    }
     return created
   }
 

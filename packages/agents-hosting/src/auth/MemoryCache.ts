@@ -6,7 +6,7 @@ const CACHE_PURGE_INTERVAL = 60000 // 60 seconds
 
 /**
  * Simple in-memory cache with TTL support.
- * This is used to store authentication tokens for Agentic Identity scenarios only!
+ * This is used to store authentication tokens.
  */
 export class MemoryCache<T> {
   private cache = new Map<string, { value: T; validUntil: number }>()

@@ -12,6 +12,14 @@ import { debug } from '@microsoft/agents-telemetry'
 
 const logger = debug('agents:jwt-middleware')
 const jwksClients = new Map<string, JwksClient>()
+const maxJwksClients = 100
+
+/**
+ * Clears process-wide JWKS clients.
+ */
+export function clearJwksClients (): void {
+  jwksClients.clear()
+}
 
 /**
  * Builds the JWKS URI for the given token issuer and auth configuration.
@@ -25,11 +33,21 @@ export function buildJwksUri (iss: string, authConfig: AuthConfiguration): strin
     : `${resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId)}/discovery/v2.0/keys`
 }
 
-function getJwksClient (jwksUri: string): JwksClient {
+export function getJwksClient (jwksUri: string): JwksClient {
   // Check if a client for this JWKS URI already exists in the cache.
   let client = jwksClients.get(jwksUri)
   if (!client) {
     client = jwksRsa({ jwksUri })
+    jwksClients.set(jwksUri, client)
+    while (jwksClients.size > maxJwksClients) {
+      const oldestKey = jwksClients.keys().next().value
+      if (oldestKey === undefined) {
+        break
+      }
+      jwksClients.delete(oldestKey)
+    }
+  } else {
+    jwksClients.delete(jwksUri)
     jwksClients.set(jwksUri, client)
   }
   return client

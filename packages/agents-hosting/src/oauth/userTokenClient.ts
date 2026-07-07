@@ -327,7 +327,7 @@ export class UserTokenClient {
     if (!this.authInitialization) {
       this.authInitialization = this.authProvider.getAccessToken(this.authScope)
         .then((token) => {
-          if (token && token.length > 1) {
+          if (!this.authInitialized && token && token.length > 1) {
             this.client.setHeader('Authorization', `Bearer ${token}`)
             this.authInitialized = true
           }

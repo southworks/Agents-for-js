@@ -131,6 +131,40 @@ describe('MsalTokenProvider', () => {
     assert.strictEqual(clientInstances.size, 1)
   })
 
+  it('should evict least-recently-used confidential clients after the cache size limit is reached', async () => {
+    const clientInstances: unknown[] = []
+    sinon.stub(ConfidentialClientApplication.prototype, 'acquireTokenByClientCredential').callsFake(async function (this: unknown) {
+      clientInstances.push(this)
+      return { accessToken: 'opaque-token' } as any
+    })
+
+    const getToken = async (clientId: string) => {
+      await new MsalTokenProvider({
+        clientId,
+        clientSecret: `secret-for-${clientId}`,
+        tenantId: 'shared-tenant-id'
+      }).getAccessToken('scope')
+    }
+
+    await getToken('client-0')
+    const firstClient = clientInstances[0]
+
+    for (let i = 1; i < 100; i++) {
+      await getToken(`client-${i}`)
+    }
+    const secondClient = clientInstances[1]
+
+    await getToken('client-0')
+    assert.strictEqual(clientInstances[100], firstClient)
+
+    await getToken('client-100')
+    await getToken('client-0')
+    assert.strictEqual(clientInstances[102], firstClient)
+
+    await getToken('client-1')
+    assert.notStrictEqual(clientInstances[103], secondClient)
+  })
+
   it('should acquire token with certificate', async () => {
     authConfig.clientSecret = undefined
     // @ts-ignore
