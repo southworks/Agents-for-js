@@ -356,12 +356,17 @@ export class AgentApplicationRateLimiter {
    */
   private async commitPendingEvaluations (pendingEvaluations: PendingRuleEvaluation[]): Promise<RateLimitDecision | undefined> {
     let attempt = 0
+    const committed = new Set<string>()
 
     while (true) {
       const writes: WindowWrite[] = []
       let retry = false
 
       for (const pending of pendingEvaluations) {
+        if (committed.has(this.getLockKey(pending.storage, pending.storageKey))) {
+          continue
+        }
+
         try {
           const { result, write } = await this.evaluateRule(pending)
           if (result) {
@@ -397,6 +402,7 @@ export class AgentApplicationRateLimiter {
       for (const pending of writes) {
         try {
           await pending.storage.write({ [pending.storageKey]: pending.window })
+          committed.add(this.getLockKey(pending.storage, pending.storageKey))
         } catch (err) {
           if (attempt >= (pending.rule.maxStorageRetries ?? DEFAULT_MAX_STORAGE_RETRIES)) {
             const decision = this.handleStorageError(pending.rule, {
@@ -588,6 +594,11 @@ export class AgentApplicationRateLimiter {
       return {
         count: 0,
         resetAt: now + rule.windowMs,
+        // TODO: Once microsoft/Agents-for-net#883 lands in this SDK's storage
+        // contract, use a create-if-absent write for new rate limit counters
+        // instead of wildcard eTags. Wildcard writes are unconditional across
+        // shared storage, so process-local locks cannot protect fresh scopes
+        // in scaled-out deployments.
         eTag: current?.eTag ?? '*'
       }
     }

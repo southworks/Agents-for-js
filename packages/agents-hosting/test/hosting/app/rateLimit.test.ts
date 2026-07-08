@@ -61,6 +61,43 @@ class RecordingStorage implements Storage {
   }
 }
 
+class FailsOnceForKeyStorage implements Storage {
+  private readonly items: StoreItem = {}
+  private hasFailed = false
+
+  constructor (private readonly failingKey: string) {}
+
+  async read (keys: string[]): Promise<StoreItem> {
+    const result: StoreItem = {}
+    for (const key of keys) {
+      if (this.items[key]) {
+        result[key] = this.items[key]
+      }
+    }
+    return result
+  }
+
+  async write (changes: StoreItem): Promise<void> {
+    const key = Object.keys(changes)[0]
+    if (key === this.failingKey && !this.hasFailed) {
+      this.hasFailed = true
+      throw new Error('transient conflict')
+    }
+
+    Object.assign(this.items, changes)
+  }
+
+  async delete (keys: string[]): Promise<void> {
+    for (const key of keys) {
+      delete this.items[key]
+    }
+  }
+
+  getItem<T = StoreItem> (key: string): T | undefined {
+    return this.items[key] as T | undefined
+  }
+}
+
 const createTestActivity = () => Activity.fromObject({
   type: ActivityTypes.Message,
   from: {
@@ -253,6 +290,30 @@ describe('AgentApplication rate limiting', () => {
     assert.equal(await app.runInternal(new TurnContext(new TestAdapter(), createTestActivity())), true)
     assert.equal(await app.runInternal(new TurnContext(new TestAdapter(), createTestActivity())), false)
     assert.equal(storage.getItem<{ count: number }>('rateLimit:0:user-1')?.count, 1)
+  })
+
+  it('should not retry counter writes that already committed for the same turn', async () => {
+    const storage = new FailsOnceForKeyStorage('rateLimit:1:conversation-1')
+    const app = new AgentApplication({
+      storage,
+      rateLimit: [
+        {
+          scope: context => context.activity.from?.id,
+          limit: 10,
+          windowMs: 60_000
+        },
+        {
+          scope: context => context.activity.conversation?.id,
+          limit: 10,
+          windowMs: 60_000
+        }
+      ]
+    })
+    app.onActivity(ActivityTypes.Message, async () => {})
+
+    assert.equal(await app.runInternal(new TurnContext(new TestAdapter(), createTestActivity())), true)
+    assert.equal(storage.getItem<{ count: number }>('rateLimit:0:user-1')?.count, 1)
+    assert.equal(storage.getItem<{ count: number }>('rateLimit:1:conversation-1')?.count, 1)
   })
 
   it('should support a custom scope key and appliesTo predicate', async () => {
