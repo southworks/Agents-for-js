@@ -1,4 +1,5 @@
 import { strict as assert } from 'assert'
+import { describe, it } from 'node:test'
 import * as sinon from 'sinon'
 
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
@@ -77,14 +78,8 @@ const createTestActivity = () => Activity.fromObject({
   text: 'hello'
 })
 
-let completedChecks = 0
-const check = async (_name: string, fn: () => Promise<void> | void): Promise<void> => {
-  await fn()
-  completedChecks++
-}
-
-async function runRateLimitAssertions (): Promise<void> {
-  await check('should not rate limit when rateLimit is omitted', async () => {
+describe('AgentApplication rate limiting', () => {
+  it('should not rate limit when rateLimit is omitted', async () => {
     let called = 0
     const app = new AgentApplication()
     app.onActivity(ActivityTypes.Message, async () => {
@@ -96,7 +91,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(called, 2)
   })
 
-  await check('should not rate limit when rateLimit is empty', async () => {
+  it('should not rate limit when rateLimit is empty', async () => {
     let called = 0
     const app = new AgentApplication({ rateLimit: [] })
     app.onActivity(ActivityTypes.Message, async () => {
@@ -108,7 +103,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(called, 2)
   })
 
-  await check('should throttle a turn when a user rule is exceeded', async () => {
+  it('should throttle a turn when a user rule is exceeded', async () => {
     let called = 0
     const adapter = new RecordingTestAdapter()
     const app = new AgentApplication({
@@ -131,7 +126,29 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(adapter.sentActivities[0].text, 'Slow down.')
   })
 
-  await check('should reset fixed windows over time', async () => {
+  it('should not allow concurrent first turns to bypass a new counter limit', async () => {
+    let called = 0
+    const app = new AgentApplication({
+      rateLimit: [{
+        scope: context => context.activity.from?.id,
+        limit: 1,
+        windowMs: 60_000
+      }]
+    })
+    app.onActivity(ActivityTypes.Message, async () => {
+      called++
+    })
+
+    const results = await Promise.all([
+      app.runInternal(new TurnContext(new TestAdapter(), createTestActivity())),
+      app.runInternal(new TurnContext(new TestAdapter(), createTestActivity()))
+    ])
+
+    assert.equal(results.filter(Boolean).length, 1)
+    assert.equal(called, 1)
+  })
+
+  it('should reset fixed windows over time', async () => {
     const clock = sinon.useFakeTimers()
     try {
       let called = 0
@@ -156,7 +173,7 @@ async function runRateLimitAssertions (): Promise<void> {
     }
   })
 
-  await check('should report retryAfterMs as time remaining in fixed window', async () => {
+  it('should report retryAfterMs as time remaining in fixed window', async () => {
     const clock = sinon.useFakeTimers()
     try {
       let retryAfterMs = 0
@@ -184,7 +201,7 @@ async function runRateLimitAssertions (): Promise<void> {
     }
   })
 
-  await check('should evaluate multiple rules in order and keep rule windows independent', async () => {
+  it('should evaluate multiple rules in order and keep rule windows independent', async () => {
     let called = 0
     const adapter = new RecordingTestAdapter()
     const app = new AgentApplication({
@@ -214,7 +231,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(adapter.sentActivities[0].text, 'Conversation limited.')
   })
 
-  await check('should not persist pending window updates when a later rule throttles', async () => {
+  it('should not persist pending window updates when a later rule throttles', async () => {
     const storage = new RecordingStorage()
     const app = new AgentApplication({
       storage,
@@ -238,7 +255,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(storage.getItem<{ count: number }>('rateLimit:0:user-1')?.count, 1)
   })
 
-  await check('should support a custom scope key and appliesTo predicate', async () => {
+  it('should support a custom scope key and appliesTo predicate', async () => {
     let called = 0
     const adapter = new RecordingTestAdapter()
     const app = new AgentApplication({
@@ -264,7 +281,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(called, 2)
   })
 
-  await check('should support userAndConversation scope', async () => {
+  it('should support userAndConversation scope', async () => {
     let called = 0
     const app = new AgentApplication({
       rateLimit: [{
@@ -291,7 +308,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(called, 2)
   })
 
-  await check('should use application storage when rule storage is omitted', async () => {
+  it('should use application storage when rule storage is omitted', async () => {
     const storage = new RecordingStorage()
     const app = new AgentApplication({
       storage,
@@ -309,7 +326,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(storage.writeKeys.filter(key => key.startsWith('rateLimit:')).length, 1)
   })
 
-  await check('should prefer rule storage over application storage', async () => {
+  it('should prefer rule storage over application storage', async () => {
     const appStorage = new RecordingStorage()
     const ruleStorage = new RecordingStorage()
     const app = new AgentApplication({
@@ -331,7 +348,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(ruleStorage.writeKeys.filter(key => key.startsWith('rateLimit:')).length, 1)
   })
 
-  await check('should throttle when the configured scope key cannot be derived', async () => {
+  it('should throttle when the configured scope key cannot be derived', async () => {
     let called = 0
     const adapter = new RecordingTestAdapter()
     const app = new AgentApplication({
@@ -353,7 +370,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(adapter.sentActivities[0].text, 'Too many requests. Please try again later.')
   })
 
-  await check('should set a 429 invoke response when an invoke activity is throttled', async () => {
+  it('should set a 429 invoke response when an invoke activity is throttled', async () => {
     const app = new AgentApplication({
       rateLimit: [{
         scope: context => context.activity.conversation?.id,
@@ -374,7 +391,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(invokeResponse.value.body.message, 'Invoke limited.')
   })
 
-  await check('should allow turns when storage fails and storageErrorBehavior is allow', async () => {
+  it('should allow turns when storage fails and storageErrorBehavior is allow', async () => {
     let called = 0
     const app = new AgentApplication({
       rateLimit: [{
@@ -393,7 +410,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(called, 1)
   })
 
-  await check('should throttle turns when storage fails and storageErrorBehavior is throttle', async () => {
+  it('should throttle turns when storage fails and storageErrorBehavior is throttle', async () => {
     let called = 0
     const adapter = new RecordingTestAdapter()
     const app = new AgentApplication({
@@ -413,7 +430,7 @@ async function runRateLimitAssertions (): Promise<void> {
     assert.equal(adapter.sentActivities[0].text, 'Too many requests. Please try again later.')
   })
 
-  await check('should throw when storage fails and storageErrorBehavior is throw', async () => {
+  it('should throw when storage fails and storageErrorBehavior is throw', async () => {
     const app = new AgentApplication({
       rateLimit: [{
         scope: context => context.activity.from?.id,
@@ -428,12 +445,5 @@ async function runRateLimitAssertions (): Promise<void> {
       async () => await app.runInternal(new TurnContext(new TestAdapter(), createTestActivity())),
       /storage failed/
     )
-  })
-  assert.equal(completedChecks, 16)
-}
-
-runRateLimitAssertions().catch((err) => {
-  setImmediate(() => {
-    throw err
   })
 })

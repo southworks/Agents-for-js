@@ -278,17 +278,23 @@ interface RateLimitDecision {
   rule?: RateLimitRule
 }
 
-interface PendingWindowWrite {
+interface PendingRuleEvaluation {
   rule: RateLimitRule
   ruleIndex: number
   storage: Storage
   storageKey: string
   key: string
+}
+
+interface WindowWrite extends PendingRuleEvaluation {
   window: WindowState
 }
 
 export class AgentApplicationRateLimiter {
   private readonly fallbackStorage = new MemoryStorage()
+  private readonly storageIds = new WeakMap<Storage, number>()
+  private readonly locks = new Map<string, Promise<void>>()
+  private nextStorageId = 1
 
   /**
    * Creates a limiter for the configured rules, using application storage as
@@ -301,7 +307,7 @@ export class AgentApplicationRateLimiter {
    * allowed only when no rule is over its limit and all required writes succeed.
    */
   async shouldAllowTurn (context: TurnContext): Promise<RateLimitDecision> {
-    const pendingWrites: PendingWindowWrite[] = []
+    const pendingEvaluations: PendingRuleEvaluation[] = []
 
     for (let i = 0; i < this.rules.length; i++) {
       const rule = this.rules[i]
@@ -319,13 +325,7 @@ export class AgentApplicationRateLimiter {
       }
 
       try {
-        const { result, pendingWrite } = await this.evaluateRule(rule, i, key)
-        if (result) {
-          return { allowed: false, rule, result }
-        }
-        if (pendingWrite) {
-          pendingWrites.push(pendingWrite)
-        }
+        pendingEvaluations.push(this.createPendingEvaluation(rule, i, key))
       } catch (err) {
         const decision = this.handleStorageError(rule, { ruleIndex: i, key, retryAfterMs: rule.windowMs }, err)
         if (!decision) {
@@ -335,39 +335,91 @@ export class AgentApplicationRateLimiter {
       }
     }
 
-    for (const pending of pendingWrites) {
-      try {
-        await this.writeWindow(pending)
-      } catch (err) {
-        const decision = this.handleStorageError(pending.rule, {
-          ruleIndex: pending.ruleIndex,
-          key: pending.key,
-          retryAfterMs: pending.rule.windowMs
-        }, err)
-        if (!decision) {
-          continue
+    if (pendingEvaluations.length > 0) {
+      return await this.withLocks(
+        pendingEvaluations.map(pending => this.getLockKey(pending.storage, pending.storageKey)),
+        async () => {
+          const decision = await this.commitPendingEvaluations(pendingEvaluations)
+          return decision ?? { allowed: true }
         }
-        return decision
-      }
+      )
     }
 
     return { allowed: true }
   }
 
   /**
-   * Persists a fixed-window state update, retrying transient write failures.
+   * Reads and persists fixed-window state updates while holding key locks.
+   *
+   * The evaluation happens here so reads and writes use fresh eTags, and so
+   * concurrent first requests cannot all write wildcard-created counters.
    */
-  private async writeWindow (pending: PendingWindowWrite): Promise<void> {
-    const maxRetries = pending.rule.maxStorageRetries ?? DEFAULT_MAX_STORAGE_RETRIES
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        await pending.storage.write({ [pending.storageKey]: pending.window })
-        return
-      } catch (err) {
-        if (attempt >= maxRetries) {
-          throw err
+  private async commitPendingEvaluations (pendingEvaluations: PendingRuleEvaluation[]): Promise<RateLimitDecision | undefined> {
+    let attempt = 0
+
+    while (true) {
+      const writes: WindowWrite[] = []
+      let retry = false
+
+      for (const pending of pendingEvaluations) {
+        try {
+          const { result, write } = await this.evaluateRule(pending)
+          if (result) {
+            return { allowed: false, rule: pending.rule, result }
+          }
+
+          if (write) {
+            writes.push(write)
+          }
+        } catch (err) {
+          if (attempt >= (pending.rule.maxStorageRetries ?? DEFAULT_MAX_STORAGE_RETRIES)) {
+            const decision = this.handleStorageError(pending.rule, {
+              ruleIndex: pending.ruleIndex,
+              key: pending.key,
+              retryAfterMs: pending.rule.windowMs
+            }, err)
+            if (decision) {
+              return decision
+            }
+            continue
+          }
+
+          retry = true
+          break
         }
       }
+
+      if (retry) {
+        attempt++
+        continue
+      }
+
+      for (const pending of writes) {
+        try {
+          await pending.storage.write({ [pending.storageKey]: pending.window })
+        } catch (err) {
+          if (attempt >= (pending.rule.maxStorageRetries ?? DEFAULT_MAX_STORAGE_RETRIES)) {
+            const decision = this.handleStorageError(pending.rule, {
+              ruleIndex: pending.ruleIndex,
+              key: pending.key,
+              retryAfterMs: pending.rule.windowMs
+            }, err)
+            if (decision) {
+              return decision
+            }
+            continue
+          }
+
+          retry = true
+          break
+        }
+      }
+
+      if (!retry) {
+        return undefined
+      }
+
+      attempt++
     }
   }
 
@@ -448,13 +500,8 @@ export class AgentApplicationRateLimiter {
    * Reads the current window, decides whether the turn is over limit, and
    * prepares the next window state when the turn should be counted.
    */
-  private async evaluateRule (
-    rule: RateLimitRule,
-    ruleIndex: number,
-    key: string
-  ): Promise<{ result?: RateLimitResult, pendingWrite?: PendingWindowWrite }> {
-    const storage = rule.storage ?? this.storage ?? this.fallbackStorage
-    const storageKey = `rateLimit:${ruleIndex}:${key}`
+  private async evaluateRule (pending: PendingRuleEvaluation): Promise<{ result?: RateLimitResult, write?: WindowWrite }> {
+    const { rule, ruleIndex, storage, storageKey, key } = pending
     const items = await storage.read([storageKey])
     const current = items[storageKey] as WindowState | undefined
     const now = Date.now()
@@ -466,15 +513,71 @@ export class AgentApplicationRateLimiter {
           ruleIndex,
           key,
           retryAfterMs: Math.max(0, window.resetAt - now)
-        },
-        pendingWrite: { rule, ruleIndex, storage, storageKey, key, window }
+        }
       }
     }
 
     window.count++
     return {
-      pendingWrite: { rule, ruleIndex, storage, storageKey, key, window }
+      write: { ...pending, window }
     }
+  }
+
+  private createPendingEvaluation (rule: RateLimitRule, ruleIndex: number, key: string): PendingRuleEvaluation {
+    const storage = rule.storage ?? this.storage ?? this.fallbackStorage
+    const storageKey = `rateLimit:${ruleIndex}:${key}`
+    return { rule, ruleIndex, storage, storageKey, key }
+  }
+
+  private async withLocks<T> (lockKeys: string[], action: () => Promise<T>): Promise<T> {
+    const releases: Array<() => void> = []
+    const uniqueLockKeys = [...new Set(lockKeys)].sort()
+
+    for (const key of uniqueLockKeys) {
+      releases.push(await this.acquireLock(key))
+    }
+
+    try {
+      return await action()
+    } finally {
+      for (const release of releases.reverse()) {
+        release()
+      }
+    }
+  }
+
+  private async acquireLock (key: string): Promise<() => void> {
+    const previous = this.locks.get(key) ?? Promise.resolve()
+    let releaseCurrent!: () => void
+    const current = new Promise<void>(resolve => {
+      releaseCurrent = resolve
+    })
+    const next = previous.then(() => current)
+    this.locks.set(key, next)
+
+    await previous
+
+    return () => {
+      if (this.locks.get(key) === next) {
+        this.locks.delete(key)
+      }
+      releaseCurrent()
+    }
+  }
+
+  private getLockKey (storage: Storage, storageKey: string): string {
+    return `${this.getStorageId(storage)}:${storageKey}`
+  }
+
+  private getStorageId (storage: Storage): number {
+    const existing = this.storageIds.get(storage)
+    if (existing) {
+      return existing
+    }
+
+    const id = this.nextStorageId++
+    this.storageIds.set(storage, id)
+    return id
   }
 
   /**
