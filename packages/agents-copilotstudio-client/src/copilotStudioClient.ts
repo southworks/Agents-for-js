@@ -6,7 +6,7 @@
 import { createEventSource, EventSourceClient } from 'eventsource-client'
 import { ConnectionSettings } from './connectionSettings'
 import { getCopilotStudioConnectionUrl, getCopilotStudioSubscribeUrl } from './powerPlatformEnvironment'
-import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes, ConversationAccount, ExceptionHelper } from '@microsoft/agents-activity'
 import { ExecuteTurnRequest } from './executeTurnRequest'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { UserAgentHelper } from './userAgentHelper'
@@ -15,6 +15,7 @@ import { StartRequest } from './startRequest'
 import { StartResponse, ExecuteTurnResponse, createStartResponse, createExecuteTurnResponse } from './responses'
 import { SubscribeEvent } from './subscribeEvent'
 import { CopilotStudioClientTraceDefinitions } from './observability'
+import { Errors } from './errorHelper'
 
 const logger = debug('copilot-studio:client')
 
@@ -84,6 +85,7 @@ export class CopilotStudioClient {
       logger.debug(`>>> SEND TO ${url}`)
 
       const streamMap = new Map<string, { text: string, sequence: number }[]>()
+      let requestError: Error | undefined
 
       const eventSource: EventSourceClient = createEventSource({
         url,
@@ -95,8 +97,18 @@ export class CopilotStudioClient {
         },
         body: body ? JSON.stringify(body) : undefined,
         method,
+        onScheduleReconnect: () => {
+          if (requestError) {
+            eventSource.close()
+          }
+        },
         fetch: async (url, init) => {
           const response = await fetch(url, init)
+          const failedResponseError = CopilotStudioClient.getFailedResponseError(response)
+          if (failedResponseError) {
+            requestError = failedResponseError
+            throw failedResponseError
+          }
           this.processResponseHeaders(response.headers)
           return response
         }
@@ -159,6 +171,10 @@ export class CopilotStudioClient {
             break
           }
         }
+
+        if (requestError) {
+          throw requestError
+        }
       } finally {
         eventSource.close()
       }
@@ -190,6 +206,20 @@ export class CopilotStudioClient {
       }
     })
     this.logDiagnostic('Response Headers:', sanitizedHeaders)
+  }
+
+  private static getFailedResponseError (response: Response): Error | undefined {
+    if (response.ok) {
+      return undefined
+    }
+
+    const statusText = CopilotStudioClient.sanitizeStatusText(response.statusText)
+    const status = statusText ? `${response.status} ${statusText}` : `${response.status}`
+    return ExceptionHelper.generateException(Error, Errors.CopilotStudioRequestFailed, undefined, { status })
+  }
+
+  private static sanitizeStatusText (statusText?: string): string {
+    return statusText?.replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) ?? ''
   }
 
   /**
@@ -289,7 +319,7 @@ export class CopilotStudioClient {
     managed.record({ activity, conversationId })
     try {
       if (!conversationId || !conversationId.trim()) {
-        throw new Error('conversationId is required for executeStreaming')
+        throw ExceptionHelper.generateException(Error, Errors.ExecuteStreamingConversationIdRequired)
       }
 
       const uriExecute = getCopilotStudioConnectionUrl(this.settings, conversationId)
@@ -455,13 +485,15 @@ export class CopilotStudioClient {
     managed.record({ conversationId, lastReceivedEventId })
     try {
       if (!conversationId || !conversationId.trim()) {
-        throw new Error('conversationId is required for subscribeAsync')
+        throw ExceptionHelper.generateException(Error, Errors.SubscribeAsyncConversationIdRequired)
       }
 
       const url = getCopilotStudioSubscribeUrl(this.settings, conversationId)
 
       logger.info('Subscribing to conversation:', conversationId)
       this.logDiagnostic('Subscribe request:', { conversationId, lastReceivedEventId, url })
+
+      let requestError: Error | undefined
 
       const eventSource: EventSourceClient = createEventSource({
         url,
@@ -472,8 +504,18 @@ export class CopilotStudioClient {
           ...(lastReceivedEventId && { 'Last-Event-ID': lastReceivedEventId })
         },
         method: 'GET',
+        onScheduleReconnect: () => {
+          if (requestError) {
+            eventSource.close()
+          }
+        },
         fetch: async (url, init) => {
           const response = await fetch(url, init)
+          const failedResponseError = CopilotStudioClient.getFailedResponseError(response)
+          if (failedResponseError) {
+            requestError = failedResponseError
+            throw failedResponseError
+          }
           this.processResponseHeaders(response.headers)
           return response
         }
@@ -506,6 +548,10 @@ export class CopilotStudioClient {
             logger.debug('Subscription connection closed')
             break
           }
+        }
+
+        if (requestError) {
+          throw requestError
         }
       } finally {
         eventSource.close()
