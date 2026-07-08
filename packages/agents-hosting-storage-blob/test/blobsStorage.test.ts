@@ -25,6 +25,7 @@ describe('BlobsStorage TTL', () => {
 
   it('should omit expired blobs on read and attempt cleanup', async () => {
     let deletedBlobName: string | undefined
+    let deleteOptions: any
     const storage = Object.create(BlobsStorage.prototype) as BlobsStorage
     const storageAsAny = storage as any
     storageAsAny._containerClient = {
@@ -36,8 +37,9 @@ describe('BlobsStorage TTL', () => {
           readableStreamBody: Readable.from(['{"value":"test"}'])
         })
       }),
-      deleteBlob: async (name: string) => {
+      deleteBlob: async (name: string, options: any) => {
         deletedBlobName = name
+        deleteOptions = options
       }
     }
 
@@ -45,5 +47,30 @@ describe('BlobsStorage TTL', () => {
 
     assert.deepStrictEqual(result, {})
     assert.strictEqual(deletedBlobName, '%2Fkey1')
+    assert.deepStrictEqual(deleteOptions, { conditions: { ifMatch: 'etag-1' } })
+  })
+
+  it('should ignore cleanup conflicts when expired blob was replaced', async () => {
+    const storage = Object.create(BlobsStorage.prototype) as BlobsStorage
+    const storageAsAny = storage as any
+    storageAsAny._containerClient = {
+      createIfNotExists: async () => undefined,
+      getBlobClient: () => ({
+        download: async () => ({
+          etag: 'etag-1',
+          metadata: { agentsstorageexpiresat: (Date.now() - 1000).toString() },
+          readableStreamBody: Readable.from(['{"value":"test"}'])
+        })
+      }),
+      deleteBlob: async (_name: string, _options: any) => {
+        const err: any = new Error('precondition failed')
+        err.statusCode = 412
+        throw err
+      }
+    }
+
+    const result = await storage.read(['key1'])
+
+    assert.deepStrictEqual(result, {})
   })
 })

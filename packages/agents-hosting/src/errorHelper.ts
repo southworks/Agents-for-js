@@ -668,6 +668,14 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'Invalid state scope: {scope}'
   },
 
+  /**
+   * Error thrown when a storage TTL value is invalid.
+   */
+  InvalidStorageTtl: {
+    code: -120740,
+    description: 'StorageWriteOptions.ttl must be a finite number greater than zero.'
+  },
+
   // ============================================================================
   // Application Configuration Errors (-120850 to -120900)
   // ============================================================================

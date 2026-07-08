@@ -96,9 +96,11 @@ describe('MemoryStorage', () => {
     it('should reject invalid ttl values', async () => {
       await assert.rejects(
         async () => await memoryStorage.write({ key1: { value: 'test', eTag: '*' } }, { ttl: 0 }),
-        {
-          name: 'RangeError',
-          message: 'StorageWriteOptions.ttl must be a finite number greater than zero.'
+        (err: any) => {
+          assert.strictEqual(err.name, 'RangeError')
+          assert.strictEqual(err.code, -120701)
+          assert.match(err.message, /StorageWriteOptions\.ttl must be a finite number greater than zero\./)
+          return true
         }
       )
     })

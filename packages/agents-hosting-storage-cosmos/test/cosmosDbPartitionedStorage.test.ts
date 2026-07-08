@@ -29,6 +29,7 @@ describe('CosmosDbPartitionedStorage TTL', () => {
 
   it('should omit expired items on read and attempt cleanup', async () => {
     let deleteCalled = false
+    let deleteOptions: any
     const storage = Object.create(CosmosDbPartitionedStorage.prototype) as CosmosDbPartitionedStorage
     const storageAsAny = storage as any
     storageAsAny.container = {
@@ -42,8 +43,9 @@ describe('CosmosDbPartitionedStorage TTL', () => {
             _etag: 'etag-1'
           }
         }),
-        delete: async () => {
+        delete: async (options: any) => {
           deleteCalled = true
+          deleteOptions = options
         }
       })
     }
@@ -55,5 +57,34 @@ describe('CosmosDbPartitionedStorage TTL', () => {
 
     assert.deepStrictEqual(result, {})
     assert.strictEqual(deleteCalled, true)
+    assert.deepStrictEqual(deleteOptions, { accessCondition: { type: 'IfMatch', condition: 'etag-1' } })
+  })
+
+  it('should ignore cleanup conflicts when expired item was replaced', async () => {
+    const storage = Object.create(CosmosDbPartitionedStorage.prototype) as CosmosDbPartitionedStorage
+    const storageAsAny = storage as any
+    storageAsAny.container = {
+      item: () => ({
+        read: async () => ({
+          resource: {
+            id: 'key1',
+            realId: 'key1',
+            document: { value: 'test' },
+            expiresAt: Date.now() - 1000,
+            _etag: 'etag-1'
+          }
+        }),
+        delete: async (_options: any) => {
+          throw { code: 412 }
+        }
+      })
+    }
+    storageAsAny.cosmosDbStorageOptions = {
+      compatibilityMode: false
+    }
+
+    const result = await storage.read(['key1'])
+
+    assert.deepStrictEqual(result, {})
   })
 })

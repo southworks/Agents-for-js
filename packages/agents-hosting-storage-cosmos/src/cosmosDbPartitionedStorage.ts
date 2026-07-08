@@ -42,14 +42,19 @@ const _doOnce: DoOnce<Container> = new DoOnce<Container>()
 
 const maxDepthAllowed = 127
 
-async function ignoreNotFound (operation: Promise<unknown>): Promise<void> {
+async function ignoreCosmosErrors (operation: Promise<unknown>, ...ignoredCodes: number[]): Promise<void> {
+  const ignored = new Set(ignoredCodes)
   try {
     await operation
   } catch (err: any) {
-    if (err.code !== 404) {
+    if (!ignored.has(err.code)) {
       throw err
     }
   }
+}
+
+async function ignoreNotFound (operation: Promise<unknown>): Promise<void> {
+  await ignoreCosmosErrors(operation, 404)
 }
 
 /**
@@ -177,9 +182,16 @@ export class CosmosDbPartitionedStorage implements Storage {
                 logger.info('Document expired, deleting from storage', {
                   key: redactString(k, true),
                   documentId: redactString(documentStoreItem.id, true),
+                  eTag: redactString(documentStoreItem._etag, true),
                   expiresAt: documentStoreItem.expiresAt,
                 })
-                await ignoreNotFound(this.container.item(escapedKey, this.getPartitionKey(escapedKey)).delete())
+                await ignoreCosmosErrors(
+                  this.container.item(escapedKey, this.getPartitionKey(escapedKey)).delete({
+                    accessCondition: { type: 'IfMatch', condition: documentStoreItem._etag }
+                  }),
+                  404,
+                  412
+                )
                 return
               }
               storeItems[documentStoreItem.realId] = documentStoreItem.document

@@ -139,8 +139,8 @@ export class BlobsStorage implements Storage {
             expiresAt: metadata?.[expirationMetadataKey],
           })
           await ignoreError(
-            this._containerClient.deleteBlob(sanitizeBlobKey(key)),
-            isStatusCodeError(404)
+            this._containerClient.deleteBlob(sanitizeBlobKey(key), { conditions: { ifMatch: eTag } }),
+            isStatusCodeError(404, 412)
           )
           return result
         }
