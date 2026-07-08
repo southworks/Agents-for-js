@@ -53,10 +53,6 @@ async function ignoreCosmosErrors (operation: Promise<unknown>, ...ignoredCodes:
   }
 }
 
-async function ignoreNotFound (operation: Promise<unknown>): Promise<void> {
-  await ignoreCosmosErrors(operation, 404)
-}
-
 /**
  * Implements storage using Cosmos DB partitioned storage.
  */

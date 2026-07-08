@@ -75,6 +75,7 @@ describe('CosmosDbPartitionedStorage TTL', () => {
           }
         }),
         delete: async (_options: any) => {
+          // eslint-disable-next-line no-throw-literal
           throw { code: 412 }
         }
       })
