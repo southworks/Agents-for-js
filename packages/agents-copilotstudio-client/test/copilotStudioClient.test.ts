@@ -13,6 +13,28 @@ import {
 } from '../src'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 
+const mockFailedFetchResponse = (status: number, statusText: string, bodyText: string) => {
+  return {
+    ok: false,
+    status,
+    statusText,
+    headers: new Headers(),
+    text: async () => bodyText
+  } as unknown as Response
+}
+
+const captureRejection = async (action: () => Promise<unknown>) => {
+  let capturedError: unknown
+  try {
+    await action()
+  } catch (error) {
+    capturedError = error
+  }
+
+  assert(capturedError instanceof Error)
+  return capturedError
+}
+
 describe('scopeFromSettings', function () {
   const testCases: Array<{
     label: string
@@ -141,28 +163,6 @@ describe('CopilotStudioClient', function () {
     }
 
     return mockResponse as unknown as Response
-  }
-
-  const mockFailedFetchResponse = (status: number, statusText: string, bodyText: string) => {
-    return {
-      ok: false,
-      status,
-      statusText,
-      headers: new Headers(),
-      text: async () => bodyText
-    } as unknown as Response
-  }
-
-  const captureRejection = async (action: () => Promise<unknown>) => {
-    let capturedError: unknown
-    try {
-      await action()
-    } catch (error) {
-      capturedError = error
-    }
-
-    assert(capturedError instanceof Error)
-    return capturedError
   }
 
   describe('startConversationAsync', function () {
@@ -1712,28 +1712,6 @@ describe('subscribeAsync', function () {
     return mockResponse as unknown as Response
   }
 
-  const mockFailedSubscribeFetchResponse = (status: number, statusText: string, bodyText: string) => {
-    return {
-      ok: false,
-      status,
-      statusText,
-      headers: new Headers(),
-      text: async () => bodyText
-    } as unknown as Response
-  }
-
-  const captureRejection = async (action: () => Promise<unknown>) => {
-    let capturedError: unknown
-    try {
-      await action()
-    } catch (error) {
-      capturedError = error
-    }
-
-    assert(capturedError instanceof Error)
-    return capturedError
-  }
-
   it('should subscribe to conversation and receive events', async function () {
     const settings = createTestSettings()
     const client = new CopilotStudioClient(settings, 'test-token')
@@ -1851,7 +1829,7 @@ describe('subscribeAsync', function () {
     const client = new CopilotStudioClient(settings, 'test-token')
 
     const conversationId = 'test-conversation-id'
-    const fetchMock = mock.fn(() => Promise.resolve(mockFailedSubscribeFetchResponse(500, 'Internal Server Error', 'sensitive-response-body test-token')))
+    const fetchMock = mock.fn(() => Promise.resolve(mockFailedFetchResponse(500, 'Internal Server Error', 'sensitive-response-body test-token')))
     global.fetch = fetchMock as any
 
     const error = await captureRejection(async () => {
