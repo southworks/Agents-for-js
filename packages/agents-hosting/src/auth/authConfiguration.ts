@@ -7,7 +7,7 @@ import type { ConnectionMapItem } from './msalConnectionManager'
 import { debug, redactString, redactScopes, redactUrl } from '@microsoft/agents-telemetry'
 import { loadEnvSettings, AuthConfiguration, envParser, envParserUtils, LoadEnv, applyDefaultSettings, DEFAULT_CONNECTION_MAP, ConnectionKeys, ConnectionMapKeys } from './settings'
 
-export { type AuthConfiguration, AuthType, resolveAuthority } from './settings'
+export { type AuthConfiguration, AuthType, resolveAuthority, resolveAuthType } from './settings'
 import { prune } from '../utils'
 
 const logger = debug('agents:authConfiguration')

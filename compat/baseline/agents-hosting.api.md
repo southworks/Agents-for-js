@@ -1151,6 +1151,9 @@ export { Request_2 as Request }
 export function resolveAuthority(authority?: string, tenantId?: string): string;
 
 // @public
+export function resolveAuthType(authConfig?: AuthConfiguration): AuthType | string;
+
+// @public
 export interface ResourceResponse {
     id: string;
 }

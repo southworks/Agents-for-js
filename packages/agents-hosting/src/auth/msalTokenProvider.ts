@@ -4,7 +4,7 @@
  */
 
 import { AuthenticationResult, ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
-import { AuthConfiguration, AuthType, resolveAuthority as resolveAuthorityUtil } from './authConfiguration'
+import { AuthConfiguration, AuthType, resolveAuthority, resolveAuthority as resolveAuthorityUtil, resolveAuthType } from './authConfiguration'
 import { AuthProvider } from './authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { randomUUID } from 'crypto'
@@ -83,32 +83,6 @@ export class MsalTokenProvider implements AuthProvider {
     return created
   }
 
-  private resolveConfiguredAuthority (authConfig: AuthConfiguration): string {
-    return `${authConfig.authorityEndpoint ?? authConfig.authority}/${authConfig.tenantId || 'botframework.com'}`
-  }
-
-  private getResolvedAuthType (authConfig: AuthConfiguration): AuthType | string {
-    if (authConfig.authType) {
-      return authConfig.authType
-    }
-    if (authConfig.WIDAssertionFile !== undefined) {
-      return AuthType.WorkloadIdentity
-    }
-    if (authConfig.federatedClientId !== undefined || authConfig.FICClientId !== undefined) {
-      return AuthType.FederatedCredentials
-    }
-    if (authConfig.clientSecret !== undefined) {
-      return AuthType.ClientSecret
-    }
-    if (authConfig.certPemFile !== undefined && authConfig.certKeyFile !== undefined) {
-      return AuthType.Certificate
-    }
-    if (authConfig.clientSecret === undefined && authConfig.certPemFile === undefined && authConfig.certKeyFile === undefined) {
-      return AuthType.UserManagedIdentity
-    }
-    return 'unknown'
-  }
-
   private getFileCacheIdentity (path?: string): string {
     if (!path) {
       return ''
@@ -123,8 +97,8 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   private getAccessTokenCacheKey (authConfig: AuthConfiguration, scope: string): string {
-    const authType = this.getResolvedAuthType(authConfig)
-    let authority = this.resolveConfiguredAuthority(authConfig)
+    const authType = resolveAuthType(authConfig)
+    let authority = resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId)
     let credentialIdentity = ''
 
     switch (authType) {
@@ -234,14 +208,14 @@ export class MsalTokenProvider implements AuthProvider {
       'confidential-client',
       AuthType.ClientSecret,
       authConfig.clientId,
-      this.resolveConfiguredAuthority(authConfig),
+      resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
       MsalTokenProvider.digest(authConfig.clientSecret)
     )
 
     return this.getOrCreateConfidentialClient(cacheKey, () => new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId as string,
-        authority: this.resolveConfiguredAuthority(authConfig),
+        authority: resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
         clientSecret: authConfig.clientSecret
       },
       system: this.sysOptions
@@ -253,7 +227,7 @@ export class MsalTokenProvider implements AuthProvider {
       'confidential-client',
       authConfig.authType ?? AuthType.Certificate,
       authConfig.clientId,
-      this.resolveConfiguredAuthority(authConfig),
+      resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
       this.getFileCacheIdentity(authConfig.certPemFile),
       this.getFileCacheIdentity(authConfig.certKeyFile),
       authConfig.sendX5C
@@ -278,7 +252,7 @@ export class MsalTokenProvider implements AuthProvider {
       return new ConfidentialClientApplication({
         auth: {
           clientId: authConfig.clientId || '',
-          authority: this.resolveConfiguredAuthority(authConfig),
+          authority: resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
           clientCertificate: {
             privateKey: privateKey as string,
             thumbprint: pubKeyObject.fingerprint.replaceAll(':', ''),
@@ -336,75 +310,51 @@ export class MsalTokenProvider implements AuthProvider {
       }
 
       let token
-      if (authConfig.authType) {
-        record({ method: authConfig.authType })
-        logger.debug(`getAccessToken via ${authConfig.authType} clientId=${authConfig.clientId} scope=${actualScope}`)
-        switch (authConfig.authType) {
-          case AuthType.WorkloadIdentity: {
-            const tokenFilePath = authConfig.federatedTokenFile ?? authConfig.WIDAssertionFile
-            if (!tokenFilePath) {
-              throw ExceptionHelper.generateException(Error, Errors.WorkloadIdentityTokenFileRequired)
-            }
-            token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
-            break
+      const authType = resolveAuthType(authConfig)
+      record({ method: authType })
+      logger.debug('getAccessToken via method=%s clientId=%s scope=%s', authType, authConfig.clientId, actualScope)
+
+      switch (authType) {
+        case AuthType.WorkloadIdentity: {
+          const tokenFilePath = authConfig.federatedTokenFile ?? authConfig.WIDAssertionFile
+          if (!tokenFilePath) {
+            throw ExceptionHelper.generateException(Error, Errors.WorkloadIdentityTokenFileRequired)
           }
-          case AuthType.FederatedCredentials:
-            if (!authConfig.federatedClientId && !authConfig.FICClientId) {
-              throw ExceptionHelper.generateException(Error, Errors.FICClientIdRequired)
-            }
-            token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
-            break
-          case AuthType.ClientSecret:
-            if (!authConfig.clientSecret) {
-              throw ExceptionHelper.generateException(Error, Errors.ClientSecretRequired)
-            }
-            token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
-            break
-          case AuthType.Certificate:
-          case AuthType.CertificateSubjectName:
-            if (!authConfig.certPemFile || !authConfig.certKeyFile) {
-              throw ExceptionHelper.generateException(Error, Errors.CertificateFilesRequired)
-            }
-            token = await this.acquireTokenWithCertificate(authConfig, actualScope)
-            break
-          case AuthType.UserManagedIdentity:
-            if (!authConfig.clientId) {
-              throw ExceptionHelper.generateException(Error, Errors.ClientIdRequiredForUserManagedIdentity)
-            }
-            token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
-            break
-          case AuthType.SystemManagedIdentity:
-            token = await this.acquireTokenWithSystemAssignedIdentity(authConfig, actualScope)
-            break
-          default:
-            throw ExceptionHelper.generateException(Error, Errors.UnsupportedAuthType, undefined, { authType: authConfig.authType })
+          token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
+          break
         }
-      } else if (authConfig.WIDAssertionFile !== undefined) {
-        record({ method: AuthType.WorkloadIdentity })
-        logger.debug('getAccessToken via method=%s clientId=%s scope=%s', AuthType.WorkloadIdentity, authConfig.clientId, actualScope)
-        token = await this.acquireAccessTokenViaWID(authConfig, actualScope)
-      } else if (authConfig.federatedClientId !== undefined || authConfig.FICClientId !== undefined) {
-        record({ method: AuthType.FederatedCredentials })
-        logger.debug('getAccessToken via method=%s clientId=%s scope=%s', AuthType.FederatedCredentials, authConfig.clientId, actualScope)
-        token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
-      } else if (authConfig.clientSecret !== undefined) {
-        record({ method: AuthType.ClientSecret })
-        logger.debug('getAccessToken via method=%s clientId=%s scope=%s', AuthType.ClientSecret, authConfig.clientId, actualScope)
-        token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
-      } else if (authConfig.certPemFile !== undefined &&
-          authConfig.certKeyFile !== undefined) {
-        record({ method: AuthType.Certificate })
-        logger.debug('getAccessToken via method=%s clientId=%s scope=%s', AuthType.Certificate, authConfig.clientId, actualScope)
-        token = await this.acquireTokenWithCertificate(authConfig, actualScope)
-      } else if (authConfig.clientSecret === undefined &&
-          authConfig.certPemFile === undefined &&
-          authConfig.certKeyFile === undefined) {
-        record({ method: AuthType.UserManagedIdentity })
-        logger.debug('getAccessToken via method=%s clientId=%s scope=%s', AuthType.UserManagedIdentity, authConfig.clientId, actualScope)
-        token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
-      } else {
-        throw ExceptionHelper.generateException(Error, Errors.InvalidAuthConfig)
+        case AuthType.FederatedCredentials:
+          if (!authConfig.federatedClientId && !authConfig.FICClientId) {
+            throw ExceptionHelper.generateException(Error, Errors.FICClientIdRequired)
+          }
+          token = await this.acquireAccessTokenViaFIC(authConfig, actualScope)
+          break
+        case AuthType.ClientSecret:
+          if (!authConfig.clientSecret) {
+            throw ExceptionHelper.generateException(Error, Errors.ClientSecretRequired)
+          }
+          token = await this.acquireAccessTokenViaSecret(authConfig, actualScope)
+          break
+        case AuthType.Certificate:
+        case AuthType.CertificateSubjectName:
+          if (!authConfig.certPemFile || !authConfig.certKeyFile) {
+            throw ExceptionHelper.generateException(Error, Errors.CertificateFilesRequired)
+          }
+          token = await this.acquireTokenWithCertificate(authConfig, actualScope)
+          break
+        case AuthType.UserManagedIdentity:
+          if (!authConfig.clientId) {
+            throw ExceptionHelper.generateException(Error, Errors.ClientIdRequiredForUserManagedIdentity)
+          }
+          token = await this.acquireTokenWithUserAssignedIdentity(authConfig, actualScope)
+          break
+        case AuthType.SystemManagedIdentity:
+          token = await this.acquireTokenWithSystemAssignedIdentity(authConfig, actualScope)
+          break
+        default:
+          throw ExceptionHelper.generateException(Error, Errors.UnsupportedAuthType, undefined, { authType })
       }
+
       if (token === undefined) {
         throw ExceptionHelper.generateException(Error, Errors.FailedToAcquireToken)
       }
@@ -649,7 +599,9 @@ export class MsalTokenProvider implements AuthProvider {
     }
     logger.debug('getAgenticApplicationToken clientId=%s tenantId=%s agentAppInstanceId=%s', this.connectionSettings.clientId, tenantId, agentAppInstanceId)
 
-    if (this.connectionSettings.authType === AuthType.IdentityProxyManager) {
+    const authType = resolveAuthType(this.connectionSettings)
+
+    if (authType === AuthType.IdentityProxyManager) {
       let resource: string
       if (!this.connectionSettings.idpmResource) {
         resource = 'api://AzureAdTokenExchange/.default'
@@ -674,38 +626,28 @@ export class MsalTokenProvider implements AuthProvider {
 
     let clientAssertion
 
-    if (this.connectionSettings.authType) {
-      switch (this.connectionSettings.authType) {
-        case AuthType.WorkloadIdentity: {
-          const tokenFilePath = this.connectionSettings.federatedTokenFile ?? this.connectionSettings.WIDAssertionFile
-          if (tokenFilePath === undefined) {
-            throw ExceptionHelper.generateException(Error, Errors.WorkloadIdentityTokenFileRequired)
-          }
-          clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
-          break
+    switch (authType) {
+      case AuthType.WorkloadIdentity: {
+        const tokenFilePath = this.connectionSettings.federatedTokenFile ?? this.connectionSettings.WIDAssertionFile
+        if (tokenFilePath === undefined) {
+          throw ExceptionHelper.generateException(Error, Errors.WorkloadIdentityTokenFileRequired)
         }
-        case AuthType.FederatedCredentials:
-          if (!this.connectionSettings.federatedClientId && !this.connectionSettings.FICClientId) {
-            throw ExceptionHelper.generateException(Error, Errors.FICClientIdRequired)
-          }
-          clientAssertion = await this.fetchExternalToken(this.connectionSettings.federatedClientId as string || this.connectionSettings.FICClientId as string)
-          break
-        case AuthType.Certificate:
-        case AuthType.CertificateSubjectName:
-          if (!this.connectionSettings.certPemFile || !this.connectionSettings.certKeyFile) {
-            throw ExceptionHelper.generateException(Error, Errors.CertificateFilesRequired)
-          }
-          clientAssertion = this.getAssertionFromCert(this.connectionSettings)
-          break
+        clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
+        break
       }
-    } else if (this.connectionSettings.WIDAssertionFile !== undefined) {
-      const tokenFilePath = this.connectionSettings.federatedTokenFile ?? this.connectionSettings.WIDAssertionFile
-      clientAssertion = fs.readFileSync(tokenFilePath as string, 'utf8')
-    } else if (this.connectionSettings.federatedClientId !== undefined || this.connectionSettings.FICClientId !== undefined) {
-      clientAssertion = await this.fetchExternalToken(this.connectionSettings.federatedClientId as string || this.connectionSettings.FICClientId as string)
-    } else if (this.connectionSettings.certPemFile !== undefined &&
-      this.connectionSettings.certKeyFile !== undefined) {
-      clientAssertion = this.getAssertionFromCert(this.connectionSettings)
+      case AuthType.FederatedCredentials:
+        if (!this.connectionSettings.federatedClientId && !this.connectionSettings.FICClientId) {
+          throw ExceptionHelper.generateException(Error, Errors.FICClientIdRequired)
+        }
+        clientAssertion = await this.fetchExternalToken(this.connectionSettings.federatedClientId as string || this.connectionSettings.FICClientId as string)
+        break
+      case AuthType.Certificate:
+      case AuthType.CertificateSubjectName:
+        if (!this.connectionSettings.certPemFile || !this.connectionSettings.certKeyFile) {
+          throw ExceptionHelper.generateException(Error, Errors.CertificateFilesRequired)
+        }
+        clientAssertion = this.getAssertionFromCert(this.connectionSettings)
+        break
     }
 
     const token = await this.acquireTokenForAgenticScenarios(tenantId, this.connectionSettings.clientId, clientAssertion, ['api://AzureAdTokenExchange/.default'], {
