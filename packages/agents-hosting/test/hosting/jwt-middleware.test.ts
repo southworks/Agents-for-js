@@ -68,7 +68,8 @@ describe('authorizeJWT', () => {
 
     assert((res.status as sinon.SinonStub).calledOnceWith(401))
     assert((res.send as sinon.SinonStub).calledOnceWith({ 'jwt-auth-error': 'authorization header not found' }))
-    assert((next as sinon.SinonStub).notCalled)
+    const nextStub = next as sinon.SinonStub
+    assert(nextStub.notCalled)
   })
 
   it('should respond with 401 if token is invalid', async () => {
@@ -85,7 +86,8 @@ describe('authorizeJWT', () => {
 
     assert((res.status as sinon.SinonStub).calledOnceWith(401))
     assert((res.send as sinon.SinonStub).calledOnceWith({ 'jwt-auth-error': 'invalid token' }))
-    assert((next as sinon.SinonStub).notCalled)
+    const nextStub = next as sinon.SinonStub
+    assert(nextStub.notCalled)
 
     verifyStub.restore()
   })
@@ -97,7 +99,8 @@ describe('authorizeJWT', () => {
 
     assert((res.status as sinon.SinonStub).calledOnceWith(405))
     assert((res.send as sinon.SinonStub).calledOnceWith({ 'jwt-auth-error': 'Method not allowed' }))
-    assert((next as sinon.SinonStub).notCalled)
+    const nextStub = next as sinon.SinonStub
+    assert(nextStub.notCalled)
   })
 
   describe('buildJwksUri', () => {

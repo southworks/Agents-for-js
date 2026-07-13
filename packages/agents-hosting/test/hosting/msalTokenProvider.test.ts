@@ -25,6 +25,19 @@ function getFetchOptions (fetchStub: sinon.SinonStub): RequestInit {
   return fetchStub.getCall(0).args[1] as RequestInit
 }
 
+type JwtSignOptionsWithHeader = jwt.SignOptions & {
+  header: {
+    x5c?: string
+    alg?: string
+    typ?: string
+    'x5t#S256'?: string
+  }
+}
+
+function getJwtSignOptions (jwtSignStub: sinon.SinonStub): JwtSignOptionsWithHeader {
+  return jwtSignStub.getCall(0).args[2] as JwtSignOptionsWithHeader
+}
+
 describe('MsalTokenProvider', () => {
   let msalTokenProvider: MsalTokenProvider
   let authConfig: AuthConfiguration
@@ -197,7 +210,9 @@ describe('MsalTokenProvider', () => {
   })
 
   it('should timeout agentic token fetch requests', async () => {
-    const clock = sinon.useFakeTimers()
+    const clock = sinon.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout'],
+    })
     const tokenProvider = new MsalTokenProvider({
       clientId: 'client-id',
       tenantId: 'common',
@@ -544,7 +559,7 @@ describe('MsalTokenProvider', () => {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
 
       assert.strictEqual(jwtSignStub.called, true)
-      const signOptions = jwtSignStub.getCall(0).args[2] as jwt.SignOptions & { header: any }
+      const signOptions = getJwtSignOptions(jwtSignStub)
       assert.strictEqual(signOptions.header.x5c, fakePem, 'x5c header should contain the PEM certificate contents')
       assert.strictEqual(signOptions.header.alg, 'PS256')
       assert.strictEqual(signOptions.header.typ, 'JWT')
@@ -586,7 +601,7 @@ describe('MsalTokenProvider', () => {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
 
       assert.strictEqual(jwtSignStub.called, true)
-      const signOptions = jwtSignStub.getCall(0).args[2] as jwt.SignOptions & { header: any }
+      const signOptions = getJwtSignOptions(jwtSignStub)
       assert.strictEqual(signOptions.header.x5c, undefined, 'x5c header should not be set when sendX5C is false')
     } finally {
       // @ts-ignore
@@ -624,7 +639,7 @@ describe('MsalTokenProvider', () => {
       await tokenProvider.getAgenticApplicationToken('agentic-tenant-id', 'agent-app-instance-id')
 
       assert.strictEqual(jwtSignStub.called, true)
-      const signOptions = jwtSignStub.getCall(0).args[2] as jwt.SignOptions & { header: any }
+      const signOptions = getJwtSignOptions(jwtSignStub)
       assert.strictEqual(signOptions.header.x5c, undefined, 'x5c header should not be set when sendX5C is not provided')
     } finally {
       // @ts-ignore
