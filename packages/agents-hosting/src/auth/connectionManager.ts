@@ -4,28 +4,57 @@
  */
 
 import { Activity, ExceptionHelper, RoleTypes } from '@microsoft/agents-activity'
-import { debug } from '@microsoft/agents-telemetry'
-import { AuthConfiguration, AuthType, resolveAuthority } from './authConfiguration'
+import { debug, redactString } from '@microsoft/agents-telemetry'
+import { AuthConfiguration, AuthType, resolveAuthType } from './authConfiguration'
 import { Connections } from './connections'
-import { MsalTokenProvider } from './msalTokenProvider'
+import { AuthProvider } from './authProvider'
+import { MsalTokenProvider } from './msal/msalTokenProvider'
+import { SidecarAuthProvider } from './sidecar/sidecarAuthProvider'
 import { JwtPayload } from 'jsonwebtoken'
 import { Errors } from '../errorHelper'
+import type { ConnectionMapItem } from './settings'
 
 const logger = debug('agents:authorization:connections')
 
-export interface ConnectionMapItem {
-  audience?: string
-  serviceUrl: string
-  connection: string
-}
+/**
+ * Factory function that creates an {@link AuthProvider} instance from a connection's
+ * {@link AuthConfiguration}.
+ */
+export type AuthProviderFactory = (config: AuthConfiguration) => AuthProvider
 
-export class MsalConnectionManager implements Connections {
-  private _connections: Map<string, MsalTokenProvider>
-  private _connectionsMap: ConnectionMapItem[]
-  private _serviceConnectionConfiguration: AuthConfiguration
-  private static readonly DEFAULT_CONNECTION = 'serviceConnection'
+/**
+ * Default {@link AuthProviderFactory} that dispatches per-connection by `authType`: connections with
+ * `authType` set to `EntraAuthSideCar` use {@link SidecarAuthProvider}; all others use
+ * {@link MsalTokenProvider}.
+ * @param config The connection authentication configuration.
+ * @returns The auth provider for the connection.
+ */
+export const defaultAuthProviderFactory: AuthProviderFactory = (config: AuthConfiguration): AuthProvider =>
+  config?.authType === AuthType.EntraAuthSideCar
+    ? new SidecarAuthProvider(config)
+    : new MsalTokenProvider(config)
 
+/**
+ * Generic, provider-agnostic connection manager. Dispatches connections to any {@link AuthProvider}
+ * implementation produced by the supplied {@link AuthProviderFactory}, while owning the
+ * provider-independent connection routing logic (audience matching, service URL dispatch,
+ * `altBlueprintConnectionName` handling, default connection resolution).
+ */
+export class ConnectionManager implements Connections {
+  protected _connections: Map<string, AuthProvider>
+  protected _connectionsMap: ConnectionMapItem[]
+  protected _serviceConnectionConfiguration: AuthConfiguration
+  protected static readonly DEFAULT_CONNECTION = 'serviceConnection'
+
+  /**
+   * Creates a new {@link ConnectionManager}.
+   * @param providerFactory Factory used to instantiate an {@link AuthProvider} for each connection.
+   * @param connectionsConfigurations Map of connection names to their authentication configurations.
+   * @param connectionsMap Map items used to route activities to connections.
+   * @param configuration Fallback authentication configuration (used when the above are empty).
+   */
   constructor (
+    providerFactory: AuthProviderFactory = defaultAuthProviderFactory,
     connectionsConfigurations: Map<string, AuthConfiguration> = new Map(),
     connectionsMap: ConnectionMapItem[] = [],
     configuration: AuthConfiguration = {}) {
@@ -36,26 +65,16 @@ export class MsalConnectionManager implements Connections {
     const providedConnections = connectionsConfigurations.size > 0 ? connectionsConfigurations : (configuration.connections || new Map())
 
     for (const [name, config] of providedConnections) {
-      // Instantiate MsalTokenProvider for each connection
-      this._connections.set(name, new MsalTokenProvider(config))
-      if (name === MsalConnectionManager.DEFAULT_CONNECTION) {
+      this._connections.set(name, providerFactory(config))
+      if (name === ConnectionManager.DEFAULT_CONNECTION) {
         this._serviceConnectionConfiguration = config
       }
     }
 
     for (const [name, provider] of this._connections.entries()) {
       const cfg = provider.connectionSettings
-      const authType = cfg?.authType ??
-        (cfg?.certPemFile
-          ? AuthType.Certificate
-          : cfg?.clientSecret
-            ? AuthType.ClientSecret
-            : cfg?.WIDAssertionFile
-              ? AuthType.WorkloadIdentity
-              : cfg?.federatedClientId || cfg?.FICClientId
-                ? AuthType.FederatedCredentials
-                : 'none')
-      logger.debug('connection "%s" clientId=%s tenantId=%s authType=%s', name, cfg?.clientId ?? '<none>', cfg?.tenantId ?? '<none>', authType)
+      const authType = resolveAuthType(cfg)
+      logger.debug('connection "%s" clientId=%s tenantId=%s authType=%s', name, redactString(cfg?.clientId, true) ?? '<none>', redactString(cfg?.tenantId, true) ?? '<none>', authType)
     }
 
     for (const item of this._connectionsMap) {
@@ -68,7 +87,7 @@ export class MsalConnectionManager implements Connections {
    * @param connectionName The name of the connection.
    * @returns The OAuth connection for the agent.
    */
-  getConnection (connectionName: string): MsalTokenProvider {
+  getConnection (connectionName: string): AuthProvider {
     const conn = this._connections.get(connectionName)
     if (!conn) {
       throw ExceptionHelper.generateException(Error, Errors.ConnectionNotFound, undefined, { connectionName })
@@ -80,7 +99,7 @@ export class MsalConnectionManager implements Connections {
    * Get the default OAuth connection for the agent.
    * @returns The default OAuth connection for the agent.
    */
-  getDefaultConnection (): MsalTokenProvider {
+  getDefaultConnection (): AuthProvider {
     if (this._connections.size === 0) {
       throw ExceptionHelper.generateException(Error, Errors.NoConnectionsFoundInConfiguration)
     }
@@ -92,7 +111,7 @@ export class MsalConnectionManager implements Connections {
       }
     }
 
-    const conn = this._connections.values().next().value as MsalTokenProvider
+    const conn = this._connections.values().next().value as AuthProvider
 
     return this.applyConnectionDefaults(conn)
   }
@@ -115,7 +134,7 @@ export class MsalConnectionManager implements Connections {
    * ServiceUrl is:  A regex to match with, or "*" for any serviceUrl value.
    * Connection is: A name in the 'Connections' list.
    */
-  getTokenProvider (identity: JwtPayload, serviceUrl: string): MsalTokenProvider {
+  getTokenProvider (identity: JwtPayload, serviceUrl: string): AuthProvider {
     if (!identity) {
       throw ExceptionHelper.generateException(Error, Errors.IdentityRequiredForTokenProvider)
     }
@@ -155,7 +174,7 @@ export class MsalConnectionManager implements Connections {
         }
       }
     }
-    throw ExceptionHelper.generateException(Error, Errors.NoConnectionForAudienceAndServiceUrl, undefined, { audience, serviceUrl })
+    throw ExceptionHelper.generateException(Error, Errors.NoConnectionForAudienceAndServiceUrl, undefined, { audience: String(audience), serviceUrl })
   }
 
   /**
@@ -164,7 +183,7 @@ export class MsalConnectionManager implements Connections {
    * @param activity The activity.
    * @returns The TokenProvider for the connection.
    */
-  getTokenProviderFromActivity (identity: JwtPayload, activity: Activity): MsalTokenProvider {
+  getTokenProviderFromActivity (identity: JwtPayload, activity: Activity): AuthProvider {
     let connection = this.getTokenProvider(identity, activity.serviceUrl || '')
 
     // This is for the case where the Agentic BlueprintId is not the same as the AppId
@@ -187,29 +206,13 @@ export class MsalConnectionManager implements Connections {
     return this._serviceConnectionConfiguration
   }
 
-  private applyConnectionDefaults (conn: MsalTokenProvider): MsalTokenProvider {
-    if (conn.connectionSettings) {
-      conn.connectionSettings.authorityEndpoint ??= conn.connectionSettings.authority || 'https://login.microsoftonline.com'
-      conn.connectionSettings.authority ??= conn.connectionSettings.authorityEndpoint
-      conn.connectionSettings.issuers ??= [
-        'https://api.botframework.com',
-        `${resolveAuthority('https://sts.windows.net', conn.connectionSettings.tenantId)}/`,
-        `${resolveAuthority(conn.connectionSettings.authorityEndpoint, conn.connectionSettings.tenantId)}/v2.0`
-      ]
-      // For backward compatibility
-      if (conn.connectionSettings.federatedClientId) {
-        conn.connectionSettings.FICClientId = conn.connectionSettings.federatedClientId
-      }
-
-      if (conn.connectionSettings.scopes?.length) {
-        conn.connectionSettings.scope = conn.connectionSettings.scopes?.[0]
-      }
-
-      if (conn.connectionSettings.authorityEndpoint) {
-        conn.connectionSettings.authority = conn.connectionSettings.authorityEndpoint
-      }
-    }
-
+  /**
+   * Applies provider-specific defaults to a resolved connection before returning it. The generic
+   * base performs no mutation; provider-specific managers may override this.
+   * @param conn The resolved auth provider.
+   * @returns The auth provider, possibly with defaults applied.
+   */
+  protected applyConnectionDefaults (conn: AuthProvider): AuthProvider {
     return conn
   }
 }

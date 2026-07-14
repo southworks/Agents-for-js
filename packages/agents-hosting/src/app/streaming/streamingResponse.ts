@@ -233,6 +233,7 @@ export class StreamingResponse {
     this._message = ''
     this._nextSequence = 1
     this._streamId = undefined
+    this._attachments = undefined
   }
 
   /**
@@ -249,6 +250,27 @@ export class StreamingResponse {
    */
   public setAttachments (attachments: Attachment[]): void {
     this._attachments = attachments
+  }
+
+  /**
+   * Adds an attachment to the collection of attachments for the final message.
+   *
+   * @param attachment The attachment to add. Must not be null or undefined.
+   * @throws Error if attachment is null or undefined.
+   *
+   * @remarks
+   * Attachments are only included in the final message sent by `endStream()`.
+   * They are not sent in intermediate typing activities.
+   */
+  public addAttachment (attachment: Attachment): void {
+    if (attachment === null || attachment === undefined) {
+      throw ExceptionHelper.generateException(Error, Errors.AttachmentNullOrUndefined)
+    }
+
+    if (!this._attachments) {
+      this._attachments = []
+    }
+    this._attachments.push(attachment)
   }
 
   /**
