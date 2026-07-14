@@ -4,7 +4,7 @@
  */
 
 import { AuthenticationResult, ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
-import { AuthConfiguration, AuthType, resolveAuthority, resolveAuthority as resolveAuthorityUtil, resolveAuthType } from '../authConfiguration'
+import { AuthConfiguration, AuthType, resolveAuthority as resolveAuthorityUtil, resolveAuthType } from '../authConfiguration'
 import { AuthProvider } from '../authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { randomUUID } from 'crypto'
@@ -251,7 +251,7 @@ export class MsalTokenProvider implements AuthProvider {
       return new ConfidentialClientApplication({
         auth: {
           clientId: authConfig.clientId || '',
-          authority: resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
+          authority: resolveAuthorityUtil(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
           clientCertificate: {
             privateKey: privateKey as string,
             thumbprint: pubKeyObject.fingerprint.replaceAll(':', ''),
