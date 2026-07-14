@@ -11,7 +11,7 @@ import { firstValueFrom } from 'rxjs'
 // ---------------------------------------------------------------------------
 
 function hasWebChatSequenceId (channelData: unknown): boolean {
-  return (channelData as Record<string, unknown>)['webchat:sequence-id'] !== undefined
+  return (channelData as Record<string, unknown> | null | undefined)?.['webchat:sequence-id'] !== undefined
 }
 
 /** Creates a minimal Activity-like object. */

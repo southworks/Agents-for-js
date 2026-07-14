@@ -40,11 +40,13 @@ export default {
         const callback = [...node.arguments].reverse().find((argument) =>
           argument.type === 'ArrowFunctionExpression' || argument.type === 'FunctionExpression'
         )
-        if (callback?.body.type !== 'BlockStatement') return
+        if (!callback) return
 
-        const terminalStatement = callback.body.body.at(-1)
-        if (terminalStatement && containsCast(terminalStatement, terminalStatement)) {
-          context.report({ node: terminalStatement, messageId: 'terminalCast' })
+        const terminalNode = callback.body.type === 'BlockStatement'
+          ? callback.body.body.at(-1)
+          : callback.body
+        if (terminalNode && containsCast(terminalNode, terminalNode)) {
+          context.report({ node: terminalNode, messageId: 'terminalCast' })
         }
       }
     }
