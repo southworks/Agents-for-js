@@ -4,18 +4,17 @@
  */
 
 import { AuthenticationResult, ConfidentialClientApplication, LogLevel, ManagedIdentityApplication, NodeSystemOptions } from '@azure/msal-node'
-import { AuthConfiguration, AuthType, resolveAuthority, resolveAuthority as resolveAuthorityUtil, resolveAuthType } from './authConfiguration'
-import { AuthProvider } from './authProvider'
+import { AuthConfiguration, AuthType, resolveAuthority, resolveAuthority as resolveAuthorityUtil, resolveAuthType } from '../authConfiguration'
+import { AuthProvider } from '../authProvider'
 import { debug, trace } from '@microsoft/agents-telemetry'
 import { randomUUID } from 'crypto'
-import { MemoryCache } from './MemoryCache'
+import { MemoryCache } from '../MemoryCache'
 import jwt, { JwtPayload } from 'jsonwebtoken'
-
 import fs from 'fs'
 import crypto from 'crypto'
-import { AuthenticationTraceDefinitions } from '../observability'
+import { AuthenticationTraceDefinitions } from '../../observability'
 import { ExceptionHelper } from '@microsoft/agents-activity'
-import { Errors } from '../errorHelper'
+import { Errors } from '../../errorHelper'
 
 const audience = 'api://AzureADTokenExchange'
 const logger = debug('agents:msal')
@@ -98,7 +97,7 @@ export class MsalTokenProvider implements AuthProvider {
 
   private getAccessTokenCacheKey (authConfig: AuthConfiguration, scope: string): string {
     const authType = resolveAuthType(authConfig)
-    let authority = resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId)
+    let authority = resolveAuthorityUtil(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId)
     let credentialIdentity = ''
 
     switch (authType) {
@@ -208,14 +207,14 @@ export class MsalTokenProvider implements AuthProvider {
       'confidential-client',
       AuthType.ClientSecret,
       authConfig.clientId,
-      resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
+      resolveAuthorityUtil(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
       MsalTokenProvider.digest(authConfig.clientSecret)
     )
 
     return this.getOrCreateConfidentialClient(cacheKey, () => new ConfidentialClientApplication({
       auth: {
         clientId: authConfig.clientId as string,
-        authority: resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
+        authority: resolveAuthorityUtil(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
         clientSecret: authConfig.clientSecret
       },
       system: this.sysOptions
@@ -227,7 +226,7 @@ export class MsalTokenProvider implements AuthProvider {
       'confidential-client',
       authConfig.authType ?? AuthType.Certificate,
       authConfig.clientId,
-      resolveAuthority(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
+      resolveAuthorityUtil(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
       this.getFileCacheIdentity(authConfig.certPemFile),
       this.getFileCacheIdentity(authConfig.certKeyFile),
       authConfig.sendX5C
