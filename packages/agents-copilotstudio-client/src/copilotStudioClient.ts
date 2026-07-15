@@ -8,7 +8,7 @@ import { ConnectionSettings } from './connectionSettings'
 import { getCopilotStudioConnectionUrl, getCopilotStudioSubscribeUrl } from './powerPlatformEnvironment'
 import { Activity, ActivityTypes, ConversationAccount } from '@microsoft/agents-activity'
 import { ExecuteTurnRequest } from './executeTurnRequest'
-import { debug, redactString, redactUrl, redactDiagnosticObject, trace } from '@microsoft/agents-telemetry'
+import { debug, pseudonymizeConversationId, redactString, redactUrl, redactDiagnosticObject, trace } from '@microsoft/agents-telemetry'
 import { UserAgentHelper } from './userAgentHelper'
 import { ScopeHelper } from './scopeHelper'
 import { StartRequest } from './startRequest'
@@ -55,6 +55,13 @@ export class CopilotStudioClient {
   }
 
   /**
+   * Returns the diagnostics pseudonym key from the connection settings.
+   */
+  get diagnosticsPseudonymKey (): string {
+    return this.settings.diagnosticsPseudonymKey ?? ''
+  }
+
+  /**
    * Logs a diagnostic message if diagnostics are enabled.
    * @param message The message to log.
    * @param args Additional arguments to log.
@@ -79,7 +86,7 @@ export class CopilotStudioClient {
     try {
       this.logDiagnostic(`Request URL: ${redactUrl(url)}`)
       this.logDiagnostic(`Request Method: ${method}`)
-      this.logDiagnostic('Request Body:', body ? JSON.stringify(redactDiagnosticObject(body), null, 2) : 'none')
+      this.logDiagnostic('Request Body:', body ? JSON.stringify(redactDiagnosticObject(body, this.settings.diagnosticsPseudonymKey), null, 2) : 'none')
 
       logger.debug(`>>> SEND TO ${redactUrl(url)}`)
 
@@ -107,7 +114,7 @@ export class CopilotStudioClient {
           if (data && event === 'activity') {
             try {
               const activity = Activity.fromJson(data)
-              managed.actions.receivedFromCopilot(activity)
+              managed.actions.receivedFromCopilot(activity.type, pseudonymizeConversationId(activity.conversation?.id, this.settings.diagnosticsPseudonymKey))
 
               // check to see if this activity is part of the streamed response, in which case we need to accumulate the text
               const streamingEntity = activity.entities?.find(e => e.type === 'streaminfo' && e.streamType === 'streaming')
@@ -115,7 +122,7 @@ export class CopilotStudioClient {
                 case ActivityTypes.Message:
                   if (!this.conversationId.trim()) { // Did not get it from the header.
                     this.conversationId = activity.conversation?.id ?? ''
-                    logger.debug(`Conversation ID: ${redactString(this.conversationId)}`)
+                    logger.debug(`Conversation ID: ${pseudonymizeConversationId(this.conversationId, this.settings.diagnosticsPseudonymKey)}`)
                   }
                   yield activity
                   break
@@ -180,7 +187,7 @@ export class CopilotStudioClient {
 
     this.conversationId = responseHeaders?.get(CopilotStudioClient.conversationIdHeaderKey) ?? ''
     if (this.conversationId) {
-      logger.debug(`Conversation ID: ${redactString(this.conversationId)}`)
+      logger.debug(`Conversation ID: ${pseudonymizeConversationId(this.conversationId, this.settings.diagnosticsPseudonymKey)}`)
     }
 
     const sanitizedHeaders = new Headers()
@@ -239,8 +246,8 @@ export class CopilotStudioClient {
         body.locale = request.locale
       }
 
-      logger.info('Starting conversation ...', redactDiagnosticObject(request))
-      this.logDiagnostic('Start conversation request:', redactDiagnosticObject(body))
+      logger.info('Starting conversation ...', redactDiagnosticObject(request, this.settings.diagnosticsPseudonymKey))
+      this.logDiagnostic('Start conversation request:', redactDiagnosticObject(body, this.settings.diagnosticsPseudonymKey))
 
       yield * this.postRequestAsync(uriStart, body, 'POST')
     } catch (error) {
@@ -258,13 +265,16 @@ export class CopilotStudioClient {
    */
   public async * sendActivityStreaming (activity: Activity, conversationId: string = this.conversationId) : AsyncGenerator<Activity> {
     const managed = trace(CopilotStudioClientTraceDefinitions.sendActivity)
-    managed.record({ activity: redactDiagnosticObject(activity) as Activity })
+    managed.record({
+      activityType: activity.type,
+      conversationId: pseudonymizeConversationId(activity.conversation?.id, this.settings.diagnosticsPseudonymKey)
+    })
     try {
       const localConversationId = activity.conversation?.id ?? conversationId
       const uriExecute = getCopilotStudioConnectionUrl(this.settings, localConversationId)
       const qbody: ExecuteTurnRequest = new ExecuteTurnRequest(activity)
 
-      logger.info('Sending activity...', redactDiagnosticObject(activity))
+      logger.info('Sending activity...', redactDiagnosticObject(activity, this.settings.diagnosticsPseudonymKey))
       yield * this.postRequestAsync(uriExecute, qbody, 'POST')
     } catch (error) {
       throw managed.fail(error)
@@ -286,7 +296,10 @@ export class CopilotStudioClient {
     conversationId: string
   ): AsyncGenerator<Activity> {
     const managed = trace(CopilotStudioClientTraceDefinitions.executeStreaming)
-    managed.record({ activity: redactDiagnosticObject(activity) as Activity, conversationId: redactString(conversationId) })
+    managed.record({
+      activityType: activity.type,
+      conversationId: pseudonymizeConversationId(conversationId, this.settings.diagnosticsPseudonymKey)
+    })
     try {
       if (!conversationId || !conversationId.trim()) {
         throw new Error('conversationId is required for executeStreaming')
@@ -295,9 +308,9 @@ export class CopilotStudioClient {
       const uriExecute = getCopilotStudioConnectionUrl(this.settings, conversationId)
       const request: ExecuteTurnRequest = new ExecuteTurnRequest(activity, conversationId)
 
-      logger.info('Executing turn with conversation ID:', redactString(conversationId))
+      logger.info('Executing turn with conversation ID:', pseudonymizeConversationId(conversationId, this.settings.diagnosticsPseudonymKey))
       this.logDiagnostic('Execute turn request:', {
-        conversationId: redactString(conversationId),
+        conversationId: pseudonymizeConversationId(conversationId, this.settings.diagnosticsPseudonymKey),
         activityType: activity.type,
         activityText: redactString(activity.text)
       })
@@ -452,7 +465,7 @@ export class CopilotStudioClient {
     lastReceivedEventId?: string
   ): AsyncGenerator<SubscribeEvent> {
     const managed = trace(CopilotStudioClientTraceDefinitions.subscribeAsync)
-    managed.record({ conversationId: redactString(conversationId), lastReceivedEventId })
+    managed.record({ conversationId: pseudonymizeConversationId(conversationId, this.settings.diagnosticsPseudonymKey), lastReceivedEventId })
     try {
       if (!conversationId || !conversationId.trim()) {
         throw new Error('conversationId is required for subscribeAsync')
@@ -460,8 +473,8 @@ export class CopilotStudioClient {
 
       const url = getCopilotStudioSubscribeUrl(this.settings, conversationId)
 
-      logger.info('Subscribing to conversation:', redactString(conversationId))
-      this.logDiagnostic('Subscribe request:', { conversationId: redactString(conversationId), lastReceivedEventId, url: redactString(url) })
+      logger.info('Subscribing to conversation:', pseudonymizeConversationId(conversationId, this.settings.diagnosticsPseudonymKey))
+      this.logDiagnostic('Subscribe request:', { conversationId: pseudonymizeConversationId(conversationId, this.settings.diagnosticsPseudonymKey), lastReceivedEventId, url: redactUrl(url) })
 
       const eventSource: EventSourceClient = createEventSource({
         url,

@@ -6,7 +6,7 @@
 import { AgentType } from './agentType'
 import { CopilotStudioConnectionSettings } from './copilotStudioConnectionSettings'
 import { PowerPlatformCloud } from './powerPlatformCloud'
-import { debug, redactUrl } from '@microsoft/agents-telemetry'
+import { debug, redactString, redactUrl } from '@microsoft/agents-telemetry'
 
 const logger = debug('copilot-studio:settings')
 
@@ -49,6 +49,8 @@ abstract class ConnectionOptions implements Omit<CopilotStudioConnectionSettings
   public useExperimentalEndpoint?: boolean = false
   /** Flag to enable diagnostic logging. Default is false. */
   public enableDiagnostics?: boolean = false
+  /** Optional secret used to keep diagnostic conversation pseudonyms stable across restarts. */
+  public diagnosticsPseudonymKey?: string
 }
 
 /**
@@ -102,6 +104,7 @@ export class ConnectionSettings extends ConnectionOptions {
       directConnectUrl: redactUrl(options.directConnectUrl),
       useExperimentalEndpoint: options.useExperimentalEndpoint,
       enableDiagnostics: options.enableDiagnostics,
+      diagnosticsPseudonymKey: redactString(options.diagnosticsPseudonymKey, true),
     })
 
     Object.assign(this, { ...options, cloud, copilotAgentType, authority })
@@ -125,6 +128,7 @@ export const loadCopilotStudioConnectionSettingsFromEnv: () => ConnectionSetting
     copilotAgentType: process.env.copilotAgentType as AgentType,
     directConnectUrl: process.env.directConnectUrl,
     useExperimentalEndpoint: process.env.useExperimentalEndpoint?.toLowerCase() === 'true',
-    enableDiagnostics: process.env.enableDiagnostics?.toLowerCase() === 'true'
+    enableDiagnostics: process.env.enableDiagnostics?.toLowerCase() === 'true',
+    diagnosticsPseudonymKey: process.env.diagnosticsPseudonymKey ?? ''
   })
 }
