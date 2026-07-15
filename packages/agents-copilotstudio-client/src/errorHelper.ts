@@ -6,12 +6,12 @@ import { AgentErrorDefinition } from '@microsoft/agents-activity'
 export const Errors: { [key: string]: AgentErrorDefinition } = {
   InvalidPowerPlatformCloud: {
     code: -140000,
-    description: "Invalid PowerPlatformCloud: '{cloud}'. Supported values: {supportedValues}"
+    description: 'Invalid PowerPlatformCloud: \'{cloud}\'. Supported values: {supportedValues}'
   },
 
   InvalidAgentType: {
     code: -140001,
-    description: "Invalid AgentType: '{agentType}'. Supported values: {supportedValues}"
+    description: 'Invalid AgentType: \'{agentType}\'. Supported values: {supportedValues}'
   },
 
   MissingConnectionUrlSettings: {

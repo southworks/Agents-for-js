@@ -23,16 +23,17 @@ const mockFailedFetchResponse = (status: number, statusText: string, bodyText: s
   } as unknown as Response
 }
 
-const captureRejection = async (action: () => Promise<unknown>) => {
-  let capturedError: unknown
+const captureRejection = async (action: () => Promise<unknown>): Promise<Error> => {
   try {
     await action()
   } catch (error) {
-    capturedError = error
+    if (error instanceof Error) {
+      return error
+    }
+    return new Error(String(error))
   }
 
-  assert(capturedError instanceof Error)
-  return capturedError
+  assert.fail('Expected promise to reject, but it did not.')
 }
 
 describe('scopeFromSettings', function () {
