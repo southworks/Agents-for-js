@@ -9,8 +9,9 @@ import { Activity, Attachment, ConversationAccount } from '@microsoft/agents-act
 import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
-import { debug, trace, redactString } from '@microsoft/agents-telemetry'
+import { debug, redactString, redactUrl, trace } from '@microsoft/agents-telemetry'
 import { CopilotStudioClientTraceDefinitions } from './observability'
+import { redactDiagnosticValue } from './redact'
 
 const logger = debug('copilot-studio:webchat')
 
@@ -335,7 +336,7 @@ export class CopilotStudioWebChat {
           },
         }
         sequence++
-        logger.debug(`Notify '${newActivity.type}' activity to WebChat:`, newActivity)
+        logger.debug(`Notify '${newActivity.type}' activity to WebChat:`, redactDiagnosticValue(newActivity))
         activitySubscriber?.next(newActivity)
       }
 
@@ -480,7 +481,7 @@ async function processBlobAttachment (attachment: Attachment): Promise<Attachmen
     newContentUrl = `data:${blob.type};base64,${base64}`
   } catch (error) {
     newContentUrl = attachment.contentUrl
-    logger.error('Error processing blob attachment:', newContentUrl, error)
+    logger.error('Error processing blob attachment:', redactUrl(newContentUrl), error)
   }
 
   return { ...attachment, contentUrl: newContentUrl }

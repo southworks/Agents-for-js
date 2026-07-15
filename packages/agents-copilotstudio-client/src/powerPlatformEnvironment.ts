@@ -5,7 +5,7 @@
 
 import { AgentType } from './agentType'
 import { ConnectionSettings } from './connectionSettings'
-import { debug } from '@microsoft/agents-telemetry'
+import { debug, redactUrl } from '@microsoft/agents-telemetry'
 import { PowerPlatformCloud } from './powerPlatformCloud'
 import { PrebuiltBotStrategy } from './strategies/prebuiltBotStrategy'
 import { PublishedBotStrategy } from './strategies/publishedBotStrategy'
@@ -29,7 +29,7 @@ export function getCopilotStudioConnectionUrl (
   }
 
   if (settings.directConnectUrl?.trim()) {
-    logger.debug(`Using direct connection: ${settings.directConnectUrl}`)
+    logger.debug(`Using direct connection: ${redactUrl(settings.directConnectUrl)}`)
     if (!isValidUri(settings.directConnectUrl)) {
       throw new Error('directConnectUrl must be a valid URL')
     }
@@ -47,7 +47,7 @@ export function getCopilotStudioConnectionUrl (
     if (!settings.customPowerPlatformCloud?.trim()) {
       throw new Error('customPowerPlatformCloud must be provided when PowerPlatformCloud is Other')
     } else if (isValidUri(settings.customPowerPlatformCloud)) {
-      logger.debug(`Using custom Power Platform cloud: ${settings.customPowerPlatformCloud}`)
+      logger.debug(`Using custom Power Platform cloud: ${redactUrl(settings.customPowerPlatformCloud)}`)
     } else {
       throw new Error(
         'customPowerPlatformCloud must be a valid URL'
@@ -69,7 +69,7 @@ export function getCopilotStudioConnectionUrl (
   }[agentType]()
 
   const url = strategy.getConversationUrl(conversationId)
-  logger.debug(`Generated Copilot Studio connection URL: ${url}`)
+  logger.debug(`Generated Copilot Studio connection URL: ${redactUrl(url)}`)
   return url
 }
 
@@ -95,7 +95,7 @@ export function getCopilotStudioSubscribeUrl (
     : `${url.pathname}/subscribe`
   const subscribeUrl = url.href
 
-  logger.debug(`Generated Copilot Studio subscribe URL: ${subscribeUrl}`)
+  logger.debug(`Generated Copilot Studio subscribe URL: ${redactUrl(subscribeUrl)}`)
   return subscribeUrl
 }
 

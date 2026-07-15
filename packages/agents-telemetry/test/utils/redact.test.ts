@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { describe, it } from 'node:test'
-import { redactScopes, redactString, redactUrl } from '../../src/utils/redact'
+import { redactScopes, redactString, redactUrl, redactDiagnosticObject } from '../../src/utils/redact'
 
 describe('redactString', () => {
   it('returns undefined for undefined input', () => {
@@ -55,5 +55,51 @@ describe('redactScopes', () => {
     assert.strictEqual(redactScopes([]), '<redacted> (0 scopes)')
     assert.strictEqual(redactScopes(['scope.one']), '<redacted> (1 scope)')
     assert.strictEqual(redactScopes(['scope.one', 'scope.two']), '<redacted> (2 scopes)')
+  })
+})
+
+describe('redactDiagnosticObject', () => {
+  it('redacts conversation IDs, activity text, and URLs without changing unrelated request fields', () => {
+    const body = {
+      emitStartConversationEvent: true,
+      locale: 'en-US',
+      conversationId: 'conversation-secret',
+      activity: {
+        type: 'message',
+        text: 'activity-text-secret',
+        conversation: { id: 'nested-conversation-secret', name: 'Support' },
+        attachments: [{ contentUrl: 'https://files.example.com/attachments/private-file?token=secret' }]
+      },
+      callbackUrl: 'https://example.com/callback/private?code=secret'
+    }
+
+    assert.deepEqual(redactDiagnosticObject(body), {
+      emitStartConversationEvent: true,
+      locale: 'en-US',
+      conversationId: '<redacted>',
+      activity: {
+        type: 'message',
+        text: '<redacted>',
+        conversation: { id: '<redacted>', name: 'Support' },
+        attachments: [{ contentUrl: 'https://files.example.com/<redacted> (2 segments)' }]
+      },
+      callbackUrl: 'https://example.com/<redacted> (2 segments)'
+    })
+
+    assert.equal(body.conversationId, 'conversation-secret')
+    assert.equal(body.activity.text, 'activity-text-secret')
+    assert.equal(body.activity.attachments[0].contentUrl, 'https://files.example.com/attachments/private-file?token=secret')
+  })
+
+  it('redacts activityText diagnostic fields and URL aliases', () => {
+    assert.deepEqual(redactDiagnosticObject({
+      activityText: 'activity-text-secret',
+      uri: 'https://example.com/private/resource',
+      href: 'https://example.com/private/link'
+    }), {
+      activityText: '<redacted>',
+      uri: 'https://example.com/<redacted> (2 segments)',
+      href: 'https://example.com/<redacted> (2 segments)'
+    })
   })
 })

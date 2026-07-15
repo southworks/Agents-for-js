@@ -59,3 +59,40 @@ export function redactScopes (scopes: string[] | undefined): string | undefined 
   const count = scopes.length
   return `${REDACTED_VALUE} (${count} ${count === 1 ? 'scope' : 'scopes'})`
 }
+
+/**
+ * Creates a redacted copy of an object for diagnostic logging.
+ * Conversation IDs, activity text, and URL-valued properties are redacted while all other values are preserved.
+ * @param value The value to sanitize for diagnostics.
+ * @returns A non-mutating, redacted copy of the value.
+ */
+export function redactDiagnosticObject (value: unknown): unknown {
+  return redactValue(value, [])
+}
+
+function redactValue (value: unknown, path: string[]): unknown {
+  if (typeof value === 'string') {
+    const propertyName = path.at(-1)?.toLowerCase()
+    const parentPropertyName = path.at(-2)?.toLowerCase()
+
+    if (propertyName === 'conversationid' || (propertyName === 'id' && parentPropertyName === 'conversation') || propertyName === 'text' || propertyName === 'activitytext') {
+      return redactString(value)
+    }
+
+    if (propertyName?.includes('url') || propertyName === 'uri' || propertyName === 'href') {
+      return redactUrl(value)
+    }
+
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(item => redactValue(item, path))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactValue(item, [...path, key])]))
+  }
+
+  return value
+}
