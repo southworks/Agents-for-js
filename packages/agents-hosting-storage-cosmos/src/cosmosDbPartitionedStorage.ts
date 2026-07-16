@@ -31,7 +31,13 @@ class DoOnce<T> {
    */
   waitFor (key: string, fn: () => Promise<T>): Promise<T> {
     if (!this.task[key]) {
-      this.task[key] = fn()
+      const task = fn()
+      this.task[key] = task
+      task.catch(() => {
+        if (this.task[key] === task) {
+          delete this.task[key]
+        }
+      })
     }
 
     return this.task[key]
