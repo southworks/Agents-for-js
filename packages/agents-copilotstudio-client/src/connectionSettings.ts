@@ -104,7 +104,7 @@ export class ConnectionSettings extends ConnectionOptions {
       directConnectUrl: redactUrl(options.directConnectUrl),
       useExperimentalEndpoint: options.useExperimentalEndpoint,
       enableDiagnostics: options.enableDiagnostics,
-      diagnosticsPseudonymKey: redactString(options.diagnosticsPseudonymKey, true),
+      diagnosticsPseudonymKey: redactString(options.diagnosticsPseudonymKey),
     })
 
     Object.assign(this, { ...options, cloud, copilotAgentType, authority })

@@ -76,8 +76,10 @@ export function pseudonymizeConversationId (conversationId: string | undefined, 
     return undefined
   }
 
-  processLocalKey ??= createProcessLocalKey()
-  const hmacKey = key?.trim() ? utf8ToBytes(key.trim()) : processLocalKey
+  const trimmedKey = key?.trim()
+  const hmacKey = trimmedKey
+    ? utf8ToBytes(trimmedKey)
+    : (processLocalKey ??= createProcessLocalKey())
   const digest = hmac(sha256, hmacKey, utf8ToBytes(conversationId))
 
   return `cid_${bytesToHex(digest).slice(0, 32)}`
