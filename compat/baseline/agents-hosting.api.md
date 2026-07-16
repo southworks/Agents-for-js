@@ -776,6 +776,9 @@ export function getAuthConfigWithDefaults(config?: AuthConfiguration): AuthConfi
 export const getProductInfo: () => string;
 
 // @public
+export function getStorageWriteExpiry(options?: StorageWriteOptions): number | undefined;
+
+// @public
 export class HeaderPropagation implements HeaderPropagationCollection {
     constructor(headers: Record<string, string | string[] | undefined>);
     // (undocumented)

@@ -98,7 +98,7 @@ describe('MemoryStorage', () => {
         async () => await memoryStorage.write({ key1: { value: 'test', eTag: '*' } }, { ttl: 0 }),
         (err: any) => {
           assert.strictEqual(err.name, 'RangeError')
-          assert.strictEqual(err.code, -120701)
+          assert.strictEqual(err.code, -120740)
           assert.match(err.message, /StorageWriteOptions\.ttl must be a finite number greater than zero\./)
           return true
         }

@@ -110,18 +110,22 @@ export class FileStorage implements Storage {
           reject(new ReferenceError('Keys are required when reading.'))
         } else {
           const data: StoreItem = {}
+          let storageChanged = false
           for (const key of keys) {
             if (this.isExpired(key)) {
               logger.info('Item expired, deleting from storage', { key: redactString(key, true) })
               delete this._stateFile[key]
               delete this._metadataFile.expirations![key]
-              this.writeFiles()
+              storageChanged = true
               continue
             }
             const item = this._stateFile[key]
             if (item) {
               data[key] = item
             }
+          }
+          if (storageChanged) {
+            this.writeFiles()
           }
           resolve(data)
         }
