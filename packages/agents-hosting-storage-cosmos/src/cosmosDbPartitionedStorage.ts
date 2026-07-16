@@ -13,15 +13,21 @@ import { CosmosStorageTraceDefinitions } from './observability'
 import { debug } from '@microsoft/agents-telemetry'
 
 const logger = debug('agents:cosmos-storage')
+const maxCachedInitializations = 100
+
+interface CachedTask<T> {
+  promise: Promise<T>;
+  settled: boolean;
+}
 
 /**
  * A utility class to ensure that a specific asynchronous task is executed only once for a given key.
  * @typeParam T The type of the result returned by the asynchronous task.
  */
 class DoOnce<T> {
-  private task: {
-    [key: string]: Promise<T>;
-  } = {}
+  private readonly tasks = new Map<string, CachedTask<T>>()
+
+  constructor (private readonly maxTasks: number) {}
 
   /**
    * Waits for the task associated with the given key to complete, or starts the task if it hasn't been started yet.
@@ -30,17 +36,47 @@ class DoOnce<T> {
    * @returns A promise that resolves to the result of the task.
    */
   waitFor (key: string, fn: () => Promise<T>): Promise<T> {
-    if (!this.task[key]) {
-      const task = fn()
-      this.task[key] = task
-      task.catch(() => {
-        if (this.task[key] === task) {
-          delete this.task[key]
-        }
-      })
+    const existingTask = this.tasks.get(key)
+    if (existingTask) {
+      this.tasks.delete(key)
+      this.tasks.set(key, existingTask)
+      return existingTask.promise
     }
 
-    return this.task[key]
+    const cachedTask: CachedTask<T> = {
+      promise: Promise.resolve().then(fn),
+      settled: false,
+    }
+    this.tasks.set(key, cachedTask)
+    cachedTask.promise.then(() => {
+      if (this.tasks.get(key) === cachedTask) {
+        cachedTask.settled = true
+        this.evictLeastRecentlyUsed()
+      }
+    }, () => {
+      if (this.tasks.get(key) === cachedTask) {
+        this.tasks.delete(key)
+      }
+    })
+    this.evictLeastRecentlyUsed()
+
+    return cachedTask.promise
+  }
+
+  private evictLeastRecentlyUsed (): void {
+    while (this.tasks.size > this.maxTasks) {
+      let evicted = false
+      for (const [key, task] of this.tasks) {
+        if (task.settled) {
+          this.tasks.delete(key)
+          evicted = true
+          break
+        }
+      }
+      if (!evicted) {
+        return
+      }
+    }
   }
 }
 
@@ -49,7 +85,7 @@ interface ContainerInitialization {
   compatibilityModePartitionKey: boolean;
 }
 
-const _doOnce: DoOnce<ContainerInitialization> = new DoOnce<ContainerInitialization>()
+const _doOnce: DoOnce<ContainerInitialization> = new DoOnce<ContainerInitialization>(maxCachedInitializations)
 
 const maxDepthAllowed = 127
 
@@ -309,7 +345,7 @@ export class CosmosDbPartitionedStorage implements Storage {
       ])
       const initialization = await _doOnce.waitFor(
         dbAndContainerKey,
-        async (): Promise<ContainerInitialization> => await this.getOrCreateContainer()
+        () => this.getOrCreateContainer()
       )
       this.container = initialization.container
       this.compatibilityModePartitionKey = initialization.compatibilityModePartitionKey

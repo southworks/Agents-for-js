@@ -117,6 +117,76 @@ describe('CosmosDbPartitionedStorage initialization', () => {
     assert.strictEqual(retryStorage.container, container)
   })
 
+  it('should cache initialization attempts that throw synchronously', async () => {
+    const endpoint = 'https://synchronous-failure-account.documents.azure.com/'
+    const firstStorage = createStorage(endpoint) as unknown as StorageInternals
+    const concurrentStorage = createStorage(endpoint) as unknown as StorageInternals
+    const retryStorage = createStorage(endpoint) as unknown as StorageInternals
+    const container = {} as Container
+    let attempts = 0
+    const throwSynchronously = (): never => {
+      attempts++
+      throw new Error('Synchronous initialization failure')
+    }
+
+    firstStorage.client = {} as CosmosClient
+    concurrentStorage.client = {} as CosmosClient
+    retryStorage.client = {} as CosmosClient
+    firstStorage.getOrCreateContainer = throwSynchronously
+    concurrentStorage.getOrCreateContainer = throwSynchronously
+    retryStorage.getOrCreateContainer = async () => {
+      attempts++
+      return { container, compatibilityModePartitionKey: false }
+    }
+
+    const results = await Promise.allSettled([
+      firstStorage.initialize(),
+      concurrentStorage.initialize(),
+    ])
+
+    assert.deepStrictEqual(results.map(result => result.status), ['rejected', 'rejected'])
+    assert.strictEqual(attempts, 1)
+
+    await retryStorage.initialize()
+
+    assert.strictEqual(attempts, 2)
+    assert.strictEqual(retryStorage.container, container)
+  })
+
+  it('should evict least-recently-used successful initializations after the cache limit', async () => {
+    const firstEndpoint = 'https://lru-account-0.documents.azure.com/'
+    const firstContainer = {} as Container
+    const firstStorage = createStorage(firstEndpoint) as unknown as StorageInternals
+    firstStorage.client = {} as CosmosClient
+    firstStorage.getOrCreateContainer = async () => ({
+      container: firstContainer,
+      compatibilityModePartitionKey: false,
+    })
+    await firstStorage.initialize()
+
+    for (let i = 1; i <= 100; i++) {
+      const storage = createStorage(`https://lru-account-${i}.documents.azure.com/`) as unknown as StorageInternals
+      storage.client = {} as CosmosClient
+      storage.getOrCreateContainer = async () => ({
+        container: {} as Container,
+        compatibilityModePartitionKey: false,
+      })
+      await storage.initialize()
+    }
+
+    const replacementContainer = {} as Container
+    const replacementStorage = createStorage(firstEndpoint) as unknown as StorageInternals
+    replacementStorage.client = {} as CosmosClient
+    replacementStorage.getOrCreateContainer = async () => ({
+      container: replacementContainer,
+      compatibilityModePartitionKey: false,
+    })
+
+    await replacementStorage.initialize()
+
+    assert.strictEqual(replacementStorage.container, replacementContainer)
+  })
+
   it('should reject unsupported partition keys without attempting container creation', async () => {
     const storage = createStorage('https://unsupported-partition-account.documents.azure.com/') as unknown as StorageInternals
     const container = {
