@@ -12,6 +12,11 @@ export default {
   create (context) {
     const sourceCode = context.sourceCode
     const testFunctionNames = new Set(['it', 'test'])
+    const nonExecutableStatements = new Set([
+      'ClassDeclaration',
+      'EmptyStatement',
+      'FunctionDeclaration'
+    ])
 
     const isTestCall = (node) => {
       if (node.callee.type === 'Identifier') return testFunctionNames.has(node.callee.name)
@@ -23,15 +28,31 @@ export default {
         ['only', 'skip', 'todo'].includes(node.callee.property.name)
     }
 
+    const isAstNode = (value) => value != null &&
+      typeof value === 'object' &&
+      typeof value.type === 'string'
+
     const containsCast = (node, root) => {
+      if (!isAstNode(node)) return false
       if (node.type === 'TSAsExpression' || node.type === 'TSTypeAssertion') return true
-      if (node !== root && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression')) return false
+      if (node !== root && [
+        'ArrowFunctionExpression',
+        'ClassDeclaration',
+        'ClassExpression',
+        'FunctionDeclaration',
+        'FunctionExpression'
+      ].includes(node.type)) return false
       return (sourceCode.visitorKeys[node.type] ?? []).some((key) => {
         const value = node[key]
         return Array.isArray(value)
           ? value.some(child => containsCast(child, root))
-          : value != null && containsCast(value, root)
+          : containsCast(value, root)
       })
+    }
+
+    const findTerminalNode = (body) => {
+      if (body.type !== 'BlockStatement') return body
+      return body.body.findLast(statement => !nonExecutableStatements.has(statement.type))
     }
 
     return {
@@ -42,9 +63,7 @@ export default {
         )
         if (!callback) return
 
-        const terminalNode = callback.body.type === 'BlockStatement'
-          ? callback.body.body.at(-1)
-          : callback.body
+        const terminalNode = findTerminalNode(callback.body)
         if (terminalNode && containsCast(terminalNode, terminalNode)) {
           context.report({ node: terminalNode, messageId: 'terminalCast' })
         }
