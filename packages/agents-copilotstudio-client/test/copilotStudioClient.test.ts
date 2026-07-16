@@ -278,6 +278,33 @@ describe('CopilotStudioClient', function () {
       const thirdRequestUrl = String(fetchMock.mock.calls[2].arguments[0])
       assert(thirdRequestUrl.includes(`/conversations/${conversationId}`), `Expected request URL to retain conversation ID: ${thirdRequestUrl}`)
     })
+
+    it('should replace a stale conversation ID when starting a headerless conversation', async function () {
+      const settings = createTestSettings()
+      const client = new CopilotStudioClient(settings, 'test-token')
+      const firstConversationId = 'first-conversation-id'
+      const secondConversationId = 'second-conversation-id'
+      const secondConversationActivity = Activity.fromObject({
+        type: ActivityTypes.Message,
+        text: 'New conversation',
+        conversation: { id: secondConversationId }
+      })
+      const responses = [
+        mockFetchResponse([], firstConversationId),
+        mockFetchResponse([secondConversationActivity]),
+        mockFetchResponse([])
+      ]
+      const fetchMock = mock.fn(() => Promise.resolve(responses.shift()!))
+      global.fetch = fetchMock as any
+
+      await consumeStream(client.startConversationStreaming())
+      await consumeStream(client.startConversationStreaming())
+      await consumeStream(client.sendActivityStreaming(Activity.fromObject({ type: ActivityTypes.Message, text: 'Follow-up' })))
+
+      assert.equal(client['conversationId'], secondConversationId)
+      const thirdRequestUrl = String(fetchMock.mock.calls[2].arguments[0])
+      assert(thirdRequestUrl.includes(`/conversations/${secondConversationId}`), `Expected request URL to use the new conversation ID: ${thirdRequestUrl}`)
+    })
   })
 
   describe('sendActivity', function () {
@@ -1469,6 +1496,28 @@ describe('CopilotStudioClient', function () {
 
       assert.equal(activities.length, 1)
       assert.equal(activities[0].text, 'Hi!')
+    })
+
+    it('should use an explicitly executed conversation for later default sends', async function () {
+      const settings = createTestSettings()
+      const client = new CopilotStudioClient(settings, 'test-token')
+      const firstConversationId = 'first-conversation-id'
+      const executedConversationId = 'executed-conversation-id'
+      const responses = [
+        mockFetchResponse([], firstConversationId),
+        mockFetchResponse([]),
+        mockFetchResponse([])
+      ]
+      const fetchMock = mock.fn(() => Promise.resolve(responses.shift()!))
+      global.fetch = fetchMock as any
+
+      await consumeStream(client.startConversationStreaming())
+      await consumeStream(client.executeStreaming(Activity.fromObject({ type: ActivityTypes.Message, text: 'Execute' }), executedConversationId))
+      await consumeStream(client.sendActivityStreaming(Activity.fromObject({ type: ActivityTypes.Message, text: 'Follow-up' })))
+
+      assert.equal(client['conversationId'], executedConversationId)
+      const thirdRequestUrl = String(fetchMock.mock.calls[2].arguments[0])
+      assert(thirdRequestUrl.includes(`/conversations/${executedConversationId}`), `Expected request URL to use the executed conversation ID: ${thirdRequestUrl}`)
     })
 
     it('should throw error if conversationId is empty', async function () {
