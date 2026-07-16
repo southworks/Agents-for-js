@@ -2,6 +2,7 @@ import assert from 'assert'
 import { Container, CosmosClient } from '@azure/cosmos'
 import { describe, it } from 'node:test'
 import { CosmosDbPartitionedStorage } from '../src/cosmosDbPartitionedStorage'
+import { Errors } from '../src/errorHelper'
 
 interface StorageInternals {
   client: CosmosClient;
@@ -114,5 +115,72 @@ describe('CosmosDbPartitionedStorage initialization', () => {
 
     assert.strictEqual(attempts, 2)
     assert.strictEqual(retryStorage.container, container)
+  })
+
+  it('should reject unsupported partition keys without attempting container creation', async () => {
+    const storage = createStorage('https://unsupported-partition-account.documents.azure.com/') as unknown as StorageInternals
+    const container = {
+      readPartitionKeyDefinition: async () => ({ resource: { paths: ['/tenantId'] } }),
+    } as unknown as Container
+    let createContainerCalls = 0
+
+    storage.client = {
+      databases: {
+        createIfNotExists: async () => ({
+          database: {
+            container: () => container,
+            containers: {
+              createIfNotExists: async () => {
+                createContainerCalls++
+                return { container }
+              },
+            },
+          },
+        }),
+      },
+    } as unknown as CosmosClient
+
+    await assert.rejects(storage.initialize(), (err: unknown) => {
+      const initializationError = err as Error & {
+        code?: number;
+        innerException?: Error & { code?: number };
+      }
+      assert.strictEqual(initializationError.code, Errors.InitializationError.code)
+      assert.strictEqual(initializationError.innerException?.code, Errors.UnsupportedCustomPartitionKeyPath.code)
+      return true
+    })
+    assert.strictEqual(createContainerCalls, 0)
+  })
+
+  it('should create the container when compatibility-mode validation returns not found', async () => {
+    const storage = createStorage('https://missing-container-account.documents.azure.com/') as unknown as StorageInternals
+    const existingContainer = {
+      readPartitionKeyDefinition: async () => {
+        throw Object.assign(new Error('Container not found'), { code: 404 })
+      },
+    } as unknown as Container
+    const createdContainer = {} as Container
+    let createContainerCalls = 0
+
+    storage.client = {
+      databases: {
+        createIfNotExists: async () => ({
+          database: {
+            container: () => existingContainer,
+            containers: {
+              createIfNotExists: async () => {
+                createContainerCalls++
+                return { container: createdContainer }
+              },
+            },
+          },
+        }),
+      },
+    } as unknown as CosmosClient
+
+    await storage.initialize()
+
+    assert.strictEqual(createContainerCalls, 1)
+    assert.strictEqual(storage.container, createdContainer)
   })
 })

@@ -53,6 +53,14 @@ const _doOnce: DoOnce<ContainerInitialization> = new DoOnce<ContainerInitializat
 
 const maxDepthAllowed = 127
 
+function isNotFoundError (err: unknown): boolean {
+  if (!err || typeof err !== 'object' || !('code' in err)) {
+    return false
+  }
+
+  return Number(err.code) === 404
+}
+
 /**
  * Implements storage using Cosmos DB partitioned storage.
  */
@@ -342,7 +350,10 @@ export class CosmosDbPartitionedStorage implements Storage {
             compatibilityModePartitionKey = true
           }
           return { container, compatibilityModePartitionKey }
-        } catch {
+        } catch (err: unknown) {
+          if (!isNotFoundError(err)) {
+            throw err
+          }
           createIfNotExists = true
         }
       }
