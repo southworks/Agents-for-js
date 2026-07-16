@@ -13,6 +13,14 @@ import {
 } from '../src'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
 
+async function consumeStream (stream: AsyncIterable<unknown>): Promise<void> {
+  const iterator = stream[Symbol.asyncIterator]()
+  let next = await iterator.next()
+  while (!next.done) {
+    next = await iterator.next()
+  }
+}
+
 describe('scopeFromSettings', function () {
   const testCases: Array<{
     label: string
@@ -248,6 +256,27 @@ describe('CopilotStudioClient', function () {
       assert.equal(activities.length, 1)
       assert.equal(activities[0].conversation?.id, 'not-expected-conversation-id')
       assert.equal(client['conversationId'], expectedConversationId)
+    })
+
+    it('should retain the conversation ID when a later response omits the header', async function () {
+      const settings = createTestSettings()
+      const client = new CopilotStudioClient(settings, 'test-token')
+      const conversationId = 'header-conversation-id'
+      const responses = [
+        mockFetchResponse([], conversationId),
+        mockFetchResponse([]),
+        mockFetchResponse([]),
+      ]
+      const fetchMock = mock.fn(() => Promise.resolve(responses.shift()!))
+      global.fetch = fetchMock as any
+
+      await consumeStream(client.startConversationStreaming())
+      await consumeStream(client.sendActivityStreaming(Activity.fromObject({ type: ActivityTypes.Message, text: 'First message' })))
+      await consumeStream(client.sendActivityStreaming(Activity.fromObject({ type: ActivityTypes.Message, text: 'Second message' })))
+
+      assert.equal(client['conversationId'], conversationId)
+      const thirdRequestUrl = String(fetchMock.mock.calls[2].arguments[0])
+      assert(thirdRequestUrl.includes(`/conversations/${conversationId}`), `Expected request URL to retain conversation ID: ${thirdRequestUrl}`)
     })
   })
 

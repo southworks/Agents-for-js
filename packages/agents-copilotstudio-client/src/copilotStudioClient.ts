@@ -178,8 +178,9 @@ export class CopilotStudioClient {
       }
     }
 
-    this.conversationId = responseHeaders?.get(CopilotStudioClient.conversationIdHeaderKey) ?? ''
-    if (this.conversationId) {
+    const conversationId = responseHeaders?.get(CopilotStudioClient.conversationIdHeaderKey)
+    if (conversationId) {
+      this.conversationId = conversationId
       logger.debug(`Conversation ID: ${this.conversationId}`)
     }
 
