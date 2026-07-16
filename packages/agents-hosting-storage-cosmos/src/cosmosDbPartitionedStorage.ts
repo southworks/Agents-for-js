@@ -38,7 +38,12 @@ class DoOnce<T> {
   }
 }
 
-const _doOnce: DoOnce<Container> = new DoOnce<Container>()
+interface ContainerInitialization {
+  container: Container;
+  compatibilityModePartitionKey: boolean;
+}
+
+const _doOnce: DoOnce<ContainerInitialization> = new DoOnce<ContainerInitialization>()
 
 const maxDepthAllowed = 127
 
@@ -283,17 +288,24 @@ export class CosmosDbPartitionedStorage implements Storage {
       if (!this.client) {
         this.client = new CosmosClient(this.cosmosDbStorageOptions.cosmosClientOptions!)
       }
-      const dbAndContainerKey = `${this.cosmosDbStorageOptions.databaseId}-${this.cosmosDbStorageOptions.containerId}`
-      this.container = await _doOnce.waitFor(
+      const dbAndContainerKey = JSON.stringify([
+        this.cosmosDbStorageOptions.cosmosClientOptions!.endpoint,
+        this.cosmosDbStorageOptions.databaseId,
+        this.cosmosDbStorageOptions.containerId,
+      ])
+      const initialization = await _doOnce.waitFor(
         dbAndContainerKey,
-        async (): Promise<Container> => await this.getOrCreateContainer()
+        async (): Promise<ContainerInitialization> => await this.getOrCreateContainer()
       )
+      this.container = initialization.container
+      this.compatibilityModePartitionKey = initialization.compatibilityModePartitionKey
     }
   }
 
-  private async getOrCreateContainer (): Promise<Container> {
+  private async getOrCreateContainer (): Promise<ContainerInitialization> {
     let createIfNotExists = !this.cosmosDbStorageOptions.compatibilityMode
     let container: Container | undefined
+    let compatibilityModePartitionKey = false
 
     try {
       const { database } = await this.client.databases.createIfNotExists({
@@ -308,7 +320,7 @@ export class CosmosDbPartitionedStorage implements Storage {
           if (partitionKeyResponse.resource && partitionKeyResponse.resource.paths) {
             const paths = partitionKeyResponse.resource.paths
             if (paths.includes('/_partitionKey')) {
-              this.compatibilityModePartitionKey = true
+              compatibilityModePartitionKey = true
             } else if (paths.indexOf(DocumentStoreItem.partitionKeyPath) === -1) {
               throw ExceptionHelper.generateException(
                 Error,
@@ -321,9 +333,9 @@ export class CosmosDbPartitionedStorage implements Storage {
               )
             }
           } else {
-            this.compatibilityModePartitionKey = true
+            compatibilityModePartitionKey = true
           }
-          return container
+          return { container, compatibilityModePartitionKey }
         } catch {
           createIfNotExists = true
         }
@@ -337,7 +349,7 @@ export class CosmosDbPartitionedStorage implements Storage {
           },
           throughput: this.cosmosDbStorageOptions.containerThroughput,
         })
-        return result.container
+        return { container: result.container, compatibilityModePartitionKey }
       }
 
       if (!container) {
@@ -348,7 +360,7 @@ export class CosmosDbPartitionedStorage implements Storage {
           { containerId: this.cosmosDbStorageOptions.containerId }
         )
       }
-      return container
+      return { container, compatibilityModePartitionKey }
     } catch (err: any) {
       throw ExceptionHelper.generateException(
         Error,
