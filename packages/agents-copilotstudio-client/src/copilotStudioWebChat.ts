@@ -296,12 +296,13 @@ export class CopilotStudioWebChat {
           await handleAcknowledgementOnce()
           return
         }
+
+        logger.debug('--> Connection established.')
         started = true
+        notifyTyping()
 
         await trace(CopilotStudioClientTraceDefinitions.webchatStartConversation, async ({ record }) => {
           let activityCount = 0
-          logger.debug('--> Connection established.')
-          notifyTyping()
 
           for await (const activity of client.startConversationStreaming()) {
             delete activity.replyToId
@@ -314,9 +315,10 @@ export class CopilotStudioWebChat {
             activityCount++
             record({ activityCount, conversationId: activeConversationId })
             await handleAcknowledgementOnce()
+            notifyActivity(activity)
+
             trace(CopilotStudioClientTraceDefinitions.webchatReceiveActivity, ({ record }) => {
               record({ activity, conversationId: activeConversationId })
-              notifyActivity(activity)
             })
           }
           // If no activities received from bot, we should still acknowledge.
