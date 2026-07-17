@@ -335,9 +335,6 @@ export class CosmosDbPartitionedStorage implements Storage {
    */
   private async initialize (): Promise<void> {
     if (!this.container) {
-      if (!this.client) {
-        this.client = new CosmosClient(this.cosmosDbStorageOptions.cosmosClientOptions!)
-      }
       const dbAndContainerKey = JSON.stringify([
         this.cosmosDbStorageOptions.cosmosClientOptions!.endpoint,
         this.cosmosDbStorageOptions.databaseId,
@@ -345,7 +342,12 @@ export class CosmosDbPartitionedStorage implements Storage {
       ])
       const initialization = await _doOnce.waitFor(
         dbAndContainerKey,
-        () => this.getOrCreateContainer()
+        () => {
+          if (!this.client) {
+            this.client = new CosmosClient(this.cosmosDbStorageOptions.cosmosClientOptions!)
+          }
+          return this.getOrCreateContainer()
+        }
       )
       this.container = initialization.container
       this.compatibilityModePartitionKey = initialization.compatibilityModePartitionKey

@@ -55,7 +55,7 @@ export class StateManagementAgent extends ActivityHandler {
           if (turnContext.activity.text === '/reset') {
             await this.conversationDataAccessor.delete(turnContext)
             await this.userProfileAccessor.delete(turnContext)
-            await turnContext.sendActivity('State has been reset. What is your name?')
+            await turnContext.sendActivity('State has been reset.')
           } else if (turnContext.activity.text === '/transcript') {
             await this.showTranscript(turnContext)
           } else {

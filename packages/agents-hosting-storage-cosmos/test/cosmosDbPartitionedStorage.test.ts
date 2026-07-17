@@ -80,6 +80,28 @@ describe('CosmosDbPartitionedStorage initialization', () => {
     assert.strictEqual(secondStorage.compatibilityModePartitionKey, true)
   })
 
+  it('should not create a client when container initialization is cached', async () => {
+    const container = {} as Container
+    const endpoint = 'https://cached-initialization-account.documents.azure.com/'
+    const initializingStorage = createStorage(endpoint) as unknown as StorageInternals
+    const cachedStorage = createStorage(endpoint) as unknown as StorageInternals
+
+    initializingStorage.client = {} as CosmosClient
+    initializingStorage.getOrCreateContainer = async () => ({
+      container,
+      compatibilityModePartitionKey: false,
+    })
+    cachedStorage.getOrCreateContainer = async () => {
+      throw new Error('The cached initialization should be reused')
+    }
+
+    await initializingStorage.initialize()
+    await cachedStorage.initialize()
+
+    assert.strictEqual(cachedStorage.container, container)
+    assert.strictEqual(cachedStorage.client, undefined)
+  })
+
   it('should evict failed initialization attempts so a later call can retry', async () => {
     const endpoint = 'https://retry-account.documents.azure.com/'
     const firstStorage = createStorage(endpoint) as unknown as StorageInternals
