@@ -15,6 +15,15 @@ interface StorageInternals {
   }>;
 }
 
+interface StorageError extends Error {
+  code?: number;
+  innerException?: StorageError;
+}
+
+function isStorageError (err: unknown): err is StorageError {
+  return err instanceof Error
+}
+
 function createStorage (endpoint: string): CosmosDbPartitionedStorage {
   return new CosmosDbPartitionedStorage({
     cosmosClientOptions: { endpoint, key: 'test-key' },
@@ -153,6 +162,38 @@ describe('CosmosDbPartitionedStorage initialization', () => {
     assert.strictEqual(retryStorage.container, container)
   })
 
+  it('should preserve the upsert error for circular documents', async () => {
+    const storage = createStorage('https://circular-document-account.documents.azure.com/')
+    const storageInternals = storage as unknown as StorageInternals
+    const upsertError = new Error('Cosmos DB rejected the document')
+    const container = {
+      items: {
+        upsert: async () => {
+          throw upsertError
+        },
+      },
+    } as unknown as Container
+    const document: Record<string, unknown> = {}
+    document.self = document
+
+    storageInternals.client = {} as CosmosClient
+    storageInternals.getOrCreateContainer = async () => ({
+      container,
+      compatibilityModePartitionKey: false,
+    })
+
+    let caughtError: unknown
+    try {
+      await storage.write({ document })
+    } catch (err) {
+      caughtError = err
+    }
+
+    assert.ok(isStorageError(caughtError))
+    assert.strictEqual(caughtError.code, Errors.DocumentUpsertError.code)
+    assert.strictEqual(caughtError.innerException, upsertError)
+  })
+
   it('should evict least-recently-used successful initializations after the cache limit', async () => {
     const firstEndpoint = 'https://lru-account-0.documents.azure.com/'
     const firstContainer = {} as Container
@@ -210,15 +251,17 @@ describe('CosmosDbPartitionedStorage initialization', () => {
       },
     } as unknown as CosmosClient
 
-    await assert.rejects(storage.initialize(), (err: unknown) => {
-      const initializationError = err as Error & {
-        code?: number;
-        innerException?: Error & { code?: number };
-      }
-      assert.strictEqual(initializationError.code, Errors.InitializationError.code)
-      assert.strictEqual(initializationError.innerException?.code, Errors.UnsupportedCustomPartitionKeyPath.code)
-      return true
-    })
+    let caughtError: unknown
+    try {
+      await storage.initialize()
+    } catch (err) {
+      caughtError = err
+    }
+
+    assert.ok(isStorageError(caughtError))
+    assert.strictEqual(caughtError.code, Errors.InitializationError.code)
+    assert.ok(isStorageError(caughtError.innerException))
+    assert.strictEqual(caughtError.innerException.code, Errors.UnsupportedCustomPartitionKeyPath.code)
     assert.strictEqual(createContainerCalls, 0)
   })
 

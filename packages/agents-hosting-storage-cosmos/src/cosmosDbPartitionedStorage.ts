@@ -432,6 +432,8 @@ export class CosmosDbPartitionedStorage implements Storage {
   }
 
   private checkForNestingError (json: object, err: Error | Record<'message', string> | string): void {
+    const ancestors = new WeakSet<object>()
+
     const checkDepth = (obj: unknown, depth: number, isInDialogState: boolean): void => {
       if (depth > maxDepthAllowed) {
         let additionalMessage = ''
@@ -462,8 +464,17 @@ export class CosmosDbPartitionedStorage implements Storage {
           }
         )
       } else if (obj && typeof obj === 'object') {
-        for (const [key, value] of Object.entries(obj)) {
-          checkDepth(value, depth + 1, key === 'dialogStack' || isInDialogState)
+        if (ancestors.has(obj)) {
+          return
+        }
+
+        ancestors.add(obj)
+        try {
+          for (const [key, value] of Object.entries(obj)) {
+            checkDepth(value, depth + 1, key === 'dialogStack' || isInDialogState)
+          }
+        } finally {
+          ancestors.delete(obj)
         }
       }
     }
