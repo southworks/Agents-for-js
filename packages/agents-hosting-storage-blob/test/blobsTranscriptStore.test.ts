@@ -54,10 +54,9 @@ function blob (name: string, timestamp: string): BlobItem {
 }
 
 function createFilteringStore (
-  items: BlobItem[],
-  options?: { decodeTranscriptKey?: boolean }
+  items: BlobItem[]
 ): { store: BlobsTranscriptStore; deleted: string[]; listOptions: Array<{ prefix?: string; includeMetadata?: boolean }> } {
-  const store = new BlobsTranscriptStore('UseDevelopmentStorage=true;', 'transcripts', options)
+  const store = new BlobsTranscriptStore('UseDevelopmentStorage=true;', 'transcripts')
   const deleted: string[] = []
   const listOptions: Array<{ prefix?: string; includeMetadata?: boolean }> = []
   const listBlobs = (options?: { prefix?: string; includeMetadata?: boolean }) => {
@@ -113,26 +112,15 @@ describe('BlobsTranscriptStore.listTranscripts', () => {
     assert.deepStrictEqual(result.items.map(({ id }) => id), ['conv'])
   })
 
-  it('extracts conversation IDs from encoded and decoded blob names', async () => {
+  it('extracts conversation IDs from encoded blob names', async () => {
     const store = createStore([[
       blob(sanitizeBlobKey('teams/conv-one/file.json'), '2026-01-02T00:00:00.000Z'),
-      blob(sanitizeBlobKey('teams/conv-two/file.json', { decodeTranscriptKey: true }), '2026-01-03T00:00:00.000Z'),
+      blob(sanitizeBlobKey('teams/conv-two/file.json'), '2026-01-03T00:00:00.000Z'),
     ]])
 
     const result = await store.listTranscripts('teams')
 
     assert.deepStrictEqual(result.items.map(({ id }) => id), ['conv-one', 'conv-two'])
-  })
-
-  it('lists decoded transcript keys using flat blob enumeration', async () => {
-    const conversationBlob = sanitizeBlobKey('teams/conv/file.json', { decodeTranscriptKey: true })
-    const { store } = createFilteringStore([
-      blob(conversationBlob, '2026-01-01T00:00:00.000Z'),
-    ], { decodeTranscriptKey: true })
-
-    const result = await store.listTranscripts('teams')
-
-    assert.deepStrictEqual(result.items.map(({ id }) => id), ['conv'])
   })
 
   it('requests metadata used for the transcript creation timestamp', async () => {
@@ -214,19 +202,6 @@ describe('BlobsTranscriptStore.getTranscriptActivities', () => {
       blob(conversationBlob, '2026-01-01T00:00:00.000Z'),
       blob(neighboringConversationBlob, '2026-01-02T00:00:00.000Z'),
     ])
-
-    const result = await store.getTranscriptActivities('channel', 'conv')
-
-    assert.deepStrictEqual(result.items.map(({ id }) => id), [conversationBlob])
-  })
-
-  it('reads decoded transcript keys with an isolated conversation prefix', async () => {
-    const conversationBlob = sanitizeBlobKey('channel/conv/file.json', { decodeTranscriptKey: true })
-    const neighboringConversationBlob = sanitizeBlobKey('channel/conv2/file.json', { decodeTranscriptKey: true })
-    const { store } = createFilteringStore([
-      blob(conversationBlob, '2026-01-01T00:00:00.000Z'),
-      blob(neighboringConversationBlob, '2026-01-02T00:00:00.000Z'),
-    ], { decodeTranscriptKey: true })
 
     const result = await store.getTranscriptActivities('channel', 'conv')
 

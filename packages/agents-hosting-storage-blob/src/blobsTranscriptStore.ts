@@ -34,10 +34,9 @@ function formatTicks (timestamp: Date): string {
  * @param channelId - The ID of the channel.
  * @returns A sanitized string prefix for the channel.
  */
-function getChannelPrefix (channelId: string, decodeTranscriptKey = false): string {
-  // sanitizeBlobKey removes trailing separators, so restore the configured separator to avoid matching "channel2".
-  const separator = decodeTranscriptKey ? '/' : ENCODED_PATH_SEPARATOR
-  return `${sanitizeBlobKey(channelId, { decodeTranscriptKey })}${separator}`
+function getChannelPrefix (channelId: string): string {
+  // sanitizeBlobKey removes trailing separators, so restore the encoded separator to avoid matching "channel2".
+  return `${sanitizeBlobKey(channelId)}${ENCODED_PATH_SEPARATOR}`
 }
 
 /**
@@ -48,12 +47,10 @@ function getChannelPrefix (channelId: string, decodeTranscriptKey = false): stri
  */
 function getConversationPrefix (
   channelId: string,
-  conversationId: string,
-  decodeTranscriptKey = false
+  conversationId: string
 ): string {
-  // sanitizeBlobKey removes trailing separators, so restore the configured separator to avoid matching "conv2".
-  const separator = decodeTranscriptKey ? '/' : ENCODED_PATH_SEPARATOR
-  return `${sanitizeBlobKey(`${channelId}/${conversationId}`, { decodeTranscriptKey })}${separator}`
+  // sanitizeBlobKey removes trailing separators, so restore the encoded separator to avoid matching "conv2".
+  return `${sanitizeBlobKey(`${channelId}/${conversationId}`)}${ENCODED_PATH_SEPARATOR}`
 }
 
 function getBlobKey (activity: Activity, options?: BlobsTranscriptStoreOptions): string {
@@ -171,7 +168,7 @@ export interface BlobsTranscriptStoreOptions {
   storagePipelineOptions?: StoragePipelineOptions;
 
   /**
-   * Indicates whether to store and retrieve transcript keys as decoded paths.
+   * Indicates whether to decode a transcript key when supplied to an operation.
    */
   decodeTranscriptKey?: boolean;
 }
@@ -183,7 +180,6 @@ export class BlobsTranscriptStore implements TranscriptStore {
   private readonly _containerClient: ContainerClient
   private readonly _concurrency = Infinity
   private _initializePromise?: Promise<unknown>
-  private readonly _isDecodeTranscriptKey: boolean
 
   /**
    * Constructs a new instance of the BlobsTranscriptStore class.
@@ -232,8 +228,6 @@ export class BlobsTranscriptStore implements TranscriptStore {
       }
     }
 
-    this._isDecodeTranscriptKey = options?.decodeTranscriptKey ?? false
-
     logger.info('BlobsTranscriptStore settings loaded', {
       container: containerName,
       connection: {
@@ -241,7 +235,7 @@ export class BlobsTranscriptStore implements TranscriptStore {
         type: (blobServiceUri || connectionString).trim() === 'UseDevelopmentStorage=true;' ? 'development' : 'production',
       },
       pipeline: options?.storagePipelineOptions !== undefined ? 'custom' : 'default',
-      transcriptKey: this._isDecodeTranscriptKey ? 'decoded' : 'encoded',
+      transcriptKey: 'encoded',
     })
   }
 
@@ -271,7 +265,7 @@ export class BlobsTranscriptStore implements TranscriptStore {
 
     await this._initialize()
 
-    const prefix = getConversationPrefix(channelId, conversationId, this._isDecodeTranscriptKey)
+    const prefix = getConversationPrefix(channelId, conversationId)
     logger.debug('Using conversation prefix', { prefix })
 
     const iter = this._containerClient
@@ -343,7 +337,7 @@ export class BlobsTranscriptStore implements TranscriptStore {
 
     const iter = this._containerClient
       .listBlobsFlat({
-        prefix: getChannelPrefix(channelId, this._isDecodeTranscriptKey),
+        prefix: getChannelPrefix(channelId),
         includeMetadata: true,
       })
       .byPage({ continuationToken, maxPageSize: MAX_PAGE_SIZE })
@@ -394,11 +388,9 @@ export class BlobsTranscriptStore implements TranscriptStore {
 
     const iter = this._containerClient
       .listBlobsFlat({
-        prefix: getConversationPrefix(channelId, conversationId, this._isDecodeTranscriptKey),
+        prefix: getConversationPrefix(channelId, conversationId),
       })
-      .byPage({
-        maxPageSize: MAX_PAGE_SIZE,
-      })
+      .byPage({ maxPageSize: MAX_PAGE_SIZE })
 
     let page = await iter.next()
     while (!page.done) {
@@ -419,7 +411,7 @@ export class BlobsTranscriptStore implements TranscriptStore {
    * Logs an activity to the transcript store.
    *
    * @param activity - The activity to log.
-   * @param options - Optional configuration that overrides the store's transcript key format for this activity.
+   * @param options - Optional configuration for this activity.
    * @returns A promise that resolves when the activity is logged.
    */
   async logActivity (activity: Activity, options?: BlobsTranscriptStoreOptions): Promise<void> {
@@ -431,9 +423,7 @@ export class BlobsTranscriptStore implements TranscriptStore {
 
     await this._initialize()
 
-    const blob = this._containerClient.getBlockBlobClient(getBlobKey(activity, {
-      decodeTranscriptKey: options?.decodeTranscriptKey ?? this._isDecodeTranscriptKey,
-    }))
+    const blob = this._containerClient.getBlockBlobClient(getBlobKey(activity, options))
     const serialized = JSON.stringify(activity)
     const metadata: Record<string, string> = {
       FromId: activity.from?.id ?? '',
