@@ -20,14 +20,14 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 describe('Message', () => {
   const adapter = new CloudAdapter()
 
-  it('onMessageEdit fires for editMessage event with base TurnContext', async () => {
+  it('onMessageEdit fires for editMessage event with TeamsTurnContext', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
       tae.messages.onMessageEdit(async (context) => {
         handled = true
-        assert.strictEqual(context instanceof TeamsTurnContext, false)
+        assert.ok(context instanceof TeamsTurnContext)
       })
     })
 
@@ -50,7 +50,10 @@ describe('Message', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messages.onMessageDelete(async () => { handled = true })
+      tae.messages.onMessageDelete(async (context) => {
+        handled = true
+        assert.ok(context instanceof TeamsTurnContext)
+      })
     })
 
     const activity = Activity.fromObject({
@@ -72,7 +75,10 @@ describe('Message', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     app.registerExtension(teamsExt, (tae) => {
-      tae.messages.onMessageUndelete(async () => { handled = true })
+      tae.messages.onMessageUndelete(async (context) => {
+        handled = true
+        assert.ok(context instanceof TeamsTurnContext)
+      })
     })
 
     const activity = Activity.fromObject({

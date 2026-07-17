@@ -7,6 +7,7 @@ import { parseTeamsChannelData } from '../activity-extensions'
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api'
 import { TeamsTurnContext } from '../teamsTurnContext'
 import type { ReadReceiptInfo } from '../models/readReceiptInfo'
+import { createTeamsRouteHandler, TeamsRouteHandler } from '../teamsRouteHandler'
 
 type ExecuteActionRouteHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, query: O365ConnectorCardActionQuery) => Promise<void>
 type ReadReceiptHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: ReadReceiptInfo) => Promise<void>
@@ -40,7 +41,7 @@ export class Message<TState extends TurnState = TurnState> {
    * @param authHandlers - Optional authorization handlers required by the route.
    * @returns This message helper for chaining.
    */
-  onMessageEdit (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageEdit (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -49,7 +50,7 @@ export class Message<TState extends TurnState = TurnState> {
         equalsIgnoreCase(channelData?.eventType, 'editMessage')
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
     return this
   }
 
@@ -61,7 +62,7 @@ export class Message<TState extends TurnState = TurnState> {
    * @param authHandlers - Optional authorization handlers required by the route.
    * @returns This message helper for chaining.
    */
-  onMessageDelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageDelete (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -70,7 +71,7 @@ export class Message<TState extends TurnState = TurnState> {
         equalsIgnoreCase(channelData?.eventType, 'softDeleteMessage')
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
     return this
   }
 
@@ -82,7 +83,7 @@ export class Message<TState extends TurnState = TurnState> {
    * @param authHandlers - Optional authorization handlers required by the route.
    * @returns This message helper for chaining.
    */
-  onMessageUndelete (handler: RouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  onMessageUndelete (handler: TeamsRouteHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       const channelData = parseTeamsChannelData(context.activity.channelData)
       return Promise.resolve(
@@ -91,7 +92,7 @@ export class Message<TState extends TurnState = TurnState> {
         equalsIgnoreCase(channelData?.eventType, 'undeleteMessage')
       )
     }
-    this._app.addRoute(routeSel, handler, false, rank, authHandlers)
+    this._app.addRoute(routeSel, createTeamsRouteHandler(handler), false, rank, authHandlers)
     return this
   }
 
