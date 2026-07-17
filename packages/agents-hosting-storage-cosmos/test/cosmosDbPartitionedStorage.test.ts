@@ -231,7 +231,7 @@ describe('CosmosDbPartitionedStorage initialization', () => {
   it('should reject unsupported partition keys without attempting container creation', async () => {
     const storage = createStorage('https://unsupported-partition-account.documents.azure.com/') as unknown as StorageInternals
     const container = {
-      readPartitionKeyDefinition: async () => ({ resource: { paths: ['/tenantId'] } }),
+      read: async () => ({ resource: { partitionKey: { paths: ['/tenantId'] } } }),
     } as unknown as Container
     let createContainerCalls = 0
 
@@ -268,7 +268,7 @@ describe('CosmosDbPartitionedStorage initialization', () => {
   it('should create the container when compatibility-mode validation returns not found', async () => {
     const storage = createStorage('https://missing-container-account.documents.azure.com/') as unknown as StorageInternals
     const existingContainer = {
-      readPartitionKeyDefinition: async () => {
+      read: async () => {
         throw Object.assign(new Error('Container not found'), { code: 404 })
       },
     } as unknown as Container

@@ -365,10 +365,9 @@ export class CosmosDbPartitionedStorage implements Storage {
       if (this.cosmosDbStorageOptions.compatibilityMode) {
         try {
           container = database.container(this.cosmosDbStorageOptions.containerId)
-          // @ts-ignore
-          const partitionKeyResponse = await container.readPartitionKeyDefinition()
-          if (partitionKeyResponse.resource && partitionKeyResponse.resource.paths) {
-            const paths = partitionKeyResponse.resource.paths
+          const containerResponse = await container.read()
+          const paths = containerResponse.resource?.partitionKey?.paths
+          if (paths) {
             if (paths.includes('/_partitionKey')) {
               compatibilityModePartitionKey = true
             } else if (paths.indexOf(DocumentStoreItem.partitionKeyPath) === -1) {
