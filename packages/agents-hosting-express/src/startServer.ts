@@ -66,6 +66,7 @@ export interface StartServerOptions {
    * ```
    */
   beforeListen?: (app: express.Express) => void
+
 }
 
 /**
@@ -80,6 +81,7 @@ export interface StartServerOptions {
  * This function sets up an Express server with the necessary middleware and routes for handling
  * agent requests. It configures JWT authorization middleware on the messages route and sets up the endpoint.
  * The server will listen on the port specified in options, the PORT environment variable, or 3978 by default.
+ * adapter created for an `ActivityHandler` or reused from an `AgentApplication`.
  *
  * @example
  * ```typescript

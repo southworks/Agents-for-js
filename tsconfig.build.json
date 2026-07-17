@@ -26,7 +26,7 @@
         "path": "packages/agents-hosting-dialogs"
       },
       {
-        "path": "packages/agents-hosting-extensions-teams"
+        "path": "packages/agents-hosting-extensions-msteams"
       },
       {
         "path": "packages/agents-hosting-extensions-slack"
