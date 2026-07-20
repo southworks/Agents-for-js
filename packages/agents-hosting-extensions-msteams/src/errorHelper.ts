@@ -19,7 +19,7 @@ import { AgentErrorDefinition } from '@microsoft/agents-activity'
  * ```
  */
 export const Errors: { [key: string]: AgentErrorDefinition } = {
-  // Teams Graph Errors (-150012 to -150014)
+  // Teams Graph Errors (-150012 to -150015, -150017 to -150019)
   /**
    * Error thrown when a Graph authorization handler returns an empty token.
    */
@@ -42,6 +42,38 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   TeamsGraphAuthorizationHandlerNameRequired: {
     code: -150014,
     description: 'A Graph client requires handlerName when multiple authorization handlers are configured.'
+  },
+
+  /**
+   * Error thrown when a required Graph client parameter is missing.
+   */
+  TeamsGraphParameterRequired: {
+    code: -150015,
+    description: 'The {parameterName} parameter is required to create a Graph client.'
+  },
+
+  /**
+   * Error thrown when the Graph base URL is invalid.
+   */
+  TeamsGraphInvalidBaseUrl: {
+    code: -150017,
+    description: 'The graphBaseUrl parameter must be a valid absolute URL.'
+  },
+
+  /**
+   * Error thrown when user authorization is unavailable from the current turn.
+   */
+  TeamsGraphUserAuthorizationNotConfigured: {
+    code: -150018,
+    description: 'User authorization is not configured on the AgentApplication. A delegated Graph client requires configured user authorization.'
+  },
+
+  /**
+   * Error thrown when token connections are unavailable.
+   */
+  TeamsGraphConnectionsNotConfigured: {
+    code: -150019,
+    description: 'Connections are not configured on the AgentApplication. An app-only Graph client requires a configured token connection.'
   },
 
   // TaskModule Errors (-150016)

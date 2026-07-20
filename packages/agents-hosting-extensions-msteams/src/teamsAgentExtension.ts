@@ -2,12 +2,11 @@
 // Licensed under the MIT License.
 
 import { ExceptionHelper } from '@microsoft/agents-activity'
-import { Client as GraphClient, type AuthenticationProvider, type ClientOptions } from '@microsoft/microsoft-graph-client'
-import { AgentApplication, AgentExtension, TurnContext, TurnState } from '@microsoft/agents-hosting'
+import { Client as GraphClient } from '@microsoft/microsoft-graph-client'
+import { AgentApplication, AgentExtension, type Connections, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { Client as TeamsClient } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
 import { TeamsConfig } from './config/config'
-import { Errors } from './errorHelper'
 import { FileConsent } from './fileConsents/fileConsent'
 import { Meeting } from './meetings/meeting'
 import { Message } from './messages/message'
@@ -18,67 +17,10 @@ import { TeamsTeam } from './teams/teamsTeam'
 import { setTeamsApiClient } from './teamsApiClientExtensions'
 import { applyTeamsHeaderPropagation } from './teamsHeaderPropagation'
 import { TeamsTurnContext } from './teamsTurnContext'
+import { createAppGraphClient, createUserGraphClient } from './graphClientFactory'
+import { Errors } from './errorHelper'
 
 const DEFAULT_GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
-
-class GraphAuthenticationProvider implements AuthenticationProvider {
-  constructor (
-    private readonly app: AgentApplication<any>,
-    private readonly context: TurnContext,
-    private readonly handlerName?: string
-  ) {}
-
-  async getAccessToken (): Promise<string> {
-    const handlerName = this.handlerName ?? this.getDefaultHandlerName()
-    const { token } = await this.app.authorization.getToken(this.context, handlerName)
-
-    if (!token?.trim()) {
-      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphTokenUnavailable, undefined, { handlerName })
-    }
-
-    return token
-  }
-
-  private getDefaultHandlerName (): string {
-    const authorization = this.app.authorization as unknown as {
-      manager?: { handlers?: Array<{ id: string }> }
-    }
-    const handlerIds = authorization.manager?.handlers?.map((handler) => handler.id) ?? Object.keys(this.app.options.authorization ?? {})
-
-    if (handlerIds.length === 1) {
-      return handlerIds[0]
-    }
-
-    if (handlerIds.length === 0) {
-      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphAuthorizationHandlerRequired)
-    }
-
-    throw ExceptionHelper.generateException(Error, Errors.TeamsGraphAuthorizationHandlerNameRequired)
-  }
-}
-
-function createGraphClientOptions (authProvider: AuthenticationProvider, graphBaseUrl: string): ClientOptions {
-  const options: ClientOptions = {
-    authProvider,
-    baseUrl: graphBaseUrl,
-    defaultVersion: ''
-  }
-  const graphHost = getHost(graphBaseUrl)
-
-  if (graphHost) {
-    options.customHosts = new Set([graphHost])
-  }
-
-  return options
-}
-
-function getHost (url: string): string | undefined {
-  try {
-    return new URL(url).hostname
-  } catch {
-    return undefined
-  }
-}
 
 /**
  * Adds Microsoft Teams-specific routing, context helpers, and API clients to an agent application.
@@ -214,9 +156,50 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
    * @returns A Microsoft Graph client configured with the resolved authentication provider.
    */
   public getGraphClient (context: TurnContext, handlerName?: string, graphBaseUrl: string = DEFAULT_GRAPH_BASE_URL): GraphClient {
-    return GraphClient.initWithMiddleware(createGraphClientOptions(
-      new GraphAuthenticationProvider(this._app, context, handlerName),
-      graphBaseUrl
-    ))
+    if (!context) {
+      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphParameterRequired, undefined, { parameterName: 'context' })
+    }
+
+    return createUserGraphClient(this._app.authorization, context, handlerName, graphBaseUrl)
+  }
+
+  /**
+   * Creates a Microsoft Graph client that obtains an app-only token from the connection resolved for the current turn.
+   *
+   * @param context - The turn context used to resolve the token connection.
+   * @param graphBaseUrl - Optional Graph base URL. Defaults to Microsoft Graph v1.0.
+   * @returns A Microsoft Graph client configured with application permissions.
+   */
+  public getAppGraphClient (context: TurnContext, graphBaseUrl: string = DEFAULT_GRAPH_BASE_URL): GraphClient {
+    if (!context) {
+      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphParameterRequired, undefined, { parameterName: 'context' })
+    }
+
+    const tokenProvider = this.getConnections().getTokenProviderFromActivity(context.identity, context.activity)
+    return createAppGraphClient(tokenProvider, graphBaseUrl)
+  }
+
+  /**
+   * Creates a Microsoft Graph client that obtains an app-only token from a named connection.
+   *
+   * @param connectionName - The configured token connection name.
+   * @param graphBaseUrl - Optional Graph base URL. Defaults to Microsoft Graph v1.0.
+   * @returns A Microsoft Graph client configured with application permissions.
+   */
+  public getAppGraphClientForConnection (connectionName: string, graphBaseUrl: string = DEFAULT_GRAPH_BASE_URL): GraphClient {
+    if (!connectionName) {
+      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphParameterRequired, undefined, { parameterName: 'connectionName' })
+    }
+
+    return createAppGraphClient(this.getConnections().getConnection(connectionName), graphBaseUrl)
+  }
+
+  private getConnections (): Connections {
+    const connections = this._app.options.connections ?? this._app.adapter.connectionManager
+    if (!connections) {
+      throw ExceptionHelper.generateException(Error, Errors.TeamsGraphConnectionsNotConfigured)
+    }
+
+    return connections
   }
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
 import { Activity, ActivityTypes } from '@microsoft/agents-activity'
-import { AgentApplication, HeaderPropagation, TurnContext } from '@microsoft/agents-hosting'
+import { AgentApplication, type AuthProvider, type Connections, HeaderPropagation, TurnContext } from '@microsoft/agents-hosting'
 import { Client as GraphClient, type ClientOptions } from '@microsoft/microsoft-graph-client'
 import { TeamsAgentExtension } from '../src/teamsAgentExtension'
 import { TEAMS_USER_AGENT_PRODUCT } from '../src/teamsHeaderPropagation'
@@ -26,7 +26,8 @@ function createContext (channelId: string = 'msteams', type: string = ActivityTy
       from: { id: 'user' },
       channelData: { eventType: 'editMessage' },
       text: 'hello'
-    })
+    }),
+    { aud: 'api://agent' }
   )
 
   context.turnState.set(adapter.ConnectorClientKey, {
@@ -63,7 +64,7 @@ async function withCapturedGraphClientOptions (
 }
 
 describe('TeamsAgentExtension', () => {
-  it('creates a Teams turn context during Teams turns', async () => {
+  it('should create a Teams turn context during Teams turns', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
 
@@ -78,7 +79,7 @@ describe('TeamsAgentExtension', () => {
     assert.strictEqual(teamsContext.client.serviceUrl, 'https://service.example.com')
   })
 
-  it('does not create a Teams turn context for non-Teams activities', async () => {
+  it('should not create a Teams turn context for non-Teams activities', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
 
@@ -92,7 +93,7 @@ describe('TeamsAgentExtension', () => {
     assert.throws(() => new TeamsTurnContext(context).client, /Teams API client is not available/)
   })
 
-  it('gets the Teams client for a Teams turn', async () => {
+  it('should get the Teams client for a Teams turn', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
 
@@ -107,7 +108,7 @@ describe('TeamsAgentExtension', () => {
     assert.strictEqual(teamsClient.serviceUrl, 'https://service.example.com')
   })
 
-  it('throws when getting the Teams client before it is available', () => {
+  it('should throw when getting the Teams client before it is available', () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
     const context = createContext('emulator')
@@ -115,7 +116,7 @@ describe('TeamsAgentExtension', () => {
     assert.throws(() => extension.getTeamsClient(context), /Teams API client is not available/)
   })
 
-  it('passes TeamsTurnContext to Teams channel handlers', async () => {
+  it('should pass TeamsTurnContext to Teams channel handlers', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
     let handlerContext: TeamsTurnContext | undefined
@@ -140,7 +141,7 @@ describe('TeamsAgentExtension', () => {
     assert.strictEqual(typeof handlerContext.sendTargetedActivities, 'function')
   })
 
-  it('configures header propagation with the Teams user-agent product token', () => {
+  it('should configure header propagation with the Teams user-agent product token', () => {
     const headers = new HeaderPropagation({})
     const app = new AgentApplication()
     let extensionRegistered = false
@@ -158,7 +159,7 @@ describe('TeamsAgentExtension', () => {
     assert.strictEqual(headers.outgoing['User-Agent'], TEAMS_USER_AGENT_PRODUCT)
   })
 
-  it('appends the Teams user-agent product token to an incoming user-agent', () => {
+  it('should append the Teams user-agent product token to an incoming user-agent', () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     let extensionRegistered = false
@@ -177,7 +178,7 @@ describe('TeamsAgentExtension', () => {
     assert.match(headers.outgoing['user-agent'], new RegExp(escapeRegExp(TEAMS_USER_AGENT_PRODUCT)))
   })
 
-  it('composes with existing app header propagation before appending the Teams user-agent product token', () => {
+  it('should compose with existing app header propagation before appending the Teams user-agent product token', () => {
     let extensionRegistered = false
     const app = new AgentApplication({
       headerPropagation: (headers) => {
@@ -202,7 +203,7 @@ describe('TeamsAgentExtension', () => {
     assert.match(headers.outgoing['User-Agent'], new RegExp(escapeRegExp(TEAMS_USER_AGENT_PRODUCT)))
   })
 
-  it('copies the propagated Teams user-agent product token to the Teams API client', async () => {
+  it('should copy the propagated Teams user-agent product token to the Teams API client', async () => {
     const app = new AgentApplication()
     const extension = new TeamsAgentExtension(app)
 
@@ -225,7 +226,7 @@ describe('TeamsAgentExtension', () => {
     assert.strictEqual((teamsContext.client as any).http.options.headers['User-Agent'], TEAMS_USER_AGENT_PRODUCT)
   })
 
-  it('creates a Graph client that uses the configured authorization handler', async () => {
+  it('should create a Graph client that uses the configured authorization handler', async () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     const context = createContext()
@@ -259,7 +260,7 @@ describe('TeamsAgentExtension', () => {
     })
   })
 
-  it('creates a Graph client with the default authorization handler and Graph base URL', async () => {
+  it('should create a Graph client with the default authorization handler and Graph base URL', async () => {
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
     const context = createContext()
@@ -294,6 +295,90 @@ describe('TeamsAgentExtension', () => {
       assert.strictEqual(requestedContext, context)
       assert.strictEqual(requestedHandlerName, 'defaultGraph')
     })
+  })
+
+  it('should create an app-only Graph client using the connection resolved for the current turn', async () => {
+    const context = createContext()
+    let requestedIdentity: unknown
+    let requestedActivity: Activity | undefined
+    let requestedScope: string | undefined
+    const tokenProvider = {
+      async getAccessToken (scope: string) {
+        requestedScope = scope
+        return 'app-token'
+      }
+    } as AuthProvider
+    const connections = {
+      getTokenProviderFromActivity (identity, activity) {
+        requestedIdentity = identity
+        requestedActivity = activity
+        return tokenProvider
+      }
+    } as Connections
+    const teamsExt = new TeamsAgentExtension(new AgentApplication({ connections }))
+
+    await withCapturedGraphClientOptions(async (getOptions, expectedClient) => {
+      const client = teamsExt.getAppGraphClient(context)
+      const graphOptions = getOptions()
+
+      assert.strictEqual(client, expectedClient)
+      assert.strictEqual(graphOptions?.baseUrl, 'https://graph.microsoft.com/v1.0')
+      assert.ok(graphOptions?.authProvider)
+      assert.strictEqual(await graphOptions.authProvider.getAccessToken(), 'app-token')
+      assert.deepStrictEqual(requestedIdentity, { aud: 'api://agent' })
+      assert.strictEqual(requestedActivity, context.activity)
+      assert.strictEqual(requestedScope, 'https://graph.microsoft.com/.default')
+    })
+  })
+
+  it('should create an app-only Graph client using a named connection and national cloud scope', async () => {
+    let requestedConnectionName: string | undefined
+    let requestedScope: string | undefined
+    const tokenProvider = {
+      async getAccessToken (scope: string) {
+        requestedScope = scope
+        return 'app-token'
+      }
+    } as AuthProvider
+    const connections = {
+      getConnection (connectionName) {
+        requestedConnectionName = connectionName
+        return tokenProvider
+      }
+    } as Connections
+    const teamsExt = new TeamsAgentExtension(new AgentApplication({ connections }))
+
+    await withCapturedGraphClientOptions(async (getOptions, expectedClient) => {
+      const client = teamsExt.getAppGraphClientForConnection('graph-app', 'https://graph.microsoft.us/v1.0')
+      const graphOptions = getOptions()
+
+      assert.strictEqual(client, expectedClient)
+      assert.strictEqual(graphOptions?.baseUrl, 'https://graph.microsoft.us/v1.0')
+      assert.deepStrictEqual(graphOptions?.customHosts, new Set(['graph.microsoft.us']))
+      assert.ok(graphOptions?.authProvider)
+      assert.strictEqual(await graphOptions.authProvider.getAccessToken(), 'app-token')
+      assert.strictEqual(requestedConnectionName, 'graph-app')
+      assert.strictEqual(requestedScope, 'https://graph.microsoft.us/.default')
+    })
+  })
+
+  it('should reject an empty app-only Graph connection name', () => {
+    const teamsExt = new TeamsAgentExtension(new AgentApplication())
+
+    assert.throws(() => teamsExt.getAppGraphClientForConnection(''), /connectionName parameter is required/)
+  })
+
+  it('should validate required turn contexts before creating Graph clients', () => {
+    const teamsExt = new TeamsAgentExtension(new AgentApplication())
+
+    assert.throws(
+      () => teamsExt.getGraphClient(undefined as unknown as TurnContext),
+      /context parameter is required/
+    )
+    assert.throws(
+      () => teamsExt.getAppGraphClient(undefined as unknown as TurnContext),
+      /context parameter is required/
+    )
   })
 })
 

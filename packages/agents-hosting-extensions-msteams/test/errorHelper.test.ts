@@ -11,6 +11,10 @@ describe('TeamsExtensionErrors', () => {
     assert.strictEqual(Errors.TeamsGraphTokenUnavailable.code, -150012)
     assert.strictEqual(Errors.TeamsGraphAuthorizationHandlerRequired.code, -150013)
     assert.strictEqual(Errors.TeamsGraphAuthorizationHandlerNameRequired.code, -150014)
+    assert.strictEqual(Errors.TeamsGraphParameterRequired.code, -150015)
+    assert.strictEqual(Errors.TeamsGraphInvalidBaseUrl.code, -150017)
+    assert.strictEqual(Errors.TeamsGraphUserAuthorizationNotConfigured.code, -150018)
+    assert.strictEqual(Errors.TeamsGraphConnectionsNotConfigured.code, -150019)
   })
 
   it('should contain error message in description', () => {
@@ -25,6 +29,9 @@ describe('TeamsExtensionErrors', () => {
 
     const graphError = ExceptionHelper.generateException(Error, Errors.TeamsGraphTokenUnavailable, undefined, { handlerName: 'graph' })
     assert.ok(graphError.message.includes('graph'))
+
+    const parameterError = ExceptionHelper.generateException(Error, Errors.TeamsGraphParameterRequired, undefined, { parameterName: 'context' })
+    assert.ok(parameterError.message.includes('context'))
   })
 
   it('should have all required properties', () => {
