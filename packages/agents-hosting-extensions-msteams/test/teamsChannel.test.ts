@@ -45,7 +45,7 @@ function createMemberActivity (membersAdded?: { id: string }[], membersRemoved?:
 describe('TeamsChannel', () => {
   const adapter = new CloudAdapter()
 
-  it('onChannelEventReceived fires for channelCreated', async () => {
+  it('should fire onChannelEventReceived when receiving channelCreated', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -62,7 +62,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onChannelEventReceived fires for channelDeleted', async () => {
+  it('should fire onChannelEventReceived when receiving channelDeleted', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -79,7 +79,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onChannelEventReceived fires for channel member events', async () => {
+  it('should fire onChannelEventReceived when receiving channel member events', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -97,7 +97,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onChannelEventReceived does not fire for non-channel events', async () => {
+  it('should not fire onChannelEventReceived when receiving non-channel events', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -114,7 +114,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('onCreated fires for channelCreated event', async () => {
+  it('should fire onCreated when receiving a channelCreated event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -132,7 +132,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onDeleted fires for channelDeleted event', async () => {
+  it('should fire onDeleted when receiving a channelDeleted event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -147,7 +147,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onRenamed fires for channelRenamed event', async () => {
+  it('should fire onRenamed when receiving a channelRenamed event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -162,7 +162,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onRestored fires for channelRestored event', async () => {
+  it('should fire onRestored when receiving a channelRestored event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -177,7 +177,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onShared fires for channelShared event', async () => {
+  it('should fire onShared when receiving a channelShared event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -192,7 +192,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onUnshared fires for channelUnshared event', async () => {
+  it('should fire onUnshared when receiving a channelUnshared event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -207,7 +207,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onMemberAdded fires for channelMemberAdded event', async () => {
+  it('should fire onMemberAdded when receiving a channelMemberAdded event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -225,7 +225,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onMemberAdded does not fire for conversation member changes without channel event data', async () => {
+  it('should not fire onMemberAdded when conversation member changes lack channel event data', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -240,7 +240,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('onMemberRemoved fires for channelMemberRemoved event', async () => {
+  it('should fire onMemberRemoved when receiving a channelMemberRemoved event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -258,7 +258,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('channel handlers do not fire for non-msteams channel', async () => {
+  it('should not fire channel handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -274,7 +274,7 @@ describe('TeamsChannel', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('channel handlers do not fire when channel data is missing', async () => {
+  it('should not fire channel handlers when channel data is missing', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)

@@ -115,6 +115,19 @@ describe('TeamsTurnContext', () => {
     assert.strictEqual(new TeamsTurnContext(context).client, new TeamsTurnContext(context).client)
   })
 
+  it('should override the parent TurnContext responded property', () => {
+    const context = createContext()
+    const teamsContext = new TeamsTurnContext(context)
+
+    assert.strictEqual(context.responded, false)
+    assert.strictEqual(teamsContext.responded, false)
+
+    teamsContext.responded = true
+
+    assert.strictEqual(teamsContext.responded, true)
+    assert.strictEqual(context.responded, true)
+  })
+
   it('should send a cloned targeted activity without mutating the caller activity', async () => {
     const sentActivities: Activity[] = []
     const context = createContext()
@@ -268,7 +281,7 @@ describe('TeamsTurnContext', () => {
     assert.throws(() => teamsContext.getAppGraphClientForConnection(''), /connectionName parameter is required/)
   })
 
-  it('is assignable to the public TeamsTurnContext type', () => {
+  it('should be assignable to the public TeamsTurnContext type', () => {
     const context = createContext()
     setTeamsApiClient(context)
 

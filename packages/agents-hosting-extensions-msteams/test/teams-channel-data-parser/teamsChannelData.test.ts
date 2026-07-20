@@ -5,12 +5,12 @@ import { parseTeamsChannelData } from '../../src/activity-extensions'
 import type { ChannelInfo } from '@microsoft/teams.api'
 
 describe('parseTeamsChannelData test', () => {
-  it('Parse undefined as empty object', () => {
+  it('should parse an empty object when channelData is undefined', () => {
     const teamsChannelData = parseTeamsChannelData(undefined)
     assert.deepEqual(teamsChannelData, {})
   })
 
-  it('Parse with no properties defined', () => {
+  it('should parse channelData when no properties are defined', () => {
     const teamsChannelDataObject = {}
     const obj = { type: ActivityTypes.Message, channelData: teamsChannelDataObject }
     const a1: Activity = Activity.fromObject(obj)
@@ -19,7 +19,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with channel', () => {
+  it('should parse channelData when channel is present', () => {
     const channelInfo = {
       id: 'id',
       name: 'name',
@@ -35,7 +35,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with eventType', () => {
+  it('should parse channelData when eventType is present', () => {
     const teamsChannelDataObject = {
       eventType: 'eventType'
     }
@@ -46,7 +46,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with team', () => {
+  it('should parse channelData when team is present', () => {
     const team = {
       id: 'id',
       name: 'name',
@@ -62,7 +62,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with notification', () => {
+  it('should parse channelData when notification is present', () => {
     const notification = {
       alert: true,
       alertInMeeting: false,
@@ -78,7 +78,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with tenant', () => {
+  it('should parse channelData when tenant is present', () => {
     const tenant = {
       id: 'id'
     }
@@ -92,7 +92,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with meeting', () => {
+  it('should parse channelData when meeting is present', () => {
     const meeting = {
       id: 'id'
     }
@@ -106,7 +106,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with settings', () => {
+  it('should parse channelData when settings are present', () => {
     const channelInfo: ChannelInfo = {
       id: 'id',
       name: 'name',
@@ -125,7 +125,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with settings with extra props', () => {
+  it('should parse channelData when settings contain extra properties', () => {
     const channelInfo: ChannelInfo = {
       id: 'id',
       name: 'name',
@@ -145,7 +145,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with onBehalfOf', () => {
+  it('should parse channelData when onBehalfOf is present', () => {
     const onBehalfOf = {
       itemid: 0,
       mentionType: 'person',
@@ -162,7 +162,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with onBehalfOf with only required props', () => {
+  it('should parse channelData when onBehalfOf contains only required properties', () => {
     const onBehalfOf = {
       itemid: 1,
       mentionType: 'mentionType',
@@ -178,7 +178,7 @@ describe('parseTeamsChannelData test', () => {
     assert.deepEqual(a1.channelData, teamsChannelData)
   })
 
-  it('Parse with onBehalfOf with literal values', () => {
+  it('should parse channelData when onBehalfOf contains literal values', () => {
     const onBehalfOf = {
       itemid: 0,
       mentionType: 'person',

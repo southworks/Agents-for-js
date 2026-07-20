@@ -30,7 +30,7 @@ function createMeetingActivity (name: string, value?: unknown): Activity {
 describe('Meeting', () => {
   const adapter = new CloudAdapter()
 
-  it('onStart fires for meetingStart event', async () => {
+  it('should fire onStart when receiving a meetingStart event', async () => {
     let handled = false
     let receivedDetails: unknown
     const app = new AgentApplication()
@@ -52,7 +52,7 @@ describe('Meeting', () => {
     assert.deepStrictEqual(receivedDetails, meetingDetails)
   })
 
-  it('onEnd fires for meetingEnd event', async () => {
+  it('should fire onEnd when receiving a meetingEnd event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -67,7 +67,7 @@ describe('Meeting', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onParticipantsJoin fires for participant join event', async () => {
+  it('should fire onParticipantsJoin when participants join', async () => {
     let handled = false
     let receivedDetails: unknown
     const app = new AgentApplication()
@@ -89,7 +89,7 @@ describe('Meeting', () => {
     assert.deepStrictEqual(receivedDetails, participantsData)
   })
 
-  it('onParticipantsLeave fires for participant leave event', async () => {
+  it('should fire onParticipantsLeave when participants leave', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -104,7 +104,7 @@ describe('Meeting', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('meeting handlers do not fire for non-msteams channel', async () => {
+  it('should not fire meeting handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -120,7 +120,7 @@ describe('Meeting', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('meeting handler does not fire for mismatched event name', async () => {
+  it('should not fire a meeting handler when the event name does not match', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)

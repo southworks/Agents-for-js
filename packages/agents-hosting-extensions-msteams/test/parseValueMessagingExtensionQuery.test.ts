@@ -4,7 +4,7 @@ import { parseValueMessagingExtensionQuery } from '../src/messageExtensions/mess
 import { ZodError } from 'zod'
 
 describe('parseValueMessagingExtensionQuery test', () => {
-  it('Parse with all properties', () => {
+  it('should parse the query when all properties are present', () => {
     const messagingExtensionQueryObj = {
       commandId: 'commandId',
       parameters: [{
@@ -21,7 +21,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     assert.deepEqual(messagingExtensionQuery, messagingExtensionQueryObj)
   })
 
-  it('Parse with no commandId', () => {
+  it('should parse the query when commandId is absent', () => {
     const messagingExtensionQueryObj = {
       parameters: [{
         name: 'name',
@@ -37,7 +37,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     assert.deepEqual(messagingExtensionQuery, messagingExtensionQueryObj)
   })
 
-  it('Should throw with wrong commandId', () => {
+  it('should throw when commandId has the wrong type', () => {
     const messagingExtensionQueryObj = {
       commandId: 1,
       parameters: [{
@@ -55,7 +55,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     }, ZodError)
   })
 
-  it('Parse with no parameters', () => {
+  it('should parse the query when parameters are absent', () => {
     const messagingExtensionQueryObj = {
       commandId: 'commandId',
       queryOptions: {
@@ -68,7 +68,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     assert.deepEqual(messagingExtensionQuery, messagingExtensionQueryObj)
   })
 
-  it('Should throw with wrong parameters', () => {
+  it('should throw when parameters have the wrong type', () => {
     const messagingExtensionQueryObj = {
       commandId: 'commandId',
       parameters: {
@@ -86,7 +86,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     }, ZodError)
   })
 
-  it('Parse with no queryOptions', () => {
+  it('should parse the query when queryOptions is absent', () => {
     const messagingExtensionQueryObj = {
       commandId: 'commandId',
       parameters: [{
@@ -99,7 +99,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     assert.deepEqual(messagingExtensionQuery, messagingExtensionQueryObj)
   })
 
-  it('Should throw with wrong queryOptions', () => {
+  it('should throw when queryOptions has the wrong type', () => {
     const messagingExtensionQueryObj = {
       commandId: 1,
       parameters: [{
@@ -117,7 +117,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     }, ZodError)
   })
 
-  it('Parse with no state', () => {
+  it('should parse the query when state is absent', () => {
     const messagingExtensionQueryObj = {
       commandId: 'commandId',
       parameters: [{
@@ -133,7 +133,7 @@ describe('parseValueMessagingExtensionQuery test', () => {
     assert.deepEqual(messagingExtensionQuery, messagingExtensionQueryObj)
   })
 
-  it('Should throw with wrong state', () => {
+  it('should throw when state has the wrong type', () => {
     const messagingExtensionQueryObj = {
       commandId: 1,
       parameters: [{

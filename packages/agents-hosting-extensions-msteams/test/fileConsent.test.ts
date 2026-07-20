@@ -18,7 +18,7 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 describe('FileConsent', () => {
   const adapter = new CloudAdapter()
 
-  it('onAccept fires for file consent accept and sends InvokeResponse', async () => {
+  it('should fire onAccept and send an InvokeResponse when file consent is accepted', async () => {
     let handled = false
     let receivedResponse: unknown
     const app = new AgentApplication()
@@ -52,7 +52,7 @@ describe('FileConsent', () => {
     assert.strictEqual(status, 200)
   })
 
-  it('onDecline fires for file consent decline and sends InvokeResponse', async () => {
+  it('should fire onDecline and send an InvokeResponse when file consent is declined', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -80,7 +80,7 @@ describe('FileConsent', () => {
     assert.strictEqual(status, 200)
   })
 
-  it('onAccept does not fire for decline action', async () => {
+  it('should not fire onAccept when file consent is declined', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -103,7 +103,7 @@ describe('FileConsent', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('file consent handlers do not fire for non-msteams channel', async () => {
+  it('should not fire file consent handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)

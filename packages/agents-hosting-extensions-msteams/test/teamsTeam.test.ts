@@ -32,7 +32,7 @@ function createTeamActivity (eventType: string, team?: { id: string }): Activity
 describe('TeamsTeam', () => {
   const adapter = new CloudAdapter()
 
-  it('onTeamEventReceived fires for teamArchived', async () => {
+  it('should fire onTeamEventReceived when receiving teamArchived', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -47,7 +47,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onTeamEventReceived does not fire for channel events', async () => {
+  it('should not fire onTeamEventReceived when receiving channel events', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -62,7 +62,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('onArchived fires for teamArchived event', async () => {
+  it('should fire onArchived when receiving a teamArchived event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -80,7 +80,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onUnarchived fires for teamUnarchived event', async () => {
+  it('should fire onUnarchived when receiving a teamUnarchived event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -95,7 +95,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onRenamed fires for teamRenamed event', async () => {
+  it('should fire onRenamed when receiving a teamRenamed event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -110,7 +110,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onRestored fires for teamRestored event', async () => {
+  it('should fire onRestored when receiving a teamRestored event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -125,7 +125,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onDeleted fires for teamDeleted event', async () => {
+  it('should fire onDeleted when receiving a teamDeleted event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -140,7 +140,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onHardDeleted fires for teamHardDeleted event', async () => {
+  it('should fire onHardDeleted when receiving a teamHardDeleted event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -155,7 +155,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('team handlers do not fire for non-msteams channel', async () => {
+  it('should not fire team handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -171,7 +171,7 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('team handlers do not fire when team data is missing', async () => {
+  it('should not fire team handlers when team data is missing', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)

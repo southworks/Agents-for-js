@@ -42,7 +42,7 @@ describe('TaskModule', function () {
     adapter = new CloudAdapter()
   })
 
-  it('onFetch sets an InvokeResponse with status and body when handler returns a response', async function () {
+  it('should set an InvokeResponse with status and body when onFetch returns a response', async function () {
     let handled = false
     const teamsExt = new TeamsAgentExtension(app)
 
@@ -88,7 +88,7 @@ describe('TaskModule', function () {
     assert.strictEqual(invokeValue.body.task.value, 'task module opened')
   })
 
-  it('onSubmit sets an InvokeResponse with status and body when handler returns a response', async function () {
+  it('should set an InvokeResponse with status and body when onSubmit returns a response', async function () {
     let handled = false
     const teamsExt = new TeamsAgentExtension(app)
 
@@ -136,7 +136,7 @@ describe('TaskModule', function () {
     assert.strictEqual(invokeValue.body.task.value, 'task module submitted')
   })
 
-  it('onFetch with null value matches any fetch request with activity value', async function () {
+  it('should match any fetch request with an activity value when onFetch uses a null value', async function () {
     let handled = false
     const teamsExt = new TeamsAgentExtension(app)
 
@@ -166,7 +166,7 @@ describe('TaskModule', function () {
     assert.strictEqual(handled, true)
   })
 
-  it('onSubmit with null value matches any submit request with activity value', async function () {
+  it('should match any submit request with an activity value when onSubmit uses a null value', async function () {
     let handled = false
     const teamsExt = new TeamsAgentExtension(app)
 
@@ -196,7 +196,7 @@ describe('TaskModule', function () {
     assert.strictEqual(handled, true)
   })
 
-  it('wildcard task routes do not match when activity value is null', async function () {
+  it('should not match wildcard task routes when the activity value is null', async function () {
     let fetchHandled = false
     let submitHandled = false
     const teamsExt = new TeamsAgentExtension(app)

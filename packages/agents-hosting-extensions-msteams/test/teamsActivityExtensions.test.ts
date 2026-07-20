@@ -13,7 +13,7 @@ import {
 
 describe('teamsActivityExtensions', () => {
   describe('teamsGetSelectedChannelId', () => {
-    it('returns the selected channel id from settings', () => {
+    it('should return the selected channel ID when settings contain one', () => {
       const activity = Activity.fromObject({
         type: 'message',
         channelData: { settings: { selectedChannel: { id: 'channel-1' } } }
@@ -21,19 +21,19 @@ describe('teamsActivityExtensions', () => {
       assert.strictEqual(teamsGetSelectedChannelId(activity), 'channel-1')
     })
 
-    it('returns undefined when settings is absent', () => {
+    it('should return undefined when settings are absent', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       assert.strictEqual(teamsGetSelectedChannelId(activity), undefined)
     })
 
-    it('returns undefined when channelData is undefined', () => {
+    it('should return undefined when channelData is undefined', () => {
       const activity = Activity.fromObject({ type: 'message' })
       assert.strictEqual(teamsGetSelectedChannelId(activity), undefined)
     })
   })
 
   describe('teamsGetChannelId', () => {
-    it('returns the channel id from channelData', () => {
+    it('should return the channel ID when channelData contains one', () => {
       const activity = Activity.fromObject({
         type: 'message',
         channelData: { channel: { id: 'chan-42' } }
@@ -41,14 +41,14 @@ describe('teamsActivityExtensions', () => {
       assert.strictEqual(teamsGetChannelId(activity), 'chan-42')
     })
 
-    it('returns undefined when channel is absent', () => {
+    it('should return undefined when channel is absent', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       assert.strictEqual(teamsGetChannelId(activity), undefined)
     })
   })
 
   describe('teamsGetMeetingInfo', () => {
-    it('returns the meeting info from channelData', () => {
+    it('should return meeting information when channelData contains it', () => {
       const activity = Activity.fromObject({
         type: 'message',
         channelData: { meeting: { id: 'meeting-1' } }
@@ -57,14 +57,14 @@ describe('teamsActivityExtensions', () => {
       assert.deepStrictEqual(result, { id: 'meeting-1' })
     })
 
-    it('returns undefined when meeting is absent', () => {
+    it('should return undefined when meeting is absent', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       assert.strictEqual(teamsGetMeetingInfo(activity), undefined)
     })
   })
 
   describe('teamsGetTeamInfo', () => {
-    it('returns the team info from channelData', () => {
+    it('should return team information when channelData contains it', () => {
       const activity = Activity.fromObject({
         type: 'message',
         channelData: { team: { id: 'team-1', name: 'Team A' } }
@@ -73,28 +73,28 @@ describe('teamsActivityExtensions', () => {
       assert.deepStrictEqual(result, { id: 'team-1', name: 'Team A' })
     })
 
-    it('returns undefined when team is absent', () => {
+    it('should return undefined when team is absent', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       assert.strictEqual(teamsGetTeamInfo(activity), undefined)
     })
   })
 
   describe('teamsNotifyUser', () => {
-    it('sets notification on channelData with alert defaults', () => {
+    it('should set notification on channelData with alert defaults', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       teamsNotifyUser(activity)
       const channelData = activity.channelData as Record<string, unknown>
       assert.deepStrictEqual(channelData.notification, { alert: true, alertInMeeting: false })
     })
 
-    it('sets alertInMeeting when flag is true', () => {
+    it('should set alertInMeeting when the flag is true', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       teamsNotifyUser(activity, true)
       const channelData = activity.channelData as Record<string, unknown>
       assert.deepStrictEqual(channelData.notification, { alert: false, alertInMeeting: true })
     })
 
-    it('includes externalResourceUrl when provided', () => {
+    it('should include externalResourceUrl when it is provided', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       teamsNotifyUser(activity, false, 'https://example.com/resource')
       const channelData = activity.channelData as Record<string, unknown>
@@ -105,7 +105,7 @@ describe('teamsActivityExtensions', () => {
       })
     })
 
-    it('creates channelData if it is null', () => {
+    it('should create channelData when it is null', () => {
       const activity = Activity.fromObject({ type: 'message' })
       activity.channelData = null
       teamsNotifyUser(activity)
@@ -115,7 +115,7 @@ describe('teamsActivityExtensions', () => {
   })
 
   describe('teamsGetTeamOnBehalfOf', () => {
-    it('returns onBehalfOf list from channelData', () => {
+    it('should return the onBehalfOf list when channelData contains it', () => {
       const onBehalfOf = [{ itemid: 0, mentionType: 'person', mri: 'mri-1', displayName: 'User' }]
       const activity = Activity.fromObject({
         type: 'message',
@@ -124,14 +124,14 @@ describe('teamsActivityExtensions', () => {
       assert.deepStrictEqual(teamsGetTeamOnBehalfOf(activity), onBehalfOf)
     })
 
-    it('returns undefined when onBehalfOf is absent', () => {
+    it('should return undefined when onBehalfOf is absent', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: {} })
       assert.strictEqual(teamsGetTeamOnBehalfOf(activity), undefined)
     })
   })
 
   describe('teamsEnableFeedbackLoop', () => {
-    it('sets feedbackLoop channelData and returns true when channelData is null', () => {
+    it('should set feedbackLoop channelData and return true when channelData is null', () => {
       const activity = Activity.fromObject({ type: 'message' })
       activity.channelData = null
       const result = teamsEnableFeedbackLoop(activity)
@@ -139,7 +139,7 @@ describe('teamsActivityExtensions', () => {
       assert.deepStrictEqual(activity.channelData, { feedbackLoop: { type: 'default' } })
     })
 
-    it('sets custom feedbackLoop type', () => {
+    it('should set a custom feedbackLoop type', () => {
       const activity = Activity.fromObject({ type: 'message' })
       activity.channelData = null
       const result = teamsEnableFeedbackLoop(activity, 'custom')
@@ -147,7 +147,7 @@ describe('teamsActivityExtensions', () => {
       assert.deepStrictEqual(activity.channelData, { feedbackLoop: { type: 'custom' } })
     })
 
-    it('returns false when channelData is already set', () => {
+    it('should return false when channelData is already set', () => {
       const activity = Activity.fromObject({ type: 'message', channelData: { existing: true } })
       const result = teamsEnableFeedbackLoop(activity)
       assert.strictEqual(result, false)

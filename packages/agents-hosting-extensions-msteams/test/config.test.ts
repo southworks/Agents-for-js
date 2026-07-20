@@ -19,7 +19,7 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 describe('Configuration', () => {
   const adapter = new CloudAdapter()
 
-  it('onConfigFetch fires and sends InvokeResponse with body', async () => {
+  it('should fire onConfigFetch and send an InvokeResponse with a body when handling config/fetch', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -53,7 +53,7 @@ describe('Configuration', () => {
     assert.strictEqual(invokeValue.body.config.type, 'continue')
   })
 
-  it('onConfigSubmit fires and sends InvokeResponse with body', async () => {
+  it('should fire onConfigSubmit and send an InvokeResponse with a body when handling config/submit', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -84,7 +84,7 @@ describe('Configuration', () => {
     assert.strictEqual(status, 200)
   })
 
-  it('onConfigFetch does not fire for config/submit', async () => {
+  it('should not fire onConfigFetch when handling config/submit', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -110,7 +110,7 @@ describe('Configuration', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('configuration handlers do not fire for non-msteams channel', async () => {
+  it('should not fire configuration handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)

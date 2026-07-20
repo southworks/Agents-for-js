@@ -4,7 +4,7 @@ import type { MessagingExtensionAction, TaskModuleRequest } from '@microsoft/tea
 import { teamsGetDataAs, teamsGetDataString } from '../src/teamsModelExtensions'
 
 describe('TeamsModelExtensions', () => {
-  it('teamsGetDataAs returns typed data from a task module request', () => {
+  it('should return typed data when teamsGetDataAs receives a task module request', () => {
     const request: TaskModuleRequest = {
       data: {
         title: 'Quarterly report',
@@ -17,7 +17,7 @@ describe('TeamsModelExtensions', () => {
     assert.deepStrictEqual(data, { title: 'Quarterly report', count: 3 })
   })
 
-  it('teamsGetDataAs returns typed data from a message extension action', () => {
+  it('should return typed data when teamsGetDataAs receives a message extension action', () => {
     const action = {
       commandId: 'create',
       commandContext: 'compose',
@@ -31,12 +31,12 @@ describe('TeamsModelExtensions', () => {
     assert.deepStrictEqual(data, { id: 'item-1' })
   })
 
-  it('teamsGetDataAs returns undefined when data is missing', () => {
+  it('should return undefined when teamsGetDataAs receives no data', () => {
     assert.strictEqual(teamsGetDataAs({}), undefined)
     assert.strictEqual(teamsGetDataAs(undefined), undefined)
   })
 
-  it('teamsGetDataString returns a string from request data', () => {
+  it('should return a string when teamsGetDataString receives request data', () => {
     const request: TaskModuleRequest = {
       data: {
         title: 'Quarterly report',
@@ -47,11 +47,11 @@ describe('TeamsModelExtensions', () => {
     assert.strictEqual(teamsGetDataString(request, 'title'), 'Quarterly report')
   })
 
-  it('teamsGetDataString returns a string from raw data', () => {
+  it('should return a string when teamsGetDataString receives raw data', () => {
     assert.strictEqual(teamsGetDataString({ title: 'Quarterly report' }, 'title'), 'Quarterly report')
   })
 
-  it('teamsGetDataString returns the default value for missing or non-string data', () => {
+  it('should return the default value when teamsGetDataString receives missing or non-string data', () => {
     const request: TaskModuleRequest = {
       data: {
         count: 3

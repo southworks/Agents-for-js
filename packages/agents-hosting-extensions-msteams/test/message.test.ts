@@ -20,7 +20,7 @@ function addConnectorClientToTurnState (context: TurnContext): void {
 describe('Message', () => {
   const adapter = new CloudAdapter()
 
-  it('onMessageEdit fires for editMessage event with TeamsTurnContext', async () => {
+  it('should fire onMessageEdit with TeamsTurnContext when receiving an editMessage event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -45,7 +45,7 @@ describe('Message', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onMessageDelete fires for softDeleteMessage event', async () => {
+  it('should fire onMessageDelete when receiving a softDeleteMessage event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -70,7 +70,7 @@ describe('Message', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onMessageUndelete fires for undeleteMessage event', async () => {
+  it('should fire onMessageUndelete when receiving an undeleteMessage event', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -95,7 +95,7 @@ describe('Message', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onReadReceipt fires for readReceipt event', async () => {
+  it('should fire onReadReceipt when receiving a readReceipt event', async () => {
     let handled = false
     let receivedData: ReadReceiptInfo | undefined
     const app = new AgentApplication()
@@ -125,7 +125,7 @@ describe('Message', () => {
     assert.strictEqual(receivedData?.lastReadMessageId, '42')
   })
 
-  it('onExecuteAction fires and sends InvokeResponse', async () => {
+  it('should fire onExecuteAction and send an InvokeResponse when receiving an executeAction invoke', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)
@@ -156,7 +156,7 @@ describe('Message', () => {
     assert.strictEqual(status, 200)
   })
 
-  it('message handlers do not fire for non-msteams channel', async () => {
+  it('should not fire message handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
     const teamsExt = new TeamsAgentExtension(app)

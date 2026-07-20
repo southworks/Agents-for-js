@@ -42,7 +42,7 @@ function createApp (): AgentApplication<TurnState> {
 }
 
 describe('TeamsAppExtensions', () => {
-  it('onTeamsActivity handles matching Teams activity types with TeamsTurnContext', async () => {
+  it('should handle matching Teams activity types with TeamsTurnContext when using onTeamsActivity', async () => {
     const app = createApp()
     let handled = false
 
@@ -56,7 +56,7 @@ describe('TeamsAppExtensions', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onTeamsActivity ignores non-Teams activities', async () => {
+  it('should ignore non-Teams activities when using onTeamsActivity', async () => {
     const app = createApp()
     let handled = false
 
@@ -73,7 +73,7 @@ describe('TeamsAppExtensions', () => {
     assert.strictEqual(handled, false)
   })
 
-  it('onTeamsMessage matches exact text case-insensitively and regex text', async () => {
+  it('should match exact text case-insensitively and regex text when using onTeamsMessage', async () => {
     const app = createApp()
     const handled: string[] = []
 
@@ -96,7 +96,7 @@ describe('TeamsAppExtensions', () => {
     assert.deepStrictEqual(handled, ['exact', 'regex'])
   })
 
-  it('onTeamsConversationUpdate matches Teams member update events', async () => {
+  it('should match Teams member update events when using onTeamsConversationUpdate', async () => {
     const app = createApp()
     let handled = false
 
@@ -113,7 +113,7 @@ describe('TeamsAppExtensions', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onTeamsConversationUpdate treats unknown events as any Teams conversation update', async () => {
+  it('should treat unknown events as any Teams conversation update when using onTeamsConversationUpdate', async () => {
     const app = createApp()
     let handled = false
 
@@ -128,7 +128,7 @@ describe('TeamsAppExtensions', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('onTeamsEvent matches event names and custom selectors only for Teams event activities', async () => {
+  it('should match event names and custom selectors only when receiving Teams event activities', async () => {
     const app = createApp()
     const handled: string[] = []
 
@@ -156,7 +156,7 @@ describe('TeamsAppExtensions', () => {
     assert.deepStrictEqual(handled, ['name', 'selector'])
   })
 
-  it('onTeamsMessageReactionsAdded and onTeamsMessageReactionsRemoved match Teams message reactions', async () => {
+  it('should match Teams message reactions when using reaction-added and reaction-removed handlers', async () => {
     const app = createApp()
     const handled: string[] = []
 
@@ -181,7 +181,7 @@ describe('TeamsAppExtensions', () => {
     assert.deepStrictEqual(handled, ['added:like', 'removed:like'])
   })
 
-  it('onTeamsHandoff passes the continuation and sends an InvokeResponse', async () => {
+  it('should pass the continuation and send an InvokeResponse when handling a Teams handoff', async () => {
     const app = createApp()
     let continuation = ''
     let handlerContext: TeamsTurnContext | undefined
@@ -205,7 +205,7 @@ describe('TeamsAppExtensions', () => {
     assert.deepStrictEqual(invokeResp?.value, { status: 200 })
   })
 
-  it('onTeamsFeedbackLoop passes feedback data with replyToId and sends an InvokeResponse', async () => {
+  it('should pass feedback data with replyToId and send an InvokeResponse when handling Teams feedback', async () => {
     const app = createApp()
     let feedbackReaction: string | undefined
     let feedbackReplyToId: string | undefined
