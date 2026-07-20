@@ -124,7 +124,8 @@ describe('MessageExtension - additional handlers', () => {
     assert.deepStrictEqual(receivedItem, itemValue)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onQueryLink fires for composeExtension/queryLink with valid URL', async () => {
@@ -149,7 +150,8 @@ describe('MessageExtension - additional handlers', () => {
     assert.deepStrictEqual(receivedQuery, { url: 'https://example.com/page', state: 'magic-code' })
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onAnonymousQueryLink fires for composeExtension/anonymousQueryLink', async () => {
@@ -193,8 +195,10 @@ describe('MessageExtension - additional handlers', () => {
     assert.strictEqual(handled, true)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
-    assert.strictEqual((invokeResp.value as any).body.task.value, 'fetched')
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
+    const value = (invokeResp.value as any).body.task.value
+    assert.strictEqual(value, 'fetched')
   })
 
   it('onSubmitAction fires for composeExtension/submitAction with matching commandId', async () => {
@@ -222,7 +226,8 @@ describe('MessageExtension - additional handlers', () => {
     assert.strictEqual((receivedData as any).commandId, 'createCard')
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onSubmitAction fires when botMessagePreviewAction is set', async () => {
@@ -275,7 +280,8 @@ describe('MessageExtension - additional handlers', () => {
     assert.strictEqual(receivedActivity!.text, 'Edit preview')
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('onMessagePreviewSend fires for submitAction with botMessagePreviewAction=send', async () => {
@@ -300,8 +306,10 @@ describe('MessageExtension - additional handlers', () => {
     assert.strictEqual(handled, true)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
-    assert.deepStrictEqual((invokeResp.value as any).body, {})
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
+    const body = (invokeResp.value as any).body
+    assert.deepStrictEqual(body, {})
   })
 
   it('onMessagePreviewSend passes undefined when botActivityPreview is empty', async () => {
@@ -351,7 +359,8 @@ describe('MessageExtension - additional handlers', () => {
     assert.deepStrictEqual(receivedData, cardValue)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('message extension handlers do not fire for non-msteams channel', async () => {

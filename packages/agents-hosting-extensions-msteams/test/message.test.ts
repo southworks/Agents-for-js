@@ -152,7 +152,8 @@ describe('Message', () => {
     assert.strictEqual(handled, true)
     const invokeResp = context.turnState.get(INVOKE_RESPONSE_KEY) as Activity | undefined
     assert.ok(invokeResp)
-    assert.strictEqual((invokeResp.value as any).status, 200)
+    const status = (invokeResp.value as any).status
+    assert.strictEqual(status, 200)
   })
 
   it('message handlers do not fire for non-msteams channel', async () => {

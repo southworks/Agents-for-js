@@ -223,7 +223,8 @@ describe('TeamsAgentExtension', () => {
     await app.runInternal(context)
     const teamsContext = new TeamsTurnContext(context)
 
-    assert.strictEqual((teamsContext.client as any).http.options.headers['User-Agent'], TEAMS_USER_AGENT_PRODUCT)
+    const userAgentHeader = (teamsContext.client as any).http.options.headers['User-Agent']
+    assert.strictEqual(userAgentHeader, TEAMS_USER_AGENT_PRODUCT)
   })
 
   it('should create a Graph client that uses the configured authorization handler', async () => {
