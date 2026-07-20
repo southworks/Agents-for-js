@@ -24,7 +24,6 @@ import type { MessagingExtensionResponse } from '@microsoft/teams.api';
 import type { O365ConnectorCardActionQuery } from '@microsoft/teams.api';
 import type { OnBehalfOf } from '@microsoft/teams.api';
 import { ResourceResponse } from '@microsoft/agents-hosting';
-import { RouteHandler } from '@microsoft/agents-hosting';
 import { RouteSelector } from '@microsoft/agents-hosting';
 import type { TaskModuleRequest } from '@microsoft/teams.api';
 import type { TaskModuleResponse } from '@microsoft/teams.api';
@@ -78,9 +77,9 @@ export interface MeetingParticipantsEventDetails {
 export class Message<TState extends TurnState = TurnState> {
     constructor(app: AgentApplication<TState>);
     onExecuteAction(handler: ExecuteActionRouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    onMessageDelete(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    onMessageEdit(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
-    onMessageUndelete(handler: RouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    onMessageDelete(handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    onMessageEdit(handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
+    onMessageUndelete(handler: TeamsRouteHandler<TState>, rank?: number, authHandlers?: string[]): this;
     onReadReceipt(handler: ReadReceiptHandler<TState>, rank?: number, authHandlers?: string[]): this;
 }
 
@@ -230,6 +229,8 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     get channels(): TeamsChannel<TState>;
     get config(): TeamsConfig<TState>;
     get fileConsent(): FileConsent<TState>;
+    getAppGraphClient(context: TurnContext, graphBaseUrl?: string): Client_2;
+    getAppGraphClientForConnection(connectionName: string, graphBaseUrl?: string): Client_2;
     getGraphClient(context: TurnContext, handlerName?: string, graphBaseUrl?: string): Client_2;
     getTeamsClient(context: TurnContext): Client;
     get meetings(): Meeting<TState>;
@@ -324,6 +325,9 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
 // @public
 export class TeamsTurnContext extends TurnContext {
     get client(): Client;
+    getAppGraphClient(graphBaseUrl?: string): Client_2;
+    getAppGraphClientForConnection(connectionName: string, graphBaseUrl?: string): Client_2;
+    getGraphClient(handlerName?: string, graphBaseUrl?: string): Client_2;
     sendTargetedActivities(activities: Activity[]): Promise<ResourceResponse[]>;
     sendTargetedActivity(activity: Activity): Promise<ResourceResponse | undefined>;
 }
