@@ -72,7 +72,7 @@ export function redactScopes (scopes: string[] | undefined): string | undefined 
  * @returns A pseudonymized conversation ID, or undefined when no ID is supplied.
  */
 export function pseudonymizeConversationId (conversationId: string | undefined, key?: string): string | undefined {
-  if (conversationId === undefined) {
+  if (!conversationId?.trim()) {
     return undefined
   }
 

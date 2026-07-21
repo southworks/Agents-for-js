@@ -82,14 +82,15 @@ export class CopilotStudioClient {
    */
   private async * postRequestAsync (url: string, body?: any, method: string = 'POST'): AsyncGenerator<Activity> {
     const managed = trace(CopilotStudioClientTraceDefinitions.postRequest)
-    managed.record({ url: redactUrl(url), method })
+    const redactedUrl = redactUrl(url) ?? ''
+    managed.record({ url: redactedUrl, method })
 
     try {
-      this.logDiagnostic(`Request URL: ${redactUrl(url)}`)
+      this.logDiagnostic(`Request URL: ${redactedUrl}`)
       this.logDiagnostic(`Request Method: ${method}`)
       this.logDiagnostic('Request Body:', body ? JSON.stringify(redactDiagnosticObject(body, this.settings.diagnosticsPseudonymKey), null, 2) : 'none')
 
-      logger.debug(`>>> SEND TO ${redactUrl(url)}`)
+      logger.debug(`>>> SEND TO ${redactedUrl}`)
 
       const streamMap = new Map<string, { text: string, sequence: number }[]>()
 
