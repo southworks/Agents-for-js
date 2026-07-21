@@ -910,7 +910,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Entra Agent ID Sidecar Authentication Errors (-120800 to -120849)
+  // Entra Agent ID Sidecar Authentication Errors (-120800 to -120811)
   // ============================================================================
 
   /**
@@ -1012,7 +1012,7 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   },
 
   // ============================================================================
-  // Hosting / Web layer errors (-120830 to -120840)
+  // Hosting / Web layer errors (-120830 to -120832)
   // ============================================================================
 
   /**
