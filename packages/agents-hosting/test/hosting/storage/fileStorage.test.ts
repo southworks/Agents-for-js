@@ -53,7 +53,7 @@ describe('FileStorage', () => {
       async () => await storage.write({ key1: { value: 'test' } }, { ttl: Number.POSITIVE_INFINITY }),
       (err: any) => {
         assert.strictEqual(err.name, 'RangeError')
-        assert.strictEqual(err.code, -120740)
+        assert.strictEqual(err.code, -120703)
         assert.match(err.message, /StorageWriteOptions\.ttl must be a finite number greater than zero\./)
         return true
       }
