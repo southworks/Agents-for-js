@@ -1,0 +1,253 @@
+name: teams.api Drift
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: Baseline @microsoft/teams.api version
+        required: true
+        type: string
+      to:
+        description: Candidate @microsoft/teams.api version
+        required: true
+        type: string
+  pull_request:
+    branches:
+      - main
+      - release/*
+    paths:
+      - packages/agents-hosting-extensions-msteams/**
+      - package-lock.json
+      - scripts/compare-teams-api.ts
+      - scripts/detect-teams-api-drifts.ts
+      - scripts/check-teams-extension-public-api.ts
+      - scripts/render-teams-api-drift-report.ts
+      - scripts/write-teams-api-test-summary.ts
+      - .github/workflows/teams-api-drift.yml
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_drift: ${{ steps.changes.outputs.run_drift }}
+      run_public_api: ${{ steps.changes.outputs.run_public_api }}
+      from: ${{ steps.versions.outputs.from }}
+      to: ${{ steps.versions.outputs.to }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run_drift=true" >> "$GITHUB_OUTPUT"
+            echo "run_public_api=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          dependency_changed=false
+          if git diff --unified=0 "$BASE_SHA" "$HEAD_SHA" -- packages/agents-hosting-extensions-msteams/package.json | grep -q '"@microsoft/teams.api"'; then
+            dependency_changed=true
+          fi
+
+          public_api_changed=false
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- packages/agents-hosting-extensions-msteams | grep -Eq '^(packages/agents-hosting-extensions-msteams/(src/|package.json|tsconfig\.json))'; then
+            public_api_changed=true
+          fi
+
+          echo "run_drift=$dependency_changed" >> "$GITHUB_OUTPUT"
+          echo "run_public_api=$public_api_changed" >> "$GITHUB_OUTPUT"
+
+      - id: versions
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          INPUT_FROM: ${{ inputs.from }}
+          INPUT_TO: ${{ inputs.to }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "from=$INPUT_FROM" >> "$GITHUB_OUTPUT"
+            echo "to=$INPUT_TO" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base_range=$(git show "$BASE_SHA:packages/agents-hosting-extensions-msteams/package.json" | node -e "let input=''; process.stdin.on('data', value => { input += value }); process.stdin.on('end', () => { const version = JSON.parse(input).dependencies['@microsoft/teams.api']; const match = version?.match(/[0-9]+\\.[0-9]+\\.[0-9]+/); if (!match) process.exit(1); console.log(match[0]) })")
+          candidate_range=$(node -p "require('./packages/agents-hosting-extensions-msteams/package.json').dependencies['@microsoft/teams.api']")
+          candidate_version=$(node -e "const match = process.argv[1].match(/[0-9]+\\.[0-9]+\\.[0-9]+/); if (!match) process.exit(1); console.log(match[0])" "$candidate_range")
+          echo "from=$base_range" >> "$GITHUB_OUTPUT"
+          echo "to=$candidate_version" >> "$GITHUB_OUTPUT"
+
+  public-api:
+    needs: changes
+    if: needs.changes.outputs.run_public_api == 'true' && needs.changes.outputs.run_drift != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: build
+        run: npm run build
+        continue-on-error: true
+      - id: public-api
+        if: always() && steps.build.outcome == 'success'
+        run: npm run check:teams-extension-public-api -- --output artifacts/teams-api-drift --fail-on-change
+        continue-on-error: true
+      - name: Upload public API artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teams-extension-public-api-${{ github.run_id }}
+          path: artifacts/teams-api-drift
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Enforce public API check
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          PUBLIC_API_OUTCOME: ${{ steps.public-api.outcome }}
+        run: |
+          test "$BUILD_OUTCOME" = success
+          test "$PUBLIC_API_OUTCOME" = success
+
+  drift:
+    needs: changes
+    if: needs.changes.outputs.run_drift == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - id: build
+        name: Build TypeScript
+        run: npm run build
+        continue-on-error: true
+      - id: usage
+        name: Verify dependency usage manifest
+        if: always()
+        run: test -f packages/agents-hosting-extensions-msteams/teams-api-usage-manifest.json
+        continue-on-error: true
+      - id: compare
+        name: Compare teams.api versions
+        if: always() && steps.build.outcome == 'success'
+        run: npm run compare:teams-api -- --from "${{ needs.changes.outputs.from }}" --to "${{ needs.changes.outputs.to }}" --output artifacts/teams-api-drift
+        continue-on-error: true
+      - id: contracts
+        name: Run compile-time contracts
+        if: always() && steps.build.outcome == 'success'
+        run: npm run test:teams-api-contracts
+        continue-on-error: true
+      - id: boundaries
+        name: Run Teams API boundary tests
+        if: always() && steps.build.outcome == 'success'
+        run: node --test --import tsx packages/agents-hosting-extensions-msteams/test/boundaries/teamsApiClientBehavior.test.ts
+        continue-on-error: true
+      - id: public-api
+        name: Check extension public API
+        if: always() && steps.build.outcome == 'success'
+        run: npm run check:teams-extension-public-api -- --output artifacts/teams-api-drift --fail-on-change
+        continue-on-error: true
+      - id: classify
+        name: Classify direct impact
+        if: always() && steps.compare.outcome == 'success' && steps.public-api.outcome == 'success'
+        run: npm run detect:teams-api-drifts -- --comparison artifacts/teams-api-drift/raw-api-diff.json --public-api-report artifacts/teams-api-drift/public-api-report.json --output artifacts/teams-api-drift --fail-on-drift
+        continue-on-error: true
+      - id: test-summary
+        name: Write test summary
+        if: always()
+        run: >-
+          npm run write:teams-api-test-summary --
+          --build "${{ steps.build.outcome }}"
+          --usage-collection "${{ steps.usage.outcome }}"
+          --api-extraction "${{ steps.compare.outcome }}"
+          --api-comparison "${{ steps.compare.outcome }}"
+          --contract-tests "${{ steps.contracts.outcome }}"
+          --boundary-tests "${{ steps.boundaries.outcome }}"
+          --public-api-check "${{ steps.public-api.outcome }}"
+          --output artifacts/teams-api-drift
+        continue-on-error: true
+      - id: report
+        name: Render deterministic report
+        if: always() && steps.classify.outcome != 'skipped' && steps.test-summary.outcome == 'success'
+        run: npm run render:teams-api-drift-report -- --findings artifacts/teams-api-drift/findings.json --test-summary artifacts/teams-api-drift/test-summary.json --output artifacts/teams-api-drift
+        continue-on-error: true
+      - name: Upload drift artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teams-api-drift-${{ github.run_id }}
+          path: artifacts/teams-api-drift
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Update pull request summary
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && steps.report.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          ARTIFACT_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const fs = require('fs')
+            const findings = JSON.parse(fs.readFileSync('artifacts/teams-api-drift/findings.json', 'utf8'))
+            const marker = '<!-- teams-api-drift-report -->'
+            const actionable = findings.findings
+              .filter(finding => finding.classification !== 'no-action')
+              .slice(0, 5)
+            const lines = [
+              marker,
+              '## teams.api drift analysis',
+              '',
+              `Compared \`${findings.fromVersion}\` to \`${findings.toVersion}\`.`,
+              `Blocking: **${findings.summary.blocking}** · Required: **${findings.summary.required}** · Review: **${findings.summary.review}**.`,
+              '',
+              ...actionable.map(finding => `- **${finding.id}** — ${finding.classification}: \`${finding.upstreamSymbol}${finding.member ? `.${finding.member}` : ''}\``),
+              '',
+              `Full deterministic report and artifacts: ${process.env.ARTIFACT_URL}`
+            ]
+            const body = lines.join('\n')
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            })
+            const existing = comments.find(comment => comment.body.includes(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body })
+            }
+      - name: Apply blocking policy
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          USAGE_OUTCOME: ${{ steps.usage.outcome }}
+          COMPARE_OUTCOME: ${{ steps.compare.outcome }}
+          CONTRACTS_OUTCOME: ${{ steps.contracts.outcome }}
+          BOUNDARIES_OUTCOME: ${{ steps.boundaries.outcome }}
+          PUBLIC_API_OUTCOME: ${{ steps.public-api.outcome }}
+          CLASSIFY_OUTCOME: ${{ steps.classify.outcome }}
+          TEST_SUMMARY_OUTCOME: ${{ steps.test-summary.outcome }}
+          REPORT_OUTCOME: ${{ steps.report.outcome }}
+        run: |
+          for outcome in "$BUILD_OUTCOME" "$USAGE_OUTCOME" "$COMPARE_OUTCOME" "$CONTRACTS_OUTCOME" "$BOUNDARIES_OUTCOME" "$PUBLIC_API_OUTCOME" "$CLASSIFY_OUTCOME" "$TEST_SUMMARY_OUTCOME" "$REPORT_OUTCOME"; do
+            if [ "$outcome" != success ]; then
+              echo "Blocking teams.api drift check outcome: $outcome"
+              exit 1
+            fi
+          done
