@@ -144,9 +144,10 @@ describe('authorizeJWT', () => {
 
     await authorizeJWT(config)(req as Request, res as Response, next)
 
+    const nextStub: sinon.SinonStub = next as sinon.SinonStub
     assert((res.status as sinon.SinonStub).calledOnceWith(401))
     assert((res.send as sinon.SinonStub).calledOnceWith({ 'jwt-auth-error': 'invalid authorization header' }))
-    assert((next as sinon.SinonStub).notCalled)
+    assert(nextStub.notCalled)
   })
 
   it('should respond with 401 and a stable message when a non-Error is thrown', async () => {
