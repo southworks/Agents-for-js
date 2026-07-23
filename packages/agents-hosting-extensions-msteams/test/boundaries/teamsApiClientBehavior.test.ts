@@ -33,6 +33,7 @@ function createContext (serviceUrl: string | undefined, connectorBaseUrl: string
       baseURL: connectorBaseUrl,
       defaultHeaders: {
         Authorization: 'Bearer connector-token',
+        'Content-Type': 'application/json',
         'User-Agent': 'agents-test/1.0'
       }
     }
@@ -56,6 +57,7 @@ describe('Teams API client boundary', () => {
     assert.strictEqual(client.serviceUrl, 'https://activity.example.com')
     assert.deepStrictEqual(getClientHeaders(client), {
       Authorization: 'Bearer connector-token',
+      'Content-Type': 'application/json',
       'User-Agent': 'agents-test/1.0'
     })
   })
