@@ -120,7 +120,7 @@ export class AdaptiveCardsActions<TState extends TurnState> {
                         a?.name !== ACTION_INVOKE_NAME ||
                         (invokeAction?.action.type !== ACTION_EXECUTE_TYPE)
           ) {
-            throw ExceptionHelper.generateException(Error, Errors.UnexpectedActionExecute, undefined, { activityType: invokeAction?.action.type ?? 'unknown' })
+            throw ExceptionHelper.generateException(Error, Errors.UnexpectedActionExecute, undefined, { activityType: invokeAction?.action.type ?? 'undefined' })
           }
 
           if (typeof v === 'string' && invokeAction.action.verb !== v) {
@@ -196,7 +196,7 @@ export class AdaptiveCardsActions<TState extends TurnState> {
       this._app.addRoute(selector, async (context, state) => {
         const a = context?.activity
         if (a?.type !== ActivityTypes.Message || a?.text || typeof a?.value !== 'object') {
-          throw ExceptionHelper.generateException(Error, Errors.UnexpectedActionSubmit, undefined, { activityType: a?.type ?? 'unknown' })
+          throw ExceptionHelper.generateException(Error, Errors.UnexpectedActionSubmit, undefined, { activityType: a?.type ?? 'undefined' })
         }
 
         await handler(context, state as TState, (parseAdaptiveCardInvokeAction(a.value)) as TData ?? {} as TData)
@@ -227,7 +227,7 @@ export class AdaptiveCardsActions<TState extends TurnState> {
         async (context, state) => {
           const a = context?.activity
           if (a?.type !== 'invoke' || a?.name !== SEARCH_INVOKE_NAME) {
-            throw ExceptionHelper.generateException(Error, Errors.UnexpectedSearchAction, undefined, { activityType: a?.type ?? 'unknown' })
+            throw ExceptionHelper.generateException(Error, Errors.UnexpectedSearchAction, undefined, { activityType: a?.type ?? 'undefined' })
           }
 
           const parsedQuery = parseValueSearchQuery(a.value)
