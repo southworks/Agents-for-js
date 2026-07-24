@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { createRequire } from 'node:module'
@@ -15,6 +15,7 @@ type Compatibility = 'breaking' | 'non-breaking' | 'potentially-breaking' | 'unk
 interface Settings {
   from?: string
   to?: string
+  candidatePackage?: string
   registry?: string
   output?: string
   verbose: boolean
@@ -89,7 +90,7 @@ interface ComparisonResult {
 }
 
 const help = `Usage:
-  npm run compare:teams-api [--] [candidate-version] [--from <version>] [--to <version>] [--registry <url>] [--output <file-or-directory>] [--verbose]
+  npm run compare:teams-api [--] [candidate-version] [--from <version>] [--to <version>] [--candidate-package <tarball>] [--registry <url>] [--output <file-or-directory>] [--verbose]
 
 Extracts normalized public API models for two ${dependency} versions and emits a
 structured delta. Without --from, the installed version is the baseline. Without
@@ -99,6 +100,7 @@ Examples:
   npm run compare:teams-api
   npm run compare:teams-api -- 2.0.14
   npm run compare:teams-api -- --from 2.0.12 --to 2.0.14 --registry http://localhost:4873 --output artifacts/teams-api-drift
+  npm run compare:teams-api -- --from 2.0.13 --candidate-package artifacts/teams-api-drift/fixture/microsoft-teams.api-2.0.14-test.tgz --output artifacts/teams-api-drift
   npm run compare:teams-api -- 2.0.14 --output result.json
 `
 
@@ -113,11 +115,12 @@ function parseSettings (args: string[]): Settings {
       settings.verbose = true
       continue
     }
-    if (argument === '--from' || argument === '--to' || argument === '--registry' || argument === '--output' || argument === '-o') {
+    if (argument === '--from' || argument === '--to' || argument === '--candidate-package' || argument === '--registry' || argument === '--output' || argument === '-o') {
       const value = args[++index]
       if (!value) throw new Error(`${argument} requires a value.`)
       if (argument === '--from') settings.from = value
       else if (argument === '--to') settings.to = value
+      else if (argument === '--candidate-package') settings.candidatePackage = value
       else if (argument === '--registry') settings.registry = value
       else settings.output = value
       continue
@@ -128,6 +131,7 @@ function parseSettings (args: string[]): Settings {
 
   if (positional.length > 1) throw new Error('Specify at most one positional candidate version.')
   if (settings.to && positional[0]) throw new Error('Use either --to or a positional candidate version, not both.')
+  if (settings.candidatePackage && (settings.to || positional[0])) throw new Error('Use --candidate-package or a candidate version, not both.')
   settings.to ??= positional[0]
   return settings
 }
@@ -324,19 +328,22 @@ function generateApiReport (packageRoot: string, workRoot: string): ApiReport {
   }
 }
 
-function installVersion (version: string, workRoot: string, name: string, registry?: string): string {
+function installPackage (packageSpec: string, workRoot: string, name: string, registry?: string): string {
   const installRoot = join(workRoot, name)
   mkdirSync(installRoot, { recursive: true })
   writeFileSync(join(installRoot, 'package.json'), '{ "private": true }\n')
   try {
-    runNpm(['install', '--ignore-scripts', '--no-package-lock', '--no-save', ...(registry ? ['--registry', registry] : []), `${dependency}@${version}`], installRoot)
+    runNpm(['install', '--ignore-scripts', '--no-package-lock', '--no-save', '--cache', join(workRoot, 'npm-cache'), ...(registry ? ['--registry', registry] : []), packageSpec], installRoot)
   } catch (error) {
     const details = error instanceof Error && 'stderr' in error && error.stderr != null
       ? String(error.stderr).trim()
       : error instanceof Error ? error.message : String(error)
-    throw new Error(`Unable to install ${dependency}@${version}. ${details}`)
+    throw new Error(`Unable to install ${packageSpec}. ${details}`)
   }
-  return join(installRoot, 'node_modules', ...dependency.split('/'))
+  const packageRoot = join(installRoot, 'node_modules', ...dependency.split('/'))
+  const packageJson = readPackageJson(packageRoot)
+  if (packageJson.name !== dependency) throw new Error(`Expected ${dependency}, but ${packageSpec} installed ${packageJson.name}.`)
+  return packageRoot
 }
 
 function stringifyProperty (property: PropertyModel | undefined): string | undefined {
@@ -484,17 +491,21 @@ function main (): void {
   const installedPackageRoot = dirname(require.resolve(`${dependency}/package.json`))
   const installedVersion = readPackageJson(installedPackageRoot).version
   const fromVersion = settings.from ?? installedVersion
-  const toVersion = settings.to ?? getLatestStableVersion()
-  if (!isVersion(fromVersion) || !isVersion(toVersion)) throw new Error('--from and --to must be complete versions, optionally with a prerelease suffix.')
+  const candidateSpec = settings.candidatePackage ? resolve(settings.candidatePackage) : undefined
+  const toVersion = settings.to ?? (candidateSpec ? undefined : getLatestStableVersion())
+  if (!isVersion(fromVersion) || (toVersion !== undefined && !isVersion(toVersion))) throw new Error('--from and --to must be complete versions, optionally with a prerelease suffix.')
+  if (candidateSpec && (!existsSync(candidateSpec) || extname(candidateSpec).toLowerCase() !== '.tgz')) throw new Error('--candidate-package must reference an existing .tgz file.')
 
   const workRoot = mkdtempSync(join(tmpdir(), 'teams-api-compare-'))
   try {
-    console.log(`Comparing ${dependency}@${fromVersion} with ${dependency}@${toVersion}...`)
-    const currentPackageRoot = fromVersion === installedVersion ? installedPackageRoot : installVersion(fromVersion, workRoot, 'baseline')
-    const candidatePackageRoot = toVersion === installedVersion ? installedPackageRoot : installVersion(toVersion, workRoot, 'candidate', settings.registry)
+    console.log(`Comparing ${dependency}@${fromVersion} with ${candidateSpec ?? `${dependency}@${toVersion}`}...`)
+    const currentPackageRoot = fromVersion === installedVersion ? installedPackageRoot : installPackage(`${dependency}@${fromVersion}`, workRoot, 'baseline')
+    const candidatePackageRoot = candidateSpec
+      ? installPackage(candidateSpec, workRoot, 'candidate')
+      : toVersion === installedVersion ? installedPackageRoot : installPackage(`${dependency}@${toVersion}`, workRoot, 'candidate', settings.registry)
     const current = generateApiReport(currentPackageRoot, workRoot)
     const candidate = generateApiReport(candidatePackageRoot, workRoot)
-    const comparison = createComparison(current, candidate, toVersion)
+    const comparison = createComparison(current, candidate, candidateSpec ?? toVersion!)
     console.log(comparison.changed ? `${comparison.changes.length} structured API change(s) detected.` : 'No public API changes detected.')
     if (comparison.changed && settings.verbose) console.log(comparison.diff)
     if (settings.output) writeOutput(comparison, current, candidate, settings.output)

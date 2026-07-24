@@ -16,8 +16,8 @@ on:
         required: false
         default: https://registry.npmjs.org
         type: string
-      use_verdaccio_fixture:
-        description: Generate and publish the local 2.0.14-test fixture to an in-job Verdaccio registry
+      use_local_fixture:
+        description: Generate the local 2.0.14-test fixture and compare its tarball directly
         required: false
         default: false
         type: boolean
@@ -150,62 +150,23 @@ jobs:
         name: Select candidate registry
         env:
           INPUT_REGISTRY: ${{ inputs.registry }}
-          USE_VERDACCIO_FIXTURE: ${{ inputs.use_verdaccio_fixture }}
         run: |
-          if [ "$USE_VERDACCIO_FIXTURE" = true ]; then
-            echo "url=http://localhost:4873" >> "$GITHUB_OUTPUT"
-          else
-            echo "url=${INPUT_REGISTRY:-https://registry.npmjs.org}" >> "$GITHUB_OUTPUT"
-          fi
+          echo "url=${INPUT_REGISTRY:-https://registry.npmjs.org}" >> "$GITHUB_OUTPUT"
 
-      - name: Start Verdaccio and publish drift fixture
-        if: github.event_name == 'workflow_dispatch' && inputs.use_verdaccio_fixture == true
+      - id: fixture
+        name: Generate local drift fixture
+        if: github.event_name == 'workflow_dispatch' && inputs.use_local_fixture == true
         env:
           CANDIDATE_VERSION: ${{ needs.changes.outputs.to }}
-          FIXTURE_ROOT: ${{ runner.temp }}/teams-api-test-package
+          FIXTURE_ROOT: artifacts/teams-api-drift/fixture
         run: |
           if [ "$CANDIDATE_VERSION" != "2.0.14-test" ]; then
-            echo "Verdaccio fixture mode requires the candidate version 2.0.14-test; received $CANDIDATE_VERSION."
+            echo "Local fixture mode requires the candidate version 2.0.14-test; received $CANDIDATE_VERSION."
             exit 1
           fi
 
-          config_path="$RUNNER_TEMP/verdaccio-config.yaml"
-          cat > "$config_path" <<'YAML'
-          storage: /verdaccio/storage
-          auth:
-            htpasswd:
-              file: /verdaccio/storage/htpasswd
-              max_users: 1
-          uplinks:
-            npmjs:
-              url: https://registry.npmjs.org/
-          packages:
-            '@microsoft/*':
-              access: $all
-              publish: $authenticated
-              unpublish: $authenticated
-              proxy: npmjs
-            '**':
-              access: $all
-              publish: $authenticated
-              unpublish: $authenticated
-              proxy: npmjs
-          YAML
-
-          docker run --detach --rm --name teams-api-drift-verdaccio --publish 127.0.0.1:4873:4873 --volume "$config_path:/verdaccio/conf/config.yaml:ro" verdaccio/verdaccio:6.8.0
-          for attempt in {1..30}; do
-            if curl --fail --silent http://localhost:4873/-/ping > /dev/null; then
-              break
-            fi
-            sleep 1
-          done
-          curl --fail --silent http://localhost:4873/-/ping > /dev/null
-
-          printf '%s\n%s\n%s\n' fixture-publisher fixture-password fixture-publisher@example.invalid | npm adduser --auth-type=legacy --registry http://localhost:4873
-          npm whoami --registry http://localhost:4873
           npm run create:teams-api-test-package -- --output "$FIXTURE_ROOT"
-          npm publish "$FIXTURE_ROOT/microsoft-teams.api-2.0.14-test.tgz" --tag test --registry http://localhost:4873
-          npm view @microsoft/teams.api@2.0.14-test version --registry http://localhost:4873
+          echo "tarball=$GITHUB_WORKSPACE/$FIXTURE_ROOT/microsoft-teams.api-2.0.14-test.tgz" >> "$GITHUB_OUTPUT"
 
       - id: build
         name: Build TypeScript
@@ -219,7 +180,17 @@ jobs:
       - id: compare
         name: Compare teams.api versions
         if: always() && steps.build.outcome == 'success'
-        run: npm run compare:teams-api -- --from "${{ needs.changes.outputs.from }}" --to "${{ needs.changes.outputs.to }}" --registry "${{ steps.candidate-registry.outputs.url }}" --output artifacts/teams-api-drift
+        env:
+          CANDIDATE_PACKAGE: ${{ steps.fixture.outputs.tarball }}
+          CANDIDATE_REGISTRY: ${{ steps.candidate-registry.outputs.url }}
+        run: |
+          compare_args=(--from "${{ needs.changes.outputs.from }}" --output artifacts/teams-api-drift)
+          if [ -n "$CANDIDATE_PACKAGE" ]; then
+            compare_args+=(--candidate-package "$CANDIDATE_PACKAGE")
+          else
+            compare_args+=(--to "${{ needs.changes.outputs.to }}" --registry "$CANDIDATE_REGISTRY")
+          fi
+          npm run compare:teams-api -- "${compare_args[@]}"
         continue-on-error: true
       - id: contracts
         name: Run compile-time contracts
@@ -323,7 +294,3 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Stop Verdaccio fixture registry
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.use_verdaccio_fixture == true
-        run: docker rm --force teams-api-drift-verdaccio || true
