@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Set Version
-        run: node setVersion.js
+        run: node scripts/set-version.mjs
 
       - name: Generate typedoc
         run: npm run docs

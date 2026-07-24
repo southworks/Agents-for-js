@@ -127,6 +127,18 @@ We are using `eslint` configured with [neostandard](https://github.com/neostanda
 
 ## Contributing
 
+Before submitting structural, package, documentation, build-reference, or runtime-configuration changes, run:
+
+```bash
+npm run repo:doctor
+```
+
+The repository doctor reports file-oriented diagnostics with stable rule IDs and concrete fix instructions. It validates workspace discovery, build references, package metadata and exports, internal dependencies, catalogs and relative documentation links, API baselines, test-agent configuration and Docker lifecycles, supported Node runtimes, and disallowed npm lifecycle hooks.
+
+Run `npm run repo:doctor -- --rules` to list every rule's check, rationale, and typical resolution in the terminal. Add one or more rule IDs after `--rules` to inspect selected rules.
+
+Repository scripts must be explicit: do not add `pre*` or `post*` npm lifecycle wrappers. Install-time hooks (`preinstall`, `install`, `postinstall`, and `prepare`) are disallowed. Chain required work directly in the command that invokes it.
+
 #### Note for Microsoft internal developers: 
 - Internal Microsoft Developers should join the Core identity group [Agents SDK Contrib](https://coreidentity.microsoft.com/manage/Entitlement/entitlement/agentssdkint-upyj)
 
