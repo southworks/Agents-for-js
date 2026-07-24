@@ -23,6 +23,7 @@
     "lint:deps": "knip",
     "lint:deps:ci": "knip --reporter github-actions",
     "compare:teams-api": "node --import tsx scripts/compare-teams-api.ts",
+    "create:teams-api-test-package": "node --import tsx scripts/create-teams-api-test-package.ts",
     "detect:teams-api-drifts": "node --import tsx scripts/detect-teams-api-drifts.ts",
     "check:teams-extension-public-api": "node --import tsx scripts/check-teams-extension-public-api.ts",
     "render:teams-api-drift-report": "node --import tsx scripts/render-teams-api-drift-report.ts",
