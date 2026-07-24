@@ -37,12 +37,12 @@ export const ruleDefinitions = {
   },
   'scripts/implicit-hook-disallowed': {
     what: 'An authored manifest has an implicit pre/post npm hook.',
-    why: 'Keeps command execution explicit and limits supply-chain code-execution paths.',
+    why: 'npm --ignore-scripts skips implicit hooks; explicit commands remain reliable and limit supply-chain execution paths.',
     fix: 'Move the command into an explicitly invoked script and remove the implicit npm lifecycle hook.',
   },
   'scripts/install-hook-disallowed': {
     what: 'An authored manifest has an install-time npm lifecycle hook.',
-    why: 'Keeps command execution explicit and limits supply-chain code-execution paths.',
+    why: 'npm --ignore-scripts skips install hooks; explicit commands remain reliable and limit supply-chain execution paths.',
     fix: 'Remove install-time lifecycle hooks; use an explicitly invoked, reviewed setup command instead.',
   },
   'workspace/pattern-missing': {

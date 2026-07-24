@@ -359,7 +359,7 @@ test('CLI lists the rule guide without checking the repository', () => {
   assert.equal(result.status, 0)
   assert.match(result.stdout, /Repo Doctor rules/)
   assert.match(result.stdout, /scripts\/install-hook-disallowed/)
-  assert.match(result.stdout, /why {2}Keeps command execution explicit/)
+  assert.match(result.stdout, /why {2}npm --ignore-scripts skips implicit hooks/)
   assert.doesNotMatch(result.stdout, /\| Rule \|/)
 })
 

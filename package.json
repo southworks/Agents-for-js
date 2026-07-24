@@ -31,9 +31,8 @@
     "build:samples": "tsc --build --verbose tsconfig.samples.json",
     "build:browser": "npm run build:browser --workspaces --if-present",
     "build:esm": "npm run build:esm --workspaces --if-present",
-    "build": "tsc --build --verbose tsconfig.build.json",
-    "build:clean": "npm run clean:dist && npm run build",
-    "postbuild": "npm run build:esm && npm run build:browser"
+    "build": "tsc --build --verbose tsconfig.build.json && npm run build:esm && npm run build:browser",
+    "build:clean": "npm run clean:dist && npm run build"
   },
   "license": "MIT",
   "workspaces": [
@@ -47,7 +46,7 @@
     "@microsoft/microsoft-graph-types": "2.43.1",
     "@types/debug": "4.1.13",
     "@types/express": "5.0.6",
-    "@types/node": "25.6.0",
+    "@types/node": "20.19.25",
     "@types/sinon": "21.0.0",
     "esbuild": "0.28.1",
     "eslint": "9.39.2",

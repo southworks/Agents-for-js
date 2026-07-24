@@ -95,7 +95,7 @@ npm run play
 
 Run `npm run repo:doctor` after structural, package, documentation, build-reference, dependency, API-baseline, test-agent, Docker, or runtime-configuration changes. Every diagnostic includes a rule ID and a concrete fix instruction.
 
-Do not use implicit npm lifecycle wrappers such as `prebuild`, `postbuild`, `pretest`, or `posttest`. Install-time hooks (`preinstall`, `install`, `postinstall`, and `prepare`) are prohibited. Put dependent work directly in the explicit command, for example `npm run build && node ...`.
+Do not use implicit npm lifecycle wrappers such as `prebuild`, `postbuild`, `pretest`, or `posttest`. `npm --ignore-scripts` skips these hooks, so required work must be explicit. Install-time hooks (`preinstall`, `install`, `postinstall`, and `prepare`) are prohibited. Put dependent work directly in the explicit command, for example `npm run build && node ...`.
 
 ## Key Architecture Concepts
 

@@ -1,6 +1,6 @@
 # Debugging and logging
 
-This document describes how we use the [`debug`](https://www.npmjs.com/package/debug) library in this repository and the project's custom wrapper, [`logger`](../packages/agents-activity/src/logger.ts). The wrapper standardizes how namespaced loggers are created and configured across the codebase, and is the recommended API for authors and contributors. The rest of this document explains namespaces, recommended log levels, how to enable logging, and examples that use the wrapper where appropriate.
+This document describes how we use the [`debug`](https://www.npmjs.com/package/debug) library in this repository. The rest of this document explains namespaces, recommended log levels, how to enable logging, and examples where appropriate.
 
 ## Quick start (for users)
 Logging can be configured using environment variables or the command line.
@@ -55,12 +55,12 @@ Recommendation: prefer the pattern `<project>:<component>:<level>`. This keeps i
 Common pattern:
 
 ```ts
-import { debug } from '@microsoft/agents-activity/logger'
+import debug from 'debug'
 
 const logger = debug('agents:turnState')
 
-logger.debug('property not found in turnState', turnState);
-logger.error('Invalid conversation id', err);
+logger('property not found in turnState', turnState);
+logger('Invalid conversation id', err);
 ```
 
 ### Browser usage

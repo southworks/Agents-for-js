@@ -24,7 +24,7 @@ node --test --import tsx 'packages/agents-hosting/test/**/*.test.ts'            
 
 Run `npm run repo:doctor` after structural, package, documentation, build-reference, dependency, API-baseline, test-agent, Docker, or runtime-configuration changes. Its ESLint-style diagnostics include stable rule IDs and concrete fix instructions for agents and humans.
 
-Do not add npm `pre*` / `post*` lifecycle wrappers or install-time hooks (`preinstall`, `install`, `postinstall`, `prepare`). Make script dependencies explicit in the invoked command.
+Do not add npm `pre*` / `post*` lifecycle wrappers or install-time hooks (`preinstall`, `install`, `postinstall`, `prepare`). `npm --ignore-scripts` skips those hooks; make required script dependencies explicit in the invoked command.
 
 CI (`.github/workflows/ci.yml`) runs, in order: `repo:doctor` → `lint` → `lint:deps:ci` → `build` → `test` → `build:samples`. Match this before assuming work is done.
 
