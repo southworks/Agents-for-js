@@ -11,6 +11,11 @@ on:
         description: Candidate @microsoft/teams.api version
         required: true
         type: string
+      registry:
+        description: Registry used only to install the candidate @microsoft/teams.api version
+        required: false
+        default: https://registry.npmjs.org
+        type: string
   pull_request:
     branches:
       - main
@@ -147,7 +152,9 @@ jobs:
       - id: compare
         name: Compare teams.api versions
         if: always() && steps.build.outcome == 'success'
-        run: npm run compare:teams-api -- --from "${{ needs.changes.outputs.from }}" --to "${{ needs.changes.outputs.to }}" --output artifacts/teams-api-drift
+        env:
+          CANDIDATE_REGISTRY: ${{ github.event_name == 'workflow_dispatch' && inputs.registry || 'https://registry.npmjs.org' }}
+        run: npm run compare:teams-api -- --from "${{ needs.changes.outputs.from }}" --to "${{ needs.changes.outputs.to }}" --registry "$CANDIDATE_REGISTRY" --output artifacts/teams-api-drift
         continue-on-error: true
       - id: contracts
         name: Run compile-time contracts

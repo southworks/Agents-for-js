@@ -15,6 +15,7 @@ type Compatibility = 'breaking' | 'non-breaking' | 'potentially-breaking' | 'unk
 interface Settings {
   from?: string
   to?: string
+  registry?: string
   output?: string
   verbose: boolean
   help: boolean
@@ -88,7 +89,7 @@ interface ComparisonResult {
 }
 
 const help = `Usage:
-  npm run compare:teams-api [--] [candidate-version] [--from <version>] [--to <version>] [--output <file-or-directory>] [--verbose]
+  npm run compare:teams-api [--] [candidate-version] [--from <version>] [--to <version>] [--registry <url>] [--output <file-or-directory>] [--verbose]
 
 Extracts normalized public API models for two ${dependency} versions and emits a
 structured delta. Without --from, the installed version is the baseline. Without
@@ -97,7 +98,7 @@ a candidate or --to, the latest stable npm release is selected.
 Examples:
   npm run compare:teams-api
   npm run compare:teams-api -- 2.0.14
-  npm run compare:teams-api -- --from 2.0.12 --to 2.0.14 --output artifacts/teams-api-drift
+  npm run compare:teams-api -- --from 2.0.12 --to 2.0.14 --registry http://localhost:4873 --output artifacts/teams-api-drift
   npm run compare:teams-api -- 2.0.14 --output result.json
 `
 
@@ -112,11 +113,12 @@ function parseSettings (args: string[]): Settings {
       settings.verbose = true
       continue
     }
-    if (argument === '--from' || argument === '--to' || argument === '--output' || argument === '-o') {
+    if (argument === '--from' || argument === '--to' || argument === '--registry' || argument === '--output' || argument === '-o') {
       const value = args[++index]
       if (!value) throw new Error(`${argument} requires a value.`)
       if (argument === '--from') settings.from = value
       else if (argument === '--to') settings.to = value
+      else if (argument === '--registry') settings.registry = value
       else settings.output = value
       continue
     }
@@ -322,12 +324,12 @@ function generateApiReport (packageRoot: string, workRoot: string): ApiReport {
   }
 }
 
-function installVersion (version: string, workRoot: string, name: string): string {
+function installVersion (version: string, workRoot: string, name: string, registry?: string): string {
   const installRoot = join(workRoot, name)
   mkdirSync(installRoot, { recursive: true })
   writeFileSync(join(installRoot, 'package.json'), '{ "private": true }\n')
   try {
-    runNpm(['install', '--ignore-scripts', '--no-package-lock', '--no-save', `${dependency}@${version}`], installRoot)
+    runNpm(['install', '--ignore-scripts', '--no-package-lock', '--no-save', ...(registry ? ['--registry', registry] : []), `${dependency}@${version}`], installRoot)
   } catch (error) {
     const details = error instanceof Error && 'stderr' in error && error.stderr != null
       ? String(error.stderr).trim()
@@ -489,7 +491,7 @@ function main (): void {
   try {
     console.log(`Comparing ${dependency}@${fromVersion} with ${dependency}@${toVersion}...`)
     const currentPackageRoot = fromVersion === installedVersion ? installedPackageRoot : installVersion(fromVersion, workRoot, 'baseline')
-    const candidatePackageRoot = toVersion === installedVersion ? installedPackageRoot : installVersion(toVersion, workRoot, 'candidate')
+    const candidatePackageRoot = toVersion === installedVersion ? installedPackageRoot : installVersion(toVersion, workRoot, 'candidate', settings.registry)
     const current = generateApiReport(currentPackageRoot, workRoot)
     const candidate = generateApiReport(candidatePackageRoot, workRoot)
     const comparison = createComparison(current, candidate, toVersion)
