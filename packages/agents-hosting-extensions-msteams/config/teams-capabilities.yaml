@@ -34,6 +34,7 @@ capabilities:
     owners:
       - "src/channels/**"
     upstreamAreas:
+      - "clients.team"
       - "models.channel-data.channel-info"
       - "models.channel-data"
     adoptionPolicy: "review-new-members"

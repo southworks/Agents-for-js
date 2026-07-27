@@ -1,7 +1,7 @@
 import assert from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
-import { renderDeterministicReport, type FindingsResult } from '../../../../scripts/render-teams-api-drift-report'
+import { renderDeterministicReport, type FindingsResult } from '../../../../scripts/teams-api-drift/render-teams-api-drift-report'
 
 const fixturePath = 'packages/agents-hosting-extensions-msteams/test/drift/fixtures/findings.json'
 const snapshotPath = 'packages/agents-hosting-extensions-msteams/test/drift/snapshots/deterministic-report.md'

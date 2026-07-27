@@ -23,6 +23,8 @@ API changes for drift-workflow testing:
   required  MessagingExtensionAction.botActivityPreview changes to string
   review    ChannelInfo is marked @deprecated
   no-action TestOnlyDiagnostics is added but is not consumed by the extension
+  feature-review TeamClient.getChannelMembers is added for the channels capability
+  internal-opportunity Client.createDiagnosticsScope is added for internal client use
 
 The output contains a .tgz suitable for npm publish and a README with the
 publish command. It never overwrites an existing output directory.
@@ -106,6 +108,36 @@ function main (): void {
     ' * A channel info object which decribes the channel.\n *\n */',
     ' * A channel info object which decribes the channel.\n *\n * @deprecated Drift-test fixture: review the replacement channel model before upgrading.\n */'
   )
+  replaceOnce(
+    join(packageDirectory, 'dist/clients/team.d.ts'),
+    '    getConversations(id: string): Promise<ChannelInfo[]>;',
+    ['    getConversations(id: string): Promise<ChannelInfo[]>;', '    /**', '     * Lists the members of a Teams channel.', '     * Added by the drift-test fixture to exercise feature review.', '     */', '    getChannelMembers(teamId: string, channelId: string): Promise<ChannelInfo[]>;'].join('\n')
+  )
+  replaceOnce(
+    join(packageDirectory, 'dist/clients/index.d.ts'),
+    '    constructor(serviceUrl: string, options?: Client$1 | ClientOptions, apiClientSettings?: Partial<ApiClientSettings>, cloud?: CloudEnvironment);',
+    ['    constructor(serviceUrl: string, options?: Client$1 | ClientOptions, apiClientSettings?: Partial<ApiClientSettings>, cloud?: CloudEnvironment);', '    /** Creates a local request diagnostics scope. Added by the drift-test fixture. */', '    createDiagnosticsScope(name: string): { name: string; };'].join('\n')
+  )
+  replaceOnce(
+    join(packageDirectory, 'dist/clients/team.js'),
+    'exports.TeamClient = TeamClient;',
+    ['TeamClient.prototype.getChannelMembers = async function (teamId, channelId) {', '  const res = await this.http.get(this.serviceUrl + \'/v3/teams/\' + teamId + \'/channels/\' + channelId + \'/members\');', '  return res.data.members;', '};', '', 'exports.TeamClient = TeamClient;'].join('\n')
+  )
+  replaceOnce(
+    join(packageDirectory, 'dist/clients/team.mjs'),
+    'export { TeamClient };',
+    ['TeamClient.prototype.getChannelMembers = async function (teamId, channelId) {', '  const res = await this.http.get(this.serviceUrl + \'/v3/teams/\' + teamId + \'/channels/\' + channelId + \'/members\');', '  return res.data.members;', '};', '', 'export { TeamClient };'].join('\n')
+  )
+  replaceOnce(
+    join(packageDirectory, 'dist/clients/index.js'),
+    'exports.Client = Client;',
+    ['Client.prototype.createDiagnosticsScope = function (name) {', '  return { name };', '};', '', 'exports.Client = Client;'].join('\n')
+  )
+  replaceOnce(
+    join(packageDirectory, 'dist/clients/index.mjs'),
+    'export { Client };',
+    ['Client.prototype.createDiagnosticsScope = function (name) {', '  return { name };', '};', '', 'export { Client };'].join('\n')
+  )
   writeFileSync(join(packageDirectory, 'dist/test-only-diagnostics.d.ts'), ['/**', ' * Added solely to verify that unrelated upstream additions are classified as no-action.', ' */', 'declare class TestOnlyDiagnostics {', '    readonly marker: string;', '}', '', 'export { TestOnlyDiagnostics };', ''].join('\n'))
   writeFileSync(join(packageDirectory, 'dist/test-only-diagnostics.js'), ['class TestOnlyDiagnostics {', '  marker = \'teams-api-drift-test-fixture\'', '}', '', 'export { TestOnlyDiagnostics }', ''].join('\n'))
   writeFileSync(join(packageDirectory, 'dist/index.d.ts'), `${readFileSync(join(packageDirectory, 'dist/index.d.ts'), 'utf8')}\nexport { TestOnlyDiagnostics } from './test-only-diagnostics.js';\n`)
@@ -115,7 +147,7 @@ function main (): void {
   rmSync(packageDirectory, { recursive: true, force: true })
   rmSync(join(outputDirectory, '.npm-cache'), { recursive: true, force: true })
   const registryPlaceholder = 'http://localhost:4873'
-  writeFileSync(join(outputDirectory, 'README.md'), `# teams.api drift-test package\n\nThis directory was generated from the installed ${dependency}@2.0.13 package.\n\n- Package: \`${dependency}\`\n- Version: \`${fixtureVersion}\`\n- Tarball: \`${basename(tarballPath)}\`\n\nControlled declaration changes:\n\n- **blocking:** removes \`ChannelData.meeting\`, which the extension reads.\n- **required:** changes \`MessagingExtensionAction.botActivityPreview\` from \`Activity[]\` to \`string\`.\n- **review:** adds \`@deprecated\` to the consumed \`ChannelInfo\` type.\n- **no-action:** adds unconsumed \`TestOnlyDiagnostics\`.\n\nPublish only to your local test registry, for example:\n\n\`npm publish ./${basename(tarballPath)} --tag test --registry ${registryPlaceholder}\`\n\nDo not publish this fixture to npm or a shared registry.\n`)
+  writeFileSync(join(outputDirectory, 'README.md'), `# teams.api drift-test package\n\nThis directory was generated from the installed ${dependency}@2.0.13 package.\n\n- Package: \`${dependency}\`\n- Version: \`${fixtureVersion}\`\n- Tarball: \`${basename(tarballPath)}\`\n\nControlled declaration changes:\n\n- **blocking:** removes \`ChannelData.meeting\`, which the extension reads.\n- **required:** changes \`MessagingExtensionAction.botActivityPreview\` from \`Activity[]\` to \`string\`.\n- **review:** adds \`@deprecated\` to the consumed \`ChannelInfo\` type.\n- **no-action:** adds unconsumed \`TestOnlyDiagnostics\`.\n- **feature-review:** adds \`TeamClient.getChannelMembers\`, mapped to the extension's channels capability.\n- **internal implementation opportunity:** adds \`Client.createDiagnosticsScope\`, mapped to the extension's internal Teams API client capability.\n\nPublish only to your local test registry, for example:\n\n\`npm publish ./${basename(tarballPath)} --tag test --registry ${registryPlaceholder}\`\n\nDo not publish this fixture to npm or a shared registry.\n`)
   console.log(`Created ${dependency}@${fixtureVersion}: ${tarballPath}`)
 }
 

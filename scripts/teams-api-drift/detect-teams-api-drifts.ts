@@ -1,13 +1,17 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
+import { parse } from 'yaml'
 
 const dependency = '@microsoft/teams.api'
 const packageRoot = 'packages/agents-hosting-extensions-msteams'
 const defaultManifestPath = join(packageRoot, 'teams-api-usage-manifest.json')
 const defaultComparisonPath = 'artifacts/teams-api-drift/raw-api-diff.json'
+const defaultCapabilitiesPath = join(packageRoot, 'config/teams-capabilities.yaml')
 
 type Classification = 'blocking' | 'required' | 'review' | 'no-action'
 type Exposure = 'internal-only' | 'publicly-exposed' | 're-exported' | 'runtime-used' | 'type-only' | 'unknown'
+type FindingCategory = 'feature-review' | 'internal-opportunity' | 'maintainer-decision'
+type AdoptionPolicy = 'strict-compatibility' | 'review-new-members' | 'advisory-only'
 
 interface Usage {
   upstreamSymbol: string
@@ -48,6 +52,7 @@ interface ComparisonResult {
 interface Settings {
   comparison: string
   manifest: string
+  capabilities: string
   publicApiReport?: string
   output?: string
   failOnDrift: boolean
@@ -58,9 +63,11 @@ interface Finding {
   id: string
   source: 'api-diff' | 'public-api'
   classification: Classification
+  category?: FindingCategory
   kind: string
   upstreamSymbol: string
   member?: string
+  capability?: string
   usageKinds: string[]
   exposure: Exposure
   affectedFiles: string[]
@@ -78,6 +85,17 @@ interface FindingsResult {
   summary: Record<Classification, number>
   publicApi?: PublicApiFindingSummary
   findings: Finding[]
+}
+
+interface Capability {
+  upstreamAreas: string[]
+  adoptionPolicy: AdoptionPolicy
+}
+
+interface CapabilitiesDocument {
+  schemaVersion: 1
+  dependency: { package: string }
+  capabilities: Record<string, Capability>
 }
 
 interface PublicApiSymbolChange {
@@ -114,7 +132,7 @@ interface PublicApiFindingSummary {
 }
 
 const help = `Usage:
-  npm run detect:teams-api-drifts -- [--comparison <file>] [--manifest <file>] [--public-api-report <file>] [--output <file-or-directory>] [--fail-on-drift]
+  npm run detect:teams-api-drifts -- [--comparison <file>] [--manifest <file>] [--capabilities <file>] [--public-api-report <file>] [--output <file-or-directory>] [--fail-on-drift]
 
 Joins a Stage 3 raw API delta with the Teams extension's dependency usage manifest.
 The result classifies changes as blocking, required, review, or no-action and
@@ -123,6 +141,7 @@ includes the source files affected by every direct-use finding.
 Defaults:
   comparison: ${defaultComparisonPath}
   manifest:   ${defaultManifestPath}
+  capabilities: ${defaultCapabilitiesPath}
 
 Examples:
   npm run compare:teams-api -- --from 2.0.13 --to 2.0.14 --output artifacts/teams-api-drift
@@ -134,6 +153,7 @@ function parseSettings (args: string[]): Settings {
   const settings: Settings = {
     comparison: defaultComparisonPath,
     manifest: defaultManifestPath,
+    capabilities: defaultCapabilitiesPath,
     failOnDrift: false,
     help: false
   }
@@ -145,11 +165,12 @@ function parseSettings (args: string[]): Settings {
       settings.failOnDrift = true
       continue
     }
-    if (argument === '--comparison' || argument === '-c' || argument === '--manifest' || argument === '-m' || argument === '--public-api-report' || argument === '--output' || argument === '-o') {
+    if (argument === '--comparison' || argument === '-c' || argument === '--manifest' || argument === '-m' || argument === '--capabilities' || argument === '--public-api-report' || argument === '--output' || argument === '-o') {
       const value = args[++index]
       if (!value) throw new Error(`${argument} requires a file path.`)
       if (argument === '--comparison' || argument === '-c') settings.comparison = value
       else if (argument === '--manifest' || argument === '-m') settings.manifest = value
+      else if (argument === '--capabilities') settings.capabilities = value
       else if (argument === '--public-api-report') settings.publicApiReport = value
       else settings.output = value
       continue
@@ -164,6 +185,16 @@ function readJson<T> (filePath: string): T {
   const fullPath = resolve(filePath)
   if (!existsSync(fullPath)) throw new Error(`File not found: ${fullPath}`)
   return JSON.parse(readFileSync(fullPath, 'utf8')) as T
+}
+
+function readCapabilities (filePath: string): CapabilitiesDocument {
+  const fullPath = resolve(filePath)
+  if (!existsSync(fullPath)) throw new Error(`File not found: ${fullPath}`)
+  const document = parse(readFileSync(fullPath, 'utf8')) as CapabilitiesDocument
+  if (document?.schemaVersion !== 1 || document.dependency?.package !== dependency || !document.capabilities) {
+    throw new Error(`Capabilities file must be a schemaVersion 1 ownership map for ${dependency}.`)
+  }
+  return document
 }
 
 function getExposure (usage: Usage): Exposure {
@@ -201,6 +232,40 @@ function isDirectlyRelevant (change: ApiChange, usages: Usage[]): Usage[] {
   })
 }
 
+function upstreamAreasFor (change: ApiChange): string[] {
+  if (change.symbol === 'Client') return ['clients']
+  if (change.symbol.endsWith('Client')) return [`clients.${change.symbol.slice(0, -'Client'.length).toLowerCase()}`]
+  if (change.symbol === 'ChannelData') return ['models.channel-data']
+  if (change.symbol === 'ChannelInfo') return ['models.channel-data.channel-info']
+  if (change.symbol === 'TeamInfo') return ['models.channel-data.team-info']
+  if (change.symbol.startsWith('Meeting')) return ['models.meeting']
+  if (change.symbol.startsWith('MessagingExtension')) return ['models.messaging-extension']
+  if (change.symbol.startsWith('TaskModule')) return ['models.task-module']
+  if (change.symbol.startsWith('File')) return ['models.file']
+  if (change.symbol.startsWith('Config')) return ['models.config']
+  return []
+}
+
+function capabilityFor (change: ApiChange, capabilities: CapabilitiesDocument): { name: string, policy: AdoptionPolicy } | undefined {
+  const upstreamAreas = upstreamAreasFor(change)
+  const matches = Object.entries(capabilities.capabilities).flatMap(([name, capability]) => capability.upstreamAreas
+    .filter(area => upstreamAreas.some(candidate => candidate === area || candidate.startsWith(`${area}.`)))
+    .map(area => ({ name, policy: capability.adoptionPolicy, area })))
+  const match = matches.sort((left, right) => right.area.length - left.area.length || left.name.localeCompare(right.name))[0]
+  return match && { name: match.name, policy: match.policy }
+}
+
+function isAdditiveChange (change: ApiChange): boolean {
+  return change.kind === 'symbol-added' || change.kind === 'property-added' || change.kind === 'method-added' || change.kind === 'overload-added' || change.kind === 'enum-member-added'
+}
+
+function categoryFor (change: ApiChange, usages: Usage[], capability: { name: string, policy: AdoptionPolicy } | undefined): FindingCategory | undefined {
+  if (!isAdditiveChange(change) || usages.length > 0 || !capability) return undefined
+  if (capability.policy === 'review-new-members') return 'feature-review'
+  if (capability.policy === 'strict-compatibility') return 'internal-opportunity'
+  return undefined
+}
+
 function classify (change: ApiChange, usages: Usage[], publiclyExposed: boolean): Classification {
   if (usages.length === 0) return 'no-action'
   if (change.kind === 'symbol-removed' || change.kind === 'property-removed' || change.kind === 'method-removed' || change.kind === 'overload-removed') return 'blocking'
@@ -212,26 +277,32 @@ function classify (change: ApiChange, usages: Usage[], publiclyExposed: boolean)
   return 'review'
 }
 
-function recommendedAction (classification: Classification, change: ApiChange): string {
+function recommendedAction (classification: Classification, change: ApiChange, category?: FindingCategory): string {
   if (classification === 'blocking') return `Adapt or remove the use of ${change.symbol}${change.member ? `.${change.member}` : ''} before adopting the candidate version.`
   if (classification === 'required') return 'Review the affected type contract and update the extension\'s mapping or nullability handling as needed.'
+  if (category === 'feature-review') return 'Review this new upstream capability for adoption by the owning Teams extension feature.'
+  if (category === 'internal-opportunity') return 'Consider whether this new upstream API can improve the extension\'s internal implementation.'
   if (classification === 'review') return 'Review the upstream change for behavioral or public API impact; no automatic feature adoption is implied.'
   return 'No direct usage intersects this API change.'
 }
 
-function createFindings (comparison: ComparisonResult, manifest: UsageManifest, publicApiReport?: PublicApiReport): FindingsResult {
+function createFindings (comparison: ComparisonResult, manifest: UsageManifest, capabilities: CapabilitiesDocument, publicApiReport?: PublicApiReport): FindingsResult {
   const publiclyExposedSymbols = new Set(publicApiReport?.upstreamTypeLeaks.map(leak => leak.upstreamSymbol) ?? [])
   const findings: Finding[] = comparison.changes.map(change => {
     const usages = isDirectlyRelevant(change, manifest.usages)
     const publiclyExposed = publiclyExposedSymbols.has(change.symbol)
-    const classification = classify(change, usages, publiclyExposed)
+    const capability = capabilityFor(change, capabilities)
+    const category = categoryFor(change, usages, capability)
+    const classification = category ? 'review' : classify(change, usages, publiclyExposed)
     return {
       id: change.id,
       source: 'api-diff' as const,
       classification,
+      ...(category && { category }),
       kind: change.kind,
       upstreamSymbol: change.symbol,
       ...(change.member && { member: change.member }),
+      ...(capability && { capability: capability.name }),
       usageKinds: [...new Set(usages.flatMap(getUsageKinds))],
       exposure: publiclyExposed
         ? 'publicly-exposed'
@@ -242,8 +313,8 @@ function createFindings (comparison: ComparisonResult, manifest: UsageManifest, 
       affectedFiles: [...new Set(usages.flatMap(usage => usage.files))].sort(),
       ...(change.before !== undefined && { before: change.before }),
       ...(change.after !== undefined && { after: change.after }),
-      evidence: [...new Set([...change.evidence, 'dependency-usage', ...(publiclyExposed ? ['public-api-report'] : [])])],
-      recommendedAction: recommendedAction(classification, change)
+      evidence: [...new Set([...change.evidence, 'dependency-usage', ...(capability ? ['teams-capabilities'] : []), ...(publiclyExposed ? ['public-api-report'] : [])])],
+      recommendedAction: recommendedAction(classification, change, category)
     }
   })
   if (publicApiReport?.status === 'changed') {
@@ -312,6 +383,7 @@ function main (): void {
 
   const comparison = readJson<ComparisonResult>(settings.comparison)
   const manifest = readJson<UsageManifest>(settings.manifest)
+  const capabilities = readCapabilities(settings.capabilities)
   const publicApiReport = settings.publicApiReport ? readJson<PublicApiReport>(settings.publicApiReport) : undefined
   if (comparison.schemaVersion !== 1 || !Array.isArray(comparison.changes)) {
     throw new Error('Comparison result must be a schemaVersion 1 raw API delta. Re-run compare:teams-api with --output <directory>.')
@@ -323,7 +395,7 @@ function main (): void {
     throw new Error('Public API report must be a schemaVersion 1 report for @microsoft/agents-hosting-extensions-msteams.')
   }
 
-  const result = createFindings(comparison, manifest, publicApiReport)
+  const result = createFindings(comparison, manifest, capabilities, publicApiReport)
   console.log(`Classified ${result.findings.length} API change(s): ${JSON.stringify(result.summary)}`)
   if (settings.output) writeOutput(result, settings.output)
   if (settings.failOnDrift && (result.summary.blocking > 0 || result.summary.required > 0)) process.exitCode = 1
