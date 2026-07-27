@@ -36,7 +36,7 @@ export interface MeetingParticipantsEventDetails {
 
 type MeetingStartHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, details: MeetingDetails) => Promise<void>
 type MeetingEndHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, details: MeetingDetails) => Promise<void>
-type MeetingParticipantsHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, details: MeetingParticipantsEventDetails) => Promise<void>
+type MeetingParticipantsHandler<TState extends TurnState> = (context: TurnContext, state: TState, details: MeetingParticipantsEventDetails) => Promise<void>
 
 function isMeetingEvent (context: TurnContext, eventName: string): boolean {
   return (
@@ -118,7 +118,7 @@ export class Meeting<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const details = context.activity.value as MeetingParticipantsEventDetails
-      await handler(new TeamsTurnContext(context), state, details)
+      await handler(context, state, details)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
@@ -138,7 +138,7 @@ export class Meeting<TState extends TurnState> {
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       const details = context.activity.value as MeetingParticipantsEventDetails
-      await handler(new TeamsTurnContext(context), state, details)
+      await handler(context, state, details)
     }
     this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
     return this
