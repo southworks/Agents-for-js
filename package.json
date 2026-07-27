@@ -29,7 +29,7 @@
     "render:teams-api-drift-report": "node --import tsx scripts/teams-api-drift/render-teams-api-drift-report.ts",
     "prepare:teams-api-agent-report": "node --import tsx scripts/teams-api-drift/prepare-teams-api-agent-context.ts",
     "validate:teams-api-agent-report": "node --import tsx scripts/teams-api-drift/validate-teams-api-agent-report.ts",
-    "write:teams-api-test-summary": "node --import tsx scripts/write-teams-api-test-summary.ts",
+    "write:teams-api-test-summary": "node --import tsx scripts/teams-api-drift/write-teams-api-test-summary.ts",
     "test:teams-api-contracts": "tsc -p packages/agents-hosting-extensions-msteams/test/contracts/tsconfig.json --noEmit",
     "compat": "node compat.mjs",
     "test": "node --test  --test-reporter=spec  --import tsx  --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-report.xml ./packages/*/test/**/*.test.ts",

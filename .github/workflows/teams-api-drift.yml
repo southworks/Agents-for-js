@@ -28,16 +28,12 @@ on:
     paths:
       - packages/agents-hosting-extensions-msteams/**
       - package-lock.json
-      - scripts/compare-teams-api.ts
-      - scripts/create-teams-api-test-package.ts
-      - scripts/detect-teams-api-drifts.ts
-      - scripts/check-teams-extension-public-api.ts
-      - scripts/render-teams-api-drift-report.ts
-      - scripts/write-teams-api-test-summary.ts
+      - scripts/teams-api-drift/**
       - .github/workflows/teams-api-drift.yml
 
 permissions:
   contents: read
+  copilot-requests: write
   pull-requests: write
 
 jobs:
@@ -231,6 +227,62 @@ jobs:
         if: always() && steps.classify.outcome != 'skipped' && steps.test-summary.outcome == 'success'
         run: npm run render:teams-api-drift-report -- --findings artifacts/teams-api-drift/findings.json --test-summary artifacts/teams-api-drift/test-summary.json --output artifacts/teams-api-drift
         continue-on-error: true
+      - id: agent-context
+        name: Prepare AI agent context
+        if: >-
+          always() &&
+          steps.report.outcome == 'success' &&
+          (github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false))
+        run: >-
+          npm run prepare:teams-api-agent-report --
+          --findings artifacts/teams-api-drift/findings.json
+          --usage-manifest packages/agents-hosting-extensions-msteams/teams-api-usage-manifest.json
+          --capabilities packages/agents-hosting-extensions-msteams/config/teams-capabilities.yaml
+          --deterministic-report artifacts/teams-api-drift/deterministic-report.md
+          --test-summary artifacts/teams-api-drift/test-summary.json
+          --public-api-report artifacts/teams-api-drift/public-api-report.json
+          --output artifacts/teams-api-drift
+        continue-on-error: true
+      - id: copilot-install
+        name: Install GitHub Copilot CLI
+        if: always() && steps.agent-context.outcome == 'success'
+        run: npm install --global @github/copilot
+        continue-on-error: true
+      - id: agent-report
+        name: Generate AI agent report
+        if: always() && steps.copilot-install.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PROMPT_FILE: scripts/teams-api-drift/teams-api-agent-report-prompt.md
+          CONTEXT_FILE: artifacts/teams-api-drift/agent-context.json
+          REPORT_FILE: artifacts/teams-api-drift/agent-report.md
+        run: |
+          agent_prompt=$(cat "$PROMPT_FILE")
+          agent_context=$(cat "$CONTEXT_FILE")
+          copilot \
+            -s \
+            -p "$agent_prompt
+
+          ## Runtime context
+
+          \`\`\`json
+          $agent_context
+          \`\`\`" \
+            --deny-tool='shell,write,read,url,memory,github' \
+            --no-ask-user \
+            > "$REPORT_FILE"
+          test -s "$REPORT_FILE"
+        continue-on-error: true
+      - id: agent-validation
+        name: Validate AI agent report
+        if: always() && steps.agent-report.outcome == 'success'
+        run: >-
+          npm run validate:teams-api-agent-report --
+          --findings artifacts/teams-api-drift/findings.json
+          --report artifacts/teams-api-drift/agent-report.md
+          --output artifacts/teams-api-drift
+        continue-on-error: true
       - name: Upload drift artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -287,6 +339,11 @@ jobs:
           CLASSIFY_OUTCOME: ${{ steps.classify.outcome }}
           TEST_SUMMARY_OUTCOME: ${{ steps.test-summary.outcome }}
           REPORT_OUTCOME: ${{ steps.report.outcome }}
+          RUN_AI_AGENT: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) }}
+          AGENT_CONTEXT_OUTCOME: ${{ steps.agent-context.outcome }}
+          COPILOT_INSTALL_OUTCOME: ${{ steps.copilot-install.outcome }}
+          AGENT_REPORT_OUTCOME: ${{ steps.agent-report.outcome }}
+          AGENT_VALIDATION_OUTCOME: ${{ steps.agent-validation.outcome }}
         run: |
           for outcome in "$BUILD_OUTCOME" "$USAGE_OUTCOME" "$COMPARE_OUTCOME" "$CONTRACTS_OUTCOME" "$BOUNDARIES_OUTCOME" "$PUBLIC_API_OUTCOME" "$CLASSIFY_OUTCOME" "$TEST_SUMMARY_OUTCOME" "$REPORT_OUTCOME"; do
             if [ "$outcome" != success ]; then
@@ -294,3 +351,12 @@ jobs:
               exit 1
             fi
           done
+
+          if [ "$RUN_AI_AGENT" = true ]; then
+            for outcome in "$AGENT_CONTEXT_OUTCOME" "$COPILOT_INSTALL_OUTCOME" "$AGENT_REPORT_OUTCOME" "$AGENT_VALIDATION_OUTCOME"; do
+              if [ "$outcome" != success ]; then
+                echo "Blocking teams.api AI report outcome: $outcome"
+                exit 1
+              fi
+            done
+          fi
