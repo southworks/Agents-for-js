@@ -101,7 +101,7 @@ jobs:
           echo "baseline_version=$base_range" >> "$GITHUB_OUTPUT"
           echo "candidate_version=$candidate_version" >> "$GITHUB_OUTPUT"
 
-  # Detect extension API changes even when the teams.api dependency is unchanged.
+  # Verify extension API changes when the teams.api dependency is unchanged.
   extension-api-compatibility:
     name: Verify MSTeams extension public API
     needs: analysis-scope
@@ -146,6 +146,7 @@ jobs:
           test "$BUILD_OUTCOME" = success
           test "$EXTENSION_API_OUTCOME" = success
 
+  # Verify teams.api dependency compatibility when the dependency is changed or the extension API is affected.
   teams-api-compatibility:
     name: Analyze teams.api compatibility
     needs: analysis-scope
@@ -331,7 +332,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       # Upsert one marker-based summary comment only for trusted pull requests.
-      - name: Publish pull-request summary
+      - name: Publish pull-request comment
         if: always() && github.event_name == 'pull_request' && steps.render-deterministic-report.outcome == 'success'
         uses: actions/github-script@v7
         env:
@@ -346,14 +347,15 @@ jobs:
               .slice(0, 5)
             const lines = [
               marker,
-              '## teams.api drift analysis',
+              '## TEAMS API drift analysis',
               '',
               `Compared \`${findings.fromVersion}\` to \`${findings.toVersion}\`.`,
+              `The analysis identified **${findings.findings.length}** total findings, of which **${actionable.length}** require attention.`,
               `Blocking: **${findings.summary.blocking}** · Required: **${findings.summary.required}** · Review: **${findings.summary.review}**.`,
               '',
-              ...actionable.map(finding => `- **${finding.id}** — ${finding.classification}: \`${finding.upstreamSymbol}${finding.member ? `.${finding.member}` : ''}\``),
+              ...actionable.map(finding => `- **${finding.id}** — ${finding.classification} · ${finding.kind}: \`${finding.upstreamSymbol}${finding.member ? `.${finding.member}` : ''}\``),
               '',
-              `Full deterministic report and artifacts: ${process.env.ARTIFACT_URL}`
+              `Find the full report and artifacts in: ${process.env.ARTIFACT_URL}`
             ]
             const body = lines.join('\n')
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -368,7 +370,7 @@ jobs:
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body })
             }
       # Convert deferred check outcomes into the final workflow result after reports and artifacts are available.
-      - name: Enforce compatibility policy
+      - name: Report final workflow result
         if: always()
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
