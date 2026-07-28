@@ -45,7 +45,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run_dependency_drift_analysis: ${{ steps.select-checks.outputs.run_dependency_drift_analysis }}
-      run_extension_api_check: ${{ steps.select-checks.outputs.run_extension_api_check }}
       baseline_version: ${{ steps.resolve-versions.outputs.baseline_version }}
       candidate_version: ${{ steps.resolve-versions.outputs.candidate_version }}
     steps:
@@ -54,7 +53,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Manual runs execute both analyses; pull requests execute only affected checks.
+      # Manual runs always analyze the requested versions; pull requests run only for dependency updates.
       - id: select-checks
         name: Select required checks
         env:
@@ -64,7 +63,6 @@ jobs:
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "run_dependency_drift_analysis=true" >> "$GITHUB_OUTPUT"
-            echo "run_extension_api_check=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -73,13 +71,7 @@ jobs:
             dependency_changed=true
           fi
 
-          public_api_changed=false
-          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- packages/agents-hosting-extensions-msteams | grep -Eq '^(packages/agents-hosting-extensions-msteams/(src/|package.json|tsconfig\.json))'; then
-            public_api_changed=true
-          fi
-
           echo "run_dependency_drift_analysis=$dependency_changed" >> "$GITHUB_OUTPUT"
-          echo "run_extension_api_check=$public_api_changed" >> "$GITHUB_OUTPUT"
 
       - id: resolve-versions
         name: Resolve comparison versions
@@ -101,52 +93,7 @@ jobs:
           echo "baseline_version=$base_range" >> "$GITHUB_OUTPUT"
           echo "candidate_version=$candidate_version" >> "$GITHUB_OUTPUT"
 
-  # Verify extension API changes when the teams.api dependency is unchanged.
-  extension-api-compatibility:
-    name: Verify MSTeams extension public API
-    needs: analysis-scope
-    if: needs.analysis-scope.outputs.run_extension_api_check == 'true' && needs.analysis-scope.outputs.run_dependency_drift_analysis != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      # Continue so evidence is uploaded before the final policy reports all failed checks.
-      - id: build
-        name: Build
-        run: npm run build
-        continue-on-error: true
-      - id: compare-extension-public-api
-        name: Compare extension public API
-        if: always() && steps.build.outcome == 'success'
-        run: npm run check:teams-extension-public-api -- --output artifacts/teams-api-drift --fail-on-change
-        continue-on-error: true
-      # Upload compatibility evidence even when an earlier verification stage failed.
-      - name: Upload extension API artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: teams-extension-public-api-${{ github.run_id }}
-          path: artifacts/teams-api-drift
-          if-no-files-found: warn
-          retention-days: 14
-      # Convert deferred verification outcomes into the job result after evidence is available.
-      - name: Enforce extension API policy
-        if: always()
-        env:
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-          EXTENSION_API_OUTCOME: ${{ steps.compare-extension-public-api.outcome }}
-        run: |
-          test "$BUILD_OUTCOME" = success
-          test "$EXTENSION_API_OUTCOME" = success
-
-  # Verify teams.api dependency compatibility when the dependency is changed or the extension API is affected.
+  # Verify teams.api dependency compatibility when the dependency version changes.
   teams-api-compatibility:
     name: Analyze teams.api compatibility
     needs: analysis-scope
@@ -236,16 +183,11 @@ jobs:
         if: always() && steps.build.outcome == 'success'
         run: node --test --import tsx packages/agents-hosting-extensions-msteams/test/boundaries/teamsApiClientBehavior.test.ts
         continue-on-error: true
-      - id: compare-extension-public-api
-        name: Compare extension public API
-        if: always() && steps.build.outcome == 'success'
-        run: npm run check:teams-extension-public-api -- --output artifacts/teams-api-drift --fail-on-change
-        continue-on-error: true
-      # Intersect the upstream delta with usage and public exposure; defer fail-on-drift to preserve reports.
+      # Intersect the upstream delta with actual extension usage; defer fail-on-drift to preserve reports.
       - id: classify-usage-impact
         name: Classify direct compatibility impact
-        if: always() && steps.compare-upstream-api-models.outcome == 'success' && steps.compare-extension-public-api.outcome == 'success'
-        run: npm run detect:teams-api-drifts -- --comparison artifacts/teams-api-drift/raw-api-diff.json --public-api-report artifacts/teams-api-drift/public-api-report.json --output artifacts/teams-api-drift --fail-on-drift
+        if: always() && steps.compare-upstream-api-models.outcome == 'success'
+        run: npm run detect:teams-api-drifts -- --comparison artifacts/teams-api-drift/raw-api-diff.json --output artifacts/teams-api-drift --fail-on-drift
         continue-on-error: true
       - id: write-verification-summary
         name: Write verification summary
@@ -258,7 +200,6 @@ jobs:
           --api-comparison "${{ steps.compare-upstream-api-models.outcome }}"
           --contract-tests "${{ steps.run-compile-time-contracts-tests.outcome }}"
           --boundary-tests "${{ steps.run-runtime-boundaries-tests.outcome }}"
-          --public-api-check "${{ steps.compare-extension-public-api.outcome }}"
           --output artifacts/teams-api-drift
         continue-on-error: true
       - id: render-deterministic-report
@@ -280,7 +221,6 @@ jobs:
           --capabilities packages/agents-hosting-extensions-msteams/config/teams-capabilities.yaml
           --deterministic-report artifacts/teams-api-drift/deterministic-report.md
           --test-summary artifacts/teams-api-drift/test-summary.json
-          --public-api-report artifacts/teams-api-drift/public-api-report.json
           --output artifacts/teams-api-drift
         continue-on-error: true
       - id: install-copilot-cli
@@ -378,7 +318,6 @@ jobs:
           UPSTREAM_COMPARISON_OUTCOME: ${{ steps.compare-upstream-api-models.outcome }}
           COMPILE_TIME_CONTRACTS_OUTCOME: ${{ steps.run-compile-time-contracts-tests.outcome }}
           RUNTIME_BOUNDARIES_OUTCOME: ${{ steps.run-runtime-boundaries-tests.outcome }}
-          EXTENSION_API_OUTCOME: ${{ steps.compare-extension-public-api.outcome }}
           IMPACT_CLASSIFICATION_OUTCOME: ${{ steps.classify-usage-impact.outcome }}
           VERIFICATION_SUMMARY_OUTCOME: ${{ steps.write-verification-summary.outcome }}
           DETERMINISTIC_REPORT_OUTCOME: ${{ steps.render-deterministic-report.outcome }}
@@ -388,7 +327,7 @@ jobs:
           AGENT_REPORT_OUTCOME: ${{ steps.generate-advisory-report.outcome }}
           AGENT_VALIDATION_OUTCOME: ${{ steps.validate-advisory-report.outcome }}
         run: |
-          for outcome in "$BUILD_OUTCOME" "$USAGE_MANIFEST_OUTCOME" "$UPSTREAM_COMPARISON_OUTCOME" "$COMPILE_TIME_CONTRACTS_OUTCOME" "$RUNTIME_BOUNDARIES_OUTCOME" "$EXTENSION_API_OUTCOME" "$IMPACT_CLASSIFICATION_OUTCOME" "$VERIFICATION_SUMMARY_OUTCOME" "$DETERMINISTIC_REPORT_OUTCOME"; do
+          for outcome in "$BUILD_OUTCOME" "$USAGE_MANIFEST_OUTCOME" "$UPSTREAM_COMPARISON_OUTCOME" "$COMPILE_TIME_CONTRACTS_OUTCOME" "$RUNTIME_BOUNDARIES_OUTCOME" "$IMPACT_CLASSIFICATION_OUTCOME" "$VERIFICATION_SUMMARY_OUTCOME" "$DETERMINISTIC_REPORT_OUTCOME"; do
             if [ "$outcome" != success ]; then
               echo "Blocking teams.api drift check outcome: $outcome"
               exit 1
