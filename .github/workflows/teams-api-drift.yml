@@ -16,7 +16,7 @@ on:
         required: false
         default: https://registry.npmjs.org
         type: string
-      # TODO: REMOVE AFTER TESTING — temporary fixture packages a synthetic teams.api candidate for workflow validation.
+      # TODO: REMOVE AFTER TESTING — temporary fixture uses a synthetic teams.api candidate for workflow validation.
       use_local_fixture:
         description: Generate the local 2.0.14-test fixture and compare its tarball directly
         required: false
@@ -26,6 +26,7 @@ on:
     branches:
       - main
       - release/*
+      - ceci/add/teams-api-drift-detector-2
     # Run only when the extension, dependency resolution, or drift tooling can affect analysis.
     paths:
       - packages/agents-hosting-extensions-msteams/**
@@ -100,7 +101,7 @@ jobs:
           echo "baseline_version=$base_range" >> "$GITHUB_OUTPUT"
           echo "candidate_version=$candidate_version" >> "$GITHUB_OUTPUT"
 
-  # Detect extension API changes even when the teams.api dependency is unchanged.
+  # Verify extension API changes when the teams.api dependency is unchanged.
   extension-api-compatibility:
     name: Verify MSTeams extension public API
     needs: analysis-scope
@@ -145,6 +146,7 @@ jobs:
           test "$BUILD_OUTCOME" = success
           test "$EXTENSION_API_OUTCOME" = success
 
+  # Verify teams.api dependency compatibility when the dependency is changed or the extension API is affected.
   teams-api-compatibility:
     name: Analyze teams.api compatibility
     needs: analysis-scope
@@ -170,21 +172,33 @@ jobs:
         run: |
           echo "url=${INPUT_REGISTRY:-https://registry.npmjs.org}" >> "$GITHUB_OUTPUT"
 
-      # TODO: REMOVE AFTER TESTING — temporary fixture packages a synthetic teams.api candidate for workflow validation.
-      - id: build-test-candidate-package
-        name: Build local test candidate
-        if: github.event_name == 'workflow_dispatch' && inputs.use_local_fixture == true
+      # A dependency-update PR targeting 2.0.14 uses the committed fixture to simulate the candidate API.
+      # TODO: REMOVE AFTER TESTING — temporary fixture uses a synthetic teams.api candidate for workflow validation.
+      - id: select-test-candidate-package
+        name: Select local test candidate
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.use_local_fixture == true) ||
+          (github.event_name == 'pull_request' && needs.analysis-scope.outputs.candidate_version == '2.0.14')
         env:
+          EVENT_NAME: ${{ github.event_name }}
           CANDIDATE_VERSION: ${{ needs.analysis-scope.outputs.candidate_version }}
-          FIXTURE_ROOT: artifacts/teams-api-drift/fixture
+          FIXTURE_TARBALL: artifacts/teams-api-test-package/microsoft-teams.api-2.0.14-test.tgz
         run: |
-          if [ "$CANDIDATE_VERSION" != "2.0.14-test" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$CANDIDATE_VERSION" != "2.0.14-test" ]; then
             echo "Local fixture mode requires the candidate version 2.0.14-test; received $CANDIDATE_VERSION."
             exit 1
           fi
 
-          npm run create:teams-api-test-package -- --output "$FIXTURE_ROOT"
-          echo "tarball=$GITHUB_WORKSPACE/$FIXTURE_ROOT/microsoft-teams.api-2.0.14-test.tgz" >> "$GITHUB_OUTPUT"
+          if [ ! -f "$FIXTURE_TARBALL" ]; then
+            echo "Committed test fixture not found: $FIXTURE_TARBALL"
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Simulating the requested @microsoft/teams.api@$CANDIDATE_VERSION candidate with the temporary 2.0.14-test fixture."
+          fi
+
+          echo "tarball=$GITHUB_WORKSPACE/$FIXTURE_TARBALL" >> "$GITHUB_OUTPUT"
 
       # Continue so reports and artifacts describe all checks before the final policy fails the run.
       - id: build
@@ -201,7 +215,7 @@ jobs:
         name: Compare teams.api API models
         if: always() && steps.build.outcome == 'success'
         env:
-          CANDIDATE_PACKAGE: ${{ steps.build-test-candidate-package.outputs.tarball }}
+          CANDIDATE_PACKAGE: ${{ steps.select-test-candidate-package.outputs.tarball }}
           CANDIDATE_REGISTRY: ${{ steps.resolve-candidate-registry.outputs.url }}
         run: |
           compare_args=(--from "${{ needs.analysis-scope.outputs.baseline_version }}" --output artifacts/teams-api-drift)
@@ -258,8 +272,7 @@ jobs:
         if: >-
           always() &&
           steps.render-deterministic-report.outcome == 'success' &&
-          (github.event_name == 'workflow_dispatch' ||
-          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false))
+          (github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request')
         run: >-
           npm run prepare:teams-api-agent-report --
           --findings artifacts/teams-api-drift/findings.json
@@ -319,8 +332,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       # Upsert one marker-based summary comment only for trusted pull requests.
-      - name: Publish pull-request summary
-        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && steps.render-deterministic-report.outcome == 'success'
+      - name: Publish pull-request comment
+        if: always() && github.event_name == 'pull_request' && steps.render-deterministic-report.outcome == 'success'
         uses: actions/github-script@v7
         env:
           ARTIFACT_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -334,14 +347,15 @@ jobs:
               .slice(0, 5)
             const lines = [
               marker,
-              '## teams.api drift analysis',
+              '## TEAMS API drift analysis',
               '',
               `Compared \`${findings.fromVersion}\` to \`${findings.toVersion}\`.`,
+              `The analysis identified **${findings.findings.length}** total findings, of which **${actionable.length}** require attention.`,
               `Blocking: **${findings.summary.blocking}** · Required: **${findings.summary.required}** · Review: **${findings.summary.review}**.`,
               '',
-              ...actionable.map(finding => `- **${finding.id}** — ${finding.classification}: \`${finding.upstreamSymbol}${finding.member ? `.${finding.member}` : ''}\``),
+              ...actionable.map(finding => `- **${finding.id}** — ${finding.classification} · ${finding.kind}: \`${finding.upstreamSymbol}${finding.member ? `.${finding.member}` : ''}\``),
               '',
-              `Full deterministic report and artifacts: ${process.env.ARTIFACT_URL}`
+              `Find the full report and artifacts in: ${process.env.ARTIFACT_URL}`
             ]
             const body = lines.join('\n')
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -356,7 +370,7 @@ jobs:
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body })
             }
       # Convert deferred check outcomes into the final workflow result after reports and artifacts are available.
-      - name: Enforce compatibility policy
+      - name: Report final workflow result
         if: always()
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
@@ -368,7 +382,7 @@ jobs:
           IMPACT_CLASSIFICATION_OUTCOME: ${{ steps.classify-usage-impact.outcome }}
           VERIFICATION_SUMMARY_OUTCOME: ${{ steps.write-verification-summary.outcome }}
           DETERMINISTIC_REPORT_OUTCOME: ${{ steps.render-deterministic-report.outcome }}
-          RUN_AI_AGENT: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) }}
+          RUN_AI_AGENT: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
           AGENT_CONTEXT_OUTCOME: ${{ steps.prepare-agent-context.outcome }}
           COPILOT_INSTALL_OUTCOME: ${{ steps.install-copilot-cli.outcome }}
           AGENT_REPORT_OUTCOME: ${{ steps.generate-advisory-report.outcome }}
