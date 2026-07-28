@@ -92,7 +92,7 @@ export class Meeting<TState extends TurnState> {
    * @param authHandlers - Optional authorization handlers required by the route.
    * @returns This meeting helper for chaining.
    */
-  onEnd (handler: MeetingEndHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
+  private onEnd (handler: MeetingEndHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(isMeetingEvent(context, 'application/vnd.microsoft.meetingEnd'))
     }
