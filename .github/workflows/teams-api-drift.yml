@@ -16,7 +16,7 @@ on:
         required: false
         default: https://registry.npmjs.org
         type: string
-      # TODO: REMOVE AFTER TESTING — temporary fixture packages a synthetic teams.api candidate for workflow validation.
+      # TODO: REMOVE AFTER TESTING — temporary fixture uses a synthetic teams.api candidate for workflow validation.
       use_local_fixture:
         description: Generate the local 2.0.14-test fixture and compare its tarball directly
         required: false
@@ -171,21 +171,33 @@ jobs:
         run: |
           echo "url=${INPUT_REGISTRY:-https://registry.npmjs.org}" >> "$GITHUB_OUTPUT"
 
-      # TODO: REMOVE AFTER TESTING — temporary fixture packages a synthetic teams.api candidate for workflow validation.
-      - id: build-test-candidate-package
-        name: Build local test candidate
-        if: github.event_name == 'workflow_dispatch' && inputs.use_local_fixture == true
+      # A dependency-update PR targeting 2.0.14 uses the committed fixture to simulate the candidate API.
+      # TODO: REMOVE AFTER TESTING — temporary fixture uses a synthetic teams.api candidate for workflow validation.
+      - id: select-test-candidate-package
+        name: Select local test candidate
+        if: >-
+          (github.event_name == 'workflow_dispatch' && inputs.use_local_fixture == true) ||
+          (github.event_name == 'pull_request' && needs.analysis-scope.outputs.candidate_version == '2.0.14')
         env:
+          EVENT_NAME: ${{ github.event_name }}
           CANDIDATE_VERSION: ${{ needs.analysis-scope.outputs.candidate_version }}
-          FIXTURE_ROOT: artifacts/teams-api-drift/fixture
+          FIXTURE_TARBALL: artifacts/teams-api-test-package/microsoft-teams.api-2.0.14-test.tgz
         run: |
-          if [ "$CANDIDATE_VERSION" != "2.0.14-test" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$CANDIDATE_VERSION" != "2.0.14-test" ]; then
             echo "Local fixture mode requires the candidate version 2.0.14-test; received $CANDIDATE_VERSION."
             exit 1
           fi
 
-          npm run create:teams-api-test-package -- --output "$FIXTURE_ROOT"
-          echo "tarball=$GITHUB_WORKSPACE/$FIXTURE_ROOT/microsoft-teams.api-2.0.14-test.tgz" >> "$GITHUB_OUTPUT"
+          if [ ! -f "$FIXTURE_TARBALL" ]; then
+            echo "Committed test fixture not found: $FIXTURE_TARBALL"
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Simulating the requested @microsoft/teams.api@$CANDIDATE_VERSION candidate with the temporary 2.0.14-test fixture."
+          fi
+
+          echo "tarball=$GITHUB_WORKSPACE/$FIXTURE_TARBALL" >> "$GITHUB_OUTPUT"
 
       # Continue so reports and artifacts describe all checks before the final policy fails the run.
       - id: build
@@ -202,7 +214,7 @@ jobs:
         name: Compare teams.api API models
         if: always() && steps.build.outcome == 'success'
         env:
-          CANDIDATE_PACKAGE: ${{ steps.build-test-candidate-package.outputs.tarball }}
+          CANDIDATE_PACKAGE: ${{ steps.select-test-candidate-package.outputs.tarball }}
           CANDIDATE_REGISTRY: ${{ steps.resolve-candidate-registry.outputs.url }}
         run: |
           compare_args=(--from "${{ needs.analysis-scope.outputs.baseline_version }}" --output artifacts/teams-api-drift)
