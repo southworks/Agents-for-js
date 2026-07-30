@@ -101,7 +101,13 @@ export function validateAgentReport (report: string, findings: FindingsResult): 
   for (const section of requiredSections) {
     if (!new RegExp(`^## ${section}$`, 'm').test(normalizedReport)) errors.push(`Missing required section: ${section}.`)
   }
-  if (!/\badvisory\b/i.test(report)) errors.push('Report must label recommendations as advisory.')
+  const requiredSummarySentence = 'This is an advisory report; it does not make or authorize implementation decisions.'
+  const summaryMatch = normalizedReport.match(/^## Summary\s*$(?:\n)([\s\S]*?)(?=\n## |\s*$)/m)
+  const summaryContent = summaryMatch?.[1] ?? ''
+  const firstSummaryLine = summaryContent.split('\n').map(line => line.trim()).find(line => line.length > 0)
+  if (firstSummaryLine !== requiredSummarySentence) {
+    errors.push(`Summary section must start with: "${requiredSummarySentence}".`)
+  }
 
   const knownIds = new Set(findings.findings.map(finding => finding.id))
   const referencedFindingIds = [...new Set(report.match(/\b(?:TSAPI|EXTAPI)-[A-Za-z0-9-]+\b/g) ?? [])].sort()

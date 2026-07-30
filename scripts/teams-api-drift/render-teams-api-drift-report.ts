@@ -234,7 +234,7 @@ export function renderDeterministicReport (findings: FindingsResult, context: Re
   }
 
   lines.push('', '## Public API impact', '')
-  if (!findings.publicApi) lines.push('Public API impact was not evaluated. Run `check:teams-extension-public-api` and pass its report to the classifier.')
+  if (!findings.publicApi) lines.push('Public API impact was not evaluated. Re-run detect:teams-api-drifts with --public-api-report <file> to include it.')
   else {
     lines.push(`Public API status: **${findings.publicApi.status}**. Suggested release decision: **${findings.publicApi.releaseDecision}**.`)
     lines.push('')

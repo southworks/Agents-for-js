@@ -20,7 +20,7 @@ function findings (...items: Finding[]) {
 
 function report (overrides: Partial<Record<string, string>> = {}): string {
   const sections: Array<[string, string]> = [
-    ['Summary', 'This is an advisory report.'],
+    ['Summary', 'This is an advisory report; it does not make or authorize implementation decisions.'],
     ['Compatibility breaks', '- No compatibility breaks were identified.'],
     ['Required adaptations', '- No required adaptations were identified.'],
     ['Feature-review candidates', '- No feature-review candidates were identified.'],
@@ -52,7 +52,7 @@ describe('teams.api agent report validation', () => {
   it('should require recommendations to be labeled advisory', () => {
     const validation = validateAgentReport(report({ Summary: 'This report contains recommendations.' }), findings())
 
-    assert.ok(validation.errors.includes('Report must label recommendations as advisory.'))
+    assert.ok(validation.errors.includes('Summary section must start with: "This is an advisory report; it does not make or authorize implementation decisions.".'))
   })
 
   it('should require blocking and required finding IDs', () => {
@@ -65,7 +65,7 @@ describe('teams.api agent report validation', () => {
   })
 
   it('should reject unknown finding IDs', () => {
-    const validation = validateAgentReport(report({ Summary: 'This is an advisory report. TSAPI-9999 requires review.' }), findings())
+    const validation = validateAgentReport(report({ Summary: 'This is an advisory report; it does not make or authorize implementation decisions. TSAPI-9999 requires review.' }), findings())
 
     assert.deepEqual(validation.unknownFindingIds, ['TSAPI-9999'])
     assert.ok(validation.errors.includes('Unknown finding ID(s): TSAPI-9999.'))

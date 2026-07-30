@@ -1,5 +1,7 @@
 name: Teams API Drift Detector
 
+# Compares a declared @microsoft/teams.api update with the extension's recorded usage.
+# It classifies compatibility impact, publishes deterministic evidence, and generates an advisory report.
 on:
   workflow_dispatch:
     inputs:
@@ -176,6 +178,7 @@ jobs:
         name: Generate advisory AI report
         if: always() && steps.install-copilot-cli.outcome == 'success'
         env:
+          # Authenticates GitHub Copilot CLI with this workflow's copilot-requests permission.
           GITHUB_TOKEN: ${{ github.token }}
           PROMPT_FILE: scripts/teams-api-drift/teams-api-agent-report-prompt.md
           CONTEXT_FILE: artifacts/teams-api-drift/agent-context.json
