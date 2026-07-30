@@ -170,7 +170,7 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            const marker = `<!-- scheduled-teams-api-drift:${process.env.CANDIDATE_VERSION} -->`
+            const marker = '<!-- scheduled-teams-api-drift -->'
             const title = `teams.api drift detected: ${process.env.BASELINE_VERSION} → ${process.env.CANDIDATE_VERSION}`
             const advisoryReport = fs.readFileSync('artifacts/teams-api-drift/agent-report.md', 'utf8').trim()
             const body = [
