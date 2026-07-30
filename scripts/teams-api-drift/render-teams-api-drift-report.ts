@@ -123,7 +123,7 @@ function outputPathFor (destination: string): string {
 }
 
 function markdownCell (value: string): string {
-  return value.replace(/\|/g, '\\|').replace(/[\r\n]+/g, ' ')
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/[\r\n]+/g, ' ')
 }
 
 function displayPath (path: string): string {
