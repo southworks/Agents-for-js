@@ -4,6 +4,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const packageRoot = 'packages/agents-hosting-extensions-msteams'
 const defaultArtifactDirectory = 'artifacts/teams-api-drift'
@@ -173,4 +174,5 @@ function main (): void {
   console.log(`Wrote agent context to ${relative(process.cwd(), outputPath) || basename(outputPath)} (${context.relevantSourceFiles.length} source file(s)).`)
 }
 
-main()
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : undefined
+if (invokedPath === fileURLToPath(import.meta.url)) main()

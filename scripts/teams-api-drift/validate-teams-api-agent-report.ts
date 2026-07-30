@@ -122,7 +122,7 @@ export function validateAgentReport (report: string, findings: FindingsResult): 
   if (missingMandatoryFindingIds.length > 0) errors.push(`Missing blocking or required finding ID(s): ${missingMandatoryFindingIds.join(', ')}.`)
 
   for (const section of actionSections(report)) {
-    for (const line of section.split(/\r?\n/).filter(line => line.startsWith('- '))) {
+    for (const line of section.split(/\r?\n/).filter(line => /^[-*+] /.test(line))) {
       if (!/\b(?:TSAPI|EXTAPI)-[A-Za-z0-9-]+\b/.test(line) && !/^- No /i.test(line)) {
         errors.push(`Action item is not tied to a finding ID: ${line}`)
       }

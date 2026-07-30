@@ -229,15 +229,15 @@ jobs:
             const fs = require('fs')
             const findings = JSON.parse(fs.readFileSync('artifacts/teams-api-drift/findings.json', 'utf8'))
             const marker = '<!-- teams-api-drift-report -->'
-            const actionable = findings.findings
+            const actionableFindings = findings.findings
               .filter(finding => finding.classification !== 'no-action')
-              .slice(0, 5)
+            const actionable = actionableFindings.slice(0, 5)
             const lines = [
               marker,
               '## TEAMS API drift analysis',
               '',
               `Compared \`${findings.fromVersion}\` to \`${findings.toVersion}\`.`,
-              `The analysis identified **${findings.findings.length}** total findings, of which **${actionable.length}** require attention.`,
+              `The analysis identified **${findings.findings.length}** total findings, of which **${actionableFindings.length}** require attention.`,
               `Blocking: **${findings.summary.blocking}** · Required: **${findings.summary.required}** · Review: **${findings.summary.review}**.`,
               '',
               ...actionable.map(finding => `- **${finding.id}** — ${finding.classification} · ${finding.kind}: \`${finding.upstreamSymbol}${finding.member ? `.${finding.member}` : ''}\``),
