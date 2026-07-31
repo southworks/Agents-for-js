@@ -17,7 +17,7 @@ describe('AgentApplicationTraceDefinitions.run', () => {
     assert.equal(attributes['activity.name'], 'application/vnd.contoso.order')
   })
 
-  it('should omit activity.name when the activity has no name', () => {
+  it('should set activity.name to unknown when the activity has no name', () => {
     const attributes = endRunTrace(Activity.fromObject({ type: 'message' }))
 
     assert.equal(attributes['activity.name'], 'unknown')
