@@ -1,6 +1,6 @@
 # Debugging and logging
 
-This document describes how we use the [`debug`](https://www.npmjs.com/package/debug) library in this repository. The rest of this document explains namespaces, recommended log levels, how to enable logging, and examples where appropriate.
+This document describes how we use the [`debug`](https://www.npmjs.com/package/debug) library through the logging wrapper exported by `@microsoft/agents-telemetry`. The wrapper standardizes namespaced loggers and forwards enabled messages to OpenTelemetry logging when available. The rest of this document explains namespaces, recommended log levels, how to enable logging, and examples where appropriate.
 
 ## Quick start (for users)
 Logging can be configured using environment variables or the command line.
@@ -55,12 +55,12 @@ Recommendation: prefer the pattern `<project>:<component>:<level>`. This keeps i
 Common pattern:
 
 ```ts
-import debug from 'debug'
+import { debug } from '@microsoft/agents-telemetry'
 
 const logger = debug('agents:turnState')
 
-logger('property not found in turnState', turnState);
-logger('Invalid conversation id', err);
+logger.debug('property not found in turnState', turnState);
+logger.error('Invalid conversation id', err);
 ```
 
 ### Browser usage
