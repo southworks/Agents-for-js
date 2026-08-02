@@ -157,7 +157,6 @@ export class AdaptiveCardsActions<TState extends TurnState> {
               }
               await sendInvokeResponse(context, response)
             } else {
-              const activity = MessageFactory.attachment(CardFactory.adaptiveCard(result))
               response = {
                 statusCode: 200,
                 type: AdaptiveCardInvokeResponseType.ADAPTIVE,
@@ -173,10 +172,11 @@ export class AdaptiveCardsActions<TState extends TurnState> {
                   type: AdaptiveCardInvokeResponseType.MESSAGE,
                   value: 'Your response was sent to the app' as any
                 })
-                await context.sendActivity(activity)
+                await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard(result)))
               } else if (
                 actionExecuteResponseType === AdaptiveCardActionExecuteResponseType.REPLACE_FOR_ALL
               ) {
+                const activity = MessageFactory.attachment(CardFactory.adaptiveCard(result))
                 activity.id = context.activity.replyToId
                 await context.updateActivity(activity)
                 await sendInvokeResponse(context, response)
