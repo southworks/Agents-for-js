@@ -716,6 +716,7 @@ export class StreamingResponse {
   /**
    * Finalizes an M365 Copilot stream that reached the channel duration limit.
    */
+  private async handleM365StreamTimeout (): Promise<void> {
     if (this._ended || this._canceled || !this.isStreamingChannel || !this.isM365Copilot()) {
       return
     }
