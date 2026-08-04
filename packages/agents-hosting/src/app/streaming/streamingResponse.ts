@@ -409,9 +409,12 @@ export class StreamingResponse {
    * @returns Whether the streaming response was stopped.
    */
   public async sendStreamTimedOutNotification (message: string): Promise<boolean> {
-    if (this._ended) {
+    if (this._ended || this._canceled || !this.isStreamingChannel) {
       return false
     }
+
+    // Ensure any in-flight queued sends complete before we send the timeout notification.
+    await this.waitForQueue()
 
     await this.sendActivity(this.createStreamStoppedMessage(message))
     this._streamTimeoutNotificationSent = true
@@ -629,7 +632,7 @@ export class StreamingResponse {
       if (!this._streamId) {
         this._streamId = response?.id
       }
-      if (activity.entities?.some(entity => entity.streamType === 'informative')) {
+      if (this.isM365Copilot() && this.isStreamingChannel && !this._ended) {
         this.scheduleKeepAlive()
       }
       await new Promise((resolve) => setTimeout(resolve, this.delayInMs))
@@ -713,8 +716,7 @@ export class StreamingResponse {
   /**
    * Finalizes an M365 Copilot stream that reached the channel duration limit.
    */
-  private async handleM365StreamTimeout (): Promise<void> {
-    if (this._ended || !this.isStreamingChannel || !this.isM365Copilot()) {
+    if (this._ended || this._canceled || !this.isStreamingChannel || !this.isM365Copilot()) {
       return
     }
 
