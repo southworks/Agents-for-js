@@ -61,8 +61,10 @@ describe('trace definitions', () => {
 
   describe('AgentApplicationTraceDefinitions', () => {
     it('should set route attributes and turn metrics when a turn ends', () => {
-      const turnCounters = sinon.stub(HostingMetrics.turnsTotalCounter, 'add')
-      const turnDuration = sinon.stub(HostingMetrics.turnDuration, 'record')
+      const turnsTotal = { add: sinon.stub() }
+      const turnDuration = { record: sinon.stub() }
+      sinon.stub(HostingMetrics, 'turnsTotalCounter').value(turnsTotal as any)
+      sinon.stub(HostingMetrics, 'turnDuration').value(turnDuration as any)
       const activity = Activity.fromObject({ type: 'message', channelId: 'msteams' })
 
       const span = endTrace(AgentApplicationTraceDefinitions.run, {
@@ -80,13 +82,17 @@ describe('trace definitions', () => {
         'route.matched': true,
         ...metricAttributes,
       })
-      assertMetric(turnCounters, 1, metricAttributes)
-      assertMetric(turnDuration, duration, metricAttributes)
+      assertMetric(turnsTotal.add, 1, metricAttributes)
+      assertMetric(turnDuration.record, duration, metricAttributes)
     })
 
     it('should set the error metric when a turn ends with an error', () => {
-      const turnCounters = sinon.stub(HostingMetrics.turnsTotalCounter, 'add')
-      sinon.stub(HostingMetrics.turnDuration, 'record')
+      const turnsTotal = { add: sinon.stub() }
+      const turnsErrors = { add: sinon.stub() }
+      const turnDuration = { record: sinon.stub() }
+      sinon.stub(HostingMetrics, 'turnsTotalCounter').value(turnsTotal as any)
+      sinon.stub(HostingMetrics, 'turnsErrorsCounter').value(turnsErrors as any)
+      sinon.stub(HostingMetrics, 'turnDuration').value(turnDuration as any)
 
       endTrace(AgentApplicationTraceDefinitions.run, {
         authorized: false,
@@ -94,8 +100,11 @@ describe('trace definitions', () => {
         routeMatched: false,
       }, new TypeError('invalid turn'))
 
-      sinon.assert.callCount(turnCounters, 2)
-      assert.deepEqual(turnCounters.secondCall.args, [1, { 'error.type': 'TypeError' }])
+      assertMetric(turnsTotal.add, 1, {
+        'activity.type': 'message',
+        'activity.channel_id': 'unknown',
+      })
+      assertMetric(turnsErrors.add, 1, { 'error.type': 'TypeError' })
     })
 
     it('should set the attachment count when file downloads end', () => {
