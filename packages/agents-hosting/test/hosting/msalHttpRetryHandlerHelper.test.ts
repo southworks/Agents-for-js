@@ -101,6 +101,15 @@ describe('MsalHttpRetryHandlerHelper', () => {
     assert.strictEqual(networkClient.getCalls, 1)
   })
 
+  it('should normalize fractional retry counts', async () => {
+    const networkClient = new SequenceNetworkClient([408])
+    const helper = new MsalHttpRetryHandlerHelper(networkClient, 1.7)
+
+    await helper.sendGetRequestAsync('https://example.com')
+
+    assert.strictEqual(networkClient.getCalls, 2)
+  })
+
   it('should retry real HTTP 408 responses using the default MSAL HTTP client', async () => {
     let requests = 0
     const server = createServer((_request, response) => {

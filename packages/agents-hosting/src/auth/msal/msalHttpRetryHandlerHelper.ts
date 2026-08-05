@@ -17,6 +17,17 @@ const requestTimeoutStatus = 408
 export const DEFAULT_MSAL_RETRY_COUNT = 2
 
 /**
+ * Converts a configured MSAL retry count to its effective runtime value.
+ */
+export function normalizeMsalRetryCount (retryCount: number | undefined): number {
+  if (!Number.isFinite(retryCount)) {
+    return DEFAULT_MSAL_RETRY_COUNT
+  }
+
+  return Math.max(0, Math.floor(retryCount as number))
+}
+
+/**
  * MSAL network client that retries responses with HTTP status 408 (Request Timeout).
  *
  * @remarks
@@ -30,9 +41,7 @@ export class MsalHttpRetryHandlerHelper implements INetworkModule {
     private readonly networkClient: INetworkModule = new MsalHttpClient(),
     maxRetryCount: number = DEFAULT_MSAL_RETRY_COUNT
   ) {
-    this.maxRetryCount = Number.isFinite(maxRetryCount)
-      ? Math.max(0, Math.floor(maxRetryCount))
-      : DEFAULT_MSAL_RETRY_COUNT
+    this.maxRetryCount = normalizeMsalRetryCount(maxRetryCount)
   }
 
   /**

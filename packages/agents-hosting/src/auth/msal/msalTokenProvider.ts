@@ -15,7 +15,7 @@ import crypto from 'crypto'
 import { AuthenticationTraceDefinitions } from '../../observability'
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from '../../errorHelper'
-import { DEFAULT_MSAL_RETRY_COUNT, MsalHttpRetryHandlerHelper } from './msalHttpRetryHandlerHelper'
+import { MsalHttpRetryHandlerHelper, normalizeMsalRetryCount } from './msalHttpRetryHandlerHelper'
 
 const audience = 'api://AzureADTokenExchange'
 const logger = debug('agents:msal')
@@ -204,13 +204,14 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   private getClientSecretClient (authConfig: AuthConfiguration): ConfidentialClientApplication {
+    const retryCount = normalizeMsalRetryCount(authConfig.msalRetryCount)
     const cacheKey = MsalTokenProvider.cacheKey(
       'confidential-client',
       AuthType.ClientSecret,
       authConfig.clientId,
       resolveAuthorityUtil(authConfig.authorityEndpoint ?? authConfig.authority, authConfig.tenantId),
       MsalTokenProvider.digest(authConfig.clientSecret),
-      authConfig.msalRetryCount ?? DEFAULT_MSAL_RETRY_COUNT
+      retryCount
     )
 
     return this.getOrCreateConfidentialClient(cacheKey, () => new ConfidentialClientApplication({
@@ -224,6 +225,7 @@ export class MsalTokenProvider implements AuthProvider {
   }
 
   private getCertificateClient (authConfig: AuthConfiguration): ConfidentialClientApplication {
+    const retryCount = normalizeMsalRetryCount(authConfig.msalRetryCount)
     const cacheKey = MsalTokenProvider.cacheKey(
       'confidential-client',
       authConfig.authType ?? AuthType.Certificate,
@@ -232,7 +234,7 @@ export class MsalTokenProvider implements AuthProvider {
       this.getFileCacheIdentity(authConfig.certPemFile),
       this.getFileCacheIdentity(authConfig.certKeyFile),
       authConfig.sendX5C,
-      authConfig.msalRetryCount ?? DEFAULT_MSAL_RETRY_COUNT
+      retryCount
     )
 
     return this.getOrCreateConfidentialClient(cacheKey, () => {
@@ -697,7 +699,7 @@ export class MsalTokenProvider implements AuthProvider {
   private getSystemOptions (authConfig?: AuthConfiguration): NodeSystemOptions {
     return {
       ...this.sysOptions,
-      networkClient: new MsalHttpRetryHandlerHelper(undefined, authConfig?.msalRetryCount)
+      networkClient: new MsalHttpRetryHandlerHelper(undefined, normalizeMsalRetryCount(authConfig?.msalRetryCount))
     }
   }
 
