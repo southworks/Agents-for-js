@@ -4,6 +4,7 @@ name: Scheduled Teams API Drift Detector
 # When the public API changes, it publishes deterministic artifacts and upserts an advisory issue.
 on:
   schedule:
+    # Runs at 08:00 UTC every Monday (~1am PST)
     - cron: '0 8 * * 1'
   workflow_dispatch:
 
