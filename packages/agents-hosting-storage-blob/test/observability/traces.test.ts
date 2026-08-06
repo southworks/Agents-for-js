@@ -1,0 +1,69 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+import { strict as assert } from 'assert'
+import { afterEach, describe, it } from 'node:test'
+import type { Span, TraceDefinition } from '@microsoft/agents-telemetry'
+import * as sinon from 'sinon'
+import { BlobsStorageMetrics } from '../../src/observability/metrics'
+import { BlobsStorageTraceDefinitions } from '../../src/observability/traces'
+
+const duration = 123
+
+interface TestSpan {
+  attributes: Record<string, unknown>
+  setAttributes(values: Record<string, unknown>): void
+}
+
+function createSpan (): TestSpan {
+  const attributes: Record<string, unknown> = {}
+  return { attributes, setAttributes: values => Object.assign(attributes, values) }
+}
+
+function endTrace<TRecord extends object> (definition: TraceDefinition<TRecord>, record: TRecord): TestSpan {
+  const span = createSpan()
+  definition.end({ span: span as unknown as Span, record, duration })
+  return span
+}
+
+function endTraceWithIncompleteRecord<TRecord extends object> (definition: TraceDefinition<TRecord>): TestSpan {
+  const span = createSpan()
+  definition.end({ span: span as unknown as Span, record: { keyCount: undefined } as TRecord, duration })
+  return span
+}
+
+describe('Blob storage trace definitions', () => {
+  afterEach(() => sinon.restore())
+
+  function assertStorageOperation (definition: TraceDefinition<{ keyCount: number }>, operation: string) {
+    const operationDuration = sinon.stub()
+    sinon.stub(BlobsStorageMetrics, 'storageOperationDuration').value({ record: operationDuration })
+    const expectedAttributes = { 'storage.operation': operation, 'storage.key.count': 3 }
+
+    const span = endTrace(definition, { keyCount: 3 })
+    assert.deepEqual(span.attributes, expectedAttributes)
+    sinon.assert.calledWithExactly(operationDuration, duration, expectedAttributes)
+
+    const defaultSpan = endTrace(definition, definition.record)
+    const zeroKeyCountAttributes = { 'storage.operation': operation, 'storage.key.count': 0 }
+    assert.deepEqual(defaultSpan.attributes, zeroKeyCountAttributes)
+    assert.deepEqual(operationDuration.getCall(1).args, [duration, zeroKeyCountAttributes])
+
+    const missingSpan = endTraceWithIncompleteRecord(definition)
+    assert.deepEqual(missingSpan.attributes, zeroKeyCountAttributes)
+    assert.deepEqual(operationDuration.getCall(2).args, [duration, zeroKeyCountAttributes])
+    sinon.assert.callCount(operationDuration, 3)
+  }
+
+  it('records read attributes, duration metric, defaults, and missing key counts', () => {
+    assertStorageOperation(BlobsStorageTraceDefinitions.read, 'read')
+  })
+
+  it('records write attributes, duration metric, defaults, and missing key counts', () => {
+    assertStorageOperation(BlobsStorageTraceDefinitions.write, 'write')
+  })
+
+  it('records delete attributes, duration metric, defaults, and missing key counts', () => {
+    assertStorageOperation(BlobsStorageTraceDefinitions.delete, 'delete')
+  })
+})
