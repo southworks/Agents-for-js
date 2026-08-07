@@ -13,10 +13,8 @@ const duration = 123
 
 type TraceSpan = Parameters<TraceDefinition<object, object>['end']>[0]['span']
 
-interface TestSpan {
+type TestSpan = TraceSpan & {
   attributes: Record<string, unknown>
-  setAttribute(name: string, value: unknown): void
-  setAttributes(values: Record<string, unknown>): void
 }
 
 function createSpan (): TestSpan {
@@ -24,13 +22,42 @@ function createSpan (): TestSpan {
 
   return {
     attributes,
+    spanContext () {
+      return {
+        traceId: '',
+        spanId: '',
+        traceFlags: 0,
+      }
+    },
     setAttribute (name, value) {
       attributes[name] = value
+      return this
     },
     setAttributes (values) {
       Object.assign(attributes, values)
+      return this
     },
-  }
+    addEvent () {
+      return this
+    },
+    addLink () {
+      return this
+    },
+    addLinks () {
+      return this
+    },
+    setStatus () {
+      return this
+    },
+    updateName () {
+      return this
+    },
+    end () {},
+    isRecording () {
+      return true
+    },
+    recordException () {},
+  } satisfies TestSpan
 }
 
 function endTrace<TRecord extends object, TActions extends object> (
@@ -38,7 +65,7 @@ function endTrace<TRecord extends object, TActions extends object> (
   record: TRecord
 ): TestSpan {
   const span = createSpan()
-  definition.end({ span: span as unknown as TraceSpan, record, duration })
+  definition.end({ span, record, duration })
   return span
 }
 
