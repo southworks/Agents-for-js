@@ -3,7 +3,8 @@
 
 import { strict as assert } from 'assert'
 import { afterEach, describe, it } from 'node:test'
-import type { Span, TraceDefinition } from '@microsoft/agents-telemetry'
+import type { Span } from '@opentelemetry/api'
+import type { TraceDefinition } from '@microsoft/agents-telemetry'
 import { Activity } from '@microsoft/agents-activity'
 import * as sinon from 'sinon'
 import { CopilotStudioClientMetrics } from '../../src/observability/metrics'
@@ -39,8 +40,8 @@ function createSpan (): TestSpan {
   }
 }
 
-function endTrace<TRecord extends object> (
-  definition: TraceDefinition<TRecord>,
+function endTrace<TRecord extends object, TActions extends object> (
+  definition: TraceDefinition<TRecord, TActions>,
   record: TRecord,
   error?: unknown
 ): TestSpan {
@@ -49,8 +50,8 @@ function endTrace<TRecord extends object> (
   return span
 }
 
-function endTraceWithIncompleteRecord<TRecord extends object> (
-  definition: TraceDefinition<TRecord>,
+function endTraceWithIncompleteRecord<TRecord extends object, TActions extends object> (
+  definition: TraceDefinition<TRecord, TActions>,
   record: Record<string, unknown>
 ): TestSpan {
   const span = createSpan()

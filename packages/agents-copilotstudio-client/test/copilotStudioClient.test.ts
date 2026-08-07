@@ -1525,7 +1525,7 @@ describe('UserAgentHelper', function () {
 
   it('should include platform info in Node.js', function () {
     const productInfo = UserAgentHelper.getProductInfo()
-    if (typeof window === 'undefined') {
+    if (!('window' in globalThis)) {
       assert(productInfo.includes('nodejs/'))
     }
   })
@@ -1704,7 +1704,7 @@ describe('subscribeAsync', function () {
 
     const conversationId = 'test-conversation-id'
 
-    const fetchMock = mock.fn(() => Promise.resolve(mockSubscribeFetchResponse([])))
+    const fetchMock = mock.fn((url: string | URL | Request) => Promise.resolve(mockSubscribeFetchResponse([])))
     global.fetch = fetchMock as any
 
     const events: SubscribeEvent[] = []
@@ -1731,7 +1731,8 @@ describe('subscribeAsync', function () {
 
     // Verify that the fetch was called with a URL ending in /subscribe
     assert(fetchMock.mock.calls.length > 0)
-    const callUrl = fetchMock.mock.calls[0].arguments[0]
-    assert(callUrl.includes('/subscribe'), `URL should contain /subscribe: ${callUrl}`)
+    const calls = fetchMock.mock.calls as unknown as Array<{ arguments: [string | URL | Request] }>
+    const callUrl = calls[0]?.arguments[0]
+    assert(String(callUrl).includes('/subscribe'), `URL should contain /subscribe: ${String(callUrl)}`)
   })
 })
