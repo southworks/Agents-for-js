@@ -74,7 +74,7 @@ describe('named pipe trace definitions', () => {
       pipeName: 'agents-pipe',
     })
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.pipe_name': 'agents-pipe',
     })
     sinon.assert.calledOnceWithExactly(connections, 1)
@@ -89,7 +89,7 @@ describe('named pipe trace definitions', () => {
       NamedPipeTraceDefinitions.connect.record
     )
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.pipe_name': '',
     })
     sinon.assert.calledOnceWithExactly(connections, 1)
@@ -107,7 +107,7 @@ describe('named pipe trace definitions', () => {
       'request.path': '/api/messages',
     }
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.request.verb': 'POST',
       'agents.named_pipe.request.path': '/api/messages',
       'agents.named_pipe.response.status_code': 202,
@@ -127,7 +127,7 @@ describe('named pipe trace definitions', () => {
       'request.path': '',
     }
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.request.verb': '',
       'agents.named_pipe.request.path': '',
       'agents.named_pipe.response.status_code': 0,
@@ -148,7 +148,7 @@ describe('named pipe trace definitions', () => {
       'request.path': '/api/messages',
     }
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.request.verb': 'POST',
       'agents.named_pipe.request.path': '/api/messages',
       'agents.named_pipe.response.status_code': 500,
@@ -171,7 +171,7 @@ describe('named pipe trace definitions', () => {
       'request.path': '/api/messages',
     }
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.request.verb': 'GET',
       'agents.named_pipe.request.path': '/api/messages',
       'agents.named_pipe.response.status_code': 500,
@@ -193,7 +193,7 @@ describe('named pipe trace definitions', () => {
       bodySize: 512,
     })
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.response.status_code': 202,
       'agents.named_pipe.response.body_size': 512,
     })
@@ -212,7 +212,7 @@ describe('named pipe trace definitions', () => {
       NamedPipeTraceDefinitions.send.record
     )
 
-    assert.deepEqual(span.attributes, {
+    assert.deepStrictEqual(span.attributes, {
       'agents.named_pipe.response.status_code': 0,
       'agents.named_pipe.response.body_size': 0,
     })
