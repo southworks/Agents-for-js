@@ -3,7 +3,6 @@
 
 import { strict as assert } from 'assert'
 import { afterEach, describe, it } from 'node:test'
-import type { Span } from '@opentelemetry/api'
 import type { TraceDefinition } from '@microsoft/agents-telemetry'
 import { Activity } from '@microsoft/agents-activity'
 import * as sinon from 'sinon'
@@ -16,9 +15,17 @@ const duration = 123
 interface TestSpan {
   attributes: Record<string, unknown>
   events: Array<{ name: string, attributes: Record<string, unknown> }>
-  setAttribute(name: string, value: unknown): void
-  setAttributes(values: Record<string, unknown>): void
-  addEvent(name: string, attributes: Record<string, unknown>): void
+  spanContext(): { traceId: string, spanId: string, traceFlags: number }
+  setAttribute(name: string, value: unknown): this
+  setAttributes(values: Record<string, unknown>): this
+  addEvent(name: string, attributes?: unknown, startTime?: unknown): this
+  addLink(link: unknown): this
+  addLinks(links: unknown[]): this
+  setStatus(status: unknown): this
+  updateName(name: string): this
+  end(endTime?: unknown): void
+  isRecording(): boolean
+  recordException(exception: unknown, time?: unknown): void
 }
 
 function createSpan (): TestSpan {
@@ -28,15 +35,38 @@ function createSpan (): TestSpan {
   return {
     attributes,
     events,
+    spanContext () {
+      return { traceId: '', spanId: '', traceFlags: 0 }
+    },
     setAttribute (name, value) {
       attributes[name] = value
+      return this
     },
     setAttributes (values) {
       Object.assign(attributes, values)
+      return this
     },
     addEvent (name, values) {
-      events.push({ name, attributes: values })
+      events.push({ name, attributes: (values ?? {}) as Record<string, unknown> })
+      return this
     },
+    addLink () {
+      return this
+    },
+    addLinks () {
+      return this
+    },
+    setStatus () {
+      return this
+    },
+    updateName () {
+      return this
+    },
+    end () {},
+    isRecording () {
+      return true
+    },
+    recordException () {},
   }
 }
 
@@ -46,7 +76,7 @@ function endTrace<TRecord extends object, TActions extends object> (
   error?: unknown
 ): TestSpan {
   const span = createSpan()
-  definition.end({ span: span as unknown as Span, record, duration, error })
+  definition.end({ span: span as unknown as TestSpan, record, duration, error })
   return span
 }
 
@@ -55,7 +85,7 @@ function endTraceWithIncompleteRecord<TRecord extends object, TActions extends o
   record: Record<string, unknown>
 ): TestSpan {
   const span = createSpan()
-  definition.end({ span: span as unknown as Span, record: record as TRecord, duration })
+  definition.end({ span: span as unknown as TestSpan, record: record as TRecord, duration })
   return span
 }
 
@@ -70,7 +100,7 @@ describe('Copilot Studio client trace definitions', () => {
     const connections = sinon.stub()
     sinon.stub(CopilotStudioClientMetrics, 'webchatConnectionsCounter').value({ add: connections })
     const span = createSpan()
-    const actions = CopilotStudioClientTraceDefinitions.createConnection.actions!({ span: span as unknown as Span })
+    const actions = CopilotStudioClientTraceDefinitions.createConnection.actions!({ span: span as unknown as TestSpan })
     const activity = Activity.fromObject({ type: 'message', conversation: { id: 'conversation-id' } })
 
     actions.receivedFromCopilot(activity)
@@ -95,7 +125,7 @@ describe('Copilot Studio client trace definitions', () => {
     sinon.stub(CopilotStudioClientMetrics, 'requestsErrorCounter').value({ add: requestErrors })
     sinon.stub(CopilotStudioClientMetrics, 'streamDuration').value({ record: streamDuration })
     const span = createSpan()
-    const actions = CopilotStudioClientTraceDefinitions.postRequest.actions!({ span: span as unknown as Span })
+    const actions = CopilotStudioClientTraceDefinitions.postRequest.actions!({ span: span as unknown as TestSpan })
     actions.receivedFromCopilot(Activity.fromObject({ type: 'message', conversation: { id: 'conversation-id' } }))
 
     const endedSpan = endTrace(CopilotStudioClientTraceDefinitions.postRequest, {
@@ -189,7 +219,7 @@ describe('Copilot Studio client trace definitions', () => {
     sinon.stub(CopilotStudioClientMetrics, 'subscribeAsyncCounter').value({ add: subscriptions })
     sinon.stub(CopilotStudioClientMetrics, 'streamDuration').value({ record: streamDuration })
     const span = createSpan()
-    const actions = CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span: span as unknown as Span })
+    const actions = CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span: span as unknown as TestSpan })
     const event: SubscribeEvent = { eventId: 'event-id', activity: Activity.fromObject({ type: 'message' }) }
     actions.eventReceivedFromCopilot(event)
 
@@ -235,11 +265,11 @@ describe('Copilot Studio client trace definitions', () => {
     const activity = Activity.fromObject({ type: 'message' })
 
     const connectionSpan = createSpan()
-    CopilotStudioClientTraceDefinitions.createConnection.actions!({ span: connectionSpan as unknown as Span }).receivedFromCopilot(activity)
+    CopilotStudioClientTraceDefinitions.createConnection.actions!({ span: connectionSpan as unknown as TestSpan }).receivedFromCopilot(activity)
     const requestSpan = createSpan()
-    CopilotStudioClientTraceDefinitions.postRequest.actions!({ span: requestSpan as unknown as Span }).receivedFromCopilot(activity)
+    CopilotStudioClientTraceDefinitions.postRequest.actions!({ span: requestSpan as unknown as TestSpan }).receivedFromCopilot(activity)
     const subscriptionSpan = createSpan()
-    CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span: subscriptionSpan as unknown as Span }).eventReceivedFromCopilot({ activity })
+    CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span: subscriptionSpan as unknown as TestSpan }).eventReceivedFromCopilot({ activity })
 
     assert.deepEqual(connectionSpan.events[0].attributes, { 'copilot.webchat.activity.type': 'message', 'copilot.webchat.activity.conversation_id': 'unknown' })
     assert.deepEqual(requestSpan.events[0].attributes, { 'copilot.post_request.activity.type': 'message', 'copilot.post_request.activity.conversation_id': 'unknown' })
@@ -291,7 +321,7 @@ describe('Copilot Studio client trace definitions', () => {
     const execution = endTrace(CopilotStudioClientTraceDefinitions.executeStreaming, CopilotStudioClientTraceDefinitions.executeStreaming.record)
     const subscription = endTrace(CopilotStudioClientTraceDefinitions.subscribeAsync, CopilotStudioClientTraceDefinitions.subscribeAsync.record)
     const actionSpan = createSpan()
-    CopilotStudioClientTraceDefinitions.createConnection.actions!({ span: actionSpan as unknown as Span }).sentToWebChat(Activity.fromObject({ type: 'message' }))
+    CopilotStudioClientTraceDefinitions.createConnection.actions!({ span: actionSpan as unknown as TestSpan }).sentToWebChat(Activity.fromObject({ type: 'message' }))
 
     assert.deepEqual(connection.attributes, { 'copilot.webchat.show_typing': false })
     assert.deepEqual(request.attributes, { 'copilot.post_request.url': '', 'copilot.post_request.method': '' })
