@@ -1,12 +1,12 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { strict as assert } from 'assert'
+import assert from 'node:assert'
 import { afterEach, describe, it } from 'node:test'
 import type { TraceDefinition } from '@microsoft/agents-telemetry'
 import * as sinon from 'sinon'
-import { NamedPipeMetrics } from '../../src/observability/metrics'
-import { NamedPipeTraceDefinitions } from '../../src/observability/traces'
+import { NamedPipeMetrics } from '../../src/observability/metrics.js'
+import { NamedPipeTraceDefinitions } from '../../src/observability/traces.js'
 
 const duration = 123
 
