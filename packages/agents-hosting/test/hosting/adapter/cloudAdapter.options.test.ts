@@ -4,12 +4,14 @@
 import { strict as assert } from 'assert'
 import { afterEach, describe, it } from 'node:test'
 import sinon from 'sinon'
-import { Activity, ActivityTypes } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes, ConversationParameters, ConversationReference } from '@microsoft/agents-activity'
 import {
   AuthConfiguration,
   CloudAdapter,
   CloudAdapterOptions,
   MsalConnectionManager,
+  OutboundUrlPolicy,
+  OutboundHostValidator,
   Request,
   TurnContext,
   UserTokenClient
@@ -35,12 +37,12 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
   // --- Test scaffolding ----------------------------------------------------
 
-  function buildAdapter (options?: CloudAdapterOptions) {
+  function buildAdapter (options?: CloudAdapterOptions, outboundHostValidator?: OutboundUrlPolicy) {
     const mockConnectorClient = sinon.createStubInstance(ConnectorClient)
     const mockConnectionManager = sinon.createStubInstance(MsalConnectionManager)
     const mockUserTokenClient = sinon.createStubInstance(UserTokenClient)
 
-    const adapter = new CloudAdapter(authentication, undefined, undefined, options)
+    const adapter = new CloudAdapter(authentication, undefined, undefined, options, outboundHostValidator)
     const adapterAny = adapter as any
     adapterAny.connectionManager = mockConnectionManager
     sinon.stub(adapterAny, 'createConnectorClient').returns(mockConnectorClient)
@@ -303,6 +305,114 @@ describe('CloudAdapter options (PR #838 parity)', () => {
         if (prev === undefined) delete process.env.CloudAdapterOptions__VALIDATESERVICEURL
         else process.env.CloudAdapterOptions__VALIDATESERVICEURL = prev
       }
+    })
+  })
+
+  describe('outboundHostValidator', () => {
+    it('rejects a disallowed ServiceUrl even when there is no serviceurl claim', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://evil.example.com/relay/')
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+
+      await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
+
+      sinon.assert.calledWith((res as any).status, 400)
+    })
+
+    it('allows a built-in Microsoft ServiceUrl', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://smba.trafficmanager.net/teams/')
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+
+      await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
+
+      sinon.assert.neverCalledWith((res as any).status, 400)
+    })
+
+    it('allows a configured ServiceUrl host', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true, hosts: ['contoso.com'] }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://callback.contoso.com/api/')
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+
+      await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
+
+      sinon.assert.neverCalledWith((res as any).status, 400)
+    })
+
+    it('preserves existing behavior when the validator is disabled', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: false }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://evil.example.com/relay/')
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+
+      await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
+
+      sinon.assert.neverCalledWith((res as any).status, 400)
+    })
+
+    it('enforces serviceurl claim matching when the validator is enabled', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://smba.trafficmanager.net/teams/')
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+
+      await adapter.process(buildReq({ serviceurl: 'https://graph.microsoft.com/callback/' } as any), res as Response, async () => {})
+
+      sinon.assert.calledWith((res as any).status, 400)
+    })
+
+    it('rejects a disallowed continuation ServiceUrl before creating a connector client', async () => {
+      const adapter = new CloudAdapter(
+        authentication,
+        undefined,
+        undefined,
+        undefined,
+        new OutboundHostValidator({ enabled: true })
+      )
+      const reference: ConversationReference = {
+        activityId: 'activity-id',
+        user: { id: 'user-id' },
+        agent: { id: 'agent-id' },
+        conversation: { id: 'conversation-id' },
+        channelId: 'msteams',
+        serviceUrl: 'https://evil.example.com/relay/'
+      }
+
+      await assert.rejects(
+        adapter.continueConversation('clientId', reference, async () => {}),
+        /serviceUrl host is not in the configured allowed hosts/
+      )
+    })
+
+    it('rejects a disallowed create-conversation ServiceUrl before creating a connector client', async () => {
+      const adapter = new CloudAdapter(
+        authentication,
+        undefined,
+        undefined,
+        undefined,
+        new OutboundHostValidator({ enabled: true })
+      )
+      const parameters: ConversationParameters = {
+        members: [{ id: 'user-id' }],
+        isGroup: false,
+        activity: new Activity(ActivityTypes.Message),
+        channelData: undefined
+      }
+
+      await assert.rejects(
+        adapter.createConversationAsync(
+          'agentAppId',
+          'msteams',
+          'https://evil.example.com/relay/',
+          'audience',
+          parameters,
+          async () => {}
+        ),
+        /serviceUrl host is not in the configured allowed hosts/
+      )
     })
   })
 

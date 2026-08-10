@@ -28,6 +28,48 @@ exposes framework-agnostic primitives that the
 Most consumers should keep using `startServer`/`createAgentRequestHandler` from the
 Express or Fastify packages; reach for these APIs when adapting another framework.
 
+## Outbound request host validation
+
+`OutboundHostValidator` provides an opt-in allowlist for server-side requests made
+to activity service URLs and attachment URLs. Enforcement is disabled by default.
+It can be configured with environment variables:
+
+```dotenv
+OutboundHostValidator__Enabled=true
+OutboundHostValidator__IncludeDefaultMicrosoftHosts=true
+OutboundHostValidator__Hosts=contoso.com,fabrikam.com
+```
+
+Indexed host variables such as `OutboundHostValidator__Hosts__0=contoso.com` are
+also supported. A host entry matches both the exact host and its subdomains.
+
+For explicit configuration, reuse the same immutable policy in the adapter and
+attachment downloaders:
+
+```ts
+import {
+  AgentApplication,
+  AttachmentDownloader,
+  CloudAdapter,
+  OutboundHostValidator
+} from '@microsoft/agents-hosting'
+
+const outboundHostValidator = new OutboundHostValidator({
+  enabled: true,
+  hosts: ['contoso.com']
+})
+
+const adapter = new CloudAdapter(undefined, undefined, undefined, undefined, outboundHostValidator)
+
+const agent = new AgentApplication({
+  adapter,
+  fileDownloaders: [new AttachmentDownloader('inputFiles', outboundHostValidator)]
+})
+```
+
+The validator checks the URL supplied to the downloader. Redirects retain native
+`fetch` behavior.
+
 ## Example Usage based on the AgentApplication object
 
 ```ts

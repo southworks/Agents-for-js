@@ -32,6 +32,7 @@ import { parseBooleanEnv, suggestClosest } from './utils/env'
 import { trace } from '@microsoft/agents-telemetry'
 import { AdapterTraceDefinitions } from './observability'
 import { applyAgenticHeaders } from './getProductInfo'
+import { createOutboundHostValidator, OutboundUrlPolicy } from './outboundHostValidator'
 
 const logger = debug('agents:cloud-adapter')
 
@@ -80,6 +81,9 @@ export interface CloudAdapterOptions {
    * for one service URL tries to send activities targeting a different one.
    *
    * Env var: `CloudAdapterOptions__validateServiceUrl`.
+   *
+   * @deprecated Configure {@link OutboundUrlPolicy} instead. This option
+   * remains available for backward compatibility with claim-only validation.
    */
   validateServiceUrl?: boolean
 }
@@ -246,6 +250,7 @@ export class CloudAdapter extends BaseAdapter {
   connectionManager: Connections
 
   private readonly _options: Required<CloudAdapterOptions>
+  private readonly _hostValidator: OutboundUrlPolicy
 
   /**
    * Creates an instance of CloudAdapter.
@@ -253,12 +258,16 @@ export class CloudAdapter extends BaseAdapter {
    * @param authProvider - No longer used.
    * @param userTokenClient - No longer used.
    * @param options - Optional runtime behavior overrides. See {@link CloudAdapterOptions}.
+   * @param outboundHostValidator - Optional policy for validating outbound `Activity.serviceUrl` hosts.
+   * When omitted, the policy is loaded from `OutboundHostValidator__*` environment variables
+   * and remains disabled by default.
    */
-  constructor (authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient, options?: CloudAdapterOptions) {
+  constructor (authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient, options?: CloudAdapterOptions, outboundHostValidator?: OutboundUrlPolicy) {
     super()
     this.authConfig = authConfig = getAuthConfigWithDefaults(authConfig)
     this.connectionManager = new MsalConnectionManager(undefined, undefined, authConfig)
     this._options = resolveCloudAdapterOptions(options)
+    this._hostValidator = outboundHostValidator ?? createOutboundHostValidator()
 
     // Install a CloudAdapter-aware default `onTurnError` that honors
     // `emitStackTrace`. The base class default only logs the message; we
@@ -321,6 +330,8 @@ export class CloudAdapter extends BaseAdapter {
     identity: JwtPayload,
     headers?: HeaderPropagationCollection
   ): Promise<ConnectorClient> {
+    this.ensureOutboundServiceUrlAllowed(serviceUrl)
+
     return trace(AdapterTraceDefinitions.createConnectorClient, async ({ record }) => {
       record({ serviceUrl, scopes: [scope] })
 
@@ -349,6 +360,8 @@ export class CloudAdapter extends BaseAdapter {
     identity: JwtPayload,
     activity: Activity,
     headers?: HeaderPropagationCollection) {
+    this.ensureOutboundServiceUrlAllowed(activity.serviceUrl)
+
     return trace(AdapterTraceDefinitions.createConnectorClient, async ({ record }) => {
       if (!identity?.aud) {
         // anonymous
@@ -692,6 +705,8 @@ export class CloudAdapter extends BaseAdapter {
    * should be rejected with a 400.
    */
   private validateServiceUrl (identity: JwtPayload | undefined, activity: Activity): boolean {
+    if (!this.isOutboundServiceUrlAllowed(activity.serviceUrl)) return false
+
     if (!identity) return true
     if (!activity.serviceUrl) return true
 
@@ -709,12 +724,29 @@ export class CloudAdapter extends BaseAdapter {
 
     const safeClaim = sanitizeForLog(claimValue)
     const safeServiceUrl = sanitizeForLog(activity.serviceUrl)
-    if (this._options.validateServiceUrl) {
+    if (this._hostValidator.enabled || this._options.validateServiceUrl) {
       logger.error(`Invalid service URL Claim='${safeClaim}', ServiceUrl='${safeServiceUrl}'`)
       return false
     }
     logger.warn(`Invalid service URL Claim='${safeClaim}', ServiceUrl='${safeServiceUrl}'`)
     return true
+  }
+
+  /**
+   * Applies the shared outbound host policy.
+   */
+  private isOutboundServiceUrlAllowed (serviceUrl: string | undefined): boolean {
+    if (!this._hostValidator.enabled || !serviceUrl || this._hostValidator.isAllowed(serviceUrl)) return true
+
+    logger.warn(`ServiceUrl host is not in the configured allowed hosts. ServiceUrl='${sanitizeForLog(serviceUrl)}'`)
+    return false
+  }
+
+  /** Ensures connector-client creation cannot bypass the outbound host policy. */
+  private ensureOutboundServiceUrlAllowed (serviceUrl: string | undefined): void {
+    if (!this.isOutboundServiceUrlAllowed(serviceUrl)) {
+      throw ExceptionHelper.generateException(Error, Errors.OutboundServiceUrlNotAllowed)
+    }
   }
 
   /**

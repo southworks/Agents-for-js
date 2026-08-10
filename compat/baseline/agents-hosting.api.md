@@ -366,7 +366,7 @@ export interface AttachmentData {
 
 // @public
 export class AttachmentDownloader<TState extends TurnState = TurnState> implements InputFileDownloader<TState> {
-    constructor(stateKey?: string);
+    constructor(stateKey?: string, outboundHostValidator?: OutboundUrlPolicy);
     downloadAndStoreFiles(context: TurnContext, state: TState): Promise<void>;
     downloadFiles(context: TurnContext): Promise<InputFile[]>;
 }
@@ -542,7 +542,7 @@ export function clearJwksClients(): void;
 
 // @public (undocumented)
 export class CloudAdapter extends BaseAdapter {
-    constructor(authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient, options?: CloudAdapterOptions);
+    constructor(authConfig?: AuthConfiguration, authProvider?: AuthProvider, userTokenClient?: UserTokenClient, options?: CloudAdapterOptions, outboundHostValidator?: OutboundUrlPolicy);
     // (undocumented)
     protected _agentName?: string;
     // (undocumented)
@@ -577,6 +577,7 @@ export class CloudAdapter extends BaseAdapter {
 // @public
 export interface CloudAdapterOptions {
     emitStackTrace?: boolean;
+    // @deprecated
     validateServiceUrl?: boolean;
 }
 
@@ -799,6 +800,9 @@ export class CreateConversationOptionsBuilder {
 }
 
 // @public
+export function createOutboundHostValidator(options?: OutboundHostValidatorOptions): OutboundHostValidator;
+
+// @public
 export interface CustomKey {
     channelId: string;
     conversationId: string;
@@ -992,11 +996,14 @@ export interface InvokeResponse<T = any> {
 export const loadAuthConfigFromEnv: (cnxName?: string) => AuthConfiguration;
 
 // @public
+export function loadOutboundHostValidatorOptionsFromEnv(): OutboundHostValidatorOptions;
+
+// @public
 export const loadPrevAuthConfigFromEnv: () => AuthConfiguration;
 
 // @public
 export class M365AttachmentDownloader<TState extends TurnState = TurnState> implements InputFileDownloader<TState> {
-    constructor(stateKey?: string);
+    constructor(stateKey?: string, outboundHostValidator?: OutboundUrlPolicy);
     downloadAndStoreFiles(context: TurnContext, state: TState): Promise<void>;
     downloadFiles(context: TurnContext): Promise<InputFile[]>;
 }
@@ -1154,6 +1161,30 @@ export interface OAuthCard {
     text: string;
     tokenExchangeResource: TokenExchangeResource;
     tokenPostResource: TokenPostResource;
+}
+
+// @public
+export class OutboundHostValidator implements OutboundUrlPolicy {
+    constructor(options?: OutboundHostValidatorOptions);
+    // (undocumented)
+    readonly enabled: boolean;
+    // (undocumented)
+    isAllowed(input: string | URL | null | undefined): boolean;
+}
+
+// @public
+export interface OutboundHostValidatorOptions {
+    enabled?: boolean;
+    hosts?: readonly string[];
+    includeDefaultMicrosoftHosts?: boolean;
+}
+
+// @public
+export interface OutboundUrlPolicy {
+    // (undocumented)
+    readonly enabled: boolean;
+    // (undocumented)
+    isAllowed(url: string | URL | null | undefined): boolean;
 }
 
 // @public
