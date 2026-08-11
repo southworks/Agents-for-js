@@ -41,7 +41,12 @@ OutboundHostValidator__Hosts=contoso.com,fabrikam.com
 ```
 
 Indexed host variables such as `OutboundHostValidator__Hosts__0=contoso.com` are
-also supported. A host entry matches both the exact host and its subdomains.
+also supported. A host entry matches both the exact host and its subdomains, and
+is normalized (scheme/port/path stripped; a leading `*.` is accepted and ignored).
+
+When enforcement is enabled, `CloudAdapter` rejects inbound activities whose
+`serviceUrl` host is not allowlisted, and it also rejects `serviceurl` claim
+mismatches (equivalent to `CloudAdapterOptions.validateServiceUrl=true`).
 
 For explicit configuration, reuse the same immutable policy in the adapter and
 attachment downloaders:

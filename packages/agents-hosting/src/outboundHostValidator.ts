@@ -33,9 +33,9 @@ export interface OutboundHostValidatorOptions {
   includeDefaultMicrosoftHosts?: boolean
 
   /** Additional exact hosts or host suffixes to allow.
-   * An entry matches a request host when the host equals the entry or is a subdomain of it (e.g. <c>contoso.com</c> matches <c>contoso.com</c> and <c>files.contoso.com</c>).
-   * A leading <c>*.</c> is accepted and ignored (treated as a suffix).
-  */
+   * An entry matches a request host when the host equals the entry or is a subdomain of it (e.g. `contoso.com` matches `contoso.com` and `files.contoso.com`).
+   * A leading `*.` is accepted and ignored (treated as a suffix). Ports and paths are ignored if provided.
+   */
   hosts?: readonly string[]
 }
 
