@@ -235,6 +235,10 @@ export class StreamingResponse {
     this.clearStreamTimers()
 
     if (!this.isStreamingChannel) {
+      // A failed streaming send may still be updating the timed-out activity.
+      // Preserve ordering so that the completed response is always the last update.
+      await this.waitForQueue()
+
       if (this._streamTimeoutNotificationSent && !this._message && !this._finalMessage && !this._attachments?.length) {
         return StreamingResponseResult.Success
       }
@@ -253,6 +257,13 @@ export class StreamingResponse {
 
     // Wait for the queue to drain
     await this.waitForQueue()
+
+    // The final streaming send itself can report that the channel timed out. In
+    // that case the queued final activity is discarded and must be applied as
+    // an update after the timeout recovery has completed.
+    if (this._streamTimedOut) {
+      await this.updateActivity(this.createFinalMessage())
+    }
     return StreamingResponseResult.Success
   }
 
@@ -552,7 +563,7 @@ export class StreamingResponse {
       ? `${this._message}\n\n${this.streamingTakingTooLongMessage}\n`
       : this.streamingTakingTooLongMessage
     const activity = Activity.fromObject({
-      type: addStreamFinal ? 'message' : (this.isM365Copilot() ? 'typing' : 'message'),
+      type: 'message',
       text,
       entities: []
     })
@@ -569,15 +580,29 @@ export class StreamingResponse {
         streamResult: this._message ? 'success' : 'error',
         streamSequence: this._nextSequence++
       })
-    } else if (this.isM365Copilot()) {
-      activity.entities!.push({
-        type: 'streaminfo',
-        streamType: 'streaming',
-        streamSequence: this._nextSequence++
-      })
     }
 
     return activity
+  }
+
+  /**
+   * Creates the last streaming update sent before proactively finalizing an
+   * M365 Copilot stream.
+   */
+  private createStreamTimedOutStreamingUpdate (): Activity {
+    const text = this._message
+      ? `${this._message}\n\n${this.streamingTakingTooLongMessage}\n`
+      : this.streamingTakingTooLongMessage
+
+    return Activity.fromObject({
+      type: 'typing',
+      text,
+      entities: [{
+        type: 'streaminfo',
+        streamType: 'streaming',
+        streamSequence: this._nextSequence++
+      }]
+    })
   }
 
   /**
@@ -590,16 +615,13 @@ export class StreamingResponse {
   private async sendActivity (activity: Activity): Promise<void> {
     this.startStreamTimers()
 
-    // Set activity ID to the assigned stream ID
-    if (this._streamId) {
+    // Only streaming activities should carry stream metadata. Once streaming
+    // has stopped, the completed response must be sent as an independent
+    // message without an orphaned streamId entity.
+    const streamInfo = activity.entities?.find(entity => entity.type?.toLowerCase() === 'streaminfo')
+    if (this._streamId && streamInfo) {
       activity.id = this._streamId
-      if (!activity.entities) {
-        activity.entities = []
-      }
-      if (!activity.entities[0]) {
-        activity.entities[0] = {} as Entity
-      }
-      activity.entities[0].streamId = this._streamId
+      streamInfo.streamId = this._streamId
     }
 
     if (this._citations && this._citations.length > 0 && !this._ended) {
@@ -637,10 +659,11 @@ export class StreamingResponse {
       }
       await new Promise((resolve) => setTimeout(resolve, this.delayInMs))
     } catch (error) {
-      const { message } = error as Error
+      const message = error instanceof Error ? error.message : String(error)
       this._canceled = true
-      this._queueSync = undefined
       this._queue = []
+      this._chunkQueued = false
+      this.clearStreamTimers()
 
       // MS Teams code list: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/streaming-ux?tabs=jsts#error-codes
       const normalizedMessage = message.toLowerCase()
@@ -649,16 +672,16 @@ export class StreamingResponse {
         this._streamTimedOut = true
         this._canceled = false
         this._isStreamingChannel = false
-        this._chunkQueued = false
-        this.clearStreamTimers()
         await this.updateActivity(this.createStreamTimedOutMessage())
       } else if (normalizedMessage.includes('contentstreamnotallowed')) {
         logger.warn('Streaming content is not allowed by the client side.', { originalError: message })
         this._userCanceled = true
-      } else if (message.includes('BadArgument') && message.toLowerCase().includes('streaming api is not enabled')) {
+      } else if (normalizedMessage.includes('badargument') && normalizedMessage.includes('streaming api is not enabled')) {
         logger.warn('Interaction does not support streaming. Defaulting to non-streaming response.', { originalError: message })
         this._canceled = false
         this._isStreamingChannel = false
+      } else {
+        logger.error('Exception during StreamingResponse sendActivity.', { originalError: message })
       }
     }
   }
@@ -721,8 +744,13 @@ export class StreamingResponse {
       return
     }
 
+    logger.warn('M365 Copilot streaming response reached the maximum duration. Finalizing the stream and continuing in non-streaming mode.', {
+      streamId: this._streamId,
+      elapsedMs: this._streamStartedAt === undefined ? undefined : Date.now() - this._streamStartedAt
+    })
+
     const timedOutActivities = this._message
-      ? [this.createStreamTimedOutMessage(), this.createStreamTimedOutMessage(true)]
+      ? [this.createStreamTimedOutStreamingUpdate(), this.createStreamTimedOutMessage(true)]
       : [this.createStreamTimedOutMessage(true)]
 
     this._streamTimeoutNotificationSent = true
@@ -731,9 +759,13 @@ export class StreamingResponse {
     this._chunkQueued = false
     this.clearStreamTimers()
 
+    // Queue these behind any in-flight send. Clearing pending activities and
+    // using the same drain prevents out-of-order stream sequences.
     for (const activity of timedOutActivities) {
-      await this.sendActivity(activity)
+      this.queueActivity(() => activity)
     }
+
+    await this.waitForQueue()
   }
 
   /**
@@ -751,7 +783,7 @@ export class StreamingResponse {
   }
 
   private isM365Copilot (): boolean {
-    return this._context.activity.channelId === Channels.M365Copilot
+    return this._context.activity.channelId?.toLocaleLowerCase() === Channels.M365Copilot.toLocaleLowerCase()
   }
 
   /**

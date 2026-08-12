@@ -405,21 +405,46 @@ describe('StreamingResponse', () => {
     streamingResponse.queueInformativeUpdate('Starting...')
     await clock.tickAsync(500)
     streamingResponse.queueTextChunk('Completed response text.')
+
+    // End immediately, as real callers do after queueing their final chunk.
+    // The timeout response arrives while endStream is waiting for the queue.
+    const endPromise = streamingResponse.endStream()
     await clock.tickAsync(500)
 
     assert.equal(streamingResponse.isStreamingChannel, false)
-    sinon.assert.calledOnce(mockContext.updateActivity)
-    const checkpoint = mockContext.updateActivity.firstCall.args[0] as Activity
-    assert.equal(checkpoint.id, 'test-stream-id')
-    assert.match(checkpoint.text!, /taking longer than expected/)
-
-    const result = await streamingResponse.endStream()
+    const result = await endPromise
 
     assert.equal(result, StreamingResponseResult.Success)
     sinon.assert.calledTwice(mockContext.updateActivity)
+    const checkpoint = mockContext.updateActivity.firstCall.args[0] as Activity
+    assert.equal(checkpoint.id, 'test-stream-id')
+    assert.equal(checkpoint.type, 'message')
+    assert.match(checkpoint.text!, /taking longer than expected/)
+
     const finalActivity = mockContext.updateActivity.secondCall.args[0] as Activity
     assert.equal(finalActivity.id, 'test-stream-id')
+    assert.equal(finalActivity.type, 'message')
     assert.equal(finalActivity.text, 'Completed response text.')
+  })
+
+  it('should preserve an M365 Copilot message when the channel streaming timeout is reported', async () => {
+    mockContext = createContext({ channelId: 'msteams:copilot' })
+    mockContext.sendActivity.onSecondCall().rejects(
+      new Error('ContentStreamNotAllowed: Content stream finished due to exceeded streaming time.')
+    )
+    streamingResponse = new StreamingResponse(mockContext)
+
+    streamingResponse.queueInformativeUpdate('Starting...')
+    await clock.tickAsync(1000)
+    streamingResponse.queueTextChunk('Completed response text.')
+    const endPromise = streamingResponse.endStream()
+    await clock.tickAsync(1000)
+
+    assert.equal(await endPromise, StreamingResponseResult.Success)
+    sinon.assert.calledTwice(mockContext.updateActivity)
+    assert.equal((mockContext.updateActivity.firstCall.args[0] as Activity).type, 'message')
+    assert.equal((mockContext.updateActivity.secondCall.args[0] as Activity).type, 'message')
+    assert.equal((mockContext.updateActivity.secondCall.args[0] as Activity).text, 'Completed response text.')
   })
 
   it('should stop streaming after a timeout notification and send the completed response normally', async () => {
@@ -442,11 +467,11 @@ describe('StreamingResponse', () => {
 
     const finalActivity = mockContext.sendActivity.thirdCall.args[0] as Activity
     assert.equal(finalActivity.text, 'Completed response text.')
-    assert.equal(finalActivity.entities?.some(entity => entity.type === 'streaminfo'), false)
+    assert.deepEqual(finalActivity.entities, [])
   })
 
   it('should send a keep-alive informative update for an idle M365 Copilot stream', async () => {
-    mockContext = createContext({ channelId: Channels.M365Copilot })
+    mockContext = createContext({ channelId: 'msteams:copilot' })
     streamingResponse = new StreamingResponse(mockContext)
     streamingResponse.streamingTakingTooLongMessage = 'Still working...'
 
@@ -482,7 +507,7 @@ describe('StreamingResponse', () => {
 
     const finalActivity = mockContext.sendActivity.lastCall.args[0] as Activity
     assert.equal(finalActivity.text, 'Buffered response complete.')
-    assert.equal(finalActivity.entities?.some(entity => entity.type === 'streaminfo'), false)
+    assert.deepEqual(finalActivity.entities, [])
   })
 
   it('should send one activity for non-streaming channels', async () => {
