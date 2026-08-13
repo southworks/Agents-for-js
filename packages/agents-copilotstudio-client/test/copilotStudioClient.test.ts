@@ -244,7 +244,7 @@ describe('CopilotStudioClient', function () {
       assert.equal(activities[0].conversation?.id, 'not-expected-conversation-id')
       assert.equal(client['conversationId'], expectedConversationId)
     })
-    
+
     it('should throw sanitized error for non-2xx start response', async function () {
       const settings = createTestSettings()
       const client = new CopilotStudioClient(settings, 'test-token')
