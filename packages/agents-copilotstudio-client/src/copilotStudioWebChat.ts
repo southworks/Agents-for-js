@@ -9,7 +9,7 @@ import { Activity, Attachment, ConversationAccount, ExceptionHelper } from '@mic
 import { Observable, BehaviorSubject, type Subscriber } from 'rxjs'
 
 import { CopilotStudioClient } from './copilotStudioClient'
-import { debug, trace, redactString } from '@microsoft/agents-telemetry'
+import { debug, pseudonymizeConversationId, redactDiagnosticObject, redactUrl, trace } from '@microsoft/agents-telemetry'
 import { CopilotStudioClientTraceDefinitions } from './observability'
 import { Errors } from './errorHelper'
 
@@ -270,7 +270,7 @@ export class CopilotStudioWebChat {
 
       logger.info('Copilot Studio WebChat settings loaded', {
         showTyping: settings?.showTyping,
-        conversationId: redactString(normalizedConversationId, true),
+        conversationId: pseudonymizeConversationId(normalizedConversationId, client.diagnosticsPseudonymKey),
         startConversation: settings?.startConversation,
         connectionMode: normalizedConversationId ? 'resume' : 'new',
         acknowledgementMode: shouldStart ? 'startConversationStreaming' : 'resumeWithoutStart',
@@ -280,6 +280,7 @@ export class CopilotStudioWebChat {
       let activitySubscriber: Subscriber<Partial<Activity>> | undefined
       let conversation: ConversationAccount | undefined
       let activeConversationId: string | undefined = normalizedConversationId
+      let pseudomizedConversationId: string | undefined
       let ended = false
       let started = false
 
@@ -312,14 +313,22 @@ export class CopilotStudioWebChat {
             }
             if (activity.conversation?.id) {
               activeConversationId = activity.conversation.id
+              pseudomizedConversationId = pseudonymizeConversationId(activeConversationId, client.diagnosticsPseudonymKey)
             }
             activityCount++
-            record({ activityCount, conversationId: activeConversationId })
+            record({
+              activityCount,
+              conversationId: pseudomizedConversationId
+            })
             await handleAcknowledgementOnce()
             notifyActivity(activity)
 
             trace(CopilotStudioClientTraceDefinitions.webchatReceiveActivity, ({ record }) => {
-              record({ activity, conversationId: activeConversationId })
+              record({
+                activityId: activity.id,
+                activityType: activity.type,
+                conversationId: pseudonymizeConversationId(activity.conversation?.id ?? activeConversationId, client.diagnosticsPseudonymKey)
+              })
             })
           }
           // If no activities received from bot, we should still acknowledge.
@@ -337,7 +346,7 @@ export class CopilotStudioWebChat {
           },
         }
         sequence++
-        logger.debug(`Notify '${newActivity.type}' activity to WebChat:`, newActivity)
+        logger.debug(`Notify '${newActivity.type}' activity to WebChat:`, redactDiagnosticObject(newActivity, client.diagnosticsPseudonymKey))
         activitySubscriber?.next(newActivity)
       }
 
@@ -386,11 +395,16 @@ export class CopilotStudioWebChat {
                 })
                 let responseActivityCount = 0
                 record({
-                  activity: newActivity,
-                  conversationId: activeConversationId,
+                  activityId: newActivity.id,
+                  activityType: newActivity.type,
+                  conversationId: pseudomizedConversationId,
                   responseActivityCount,
                 })
-                actions.sentToCopilot(newActivity, activeConversationId)
+                actions.sentToCopilot(
+                  newActivity.id,
+                  newActivity.type,
+                  pseudonymizeConversationId(newActivity.conversation?.id ?? activeConversationId, client.diagnosticsPseudonymKey)
+                )
 
                 notifyActivity(newActivity)
                 notifyTyping()
@@ -405,11 +419,15 @@ export class CopilotStudioWebChat {
                   }
                   responseActivityCount++
                   record({
-                    conversationId: activeConversationId,
+                    conversationId: pseudomizedConversationId,
                     responseActivityCount,
                   })
                   trace(CopilotStudioClientTraceDefinitions.webchatReceiveActivity, ({ record }) => {
-                    record({ activity: responseActivity, conversationId: activeConversationId })
+                    record({
+                      activityId: responseActivity.id,
+                      activityType: responseActivity.type,
+                      conversationId: pseudomizedConversationId
+                    })
                     notifyActivity(responseActivity)
                   })
                   logger.info('<-- Activity received correctly from Copilot Studio.')
@@ -430,7 +448,7 @@ export class CopilotStudioWebChat {
             return
           }
           trace(CopilotStudioClientTraceDefinitions.endConnection, ({ record }) => {
-            record({ conversationId: activeConversationId })
+            record({ conversationId: pseudomizedConversationId })
             logger.info('--> Ending connection between Copilot Studio and WebChat ...')
             ended = true
             connectionStatus$.complete()
@@ -490,7 +508,7 @@ async function processBlobAttachment (attachment: Attachment): Promise<Attachmen
     newContentUrl = `data:${blob.type};base64,${base64}`
   } catch (error) {
     newContentUrl = attachment.contentUrl
-    logger.error('Error processing blob attachment:', newContentUrl, error)
+    logger.error('Error processing blob attachment:', redactUrl(newContentUrl), error)
   }
 
   return { ...attachment, contentUrl: newContentUrl }

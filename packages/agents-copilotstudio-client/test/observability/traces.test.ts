@@ -8,7 +8,6 @@ import { Activity } from '@microsoft/agents-activity'
 import * as sinon from 'sinon'
 import { CopilotStudioClientMetrics } from '../../src/observability/metrics'
 import { CopilotStudioClientTraceDefinitions } from '../../src/observability/traces'
-import type { SubscribeEvent } from '../../src/subscribeEvent'
 
 const duration = 123
 
@@ -29,11 +28,15 @@ interface TestSpan {
 }
 
 interface PostRequestActions {
-  receivedFromCopilot(activity: Activity): void
+  receivedFromCopilot(activityType: string | undefined, conversationId: string | undefined): void
 }
 
 interface SubscribeAsyncActions {
-  eventReceivedFromCopilot(event: SubscribeEvent): void
+  eventReceivedFromCopilot(eventId: string | undefined, activityType: string | undefined): void
+}
+
+interface WebchatPostActivityActions {
+  sentToCopilot(activityId: string | undefined, activityType: string | undefined, conversationId: string | undefined): void
 }
 
 function createSpan (): TestSpan {
@@ -113,6 +116,58 @@ describe('Copilot Studio client trace definitions', () => {
     assertMetric(connections, 1, { 'copilot.webchat.show_typing': true })
   })
 
+  it('records only allowlisted web chat activity attributes', () => {
+    const actionSpan = createSpan()
+    const actions = CopilotStudioClientTraceDefinitions.webchatPostActivity.actions!({ span: actionSpan }) as WebchatPostActivityActions
+    actions.sentToCopilot('activity-id', 'message', 'pseudonymized-conversation-id')
+
+    const startSpan = endTrace(CopilotStudioClientTraceDefinitions.webchatStartConversation, {
+      activityCount: 2,
+      conversationId: 'pseudonymized-conversation-id'
+    })
+    const postSpan = endTrace(CopilotStudioClientTraceDefinitions.webchatPostActivity, {
+      activityId: 'activity-id',
+      activityType: 'message',
+      responseActivityCount: 1,
+      conversationId: 'pseudonymized-conversation-id'
+    })
+    const receiveSpan = endTrace(CopilotStudioClientTraceDefinitions.webchatReceiveActivity, {
+      activityId: 'response-id',
+      activityType: 'message',
+      conversationId: 'pseudonymized-conversation-id'
+    })
+    const endSpan = endTrace(CopilotStudioClientTraceDefinitions.endConnection, {
+      conversationId: 'pseudonymized-conversation-id'
+    })
+
+    assert.deepEqual(actionSpan.events, [{
+      name: 'activity.sent',
+      attributes: {
+        'copilot.webchat.activity.id': 'activity-id',
+        'copilot.webchat.activity.type': 'message',
+        'copilot.webchat.activity.conversation_id': 'pseudonymized-conversation-id'
+      }
+    }])
+    assert.deepEqual(startSpan.attributes, {
+      'copilot.webchat.activity.received_count': 2,
+      'copilot.webchat.conversation_id': 'pseudonymized-conversation-id'
+    })
+    assert.deepEqual(postSpan.attributes, {
+      'copilot.webchat.activity.type': 'message',
+      'copilot.webchat.activity.id': 'activity-id',
+      'copilot.webchat.activity.received_count': 1,
+      'copilot.webchat.conversation_id': 'pseudonymized-conversation-id'
+    })
+    assert.deepEqual(receiveSpan.attributes, {
+      'copilot.webchat.activity.id': 'response-id',
+      'copilot.webchat.activity.type': 'message',
+      'copilot.webchat.activity.conversation_id': 'pseudonymized-conversation-id'
+    })
+    assert.deepEqual(endSpan.attributes, {
+      'copilot.webchat.conversation_id': 'pseudonymized-conversation-id'
+    })
+  })
+
   it('records post request attributes, received activities, metrics, and errors', () => {
     const received = sinon.stub()
     const requests = sinon.stub()
@@ -124,7 +179,7 @@ describe('Copilot Studio client trace definitions', () => {
     sinon.stub(CopilotStudioClientMetrics, 'streamDuration').value({ record: streamDuration })
     const span = createSpan()
     const actions = CopilotStudioClientTraceDefinitions.postRequest.actions!({ span }) as PostRequestActions
-    actions.receivedFromCopilot(Activity.fromObject({ type: 'message', conversation: { id: 'conversation-id' } }))
+    actions.receivedFromCopilot('message', 'conversation-id')
 
     const endedSpan = endTrace(CopilotStudioClientTraceDefinitions.postRequest, {
       url: 'https://copilot.example.com', method: 'POST'
@@ -136,7 +191,7 @@ describe('Copilot Studio client trace definitions', () => {
     }
 
     assert.deepEqual(span.events, [{ name: 'activity.received', attributes: { 'copilot.post_request.activity.type': 'message', 'copilot.post_request.activity.conversation_id': 'conversation-id' } }])
-    assertMetric(received, 1, { 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'conversation-id' })
+    assertMetric(received, 1, { 'copilot.activity.type': 'message' })
     assert.deepEqual(endedSpan.attributes, { 'copilot.post_request.url': 'https://copilot.example.com', 'copilot.post_request.method': 'POST' })
     assertMetric(requests, 1, metricAttributes)
     assertMetric(streamDuration, duration, metricAttributes)
@@ -184,13 +239,13 @@ describe('Copilot Studio client trace definitions', () => {
     sinon.stub(CopilotStudioClientMetrics, 'activitiesSentCounter').value({ add: sent })
     sinon.stub(CopilotStudioClientMetrics, 'requestDuration').value({ record: requestDuration })
     const span = endTrace(CopilotStudioClientTraceDefinitions.sendActivity, {
-      activity: Activity.fromObject({ type: 'message', conversation: { id: 'conversation-id' } })
+      activityType: 'message', conversationId: 'conversation-id'
     })
     const attributes = { 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'conversation-id' }
-    const metricAttributes = { operation: 'sendActivityStreaming', ...attributes }
+    const metricAttributes = { operation: 'sendActivityStreaming', 'copilot.activity.type': 'message' }
 
     assert.deepEqual(span.attributes, attributes)
-    assertMetric(sent, 1, attributes)
+    assertMetric(sent, 1, { 'copilot.activity.type': 'message' })
     assertMetric(requestDuration, duration, metricAttributes)
   })
 
@@ -200,13 +255,13 @@ describe('Copilot Studio client trace definitions', () => {
     sinon.stub(CopilotStudioClientMetrics, 'executeStreamingCounter').value({ add: executed })
     sinon.stub(CopilotStudioClientMetrics, 'requestDuration').value({ record: requestDuration })
     const span = endTrace(CopilotStudioClientTraceDefinitions.executeStreaming, {
-      activity: Activity.fromObject({ type: 'event' }), conversationId: 'conversation-id'
+      activityType: 'event', conversationId: 'conversation-id'
     })
     const attributes = { 'copilot.activity.type': 'event', 'copilot.activity.conversation_id': 'conversation-id' }
 
     assert.deepEqual(span.attributes, attributes)
-    assertMetric(executed, 1, attributes)
-    assertMetric(requestDuration, duration, { operation: 'executeStreaming', ...attributes })
+    assertMetric(executed, 1, { 'copilot.activity.type': 'event' })
+    assertMetric(requestDuration, duration, { operation: 'executeStreaming', 'copilot.activity.type': 'event' })
   })
 
   it('records subscription attributes, received events, and metrics', () => {
@@ -218,8 +273,7 @@ describe('Copilot Studio client trace definitions', () => {
     sinon.stub(CopilotStudioClientMetrics, 'streamDuration').value({ record: streamDuration })
     const span = createSpan()
     const actions = CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span }) as SubscribeAsyncActions
-    const event: SubscribeEvent = { eventId: 'event-id', activity: Activity.fromObject({ type: 'message' }) }
-    actions.eventReceivedFromCopilot(event)
+    actions.eventReceivedFromCopilot('event-id', 'message')
 
     const endedSpan = endTrace(CopilotStudioClientTraceDefinitions.subscribeAsync, {
       conversationId: 'conversation-id', lastReceivedEventId: 'previous-event-id'
@@ -230,8 +284,6 @@ describe('Copilot Studio client trace definitions', () => {
     }
     const metricAttributes = {
       operation: 'subscribeAsync',
-      'copilot.conversation_id': 'conversation-id',
-      'copilot.last_received_event_id': 'previous-event-id',
     }
 
     assert.deepEqual(span.events, [{ name: 'event.received', attributes: { 'copilot.subscribe_async.event.id': 'event-id', 'copilot.subscribe_async.event.activity.type': 'message' } }])
@@ -263,19 +315,19 @@ describe('Copilot Studio client trace definitions', () => {
     const activity = Activity.fromObject({ type: 'message' })
 
     const requestSpan = createSpan()
-    ;(CopilotStudioClientTraceDefinitions.postRequest.actions!({ span: requestSpan }) as PostRequestActions).receivedFromCopilot(activity)
+    ;(CopilotStudioClientTraceDefinitions.postRequest.actions!({ span: requestSpan }) as PostRequestActions).receivedFromCopilot(activity.type, undefined)
     const subscriptionSpan = createSpan()
-    ;(CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span: subscriptionSpan }) as SubscribeAsyncActions).eventReceivedFromCopilot({ activity })
+    ;(CopilotStudioClientTraceDefinitions.subscribeAsync.actions!({ span: subscriptionSpan }) as SubscribeAsyncActions).eventReceivedFromCopilot(undefined, activity.type)
 
     assert.deepEqual(requestSpan.events[0].attributes, { 'copilot.post_request.activity.type': 'message', 'copilot.post_request.activity.conversation_id': 'unknown' })
     assert.deepEqual(subscriptionSpan.events[0].attributes, { 'copilot.subscribe_async.event.id': 'unknown', 'copilot.subscribe_async.event.activity.type': 'message' })
-    assertMetric(received, 1, { 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'unknown' })
+    assertMetric(received, 1, { 'copilot.activity.type': 'message' })
     assertMetric(events, 1, { 'copilot.subscribe_async.event.id': 'unknown', 'copilot.subscribe_async.event.activity.type': 'message' })
 
     const connection = endTraceWithIncompleteRecord(CopilotStudioClientTraceDefinitions.createConnection, { showTyping: undefined })
     const request = endTraceWithIncompleteRecord(CopilotStudioClientTraceDefinitions.postRequest, { url: undefined, method: undefined })
-    const sentActivity = endTrace(CopilotStudioClientTraceDefinitions.sendActivity, { activity })
-    const execution = endTraceWithIncompleteRecord(CopilotStudioClientTraceDefinitions.executeStreaming, { activity, conversationId: undefined })
+    const sentActivity = endTraceWithIncompleteRecord(CopilotStudioClientTraceDefinitions.sendActivity, { activityType: activity.type, conversationId: undefined })
+    const execution = endTraceWithIncompleteRecord(CopilotStudioClientTraceDefinitions.executeStreaming, { activityType: activity.type, conversationId: undefined })
     const subscription = endTraceWithIncompleteRecord(CopilotStudioClientTraceDefinitions.subscribeAsync, { conversationId: undefined, lastReceivedEventId: undefined })
 
     assert.deepEqual(connection.attributes, { 'copilot.webchat.show_typing': 'unknown' })
@@ -285,13 +337,13 @@ describe('Copilot Studio client trace definitions', () => {
     assert.deepEqual(subscription.attributes, { 'copilot.subscribe_async.conversation_id': 'unknown', 'copilot.subscribe_async.last_received_event_id': 'unknown' })
     assertMetric(connections, 1, { 'copilot.webchat.show_typing': 'unknown' })
     assertMetric(requests, 1, { operation: 'postRequestAsync', 'copilot.post_request.url': 'unknown', 'copilot.post_request.method': 'unknown' })
-    assertMetric(sent, 1, { 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'unknown' })
-    assertMetric(executed, 1, { 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'unknown' })
-    assertMetric(subscriptions, 1, { operation: 'subscribeAsync', 'copilot.conversation_id': 'unknown', 'copilot.last_received_event_id': 'unknown' })
+    assertMetric(sent, 1, { 'copilot.activity.type': 'message' })
+    assertMetric(executed, 1, { 'copilot.activity.type': 'message' })
+    assertMetric(subscriptions, 1, { operation: 'subscribeAsync' })
     sinon.assert.calledWithExactly(streamDuration, duration, { operation: 'postRequestAsync', 'copilot.post_request.url': 'unknown', 'copilot.post_request.method': 'unknown' })
-    sinon.assert.calledWithExactly(streamDuration, duration, { operation: 'subscribeAsync', 'copilot.conversation_id': 'unknown', 'copilot.last_received_event_id': 'unknown' })
-    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'sendActivityStreaming', 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'unknown' })
-    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'executeStreaming', 'copilot.activity.type': 'message', 'copilot.activity.conversation_id': 'unknown' })
+    sinon.assert.calledWithExactly(streamDuration, duration, { operation: 'subscribeAsync' })
+    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'sendActivityStreaming', 'copilot.activity.type': 'message' })
+    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'executeStreaming', 'copilot.activity.type': 'message' })
   })
 
   it('preserves trace defaults and uses unknown for missing activity values', () => {
@@ -322,12 +374,12 @@ describe('Copilot Studio client trace definitions', () => {
     assert.deepEqual(subscription.attributes, { 'copilot.subscribe_async.conversation_id': 'unknown', 'copilot.subscribe_async.last_received_event_id': 'unknown' })
     assertMetric(connections, 1, { 'copilot.webchat.show_typing': false })
     assertMetric(requests, 1, { operation: 'postRequestAsync', 'copilot.post_request.url': '', 'copilot.post_request.method': '' })
-    assertMetric(sent, 1, { 'copilot.activity.type': 'unknown', 'copilot.activity.conversation_id': 'unknown' })
-    assertMetric(executed, 1, { 'copilot.activity.type': 'unknown', 'copilot.activity.conversation_id': 'unknown' })
-    assertMetric(subscriptions, 1, { operation: 'subscribeAsync', 'copilot.conversation_id': 'unknown', 'copilot.last_received_event_id': 'unknown' })
+    assertMetric(sent, 1, { 'copilot.activity.type': 'unknown' })
+    assertMetric(executed, 1, { 'copilot.activity.type': 'unknown' })
+    assertMetric(subscriptions, 1, { operation: 'subscribeAsync' })
     sinon.assert.calledWithExactly(streamDuration, duration, { operation: 'postRequestAsync', 'copilot.post_request.url': '', 'copilot.post_request.method': '' })
-    sinon.assert.calledWithExactly(streamDuration, duration, { operation: 'subscribeAsync', 'copilot.conversation_id': 'unknown', 'copilot.last_received_event_id': 'unknown' })
-    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'sendActivityStreaming', 'copilot.activity.type': 'unknown', 'copilot.activity.conversation_id': 'unknown' })
-    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'executeStreaming', 'copilot.activity.type': 'unknown', 'copilot.activity.conversation_id': 'unknown' })
+    sinon.assert.calledWithExactly(streamDuration, duration, { operation: 'subscribeAsync' })
+    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'sendActivityStreaming', 'copilot.activity.type': 'unknown' })
+    sinon.assert.calledWithExactly(requestDuration, duration, { operation: 'executeStreaming', 'copilot.activity.type': 'unknown' })
   })
 })
