@@ -1,4 +1,4 @@
-# microsoft/agents-hosting
+# @microsoft/agents-hosting
 
 ## Overview
 
@@ -28,52 +28,14 @@ exposes framework-agnostic primitives that the
 Most consumers should keep using `startServer`/`createAgentRequestHandler` from the
 Express or Fastify packages; reach for these APIs when adapting another framework.
 
-## Outbound request host validation
-
-`OutboundHostValidator` provides an opt-in allowlist for server-side requests made
-to activity service URLs and attachment URLs. Enforcement is disabled by default.
-It can be configured with environment variables:
-
-```dotenv
-OutboundHostValidator__Enabled=true
-OutboundHostValidator__IncludeDefaultMicrosoftHosts=true
-OutboundHostValidator__Hosts=contoso.com,fabrikam.com
-```
-
-Indexed host variables such as `OutboundHostValidator__Hosts__0=contoso.com` are
-also supported. A host entry matches both the exact host and its subdomains, and
-is normalized (scheme/port/path stripped; a leading `*.` is accepted and ignored).
-
-When enforcement is enabled, `CloudAdapter` rejects inbound activities whose
-`serviceUrl` host is not allowlisted, and it also rejects `serviceurl` claim
-mismatches (equivalent to `CloudAdapterOptions.validateServiceUrl=true`).
-
-For explicit configuration, reuse the same immutable policy in the adapter and
-attachment downloaders:
-
-```ts
-import {
-  AgentApplication,
-  AttachmentDownloader,
-  CloudAdapter,
-  OutboundHostValidator
-} from '@microsoft/agents-hosting'
-
-const outboundHostValidator = new OutboundHostValidator({
-  enabled: true,
-  hosts: ['contoso.com']
-})
-
-const adapter = new CloudAdapter(undefined, undefined, undefined, undefined, outboundHostValidator)
-
-const agent = new AgentApplication({
-  adapter,
-  fileDownloaders: [new AttachmentDownloader('inputFiles', outboundHostValidator)]
-})
-```
-
-The validator checks the URL supplied to the downloader. Redirects retain native
-`fetch` behavior.
+The agent-response handler authenticates requests once through the supplied
+`CloudAdapter`. That boundary validates the token for any configured host connection;
+the handler then verifies that the caller application matches the delegated agent
+recorded for that conversation. Existing route-level `authorizeJWT` middleware is
+redundant but remains compatible. Anonymous callbacks are supported only outside
+production and emit a registration warning because peer ownership cannot be verified.
+Missing, malformed, or pre-upgrade delegated state fails closed. Pre-upgrade
+conversations must be restarted.
 
 ## Example Usage based on the AgentApplication object
 
@@ -134,3 +96,50 @@ app.post('/api/messages', async (req: Request, res: Response) => {
 })
 
 ```
+
+## Outbound request host validation
+
+`OutboundHostValidator` provides an opt-in allowlist for server-side requests made
+to activity service URLs and attachment URLs. Enforcement is disabled by default.
+It can be configured with environment variables:
+
+```dotenv
+OutboundHostValidator__Enabled=true
+OutboundHostValidator__IncludeDefaultMicrosoftHosts=true
+OutboundHostValidator__Hosts=contoso.com,fabrikam.com
+```
+
+Indexed host variables such as `OutboundHostValidator__Hosts__0=contoso.com` are
+also supported. A host entry matches both the exact host and its subdomains, and
+is normalized (scheme/port/path stripped; a leading `*.` is accepted and ignored).
+
+When enforcement is enabled, `CloudAdapter` rejects inbound activities whose
+`serviceUrl` host is not allowlisted, and it also rejects `serviceurl` claim
+mismatches (equivalent to `CloudAdapterOptions.validateServiceUrl=true`).
+
+For explicit configuration, reuse the same immutable policy in the adapter and
+attachment downloaders:
+
+```ts
+import {
+  AgentApplication,
+  AttachmentDownloader,
+  CloudAdapter,
+  OutboundHostValidator
+} from '@microsoft/agents-hosting'
+
+const outboundHostValidator = new OutboundHostValidator({
+  enabled: true,
+  hosts: ['contoso.com']
+})
+
+const adapter = new CloudAdapter(undefined, undefined, undefined, undefined, outboundHostValidator)
+
+const agent = new AgentApplication({
+  adapter,
+  fileDownloaders: [new AttachmentDownloader('inputFiles', outboundHostValidator)]
+})
+```
+
+The validator checks the URL supplied to the downloader. Redirects retain native
+`fetch` behavior.
