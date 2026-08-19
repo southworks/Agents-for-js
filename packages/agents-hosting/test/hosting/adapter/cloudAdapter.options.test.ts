@@ -373,7 +373,8 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
       await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
 
-      sinon.assert.calledWith((res as any).status, 400)
+      const responseStatus = (res as any).status
+      sinon.assert.calledWith(responseStatus, 400)
     })
 
     it('allows a built-in Microsoft ServiceUrl', async () => {
@@ -384,7 +385,8 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
       await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
 
-      sinon.assert.neverCalledWith((res as any).status, 400)
+      const responseStatus = (res as any).status
+      sinon.assert.neverCalledWith(responseStatus, 400)
     })
 
     it('allows a configured ServiceUrl host', async () => {
@@ -395,7 +397,8 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
       await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
 
-      sinon.assert.neverCalledWith((res as any).status, 400)
+      const responseStatus = (res as any).status
+      sinon.assert.neverCalledWith(responseStatus, 400)
     })
 
     it('preserves existing behavior when the validator is disabled', async () => {
@@ -406,7 +409,8 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
       await adapter.process(buildReq({ aud: 'clientId' } as any), res as Response, async () => {})
 
-      sinon.assert.neverCalledWith((res as any).status, 400)
+      const responseStatus = (res as any).status
+      sinon.assert.neverCalledWith(responseStatus, 400)
     })
 
     it('enforces serviceurl claim matching when the validator is enabled', async () => {
@@ -417,7 +421,8 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
       await adapter.process(buildReq({ serviceurl: 'https://graph.microsoft.com/callback/' } as any), res as Response, async () => {})
 
-      sinon.assert.calledWith((res as any).status, 400)
+      const responseStatus = (res as any).status
+      sinon.assert.calledWith(responseStatus, 400)
     })
 
     it('rejects a disallowed continuation ServiceUrl before creating a connector client', async () => {

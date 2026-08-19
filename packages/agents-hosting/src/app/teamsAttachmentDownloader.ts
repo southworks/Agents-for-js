@@ -72,7 +72,12 @@ export class M365AttachmentDownloader<TState extends TurnState = TurnState> impl
         const contentSchema = z.object({ downloadUrl: z.string().url() })
         const parsed = contentSchema.safeParse(attachment.content)
         const downloadUrl = parsed.success ? parsed.data.downloadUrl : attachment.contentUrl
-        if (!this._hostValidator.isAllowed(downloadUrl)) return undefined
+        if (!this._hostValidator.isAllowed(downloadUrl)) {
+          let host = '[invalid-url]'
+          try { host = new URL(downloadUrl).hostname } catch { /* invalid */ }
+          logger.warn(`Attachment downloadUrl host is not in the configured allowed hosts. Host='${host}'`)
+          return undefined
+        }
 
         const response = await this._httpClient.get(downloadUrl, { responseType: 'arraybuffer' })
 
