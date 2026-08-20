@@ -22,8 +22,8 @@ capabilities:
     description: "Parses Teams channel data and provides Teams-specific activity helpers."
     owners:
       - "src/activity-extensions/**"
+      - "src/teamsActivity.ts"
       - "src/teamsActivityExtensions.ts"
-      - "src/teamsModelExtensions.ts"
     upstreamAreas:
       - "models.channel-data"
       - "activities"
@@ -62,6 +62,7 @@ capabilities:
     description: "Handles message extension invokes, query parsing, actions, and responses."
     owners:
       - "src/messageExtensions/**"
+      - "src/teamsModelExtensions.ts"
     upstreamAreas:
       - "models.messaging-extension"
       - "models.app-based-link-query"
@@ -72,6 +73,7 @@ capabilities:
     description: "Handles Teams task module fetch and submit invokes."
     owners:
       - "src/taskModules/**"
+      - "src/teamsModelExtensions.ts"
     upstreamAreas:
       - "models.task-module"
       - "activities.invoke"
