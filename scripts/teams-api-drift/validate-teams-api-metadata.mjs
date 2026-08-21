@@ -15,6 +15,7 @@ const manifestPath = `${packagePath}/teams-api-usage-manifest.json`
 const capabilitiesPath = `${packagePath}/config/teams-capabilities.yaml`
 const packageManifestPath = `${packagePath}/package.json`
 const sourcePrefix = `${packagePath}/src/`
+const sourceReviewGuide = 'scripts/teams-api-drift/README.md#source-review-acknowledgments'
 
 /** @typedef {{ upstreamSymbol: string, usage: string, usageKinds?: string[], exposure?: string, methodsCalled?: string[], propertiesRead?: string[], propertiesValidated?: string[], propertiesWritten?: string[], files: string[] }} Usage */
 /** @typedef {{ dependency: string, declaredVersion?: string, sourceRoot?: string, usages: Usage[], sourceReview?: { outcome?: string, reason?: string } }} UsageManifest */
@@ -73,7 +74,7 @@ function validateDocumentShapes (manifest, capabilities, findings) {
 function validateReview (review, expectedOutcome, file, kind, findings) {
   if (review === undefined) return
   if (!review || review.outcome !== expectedOutcome || typeof review.reason !== 'string' || review.reason.trim() === '') {
-    add(findings, `${kind}-stale`, file, `sourceReview must use outcome "${expectedOutcome}" and include a non-empty reason.`, 'Correct sourceReview or remove it when the document contains a substantive metadata update.')
+    add(findings, `${kind}-stale`, file, `sourceReview must use outcome "${expectedOutcome}" and include a non-empty reason.`, `Correct sourceReview or remove it when the document contains a substantive metadata update. See ${sourceReviewGuide}.`)
   }
 }
 
@@ -300,10 +301,10 @@ function validateChangeReviews (root, git, manifest, capabilities, currentImport
   let usageReviewReported = false
   if (removedImportsStillRecorded.length > 0 && !explicitUsageReview) {
     usageReviewReported = true
-    add(findings, 'usage-review', manifestPath, `Removed direct Teams API import(s) remain recorded in the usage manifest: ${removedImportsStillRecorded.join(', ')}.`, 'Update the affected usage entries, or change sourceReview with outcome "no-usage-metadata-change" and explain why the indirect usage remains.')
+    add(findings, 'usage-review', manifestPath, `Removed direct Teams API import(s) remain recorded in the usage manifest: ${removedImportsStillRecorded.join(', ')}.`, `Update the affected usage entries, or follow ${sourceReviewGuide} and explain why the indirect usage remains.`)
   }
   if (!usageReviewReported && usageRelevant.length > 0 && (!metadataReviewed(baseManifest, manifest, 'usages', 'no-usage-metadata-change') || !usageReviewFresh)) {
-    add(findings, 'usage-review', manifestPath, `${usageRelevant.length} Teams API usage-related source file(s) changed without a usage-manifest update or non-impact review.`, `Update usages in ${manifestPath}, or change sourceReview with outcome "no-usage-metadata-change" and a specific reason.`, usageRelevant.slice(0, 4).join(', '))
+    add(findings, 'usage-review', manifestPath, `${usageRelevant.length} Teams API usage-related source file(s) changed without a usage-manifest update or non-impact review.`, `Update usages in ${manifestPath}, or follow ${sourceReviewGuide}.`, usageRelevant.slice(0, 4).join(', '))
   }
 
   const capabilityChanges = changedSourceFiles.map(file => {
@@ -328,7 +329,7 @@ function validateChangeReviews (root, git, manifest, capabilities, currentImport
   const explicitCapabilityReview = reviewChanged(baseCapabilities.sourceReview, capabilities.sourceReview, 'no-capability-metadata-change') && capabilityReviewFresh
   const targetedCapabilitiesUpdate = capabilityReviewFresh && capabilityChanges.every(change => capabilityChangeAddressed(change, baseCapabilities, capabilities))
   if (capabilityRelevant.length > 0 && !explicitCapabilityReview && !targetedCapabilitiesUpdate) {
-    add(findings, 'capabilities-review', capabilitiesPath, `${capabilityRelevant.length} capability ownership or upstream-area source change(s) lack a targeted capabilities update or non-impact review.`, `Add or remove owner patterns for the affected paths in ${capabilitiesPath}, or change sourceReview with outcome "no-capability-metadata-change" and a specific reason.`, capabilityRelevant.slice(0, 4).join(', '))
+    add(findings, 'capabilities-review', capabilitiesPath, `${capabilityRelevant.length} capability ownership or upstream-area source change(s) lack a targeted capabilities update or non-impact review.`, `Add or remove owner patterns for the affected paths in ${capabilitiesPath}, or follow ${sourceReviewGuide}.`, capabilityRelevant.slice(0, 4).join(', '))
   }
 }
 

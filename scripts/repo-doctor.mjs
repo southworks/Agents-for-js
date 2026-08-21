@@ -295,7 +295,7 @@ export const ruleDefinitions = {
   'compat/teams-api-usage-review-missing': {
     what: 'Ambiguous Teams API usage changes receive an explicit metadata review.',
     why: 'Keeps dynamic and manually classified Teams API usage from drifting silently.',
-    fix: 'Update the usage manifest, or change its sourceReview with a specific non-impact reason.',
+    fix: 'Update the usage manifest, or follow scripts/teams-api-drift/README.md#source-review-acknowledgments.',
   },
   'compat/teams-api-capabilities-stale': {
     what: 'Teams capability ownership and upstream areas match the extension structure.',
@@ -305,7 +305,7 @@ export const ruleDefinitions = {
   'compat/teams-api-capabilities-review-missing': {
     what: 'Ambiguous Teams capability changes receive an explicit metadata review.',
     why: 'Keeps feature ownership and adoption-policy decisions from drifting silently.',
-    fix: 'Update the capabilities map, or change its sourceReview with a specific non-impact reason.',
+    fix: 'Update the capabilities map, or follow scripts/teams-api-drift/README.md#source-review-acknowledgments.',
   },
   'runtime/toolchain-mismatch': {
     what: 'Configured Node versions match the .nvmrc major.',

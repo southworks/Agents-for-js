@@ -2,6 +2,9 @@
 # This package consumes selected Teams API types and clients; it is not a wrapper
 # for the full upstream package. Direct compatibility findings take precedence
 # over these advisory adoption policies.
+
+# For capability metadata maintenance and sourceReview acknowledgments, see:
+# scripts/teams-api-drift/README.md#source-review-acknowledgments
 schemaVersion: 1
 
 dependency:
