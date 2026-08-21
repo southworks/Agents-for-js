@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 import { Activity } from '@microsoft/agents-activity'
-import type { ChannelData, OnBehalfOf } from '@microsoft/teams.api'
+import type { ChannelData } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
 
 /**
@@ -73,7 +73,7 @@ export function teamsNotifyUser (activity: Activity, alertInMeeting: boolean = f
  * @param activity - Activity containing Teams channel data.
  * @returns The Teams on-behalf-of entries, if present.
  */
-export function teamsGetTeamOnBehalfOf (activity: Activity): OnBehalfOf[] | undefined {
+export function teamsGetTeamOnBehalfOf (activity: Activity) {
   const channelData = parseTeamsChannelData(activity.channelData)
   return (channelData as any)?.onBehalfOf
 }
