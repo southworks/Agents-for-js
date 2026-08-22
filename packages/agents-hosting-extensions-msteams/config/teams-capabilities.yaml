@@ -118,3 +118,7 @@ capabilities:
     upstreamAreas:
       - "activities"
     adoptionPolicy: "advisory-only"
+# Update the section below to provide a reason why the applied changes does not introduce a new capability boundary.
+sourceReview:
+  outcome: "no-capability-metadata-change"
+  reason: "The new helper does not introduce a new capability boundary."
