@@ -168,21 +168,19 @@ describe('quality runner', () => {
     assert.match(reduced, /failing tests/)
     assert.match(reduced, /should report this assertion/)
     assert.equal(failureOutput(check('lint'), output), output)
+    assert.equal(failureOutput(check('lint'), '::error::unsafe output', { githubActions: true }), '\u200B::error\u200B::unsafe output')
   })
 
   it('prints every captured command log in a folded GitHub Actions group', () => {
     const writes = []
-    reportCheckOutput(check('lint', { label: 'ESLint', script: 'lint' }), 'lint output\n', {
+    reportCheckOutput(check('lint', { label: 'ESLint', script: 'lint' }), '::error::lint output\n##[error]legacy output\n', {
       githubActions: true,
       stream: { write: value => writes.push(value) },
-      token: 'quality-test-token',
     })
 
     assert.deepEqual(writes, [
       '::group::ESLint — npm run lint\n',
-      '::stop-commands::quality-test-token\n',
-      'lint output\n',
-      '::quality-test-token::\n',
+      '\u200B::error\u200B::lint output\n\u200B##[error]legacy output\n',
       '::endgroup::\n',
     ])
   })

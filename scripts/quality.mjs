@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, rm } from 'node:fs/promises'
 import os from 'node:os'
@@ -223,7 +222,7 @@ export function createReporter (options = {}) {
  *
  * @param {QualityCheck} check
  * @param {string} output
- * @param {{ githubActions?: boolean, stream?: { write: (value: string) => void }, token?: string, verbose?: boolean }} [options]
+ * @param {{ githubActions?: boolean, stream?: { write: (value: string) => void }, verbose?: boolean }} [options]
  */
 export function reportCheckOutput (check, output, options = {}) {
   const githubActions = options.githubActions ?? false
@@ -232,12 +231,10 @@ export function reportCheckOutput (check, output, options = {}) {
 
   const stream = options.stream ?? process.stdout
   if (githubActions) {
-    const token = options.token ?? `quality-${randomUUID()}`
     stream.write(`::group::${check.label} — npm run ${check.script}\n`)
-    stream.write(`::stop-commands::${token}\n`)
-    stream.write(output || '(No command output.)\n')
-    if (!output.endsWith('\n')) stream.write('\n')
-    stream.write(`::${token}::\n`)
+    const safeOutput = sanitizeGitHubActionsLog(output) || '(No command output.)\n'
+    stream.write(safeOutput)
+    if (!safeOutput.endsWith('\n')) stream.write('\n')
     stream.write('::endgroup::\n')
     return
   }
@@ -245,6 +242,13 @@ export function reportCheckOutput (check, output, options = {}) {
   stream.write(`\nOutput: ${check.label} (npm run ${check.script})\n`)
   stream.write(output || '(No command output.)\n')
   if (!output.endsWith('\n')) stream.write('\n')
+}
+
+/** @param {string} output */
+function sanitizeGitHubActionsLog (output) {
+  // Child-process output can contain GitHub workflow command syntax. Insert an
+  // invisible character so the runner renders it as log text, not a command.
+  return output.replace(/::|##\[/g, match => `\u200B${match}`)
 }
 
 function createLiveReporter (options) {
@@ -380,11 +384,12 @@ export function formatDuration (durationMs) {
   return `${(durationMs / 1000).toFixed(1)}s`
 }
 
-/** @param {QualityCheck} check @param {string} output */
-export function failureOutput (check, output) {
-  if (check.id !== 'test') return output
+/** @param {QualityCheck} check @param {string} output @param {{ githubActions?: boolean }} [options] */
+export function failureOutput (check, output, options = {}) {
+  const githubActions = options.githubActions ?? false
   const failureSection = /(?:^|\r?\n)(?:✖\s*)?failing tests:\r?\n/i.exec(output)
-  return failureSection ? output.slice(failureSection.index).trimStart() : output
+  const relevantOutput = check.id === 'test' && failureSection ? output.slice(failureSection.index).trimStart() : output
+  return githubActions ? sanitizeGitHubActionsLog(relevantOutput) : relevantOutput
 }
 
 /** @param {NodeJS.WriteStream} stream */
@@ -442,18 +447,19 @@ async function runCli () {
   try {
     const checks = await runQualityChecks(qualityChecks, { runCheck: runner.run, reporter })
     reporter.summary(checks)
+    const githubActions = process.env.GITHUB_ACTIONS === 'true'
     const outputs = new Map(await Promise.all(checks.map(async check => [
       check.id,
       check.execution?.logPath ? await readFile(check.execution.logPath, 'utf8') : '',
     ])))
     for (const check of checks) {
       reportCheckOutput(check, outputs.get(check.id), {
-        githubActions: process.env.GITHUB_ACTIONS === 'true',
+        githubActions,
         verbose,
       })
     }
     for (const check of checks.filter(check => check.state === 'failed')) {
-      reporter.failure(check, failureOutput(check, outputs.get(check.id) ?? ''))
+      reporter.failure(check, failureOutput(check, outputs.get(check.id) ?? '', { githubActions }))
     }
     process.exitCode = interrupted ? 130 : checks.some(check => check.state === 'failed') ? 1 : 0
   } finally {
