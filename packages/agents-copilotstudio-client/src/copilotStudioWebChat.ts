@@ -300,6 +300,7 @@ export class CopilotStudioWebChat {
         })
 
         if (connectionError) {
+          activitySubscriber = undefined
           subscriber.error(connectionError)
           return
         }
