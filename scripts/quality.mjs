@@ -35,7 +35,7 @@ const ansiEscapePattern = new RegExp(String.raw`\u001B\[[0-?]*[ -/]*[@-~]`, 'g')
  * another begin immediately; downstream checks wait for declared dependencies.
  *
  * @param {Array<QualityCheck>} checks
- * @param {{ runCheck?: (check: QualityCheck) => Promise<CheckExecution>, reporter?: QualityReporter, now?: () => number }} [options]
+ * @param {{ isCancelled?: () => boolean, runCheck?: (check: QualityCheck) => Promise<CheckExecution>, reporter?: QualityReporter, now?: () => number }} [options]
  */
 export async function runQualityChecks (checks, options = {}) {
   validateChecks(checks)
@@ -43,6 +43,7 @@ export async function runQualityChecks (checks, options = {}) {
   const runCheck = options.runCheck ?? (() => Promise.reject(new Error('A check runner is required.')))
   const reporter = options.reporter ?? createReporter({ write: () => {} })
   const now = options.now ?? (() => performance.now())
+  const isCancelled = options.isCancelled ?? (() => false)
   const results = new Map(checks.map(check => [check.id, {
     ...check,
     after: check.after ?? [],
@@ -61,10 +62,29 @@ export async function runQualityChecks (checks, options = {}) {
       resolve(checks.map(check => results.get(check.id)))
     }
 
+    const skipQueuedChecks = reason => {
+      for (const result of results.values()) {
+        if (result.state !== 'queued') continue
+        result.state = 'skipped'
+        result.reason = reason
+        reporter.skipped(result)
+      }
+    }
+
     const schedule = () => {
+      if (isCancelled()) {
+        skipQueuedChecks('quality run interrupted')
+        if (active === 0) finish()
+        return
+      }
+
       let progressed = false
 
       for (const result of results.values()) {
+        if (isCancelled()) {
+          skipQueuedChecks('quality run interrupted')
+          break
+        }
         if (result.state !== 'queued') continue
         const dependencies = result.after.map(id => results.get(id))
         if (!dependencies.every(dependency => terminalStates.has(dependency.state))) continue
@@ -88,8 +108,16 @@ export async function runQualityChecks (checks, options = {}) {
         progressed = true
 
         Promise.resolve()
-          .then(() => runCheck(result))
+          .then(() => {
+            if (isCancelled()) {
+              result.state = 'skipped'
+              result.reason = 'quality run interrupted'
+              return
+            }
+            return runCheck(result)
+          })
           .then(execution => {
+            if (result.state === 'skipped') return
             result.execution = execution
             result.state = execution.exitCode === 0 ? 'passed' : 'failed'
           })
@@ -100,7 +128,8 @@ export async function runQualityChecks (checks, options = {}) {
           .finally(() => {
             result.durationMs = now() - result.startedAt
             active -= 1
-            reporter.finished(result)
+            if (result.state === 'skipped') reporter.skipped(result)
+            else reporter.finished(result)
             schedule()
           })
       }
@@ -185,7 +214,7 @@ export function npmInvocation (script) {
 /** @param {{ write?: (line: string) => void, color?: boolean }} [options] */
 export function createReporter (options = {}) {
   const stream = options.stream ?? process.stdout
-  const live = options.live ?? supportsLiveOutput(stream)
+  const live = options.live !== false && supportsLiveOutput(stream, options.term)
   if (live) return createLiveReporter({ ...options, stream })
 
   const write = options.write ?? (line => stream.write(`${line}\n`))
@@ -194,7 +223,7 @@ export function createReporter (options = {}) {
 
   return {
     started: check => write(`${status('RUN ', 'cyan')}  ${check.label.padEnd(22)} npm run ${check.script}`),
-    finished: check => write(`${status(check.state === 'passed' ? 'PASS' : 'FAIL', check.state === 'passed' ? 'green' : 'red')}  ${check.label.padEnd(22)} ${formatDuration(check.durationMs)}`),
+    finished: check => write(`${status(check.state === 'passed' ? 'PASS' : 'FAIL', check.state === 'passed' ? 'green' : 'red')}  ${check.label.padEnd(22)} npm run ${check.script}  ${formatDuration(check.durationMs)}`),
     skipped: check => write(`${status('SKIP', 'yellow')}  ${check.label.padEnd(22)} ${check.reason}`),
     summary: checks => {
       const counts = checks.reduce((summary, check) => ({ ...summary, [check.state]: (summary[check.state] ?? 0) + 1 }), {})
@@ -397,8 +426,8 @@ export function supportsColor (stream) {
   return Boolean(stream?.isTTY) && !Object.hasOwn(process.env, 'NO_COLOR') && process.env.TERM !== 'dumb'
 }
 
-function supportsLiveOutput (stream) {
-  return Boolean(stream?.isTTY) && typeof stream.write === 'function'
+function supportsLiveOutput (stream, term = process.env.TERM) {
+  return Boolean(stream?.isTTY) && typeof stream.write === 'function' && term !== 'dumb'
 }
 
 function style (value, kind, enabled) {
@@ -445,7 +474,7 @@ async function runCli () {
   process.once('SIGTERM', interrupt)
 
   try {
-    const checks = await runQualityChecks(qualityChecks, { runCheck: runner.run, reporter })
+    const checks = await runQualityChecks(qualityChecks, { isCancelled: () => interrupted, runCheck: runner.run, reporter })
     reporter.summary(checks)
     const githubActions = process.env.GITHUB_ACTIONS === 'true'
     const outputs = new Map(await Promise.all(checks.map(async check => [

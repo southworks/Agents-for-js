@@ -81,6 +81,61 @@ describe('quality runner', () => {
     assert.deepEqual(results.map(result => result.state), ['passed', 'failed', 'passed', 'passed'])
   })
 
+  it('does not start queued checks after cancellation', async () => {
+    const started = []
+    const completions = new Map()
+    let cancelled = false
+    const running = runQualityChecks([
+      check('build'),
+      check('test', { after: ['build'], requiresSuccess: ['build'] }),
+      check('compat', { after: ['build', 'test'], requiresSuccess: ['build'] }),
+      check('samples', { after: ['build', 'test'], requiresSuccess: ['build'] }),
+    ], {
+      isCancelled: () => cancelled,
+      runCheck: current => new Promise(resolve => {
+        started.push(current.id)
+        completions.set(current.id, resolve)
+      }),
+      reporter: silentReporter(),
+    })
+
+    await tick()
+    completions.get('build')({ exitCode: 0 })
+    await tick()
+    assert.deepEqual(started, ['build', 'test'])
+
+    cancelled = true
+    completions.get('test')({ exitCode: 1 })
+    const results = await running
+
+    assert.deepEqual(started, ['build', 'test'])
+    assert.deepEqual(results.map(result => result.state), ['passed', 'failed', 'skipped', 'skipped'])
+    assert.match(results[2].reason, /interrupted/)
+  })
+
+  it('does not launch a check if cancellation occurs while scheduling', async () => {
+    const invoked = []
+    let cancelled = false
+    const results = await runQualityChecks([
+      check('lint'),
+      check('doctor'),
+    ], {
+      isCancelled: () => cancelled,
+      runCheck: async current => {
+        invoked.push(current.id)
+        return { exitCode: 0 }
+      },
+      reporter: {
+        queued: () => {},
+        started: () => { cancelled = true },
+        skipped: () => {},
+      },
+    })
+
+    assert.deepEqual(invoked, [])
+    assert.deepEqual(results.map(result => result.state), ['skipped', 'skipped'])
+  })
+
   it('captures combined command output without forwarding it to successful reports', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'quality-test-'))
     try {
@@ -110,8 +165,9 @@ describe('quality runner', () => {
       const lines = []
       const reporter = createReporter({ write: line => lines.push(line), color: false })
       reporter.started({ label: 'fixture', script: 'fixture' })
-      reporter.finished({ label: 'fixture', state: 'passed', durationMs: 1 })
+      reporter.finished({ label: 'fixture', script: 'fixture', state: 'passed', durationMs: 1 })
       assert.doesNotMatch(lines.join('\n'), /standard (output|error)/)
+      assert.match(lines.join('\n'), /PASS\s+fixture\s+npm run fixture\s+1ms/)
     } finally {
       await rm(directory, { force: true, maxRetries: 3, recursive: true, retryDelay: 100 }).catch(() => {})
     }
@@ -128,7 +184,7 @@ describe('quality runner', () => {
       cursorTo: column => operations.push(['cursorTo', column]),
       moveCursor: (columns, rows) => operations.push(['moveCursor', columns, rows]),
     }
-    const reporter = createReporter({ stream, autoRefresh: false, color: false, now: () => currentTime })
+    const reporter = createReporter({ stream, autoRefresh: false, color: false, now: () => currentTime, term: 'xterm-256color' })
     const eslint = { id: 'lint', label: 'ESLint', script: 'lint' }
     const doctor = { id: 'doctor', label: 'Repository doctor', script: 'repo:doctor' }
 
@@ -148,6 +204,17 @@ describe('quality runner', () => {
 
     assert.match(writes.join(''), /RUN\s+.*~20%\s+ESLint\s+npm run lint\s+4\.0s/)
     assert.match(writes.join(''), /PASS\s+✓ 100%\s+ESLint\s+npm run lint\s+4\.0s/)
+  })
+
+  it('uses append-only output when TERM is dumb', () => {
+    const writes = []
+    const stream = { isTTY: true, write: value => writes.push(value) }
+    const reporter = createReporter({ stream, color: false, live: true, term: 'dumb' })
+    reporter.queued?.([check('lint')])
+    reporter.started(check('lint'))
+
+    assert.match(writes.join(''), /RUN\s+lint\s+npm run lint/)
+    assert.equal(writes.join('').includes('\u001B[?25'), false)
   })
 
   it('shows only Node test failures in the final test report', () => {
