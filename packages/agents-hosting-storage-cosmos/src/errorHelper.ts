@@ -179,12 +179,6 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'The data structure exceeds the maximum nesting depth of {maxDepth} levels. {additionalMessage} This limit is imposed to prevent stack overflow errors when storing deeply nested objects in Cosmos DB.',
   },
 
-  /** Error thrown when a built-in storage version is not supported. */
-  UnsupportedStorageVersion: {
-    code: -100020,
-    description: 'Storage version "{storageVersion}" is not supported.',
-  },
-
   /** Error thrown when an empty V2 storage version token is provided. */
   StorageV2ExpectedVersionEmpty: {
     code: -100021,

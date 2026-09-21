@@ -7,15 +7,13 @@ import {
   StorageOperationStatus,
   StorageReadResults,
   StorageV2,
-  StorageVersions,
   StorageWriteOptions,
   StorageWriteResults,
 } from '../../../src/storage'
 import { TurnContext } from '../../../src/turnContext'
 import { BaseAdapter } from '../../../src/baseAdapter'
 
-class RecordingHandlerStorage implements StorageV2 {
-  readonly storageVersion = StorageVersions.V2
+class RecordingHandlerStorage extends StorageV2 {
   changes?: Record<string, object>
   options?: StorageWriteOptions
 

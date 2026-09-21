@@ -61,6 +61,12 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'Blob Storage V2 {operation} failed for key "{key}".'
   },
 
+  /** Error thrown when a legacy Blob Storage write fails unexpectedly. */
+  StorageWriteFailed: {
+    code: -160008,
+    description: 'Blob Storage failed to write key "{key}".'
+  },
+
   /** Error thrown when a V2 storage key is empty or whitespace. */
   StorageV2KeyRequired: {
     code: -160006,
@@ -71,12 +77,6 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   StorageV2WriteModeUnsupported: {
     code: -160007,
     description: 'Storage V2 write mode "{mode}" is not supported.'
-  },
-
-  /** Error thrown when a built-in storage version is not supported. */
-  UnsupportedStorageVersion: {
-    code: -160008,
-    description: 'Storage version "{storageVersion}" is not supported.'
   },
 
   /** Error thrown when V2 write changes are missing or invalid. */

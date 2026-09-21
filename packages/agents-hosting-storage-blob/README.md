@@ -4,9 +4,9 @@
 
 This package allows to configure Azure Blob Storage as the backend for Agents conversation State
 
-`BlobsStorage` retains the legacy `Storage` contract by default. Set
-`storageVersion: 2` in its options to select `StorageV2`; V2 calls return keyed
-operation results with `value`, `status`, and `version`.
+`BlobsStorage` retains the legacy `Storage` contract. Use `BlobsStorageV2` for
+the separate `StorageV2` contract; V2 calls return keyed operation results with
+`value`, `status`, and `version`.
 
 ## Usage with connectionStrings
 
@@ -17,9 +17,7 @@ const userState = new UserState(blobStorage)
 ```
 
 ```ts
-const blobStorageV2 = new BlobsStorage(containerName, connectionString, {
-  storageVersion: 2,
-})
+const blobStorageV2 = new BlobsStorageV2(containerName, connectionString)
 ```
 
 

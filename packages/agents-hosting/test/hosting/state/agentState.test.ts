@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from 'node:test'
 import assert from 'node:assert'
-import { TurnContext, MemoryStorage } from '../../../src'
+import { TurnContext, MemoryStorage, MemoryStorageV2 } from '../../../src'
 import { AgentState } from '../../../src/state/agentState'
 import {
   StorageDeleteResults,
@@ -9,15 +9,12 @@ import {
   Storage,
   StorageProvider,
   StorageV2,
-  StorageVersions,
   StorageWriteOptions,
   StorageWriteResults,
   StoreItem,
 } from '../../../src/storage/storage'
 
-class FailedWriteStorage implements StorageV2 {
-  readonly storageVersion = StorageVersions.V2
-
+class FailedWriteStorage extends StorageV2 {
   async read<T extends object> (keys: string[]): Promise<StorageReadResults<T>> {
     return Object.fromEntries(keys.map(key => [key, { key, status: StorageOperationStatus.NotFound }]))
   }
@@ -31,8 +28,7 @@ class FailedWriteStorage implements StorageV2 {
   }
 }
 
-class RecordingAgentStateStorage implements StorageV2 {
-  readonly storageVersion = StorageVersions.V2
+class RecordingAgentStateStorage extends StorageV2 {
   changes?: Record<string, object>
   options?: StorageWriteOptions
 
@@ -223,13 +219,13 @@ describe('AgentState', () => {
 
       await assert.rejects(
         failedState.saveChanges(mockContext, true),
-        /write failed for key "mockKey" with status "conflict"/
+        /AgentState 'AgentState' could not save key 'mockKey' because another turn updated the state first \(status: conflict\)\. This turn's state changes were not saved\./
       )
 
       assert.strictEqual(mockContext.turnState.get(failedState['stateKey']).hash, 'oldHash')
     })
 
-    test('keeps V2 writes unconditional without adding a wildcard legacy eTag', async () => {
+    test('writes the version loaded from V2 storage without adding a legacy eTag', async () => {
       const storageV2 = new RecordingAgentStateStorage()
       const state = new AgentState(storageV2, storageKeyFactory)
       const loaded = await state.load(mockContext)
@@ -237,10 +233,49 @@ describe('AgentState', () => {
 
       await state.saveChanges(mockContext)
 
-      assert.strictEqual(storageV2.options, undefined)
+      assert.deepStrictEqual(storageV2.options, { expectedVersion: 'version-1' })
       assert.deepStrictEqual(storageV2.changes, {
         mockKey: { newKey: 'newValue', eTag: 'business-value' },
       })
+    })
+
+    test('rejects a stale V2 state write instead of overwriting a newer save', async () => {
+      const storageV2 = new MemoryStorageV2()
+      await storageV2.write({ mockKey: { value: 'original' } })
+      const first = new AgentState(storageV2, storageKeyFactory)
+      const second = new AgentState(storageV2, storageKeyFactory)
+      const firstContext = { turnState: new Map() } as unknown as TurnContext
+      const secondContext = { turnState: new Map() } as unknown as TurnContext
+
+      ;(await first.load(firstContext)).value = 'first'
+      ;(await second.load(secondContext)).value = 'second'
+      await first.saveChanges(firstContext)
+
+      await assert.rejects(
+        second.saveChanges(secondContext),
+        /AgentState 'AgentState' could not save key 'mockKey' because another turn updated the state first \(status: conditionNotMet\)\. This turn's state changes were not saved\./
+      )
+      const saved = await storageV2.read<{ value: string }>(['mockKey'])
+      assert.strictEqual(saved.mockKey.value?.value, 'first')
+    })
+
+    test('rejects a delayed initial state write instead of overwriting a newer save', async () => {
+      const storageV2 = new MemoryStorageV2()
+      const slow = new AgentState(storageV2, storageKeyFactory)
+      const fast = new AgentState(storageV2, storageKeyFactory)
+      const slowContext = { turnState: new Map() } as unknown as TurnContext
+      const fastContext = { turnState: new Map() } as unknown as TurnContext
+
+      ;(await slow.load(slowContext)).lastWriter = 'slow'
+      ;(await fast.load(fastContext)).lastWriter = 'fast'
+      await fast.saveChanges(fastContext)
+
+      await assert.rejects(
+        slow.saveChanges(slowContext),
+        /AgentState 'AgentState' could not save key 'mockKey' because another turn updated the state first \(status: conflict\)\. This turn's state changes were not saved\./
+      )
+      const saved = await storageV2.read<{ lastWriter: string }>(['mockKey'])
+      assert.strictEqual(saved.mockKey.value?.lastWriter, 'fast')
     })
   })
 

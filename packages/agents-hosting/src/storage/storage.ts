@@ -170,73 +170,38 @@ export interface StorageDeleteOptions {
   expectedVersion?: string;
 }
 
-/** Supported storage contract versions. */
-export const StorageVersions = {
-  V1: 1,
-  V2: 2,
-} as const
-
-/** The storage contract selected when a built-in provider is created. */
-export type StorageVersion = typeof StorageVersions[keyof typeof StorageVersions]
-
-/**
- * Selects a storage contract when a built-in provider is created.
- *
- * @remarks
- * `storageVersion` is the runtime discriminator for {@link StorageProvider}; custom legacy
- * providers must not use the value `2` unless they implement {@link StorageV2}. Keep the version
- * as a numeric literal when options are stored in a variable. Use `as const`, `satisfies`, or an
- * explicit `StorageVersionOptions` type because a mutable object can widen `2` to `number` and
- * prevent version-specific return-type inference.
- */
-export interface StorageVersionOptions<V extends StorageVersion> {
-  storageVersion: V;
-}
-
-/** Read result selected by a built-in provider's storage version. */
-export type StorageReadReturn<V extends StorageVersion, T extends object = Record<string, unknown>> =
-  V extends typeof StorageVersions.V2 ? StorageReadResults<T> : StoreItem
-
-/** Write values selected by a built-in provider's storage version. */
-export type StorageWriteChanges<V extends StorageVersion, T extends object = Record<string, unknown>> =
-  V extends typeof StorageVersions.V2 ? Record<string, T> : StoreItem
-
-/** Additional write arguments selected by a built-in provider's storage version. */
-export type StorageWriteArguments<V extends StorageVersion> =
-  V extends typeof StorageVersions.V2 ? [options?: StorageWriteOptions] : []
-
-/** Write result selected by a built-in provider's storage version. */
-export type StorageWriteReturn<V extends StorageVersion> =
-  V extends typeof StorageVersions.V2 ? StorageWriteResults : void
-
-/** Additional delete arguments selected by a built-in provider's storage version. */
-export type StorageDeleteArguments<V extends StorageVersion> =
-  V extends typeof StorageVersions.V2 ? [options?: StorageDeleteOptions] : []
-
-/** Delete result selected by a built-in provider's storage version. */
-export type StorageDeleteReturn<V extends StorageVersion> =
-  V extends typeof StorageVersions.V2 ? StorageDeleteResults : void
-
-/**
- * The version-selected contract implemented by built-in storage providers.
- * The version literal selects the input and result types of every operation.
- */
-export interface VersionedStorage<V extends StorageVersion> {
-  readonly storageVersion: V;
-
-  read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadReturn<V, T>>;
-  write<T extends object = Record<string, unknown>>(changes: StorageWriteChanges<V, T>, ...args: StorageWriteArguments<V>): Promise<StorageWriteReturn<V>>;
-  delete(keys: string[], ...args: StorageDeleteArguments<V>): Promise<StorageDeleteReturn<V>>;
-}
-
 /**
  * The version 2 storage contract.
  *
- * This intentionally does not extend {@link Storage}: JavaScript cannot
- * overload methods by return type at runtime.
+ * This does not extend {@link Storage}: JavaScript cannot overload methods by
+ * return type at runtime. V2 providers are exposed as separately named classes.
  */
-export interface StorageV2 extends VersionedStorage<typeof StorageVersions.V2> {
-  readonly storageVersion: typeof StorageVersions.V2;
+export abstract class StorageV2 {
+  /**
+   * Reads stored values and returns one result for every requested key.
+   *
+   * @param keys The keys to read. An empty array is valid.
+   * @returns Keyed results containing a value and storage version when found.
+   */
+  abstract read<T extends object = Record<string, unknown>> (keys: string[]): Promise<StorageReadResults<T>>
+
+  /**
+   * Writes values with optional create, replace, or version conditions.
+   *
+   * @param changes Values indexed by their storage keys.
+   * @param options Conditions applied to every value in the batch.
+   * @returns One result for every supplied key.
+   */
+  abstract write<T extends object = Record<string, unknown>> (changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults>
+
+  /**
+   * Deletes values with an optional version condition.
+   *
+   * @param keys The keys to delete. An empty array is valid.
+   * @param options Conditions applied to every key in the batch.
+   * @returns One result for every supplied key.
+   */
+  abstract delete (keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults>
 }
 
 /** A storage implementation supported by public hosting interfaces. */

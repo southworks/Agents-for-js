@@ -6,8 +6,8 @@
 import { StorageOperationStatus, StorageProvider, StorageReadResults, StorageWriteMode, StoreItems } from '../storage'
 import {
   asStorageV2,
+  assertAgentStateWriteSucceeded,
   assertStorageDeleteSucceeded,
-  assertStorageWriteSucceeded,
   getStorageReadValue,
   isStorageV2,
 } from '../storage/storageCompatibility'
@@ -376,7 +376,7 @@ export class TurnState<
             { [key]: value },
             options
           ).then(results => {
-            assertStorageWriteSucceeded(results, [key])
+            assertAgentStateWriteSucceeded(results, key, this.getStorageScopeName(key))
             this._versions[key] = results?.[key]?.version
             this._missingStorageKeys.delete(key)
           }))
@@ -397,6 +397,10 @@ export class TurnState<
         await Promise.all(promises)
       }
     }
+  }
+
+  private getStorageScopeName (storageKey: string): string {
+    return Object.entries(this._scopes).find(([, entry]) => entry.storageKey === storageKey)?.[0] ?? this.constructor.name
   }
 
   /**

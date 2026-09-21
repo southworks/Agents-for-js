@@ -7,17 +7,16 @@ import { Activity } from '@microsoft/agents-activity'
 import { TestAdapter } from '../testStubs'
 import { TurnContext } from '../../../src/turnContext'
 import {
+  MemoryStorageV2,
   StorageOperationStatus,
   StorageReadResults,
   StorageV2,
-  StorageVersions,
   StorageWriteMode,
   StorageWriteOptions,
   StorageWriteResults,
 } from '../../../src/storage'
 
-class RecordingTurnStateStorage implements StorageV2 {
-  readonly storageVersion = StorageVersions.V2
+class RecordingTurnStateStorage extends StorageV2 {
   readonly writes: Array<{ key: string, options?: StorageWriteOptions }> = []
 
   async read<T extends object> (keys: string[]): Promise<StorageReadResults<T>> {
@@ -192,6 +191,43 @@ describe('TurnState', () => {
       key: 'test/test/conversations/test',
       options: { mode: StorageWriteMode.CreateOnly },
     }])
+  })
+
+  it('uses the stale-turn error message when a V2 write condition is not met', async () => {
+    const storage = new RecordingTurnStateStorage()
+    storage.write = async changes => {
+      const key = Object.keys(changes)[0]
+      return { [key]: { key, status: StorageOperationStatus.ConditionNotMet } }
+    }
+    const versionedState = new TurnState()
+    await versionedState.load(context, storage)
+    versionedState.setValue('conversation.counter', 1)
+
+    await assert.rejects(
+      versionedState.save(context, storage),
+      /AgentState 'conversation' could not save key 'test\/test\/conversations\/test' because another turn updated the state first \(status: conditionNotMet\)\. This turn's state changes were not saved\./
+    )
+  })
+
+  it('rejects a delayed conversation save after a faster turn persists the loaded version', async () => {
+    const storage = new MemoryStorageV2()
+    const storageKey = 'test/test/conversations/test'
+    await storage.write({ [storageKey]: { counter: 0 } })
+    const slow = new TurnState()
+    const fast = new TurnState()
+
+    await slow.load(context, storage)
+    await fast.load(context, storage)
+    slow.setValue('conversation.lastWriter', 'slow')
+    fast.setValue('conversation.lastWriter', 'fast')
+    await fast.save(context, storage)
+
+    await assert.rejects(
+      slow.save(context, storage),
+      /AgentState 'conversation' could not save key 'test\/test\/conversations\/test' because another turn updated the state first \(status: conditionNotMet\)\. This turn's state changes were not saved\./
+    )
+    const saved = await storage.read<{ lastWriter: string }>([storageKey])
+    assert.strictEqual(saved[storageKey].value?.lastWriter, 'fast')
   })
 
   it('clears a scope version after deleting V2 state', async () => {

@@ -3,12 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import { StorageKeyFactory, StorageProvider, StorageV2, StoreItem } from '../storage/storage'
+import { StorageKeyFactory, StorageOperationStatus, StorageProvider, StorageV2, StorageWriteMode, StoreItem } from '../storage/storage'
 import {
   asStorageV2,
+  assertAgentStateWriteSucceeded,
   assertStorageDeleteSucceeded,
-  assertStorageWriteSucceeded,
   getStorageReadValue,
+  isStorageV2,
 } from '../storage/storageCompatibility'
 import { TurnContext } from '../turnContext'
 import { createHash } from 'node:crypto'
@@ -32,6 +33,10 @@ export interface CachedAgentState {
    * Hash of the state used to detect changes
    */
   hash: string;
+  /** Version returned when the state was loaded, used to reject stale V2 writes. */
+  version?: string;
+  /** Whether the state was not found when it was loaded. */
+  isNew?: boolean;
 }
 
 /**
@@ -114,7 +119,12 @@ export class AgentState {
       const storedItems = await this.internalStorage.read<Record<string, any>>([key])
       const state: any = getStorageReadValue(storedItems, key) ?? {}
       const hash: string = this.calculateChangeHash(state)
-      context.turnState.set(this.stateKey, { state, hash })
+      context.turnState.set(this.stateKey, {
+        state,
+        hash,
+        version: storedItems[key]?.version,
+        isNew: storedItems[key]?.status === StorageOperationStatus.NotFound,
+      })
 
       return state
     }
@@ -142,8 +152,18 @@ export class AgentState {
       const key: string = await this.getStorageOrCustomKey(customKey, context)
 
       logger.info(`Writing storage with key ${key}`)
-      const results = await this.internalStorage.write({ [key]: cached.state })
-      assertStorageWriteSucceeded(results, [key])
+      const results = await this.internalStorage.write(
+        { [key]: cached.state },
+        cached.version !== undefined
+          ? { expectedVersion: cached.version }
+          : cached.isNew && isStorageV2(this.storage)
+            ? { mode: StorageWriteMode.CreateOnly }
+            : undefined
+      )
+      assertAgentStateWriteSucceeded(results, key, this.constructor.name)
+      const result = results[key]
+      cached.version = result.version
+      cached.isNew = false
       cached.hash = this.calculateChangeHash(cached.state)
       context.turnState.set(this.stateKey, cached)
     }

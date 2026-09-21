@@ -794,12 +794,6 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
     description: 'The legacy storage adapter does not support the V2 storage option "{option}".'
   },
 
-  /** Error thrown when a built-in storage version is not supported. */
-  StorageVersionUnsupported: {
-    code: -120705,
-    description: 'Storage version "{storageVersion}" is not supported.'
-  },
-
   /** Error thrown when an empty V2 storage version token is provided. */
   StorageV2ExpectedVersionEmpty: {
     code: -120706,
@@ -834,6 +828,12 @@ export const Errors: { [key: string]: AgentErrorDefinition } = {
   StorageV2WriteModeUnsupported: {
     code: -120711,
     description: 'Storage V2 write mode "{mode}" is not supported.'
+  },
+
+  /** Error thrown when another turn saved state after this turn loaded it. */
+  AgentStateWriteConflict: {
+    code: -120712,
+    description: "AgentState '{name}' could not save key '{key}' because another turn updated the state first (status: {status}). This turn's state changes were not saved."
   },
 
   /**

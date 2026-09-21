@@ -11,25 +11,48 @@ import { trace } from '@microsoft/agents-telemetry'
 import { Errors } from '../errorHelper'
 import { StorageTraceDefinitions } from '../observability'
 import {
-  StorageDeleteArguments,
   StorageDeleteOptions,
   StorageDeleteResults,
-  StorageDeleteReturn,
   StorageOperationStatus,
   StorageReadResults,
-  StorageReadReturn,
-  StorageVersion,
-  StorageVersions,
-  StorageVersionOptions,
-  StorageWriteArguments,
-  StorageWriteChanges,
   StorageWriteMode,
   StorageWriteOptions,
   StorageWriteResults,
-  StorageWriteReturn,
+  Storage,
+  StorageV2,
   StoreItem,
-  VersionedStorage,
 } from './storage'
+
+class FileStorageInternals {
+  private readonly statePath: string
+  private readonly versionsPath: string
+  readonly state: Record<string, unknown>
+  readonly versions: Record<string, string>
+
+  constructor (folder: string) {
+    fs.mkdirSync(folder, { recursive: true })
+    this.statePath = path.join(folder, 'state.json')
+    this.versionsPath = path.join(folder, 'state.versions.json')
+    if (!fs.existsSync(this.statePath)) fs.writeFileSync(this.statePath, '{}')
+    this.state = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as Record<string, unknown>
+    this.versions = fs.existsSync(this.versionsPath)
+      ? JSON.parse(fs.readFileSync(this.versionsPath, 'utf8')) as Record<string, string>
+      : {}
+  }
+
+  flush (): void {
+    fs.writeFileSync(this.statePath, JSON.stringify(this.state, null, 2))
+    if (fs.existsSync(this.versionsPath) || Object.keys(this.versions).length > 0) {
+      fs.writeFileSync(this.versionsPath, JSON.stringify(this.versions, null, 2))
+    }
+  }
+
+  getOrCreateVersion (key: string): string {
+    const version = this.versions[key] ?? randomUUID()
+    this.versions[key] = version
+    return version
+  }
+}
 
 /**
  * A file-based storage implementation that persists data to the local filesystem.
@@ -41,9 +64,12 @@ import {
  *
  * Values remain a key-value JSON object in `state.json`. V2 keeps generated storage versions in
  * `state.versions.json` so a value's own `eTag` property is not changed. All operations use
- * synchronous file I/O wrapped in Promise interfaces. Omit `storageVersion` to retain the legacy
- * Storage contract. Set `storageVersion: 2` in the second constructor argument to select StorageV2.
+ * synchronous file I/O wrapped in Promise interfaces. Use {@link FileStorageV2} for the
+ * structured StorageV2 contract.
  * V2 supports create-only, replace, and expected-version conditions.
+ *
+ * The inherited constructor creates the folder and `state.json` when needed, then loads values
+ * and V2 version metadata into memory. It creates `state.versions.json` on the first V2 write.
  *
  * ### Warning
  * This implementation does not provide:
@@ -56,7 +82,7 @@ import {
  * @example
  * ```typescript
  * const legacyStorage = new FileStorage('./data')
- * const storageV2 = new FileStorage('./data-v2', { storageVersion: 2 })
+ * const storageV2 = new FileStorageV2('./data-v2')
  *
  * await storageV2.write({
  *   user123: { name: 'John', lastSeen: new Date().toISOString() }
@@ -68,267 +94,197 @@ import {
  * await storageV2.delete(['user123'])
  * ```
  */
-export class FileStorage<V extends StorageVersion = typeof StorageVersions.V1> implements VersionedStorage<V> {
-  readonly storageVersion: V
-  private readonly statePath: string
-  private readonly versionsPath: string
-  private state: Record<string, unknown>
-  private versions: Record<string, string>
-
+export class FileStorage extends FileStorageInternals implements Storage {
   /**
-   * Creates a FileStorage instance that stores data in the specified folder.
+   * Reads legacy items from `state.json`.
    *
-   * @param folder The absolute or relative folder where `state.json` is stored
-   * @param options The storage contract version; omit it to use the legacy contract
-   * @throws May throw filesystem errors if the folder or state file cannot be created or read
-   *
-   * @remarks
-   * The constructor creates the folder and state file when needed, then loads values and any V2
-   * version metadata into memory. The V2 version file is created on the first V2 write.
-   * When options are stored in a variable, preserve `storageVersion` as a literal with `as const`,
-   * `satisfies`, or an explicit {@link StorageVersionOptions} type so return types follow the version.
+   * @param keys The keys to read; must not be empty.
+   * @returns Existing items keyed by storage key. Missing keys are omitted.
    */
-  constructor (folder: string)
-  constructor (folder: string, options: StorageVersionOptions<V>)
-  constructor (folder: string, options?: StorageVersionOptions<V>) {
-    const storageVersion = options?.storageVersion ?? StorageVersions.V1
-    validateStorageVersion(storageVersion)
-    this.storageVersion = storageVersion as V
-
-    fs.mkdirSync(folder, { recursive: true })
-    this.statePath = path.join(folder, 'state.json')
-    this.versionsPath = path.join(folder, 'state.versions.json')
-    if (!fs.existsSync(this.statePath)) fs.writeFileSync(this.statePath, '{}')
-    this.state = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as Record<string, unknown>
-    this.versions = fs.existsSync(this.versionsPath)
-      ? JSON.parse(fs.readFileSync(this.versionsPath, 'utf8')) as Record<string, string>
-      : {}
-  }
-
-  /**
-   * Reads store items from the filesystem storage.
-   *
-   * @param keys The keys to read
-   * @returns Legacy items for V1, or one keyed operation result per requested key for V2
-   * @throws ReferenceError when the key input is invalid
-   *
-   * @remarks
-   * Reads use the in-memory state loaded during construction. External file changes are not observed.
-   * V2 returns cloned values so caller mutations do not modify cached or persisted state.
-   */
-  async read<T extends object = Record<string, unknown>> (keys: string[]): Promise<StorageReadReturn<V, T>> {
+  async read (keys: string[]): Promise<StoreItem> {
     return trace(StorageTraceDefinitions.read, async ({ record }) => {
       record({ keyCount: keys?.length })
-      if (this.storageVersion === StorageVersions.V2) {
-        return await this.readV2<T>(keys) as StorageReadReturn<V, T>
+      if (!keys || keys.length === 0) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
       }
-      return await this.readV1(keys) as StorageReadReturn<V, T>
+      return Object.fromEntries(keys
+        .filter(key => Boolean(this.state[key]))
+        .map(key => [key, this.state[key]])) as StoreItem
     })
   }
 
   /**
-   * Writes store items to the filesystem storage.
+   * Writes legacy items to `state.json`.
    *
-   * @param changes The key-value items to write
-   * @param args V2 write options; unavailable for V1
-   * @returns Nothing for V1, or one keyed operation result per change for V2
-   *
-   * @remarks
-   * The method updates the in-memory state and rewrites the complete state file with two-space
-   * indentation. V1 retains legacy unconditional-write behavior. V2 supports write modes and
-   * expected-version conditions and generates a new version for each successful write.
+   * @param changes The items to write, keyed by storage key.
+   * @throws If `changes` is invalid or the file cannot be written.
    */
-  async write<T extends object = Record<string, unknown>> (
-    changes: StorageWriteChanges<V, T>,
-    ...args: StorageWriteArguments<V>
-  ): Promise<StorageWriteReturn<V>> {
+  async write (changes: StoreItem): Promise<void> {
     return trace(StorageTraceDefinitions.write, async ({ record }) => {
       record({ keyCount: changes ? Object.keys(changes).length : undefined })
-      if (this.storageVersion === StorageVersions.V2) {
-        const [options] = args as [StorageWriteOptions?]
-        return await this.writeV2(changes as Record<string, T>, options) as StorageWriteReturn<V>
+      if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageWriteChangesRequired)
       }
-      await this.writeV1(changes as StoreItem)
-      return undefined as StorageWriteReturn<V>
+      Object.assign(this.state, changes)
+      for (const key of Object.keys(changes)) delete this.versions[key]
+      this.flush()
     })
   }
 
   /**
-   * Deletes store items from the filesystem storage.
+   * Deletes legacy items from `state.json`.
    *
-   * @param keys The keys to delete
-   * @param args V2 delete options; unavailable for V1
-   * @returns Nothing for V1, or one keyed operation result per requested key for V2
-   * @throws ReferenceError when the key input is invalid
-   *
-   * @remarks
-   * Successful deletes update the in-memory state and rewrite the complete state file. V1 silently
-   * ignores missing keys. V2 reports missing keys and expected-version failures in its results.
+   * @param keys The keys to delete; must not be empty. Missing keys are ignored.
    */
-  async delete (keys: string[], ...args: StorageDeleteArguments<V>): Promise<StorageDeleteReturn<V>> {
+  async delete (keys: string[]): Promise<void> {
     return trace(StorageTraceDefinitions.delete, async ({ record }) => {
       record({ keyCount: keys?.length })
-      if (this.storageVersion === StorageVersions.V2) {
-        const [options] = args as [StorageDeleteOptions?]
-        return await this.deleteV2(keys, options) as StorageDeleteReturn<V>
+      if (!keys || keys.length === 0) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageDeleteKeysRequired)
       }
-      await this.deleteV1(keys)
-      return undefined as StorageDeleteReturn<V>
-    })
-  }
-
-  /**
-   * Reads legacy items from the in-memory file snapshot.
-   *
-   * @param keys The keys to read
-   * @returns The stored items; missing keys are omitted
-   * @throws When keys are missing or empty
-   */
-  private async readV1 (keys: string[]): Promise<StoreItem> {
-    if (!keys || keys.length === 0) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
-    }
-
-    return Object.fromEntries(keys
-      .filter(key => Boolean(this.state[key]))
-      .map(key => [key, this.state[key]])) as StoreItem
-  }
-
-  /**
-   * Reads cloned V2 items with one status and version result per requested key.
-   *
-   * @param keys The keys to read
-   * @returns The keyed V2 read results
-   * @throws When the key input is invalid
-   */
-  private async readV2<T extends object> (keys: string[]): Promise<StorageReadResults<T>> {
-    validateV2Keys(keys)
-    return Object.fromEntries(keys.map(key => {
-      if (!Object.prototype.hasOwnProperty.call(this.state, key)) {
-        return [key, { key, status: StorageOperationStatus.NotFound }]
-      }
-      const value = structuredClone(this.state[key]) as T
-      return [key, {
-        key,
-        status: StorageOperationStatus.Succeeded,
-        value,
-        version: this.versions[key],
-      }]
-    }))
-  }
-
-  /**
-   * Writes legacy items and flushes the complete state file.
-   *
-   * @param changes The keyed legacy items to write
-   * @throws When the input is invalid
-   */
-  private async writeV1 (changes: StoreItem): Promise<void> {
-    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageWriteChangesRequired)
-    }
-    Object.assign(this.state, changes)
-    for (const key of Object.keys(changes)) delete this.versions[key]
-    this.flush()
-  }
-
-  /**
-   * Writes cloned V2 items with mode and expected-version conditions.
-   *
-   * @param changes The keyed values to write
-   * @param options The V2 write mode and expected version
-   * @returns One keyed operation result per change
-   * @throws When the input or options are invalid
-   */
-  private async writeV2<T extends object> (changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults> {
-    validateExpectedVersion(options?.expectedVersion)
-    validateV2Changes(changes)
-
-    const results: StorageWriteResults = {}
-    const mode = options?.mode ?? StorageWriteMode.Upsert
-    validateWriteMode(mode)
-    let changed = false
-    for (const [key, value] of Object.entries(changes)) {
-      const current = this.state[key]
-      const currentVersion = this.versions[key]
-      if (mode === StorageWriteMode.CreateOnly && current !== undefined) {
-        results[key] = { key, status: StorageOperationStatus.Conflict, version: currentVersion }
-      } else if (mode === StorageWriteMode.Replace && current === undefined) {
-        results[key] = { key, status: StorageOperationStatus.NotFound }
-      } else if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
-        results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version: currentVersion }
-      } else {
-        const version = randomUUID()
-        this.state[key] = structuredClone(value)
-        this.versions[key] = version
-        results[key] = { key, status: StorageOperationStatus.Succeeded, version }
-        changed = true
-      }
-    }
-    if (changed) this.flush()
-    return results
-  }
-
-  /**
-   * Deletes legacy items and flushes the complete state file.
-   *
-   * @param keys The keys to delete
-   * @throws When keys are missing or empty
-   */
-  private async deleteV1 (keys: string[]): Promise<void> {
-    if (!keys || keys.length === 0) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageDeleteKeysRequired)
-    }
-    for (const key of keys) {
-      delete this.state[key]
-      delete this.versions[key]
-    }
-    this.flush()
-  }
-
-  /**
-   * Deletes V2 items with an optional expected-version condition.
-   *
-   * @param keys The keys to delete
-   * @param options The optional expected version
-   * @returns One keyed operation result per requested key
-   * @throws When the key input or options are invalid
-   */
-  private async deleteV2 (keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults> {
-    validateExpectedVersion(options?.expectedVersion)
-    validateV2Keys(keys)
-
-    const results: StorageDeleteResults = {}
-    let changed = false
-    for (const key of keys) {
-      const current = this.state[key]
-      const currentVersion = this.versions[key]
-      if (current === undefined) {
-        results[key] = { key, status: StorageOperationStatus.NotFound }
-      } else if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
-        results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version: currentVersion }
-      } else {
+      for (const key of keys) {
         delete this.state[key]
         delete this.versions[key]
-        results[key] = { key, status: StorageOperationStatus.Succeeded, version: currentVersion }
-        changed = true
       }
-    }
-    if (changed) this.flush()
-    return results
-  }
-
-  private flush (): void {
-    fs.writeFileSync(this.statePath, JSON.stringify(this.state, null, 2))
-    if (this.storageVersion === StorageVersions.V2 || fs.existsSync(this.versionsPath)) {
-      fs.writeFileSync(this.versionsPath, JSON.stringify(this.versions, null, 2))
-    }
+      this.flush()
+    })
   }
 }
 
-function validateStorageVersion (storageVersion: number): asserts storageVersion is StorageVersion {
-  if (!Object.values(StorageVersions).some(version => version === storageVersion)) {
-    throw ExceptionHelper.generateException(RangeError, Errors.StorageVersionUnsupported, undefined, { storageVersion: String(storageVersion) })
+/**
+ * A file-backed provider for the structured {@link StorageV2} contract.
+ *
+ * This is the V2 counterpart to {@link FileStorage}. Values are stored in `state.json`, while
+ * generated storage versions are stored separately in `state.versions.json`; an `eTag` property
+ * in an application value is therefore preserved. Reads and mutations return a result for every
+ * requested key and support create-only, replace, and expected-version conditions.
+ *
+ * Like {@link FileStorage}, this provider is for development, local testing, and single-instance
+ * deployments. It does not provide cross-process concurrency or multi-key atomicity.
+ */
+export class FileStorageV2 extends StorageV2 {
+  private readonly internals: FileStorageInternals
+
+  /**
+   * Creates a V2 file storage provider.
+   *
+   * @param folder The absolute or relative folder where `state.json` is stored.
+   * @throws May throw filesystem errors if the folder or state file cannot be created or read.
+   */
+  constructor (folder: string) {
+    super()
+    this.internals = new FileStorageInternals(folder)
+  }
+
+  /**
+   * Reads items and their stored versions from the local state files.
+   *
+   * @param keys The keys to read. Empty batches are valid.
+   * @returns A result for every key, with `notFound` for missing items. Returned values are cloned.
+   */
+  async read<T extends object = Record<string, unknown>> (keys: string[]): Promise<StorageReadResults<T>> {
+    return trace(StorageTraceDefinitions.read, async ({ record }) => {
+      record({ keyCount: keys?.length })
+      validateV2Keys(keys)
+      let createdVersion = false
+      const results = Object.fromEntries(keys.map(key => {
+        if (!Object.prototype.hasOwnProperty.call(this.internals.state, key)) {
+          return [key, { key, status: StorageOperationStatus.NotFound }]
+        }
+        const value = structuredClone(this.internals.state[key]) as T
+        const version = this.internals.versions[key]
+        createdVersion ||= version === undefined
+        return [key, {
+          key,
+          status: StorageOperationStatus.Succeeded,
+          value,
+          version: version ?? this.internals.getOrCreateVersion(key),
+        }]
+      }))
+      if (createdVersion) this.internals.flush()
+      return results
+    })
+  }
+
+  /**
+   * Writes cloned items and generated versions to the local state files.
+   *
+   * @param changes The values to write, keyed by storage key.
+   * @param options Create-only, replace, or expected-version conditions.
+   * @returns A result for every supplied key, including concurrency-condition outcomes.
+   */
+  async write<T extends object = Record<string, unknown>> (changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults> {
+    return trace(StorageTraceDefinitions.write, async ({ record }) => {
+      record({ keyCount: changes ? Object.keys(changes).length : undefined })
+      validateExpectedVersion(options?.expectedVersion)
+      validateV2Changes(changes)
+
+      const results: StorageWriteResults = {}
+      const mode = options?.mode ?? StorageWriteMode.Upsert
+      validateWriteMode(mode)
+      let changed = false
+      let createdVersion = false
+      for (const [key, value] of Object.entries(changes)) {
+        const current = this.internals.state[key]
+        createdVersion ||= current !== undefined && this.internals.versions[key] === undefined
+        const currentVersion = current === undefined
+          ? undefined
+          : this.internals.getOrCreateVersion(key)
+        if (mode === StorageWriteMode.CreateOnly && current !== undefined) {
+          results[key] = { key, status: StorageOperationStatus.Conflict, version: currentVersion }
+        } else if (mode === StorageWriteMode.Replace && current === undefined) {
+          results[key] = { key, status: StorageOperationStatus.NotFound }
+        } else if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
+          results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version: currentVersion }
+        } else {
+          const version = randomUUID()
+          this.internals.state[key] = structuredClone(value)
+          this.internals.versions[key] = version
+          results[key] = { key, status: StorageOperationStatus.Succeeded, version }
+          changed = true
+        }
+      }
+      if (changed || createdVersion) this.internals.flush()
+      return results
+    })
+  }
+
+  /**
+   * Deletes items and their versions from the local state files.
+   *
+   * @param keys The keys to delete. Empty batches are valid.
+   * @param options An optional expected storage version.
+   * @returns A result for every supplied key.
+   */
+  async delete (keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults> {
+    return trace(StorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length })
+      validateExpectedVersion(options?.expectedVersion)
+      validateV2Keys(keys)
+
+      const results: StorageDeleteResults = {}
+      let changed = false
+      let createdVersion = false
+      for (const key of keys) {
+        const current = this.internals.state[key]
+        createdVersion ||= current !== undefined && this.internals.versions[key] === undefined
+        const currentVersion = current === undefined
+          ? undefined
+          : this.internals.getOrCreateVersion(key)
+        if (current === undefined) {
+          results[key] = { key, status: StorageOperationStatus.NotFound }
+        } else if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
+          results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version: currentVersion }
+        } else {
+          delete this.internals.state[key]
+          delete this.internals.versions[key]
+          results[key] = { key, status: StorageOperationStatus.Succeeded, version: currentVersion }
+          changed = true
+        }
+      }
+      if (changed || createdVersion) this.internals.flush()
+      return results
+    })
   }
 }
 

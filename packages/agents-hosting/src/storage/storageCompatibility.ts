@@ -13,7 +13,6 @@ import {
   StorageProvider,
   StorageReadResults,
   StorageV2,
-  StorageVersions,
   StorageWriteMode,
   StorageWriteOptions,
   StorageWriteResults,
@@ -21,7 +20,7 @@ import {
 
 /** Returns true when a storage implementation declares the V2 contract. */
 export function isStorageV2 (storage: StorageProvider): storage is StorageV2 {
-  return (storage as Partial<StorageV2>).storageVersion === StorageVersions.V2
+  return storage instanceof StorageV2
 }
 
 /** Converts a supported storage implementation to the V2 contract. */
@@ -38,10 +37,10 @@ export function getStorageReadValue<T extends object> (results: StorageReadResul
 }
 
 /** Adapts the legacy storage contract to version 2 where its semantics allow it. */
-class StorageToStorageV2Adapter implements StorageV2 {
-  readonly storageVersion = StorageVersions.V2
-
-  constructor (private readonly storage: Storage) {}
+class StorageToStorageV2Adapter extends StorageV2 {
+  constructor (private readonly storage: Storage) {
+    super()
+  }
 
   async read<T extends object = Record<string, unknown>> (keys: string[]): Promise<StorageReadResults<T>> {
     validateKeys(keys)
@@ -123,6 +122,22 @@ function throwUnsupportedOption (option: string): never {
 /** Throws when a V2 write did not succeed for every requested key. */
 export function assertStorageWriteSucceeded (results: StorageWriteResults | null | undefined, keys: string[]): void {
   assertStorageResults('write', results, keys, new Set([StorageOperationStatus.Succeeded]))
+}
+
+/** Throws the state-specific concurrency error when a state write does not succeed. */
+export function assertAgentStateWriteSucceeded (
+  results: StorageWriteResults | null | undefined,
+  key: string,
+  name: string
+): void {
+  const status = results?.[key]?.status
+  if (status !== StorageOperationStatus.Succeeded) {
+    throw ExceptionHelper.generateException(Error, Errors.AgentStateWriteConflict, undefined, {
+      name,
+      key,
+      status: status ?? 'missing',
+    })
+  }
 }
 
 /** Throws when a V2 delete did not complete with idempotent V1 semantics. */

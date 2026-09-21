@@ -1,16 +1,15 @@
 import assert from 'node:assert'
 import { beforeEach, describe, it } from 'node:test'
-import { MemoryStorage, Storage, StorageOperationStatus, StorageV2, StorageWriteMode } from '../../../src'
+import { MemoryStorage, MemoryStorageV2, Storage, StorageOperationStatus, StorageV2, StorageWriteMode } from '../../../src'
 
 describe('MemoryStorage V2', () => {
-  let storage: MemoryStorage<2>
+  let storage: MemoryStorageV2
 
   beforeEach(() => {
-    storage = new MemoryStorage(undefined, { storageVersion: 2 })
+    storage = new MemoryStorageV2()
   })
 
   it('declares the V2 contract and returns one read result per key', async () => {
-    assert.strictEqual(storage.storageVersion, 2)
     await storage.write({ existing: { value: 'test' } })
 
     const results = await storage.read<{ value: string }>(['existing', 'missing'])
@@ -108,14 +107,6 @@ describe('MemoryStorage V2', () => {
       /write mode "invalid" is not supported/
     )
   })
-
-  it('rejects unsupported singleton storage versions', () => {
-    assert.throws(
-      // @ts-expect-error Verify runtime validation for JavaScript callers.
-      () => MemoryStorage.getSingleInstance({ storageVersion: 3 }),
-      /Storage version "3" is not supported/
-    )
-  })
 })
 
 describe('MemoryStorage V1 compatibility', () => {
@@ -128,7 +119,6 @@ describe('MemoryStorage V1 compatibility', () => {
   it('uses V1 by default and keeps the legacy read shape', async () => {
     const legacyContract: Storage = storage
     assert.strictEqual(legacyContract, storage)
-    assert.strictEqual(storage.storageVersion, 1)
     await storage.write({ key: { value: 'test', eTag: '*' } })
 
     assert.deepStrictEqual(await storage.read(['key']), {
@@ -137,9 +127,10 @@ describe('MemoryStorage V1 compatibility', () => {
     assert.deepStrictEqual(await storage.read(['missing']), {})
   })
 
-  it('is assignable to StorageV2 when V2 is selected', () => {
-    const v2Contract: StorageV2 = new MemoryStorage(undefined, { storageVersion: 2 })
-    assert.strictEqual(v2Contract.storageVersion, 2)
+  it('keeps V1 and V2 contracts on separately named classes', () => {
+    const v2Contract: StorageV2 = new MemoryStorageV2()
+    assert.ok(v2Contract)
+    assert.ok(v2Contract instanceof StorageV2)
   })
 
   it('keeps legacy eTag conflicts as thrown errors', async () => {
@@ -210,12 +201,12 @@ describe('MemoryStorage V1 compatibility', () => {
     assert.deepStrictEqual(await storage.read(['key', 'missing']), {})
   })
 
-  it('shares singleton data across V1 and V2 views', async () => {
+  it('provides a singleton for each contract', async () => {
     const v1 = MemoryStorage.getSingleInstance()
-    const v2 = MemoryStorage.getSingleInstance({ storageVersion: 2 })
+    const v2 = MemoryStorageV2.getSingleInstance()
     await v1.write({ shared: { value: 'test', eTag: '*' } })
 
-    const result = await v2.read<{ value: string }>(['shared'])
-    assert.strictEqual(result.shared.value?.value, 'test')
+    assert.deepStrictEqual(await v1.read(['shared']), await MemoryStorage.getSingleInstance().read(['shared']))
+    assert.deepStrictEqual(await v2.read(['shared']), await MemoryStorageV2.getSingleInstance().read(['shared']))
   })
 })

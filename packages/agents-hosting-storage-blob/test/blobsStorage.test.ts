@@ -1,6 +1,6 @@
 import assert from 'node:assert'
 import { describe, it } from 'node:test'
-import { BlobsStorage } from '../src/blobsStorage'
+import { BlobsStorage, BlobsStorageV2 } from '../src/blobsStorage'
 import { Storage, StorageOperationStatus, StorageV2 } from '@microsoft/agents-hosting'
 import { ExceptionHelper } from '@microsoft/agents-activity'
 import { Errors } from '../src/errorHelper'
@@ -31,6 +31,10 @@ interface BlobStorageDeleteInternals {
   _initialize: () => Promise<void>;
 }
 
+interface BlobsStorageV2Internals<T> {
+  internals: T;
+}
+
 function createStatusError (statusCode: number): Error {
   return Object.assign(
     ExceptionHelper.generateException(Error, Errors.StorageV2OperationFailed, undefined, { operation: 'test', key: 'test' }),
@@ -48,30 +52,29 @@ describe('BlobsStorage', () => {
     })
   }
 
-  it('uses V1 by default and selects V2 from options', () => {
+  it('uses separately named V1 and V2 classes', () => {
     const v1 = new BlobsStorage('unused', undefined, undefined, 'https://example.blob.core.windows.net/container')
-    const v2 = new BlobsStorage(
+    const v2 = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
     const legacyContract: Storage = v1
     const v2Contract: StorageV2 = v2
     assert.strictEqual(legacyContract, v1)
     assert.strictEqual(v2Contract, v2)
-    assert.strictEqual(v1.storageVersion, 1)
-    assert.strictEqual(v2.storageVersion, 2)
+    assert.ok(v2 instanceof StorageV2)
   })
 
   it('returns a not-found result for a missing blob', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
-    const internals = storage as unknown as BlobStorageInternals
+    const { internals } = storage as unknown as BlobsStorageV2Internals<BlobStorageInternals>
     internals._initialize = async () => {}
     internals._containerClient = {
       getBlobClient: () => ({
@@ -85,13 +88,13 @@ describe('BlobsStorage', () => {
   })
 
   it('keeps value eTag data separate from the blob version', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
-    const internals = storage as unknown as BlobStorageInternals
+    const { internals } = storage as unknown as BlobsStorageV2Internals<BlobStorageInternals>
     internals._initialize = async () => {}
     internals._containerClient = {
       getBlobClient: () => ({
@@ -109,13 +112,13 @@ describe('BlobsStorage', () => {
   })
 
   it('preserves value eTag data when writing a blob', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
-    const internals = storage as unknown as BlobStorageWriteInternals
+    const { internals } = storage as unknown as BlobsStorageV2Internals<BlobStorageWriteInternals>
     let serialized = ''
     let versionReads = 0
     internals._initialize = async () => {}
@@ -141,13 +144,13 @@ describe('BlobsStorage', () => {
   })
 
   it('does not initialize Azure for empty V2 batches', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
-    const internals = storage as unknown as BlobStorageInternals
+    const { internals } = storage as unknown as BlobsStorageV2Internals<BlobStorageInternals>
     let initializeCalls = 0
     internals._initialize = async () => { initializeCalls++ }
 
@@ -158,13 +161,13 @@ describe('BlobsStorage', () => {
   })
 
   it('does not condition an unconditional V2 delete', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
-    const internals = storage as unknown as BlobStorageDeleteInternals
+    const { internals } = storage as unknown as BlobsStorageV2Internals<BlobStorageDeleteInternals>
     let versionReads = 0
     let deleteOptions: unknown
     internals._initialize = async () => {}
@@ -186,10 +189,10 @@ describe('BlobsStorage', () => {
   })
 
   it('rejects V2 values that are not object records', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
 
@@ -201,10 +204,10 @@ describe('BlobsStorage', () => {
   })
 
   it('rejects blank V2 write keys', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
 
@@ -212,10 +215,10 @@ describe('BlobsStorage', () => {
   })
 
   it('rejects unsupported V2 write modes', async () => {
-    const storage = new BlobsStorage(
+    const storage = new BlobsStorageV2(
       'unused',
       undefined,
-      { storageVersion: 2 },
+      undefined,
       'https://example.blob.core.windows.net/container'
     )
 

@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, it } from 'node:test'
-import { FileStorage, Storage, StorageOperationStatus, StorageV2, StorageWriteMode } from '../../../src'
+import { FileStorage, FileStorageV2, Storage, StorageOperationStatus, StorageV2, StorageWriteMode } from '../../../src'
 
 const folders: string[] = []
 
@@ -24,7 +24,6 @@ describe('FileStorage', () => {
 
     await contract.write({ key: { value: 1 } })
 
-    assert.strictEqual(storage.storageVersion, 1)
     assert.deepStrictEqual(await contract.read(['key']), { key: { value: 1 } })
 
     await contract.write({ falsey: 0 })
@@ -32,8 +31,9 @@ describe('FileStorage', () => {
   })
 
   it('supports V2 results, modes, and version conditions', async () => {
-    const storage = new FileStorage(createFolder(), { storageVersion: 2 })
+    const storage = new FileStorageV2(createFolder())
     const contract: StorageV2 = storage
+    assert.ok(storage instanceof StorageV2)
 
     const created = await contract.write({ key: { value: 1 } }, { mode: StorageWriteMode.CreateOnly })
     const conflict = await contract.write({ key: { value: 2 } }, { mode: StorageWriteMode.CreateOnly })
@@ -54,9 +54,9 @@ describe('FileStorage', () => {
 
   it('persists V2 values and versions across instances', async () => {
     const folder = createFolder()
-    const first = new FileStorage(folder, { storageVersion: 2 })
+    const first = new FileStorageV2(folder)
     const written = await first.write({ key: { value: 1 } })
-    const second = new FileStorage(folder, { storageVersion: 2 })
+    const second = new FileStorageV2(folder)
 
     const read = await second.read<{ value: number }>(['key'])
 
@@ -64,9 +64,26 @@ describe('FileStorage', () => {
     assert.strictEqual(read.key.version, written.key.version)
   })
 
+  it('assigns persistent versions to values created by V1 storage', async () => {
+    const folder = createFolder()
+    await new FileStorage(folder).write({ key: { value: 1 } })
+
+    const first = new FileStorageV2(folder)
+    const read = await first.read<{ value: number }>(['key'])
+    const second = new FileStorageV2(folder)
+    const stale = await second.write(
+      { key: { value: 2 } },
+      { expectedVersion: 'stale' }
+    )
+
+    assert.ok(read.key.version)
+    assert.strictEqual(stale.key.status, StorageOperationStatus.ConditionNotMet)
+    assert.strictEqual(stale.key.version, read.key.version)
+  })
+
   it('isolates V2 cached state from caller mutations', async () => {
     const folder = createFolder()
-    const storage = new FileStorage(folder, { storageVersion: 2 })
+    const storage = new FileStorageV2(folder)
     const input = { nested: { value: 1 } }
     await storage.write({ key: input })
     input.nested.value = 2
@@ -74,7 +91,7 @@ describe('FileStorage', () => {
     const first = await storage.read<typeof input>(['key'])
     first.key.value!.nested.value = 3
     const second = await storage.read<typeof input>(['key'])
-    const reloaded = await new FileStorage(folder, { storageVersion: 2 }).read<typeof input>(['key'])
+    const reloaded = await new FileStorageV2(folder).read<typeof input>(['key'])
 
     assert.strictEqual(second.key.value?.nested.value, 1)
     assert.strictEqual(reloaded.key.value?.nested.value, 1)
@@ -82,10 +99,10 @@ describe('FileStorage', () => {
 
   it('keeps value eTag data separate from the persisted storage version', async () => {
     const folder = createFolder()
-    const storage = new FileStorage(folder, { storageVersion: 2 })
+    const storage = new FileStorageV2(folder)
     const written = await storage.write({ key: { eTag: 'business-value', value: 1 } })
 
-    const read = await new FileStorage(folder, { storageVersion: 2 })
+    const read = await new FileStorageV2(folder)
       .read<{ eTag: string, value: number }>(['key'])
 
     assert.strictEqual(read.key.value?.eTag, 'business-value')
@@ -94,7 +111,7 @@ describe('FileStorage', () => {
   })
 
   it('accepts empty V2 batches and validates V2 input', async () => {
-    const storage = new FileStorage(createFolder(), { storageVersion: 2 })
+    const storage = new FileStorageV2(createFolder())
 
     assert.deepStrictEqual(await storage.read([]), {})
     assert.deepStrictEqual(await storage.write({}), {})

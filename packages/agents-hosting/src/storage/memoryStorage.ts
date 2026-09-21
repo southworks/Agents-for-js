@@ -8,24 +8,16 @@ import { debug, trace } from '@microsoft/agents-telemetry'
 import { Errors } from '../errorHelper'
 import { StorageTraceDefinitions } from '../observability'
 import {
-  StorageDeleteArguments,
   StorageDeleteOptions,
   StorageDeleteResults,
-  StorageDeleteReturn,
   StorageOperationStatus,
   StorageReadResults,
-  StorageReadReturn,
-  StorageVersion,
-  StorageVersions,
-  StorageVersionOptions,
-  StorageWriteArguments,
-  StorageWriteChanges,
   StorageWriteMode,
   StorageWriteOptions,
   StorageWriteResults,
-  StorageWriteReturn,
+  Storage,
+  StorageV2,
   StoreItem,
-  VersionedStorage,
 } from './storage'
 
 const logger = debug('agents:memory-storage')
@@ -36,338 +28,278 @@ interface MemoryStorageState {
   etag: number;
 }
 
-/**
- * A simple in-memory storage provider for development and testing.
- *
- * Omit `storageVersion` to retain the legacy Storage contract. Set
- * `storageVersion: 2` in the second constructor argument to select StorageV2.
- */
-export class MemoryStorage<V extends StorageVersion = typeof StorageVersions.V1> implements VersionedStorage<V> {
-  private static readonly singletonState: MemoryStorageState = { memory: {}, versions: {}, etag: 1 }
-  private static readonly instances: Partial<Record<StorageVersion, MemoryStorage<any>>> = {}
+class MemoryStorageInternals {
   private static readonly states = new WeakMap<object, MemoryStorageState>()
 
-  readonly storageVersion: V
-  private state: MemoryStorageState
+  readonly state: MemoryStorageState
 
   /**
-   * Creates an in-memory provider for the selected storage contract.
-   *
-   * @remarks
-   * When options are stored in a variable, preserve `storageVersion` as a literal with `as const`,
-   * `satisfies`, or an explicit {@link StorageVersionOptions} type so return types follow the version.
+   * Creates an internal in-memory provider for the selected storage contract.
    */
-  constructor (memory?: { [key: string]: string })
-  constructor (memory: { [key: string]: string } | undefined, options: StorageVersionOptions<V>)
-  constructor (
-    memory: { [key: string]: string } = {},
-    options?: StorageVersionOptions<V>
-  ) {
-    const storageVersion = options?.storageVersion ?? StorageVersions.V1
-    validateStorageVersion(storageVersion)
-    this.storageVersion = storageVersion as V
-    let state = MemoryStorage.states.get(memory)
+  constructor (memory: { [key: string]: string } = {}) {
+    let state = MemoryStorageInternals.states.get(memory)
     if (!state) {
       state = { memory, versions: {}, etag: getNextETag(memory) }
-      MemoryStorage.states.set(memory, state)
+      MemoryStorageInternals.states.set(memory, state)
     }
     this.state = state
   }
 
-  /**
-   * Gets the shared in-memory provider for the selected contract.
-   *
-   * @remarks Preserve a variable option's version literal to keep version-specific return types.
-   */
-  static getSingleInstance (): MemoryStorage<typeof StorageVersions.V1>
-  static getSingleInstance<V extends StorageVersion>(options: StorageVersionOptions<V>): MemoryStorage<V>
-  static getSingleInstance<V extends StorageVersion>(options?: StorageVersionOptions<V>): MemoryStorage<V | 1> {
-    const storageVersion = options?.storageVersion ?? StorageVersions.V1
-    validateStorageVersion(storageVersion)
-    let instance = MemoryStorage.instances[storageVersion]
-    if (!instance) {
-      instance = storageVersion === StorageVersions.V2
-        ? new MemoryStorage<typeof StorageVersions.V2>(undefined, { storageVersion: StorageVersions.V2 })
-        : new MemoryStorage<typeof StorageVersions.V1>()
-      instance.state = MemoryStorage.singletonState
-      MemoryStorage.instances[storageVersion] = instance
-    }
-    return instance as MemoryStorage<V | 1>
-  }
-
-  /**
-   * Reads items from memory storage.
-   *
-   * @param keys The keys to read
-   * @returns Legacy items for V1, or one keyed operation result per requested key for V2
-   * @throws When the key input is invalid
-   */
-  async read<T extends object = Record<string, unknown>> (keys: string[]): Promise<StorageReadReturn<V, T>> {
-    return trace(StorageTraceDefinitions.read, async ({ record }) => {
-      record({ keyCount: keys?.length })
-      if (this.storageVersion === StorageVersions.V2) {
-        return await this.readV2<T>(keys) as StorageReadReturn<V, T>
-      }
-      return await this.readV1(keys) as StorageReadReturn<V, T>
-    })
-  }
-
-  /**
-   * Writes items to memory storage.
-   *
-   * @param changes The keyed items to write
-   * @param args V2 write options; unavailable for V1
-   * @returns Nothing for V1, or one keyed operation result per change for V2
-   * @throws When the input is invalid
-   */
-  async write<T extends object = Record<string, unknown>> (
-    changes: StorageWriteChanges<V, T>,
-    ...args: StorageWriteArguments<V>
-  ): Promise<StorageWriteReturn<V>> {
-    return trace(StorageTraceDefinitions.write, async ({ record }) => {
-      record({ keyCount: changes ? Object.keys(changes).length : undefined })
-      if (this.storageVersion === StorageVersions.V2) {
-        const [options] = args as [StorageWriteOptions?]
-        return await this.writeV2(changes as Record<string, T>, options) as StorageWriteReturn<V>
-      }
-      await this.writeV1(changes as StoreItem)
-      return undefined as StorageWriteReturn<V>
-    })
-  }
-
-  /**
-   * Deletes items from memory storage.
-   *
-   * @param keys The keys to delete
-   * @param args V2 delete options; unavailable for V1
-   * @returns Nothing for V1, or one keyed operation result per requested key for V2
-   * @throws When the key input is invalid
-   */
-  async delete (keys: string[], ...args: StorageDeleteArguments<V>): Promise<StorageDeleteReturn<V>> {
-    return trace(StorageTraceDefinitions.delete, async ({ record }) => {
-      record({ keyCount: keys?.length })
-      if (this.storageVersion === StorageVersions.V2) {
-        const [options] = args as [StorageDeleteOptions?]
-        return await this.deleteV2(keys, options) as StorageDeleteReturn<V>
-      }
-      await this.deleteV1(keys)
-      return undefined as StorageDeleteReturn<V>
-    })
-  }
-
-  /**
-   * Reads legacy items and attaches their versions as `eTag` values.
-   *
-   * @param keys The keys to read
-   * @returns The stored items; missing keys are omitted
-   * @throws When keys are missing or empty
-   */
-  private async readV1 (keys: string[]): Promise<StoreItem> {
-    if (!keys || keys.length === 0) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
-    }
-
-    const data: StoreItem = {}
-    for (const key of keys) {
-      logger.debug(`Reading key: ${key}`)
-      const item = this.state.memory[key]
-      if (item) {
-        const value = JSON.parse(item)
-        const version = this.getVersion(key, value)
-        data[key] = version === undefined ? value : { ...value, eTag: version }
-      }
-    }
-    return data
-  }
-
-  /**
-   * Reads V2 items with one status and version result per requested key.
-   *
-   * @param keys The keys to read
-   * @returns The keyed V2 read results
-   * @throws When the key input is invalid
-   */
-  private async readV2<T extends object> (keys: string[]): Promise<StorageReadResults<T>> {
-    this.validateV2Keys(keys)
-
-    const results: StorageReadResults<T> = {}
-    for (const key of keys) {
-      logger.debug(`Reading key: ${key}`)
-      const item = this.state.memory[key]
-      if (!item) {
-        results[key] = { key, status: StorageOperationStatus.NotFound }
-        continue
-      }
-      const value = JSON.parse(item) as T & StoreItem
-      results[key] = {
-        key,
-        status: StorageOperationStatus.Succeeded,
-        value,
-        version: this.getVersion(key, value),
-      }
-    }
-    return results
-  }
-
-  /**
-   * Writes legacy items and applies `eTag` concurrency checks.
-   *
-   * @param changes The keyed legacy items to write
-   * @throws When the input is invalid or an `eTag` conflicts
-   */
-  private async writeV1 (changes: StoreItem): Promise<void> {
-    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageWriteChangesRequired)
-    }
-
-    for (const [key, newItem] of Object.entries(changes)) {
-      logger.debug(`Writing key: ${key}`)
-      const oldItemStr = this.state.memory[key]
-      if (!oldItemStr || newItem.eTag === '*' || !newItem.eTag) {
-        this.saveV1Item(key, newItem)
-        continue
-      }
-      const oldItem = JSON.parse(oldItemStr)
-      if (newItem.eTag === this.getVersion(key, oldItem)) {
-        this.saveV1Item(key, newItem)
-      } else {
-        throw ExceptionHelper.generateException(Error, Errors.StorageETagConflict, undefined, { key })
-      }
-    }
-  }
-
-  /**
-   * Writes V2 items with mode and expected-version conditions.
-   *
-   * @param changes The keyed values to write
-   * @param options The V2 write mode and expected version
-   * @returns One keyed operation result per change
-   * @throws When the input or options are invalid
-   */
-  private async writeV2<T extends object> (changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults> {
-    this.validateExpectedVersion(options?.expectedVersion)
-    if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageWriteChangesRequired)
-    }
-    if (Object.values(changes).some(value => value === null || typeof value !== 'object' || Array.isArray(value))) {
-      throw ExceptionHelper.generateException(TypeError, Errors.StorageV2ValueRequired)
-    }
-    this.validateV2ChangeKeys(changes)
-
-    const results: StorageWriteResults = {}
-    const mode = options?.mode ?? StorageWriteMode.Upsert
-    this.validateWriteMode(mode)
-    for (const [key, newItem] of Object.entries(changes)) {
-      const oldItemStr = this.state.memory[key]
-      const oldItem = oldItemStr ? JSON.parse(oldItemStr) as StoreItem : undefined
-      const currentVersion = oldItem ? this.getVersion(key, oldItem) : undefined
-
-      if (mode === StorageWriteMode.CreateOnly && oldItemStr) {
-        results[key] = { key, status: StorageOperationStatus.Conflict, version: currentVersion }
-      } else if (mode === StorageWriteMode.Replace && !oldItemStr) {
-        results[key] = { key, status: StorageOperationStatus.NotFound }
-      } else if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
-        results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version: currentVersion }
-      } else {
-        results[key] = { key, status: StorageOperationStatus.Succeeded, version: this.saveV2Item(key, newItem) }
-      }
-    }
-    return results
-  }
-
-  /**
-   * Deletes legacy items and their stored versions unconditionally.
-   *
-   * @param keys The keys to delete
-   */
-  private async deleteV1 (keys: string[]): Promise<void> {
-    logger.debug(`Deleting keys: ${keys.join(', ')}`)
-    for (const key of keys) {
-      delete this.state.memory[key]
-      delete this.state.versions[key]
-    }
-  }
-
-  /**
-   * Deletes V2 items with an optional expected-version condition.
-   *
-   * @param keys The keys to delete
-   * @param options The optional expected version
-   * @returns One keyed operation result per requested key
-   * @throws When the key input or options are invalid
-   */
-  private async deleteV2 (keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults> {
-    this.validateExpectedVersion(options?.expectedVersion)
-    this.validateV2Keys(keys)
-
-    const results: StorageDeleteResults = {}
-    for (const key of keys) {
-      const item = this.state.memory[key]
-      if (!item) {
-        results[key] = { key, status: StorageOperationStatus.NotFound }
-        continue
-      }
-      const value = JSON.parse(item) as StoreItem
-      const version = this.getVersion(key, value)
-      if (options?.expectedVersion !== undefined && options.expectedVersion !== version) {
-        results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version }
-        continue
-      }
-      delete this.state.memory[key]
-      delete this.state.versions[key]
-      results[key] = { key, status: StorageOperationStatus.Succeeded, version }
-    }
-    return results
-  }
-
-  private validateV2Keys (keys: string[]): void {
-    if (!Array.isArray(keys)) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
-    }
-    if (keys.some(key => typeof key !== 'string' || key.trim() === '')) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageV2KeyRequired)
-    }
-  }
-
-  private validateV2ChangeKeys (changes: Record<string, unknown>): void {
-    if (Object.keys(changes).some(key => key.trim() === '')) {
-      throw ExceptionHelper.generateException(ReferenceError, Errors.StorageV2KeyRequired)
-    }
-  }
-
-  private validateExpectedVersion (expectedVersion: string | undefined): void {
-    if (expectedVersion === '') {
-      throw ExceptionHelper.generateException(RangeError, Errors.StorageV2ExpectedVersionEmpty)
-    }
-  }
-
-  private validateWriteMode (mode: StorageWriteMode): void {
-    if (!Object.values(StorageWriteMode).includes(mode)) {
-      throw ExceptionHelper.generateException(RangeError, Errors.StorageV2WriteModeUnsupported, undefined, { mode: String(mode) })
-    }
-  }
-
-  private saveV1Item (key: string, item: StoreItem): string {
-    const { eTag: _eTag, ...value } = item
-    const version = (this.state.etag++).toString()
-    this.state.memory[key] = JSON.stringify({ ...value, eTag: version })
-    this.state.versions[key] = version
-    return version
-  }
-
-  private saveV2Item (key: string, item: unknown): string {
-    return this.saveItem(key, item)
-  }
-
-  private saveItem (key: string, item: unknown): string {
+  save (key: string, item: unknown): string {
     const version = (this.state.etag++).toString()
     this.state.memory[key] = JSON.stringify(item)
     this.state.versions[key] = version
     return version
   }
 
-  private getVersion (key: string, value: StoreItem): string | undefined {
+  getVersion (key: string, value: StoreItem): string | undefined {
     return this.state.versions[key] ?? value.eTag as string | undefined
+  }
+}
+
+/**
+ * A simple in-memory storage provider for development and testing.
+ *
+ * This class implements the legacy {@link Storage} contract. Use
+ * {@link MemoryStorageV2} for the structured StorageV2 contract.
+ */
+export class MemoryStorage extends MemoryStorageInternals implements Storage {
+  private static instance: MemoryStorage
+
+  constructor (memory: { [key: string]: string } = {}) {
+    super(memory)
+  }
+
+  /**
+   * Reads legacy items from process-local memory.
+   *
+   * @param keys The keys to read; must not be empty.
+   * @returns Existing items keyed by storage key. Missing keys are omitted and returned items
+   * include their legacy `eTag`.
+   */
+  async read (keys: string[]): Promise<StoreItem> {
+    return trace(StorageTraceDefinitions.read, async ({ record }) => {
+      record({ keyCount: keys?.length })
+      if (!keys || keys.length === 0) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
+      }
+
+      const data: StoreItem = {}
+      for (const key of keys) {
+        logger.debug(`Reading key: ${key}`)
+        const item = this.state.memory[key]
+        if (item) {
+          const value = JSON.parse(item)
+          const version = this.getVersion(key, value)
+          data[key] = version === undefined ? value : { ...value, eTag: version }
+        }
+      }
+      return data
+    })
+  }
+
+  /**
+   * Writes legacy items to process-local memory.
+   *
+   * @param changes The items to write, keyed by storage key.
+   * @throws If `changes` is invalid or an item supplies a stale legacy `eTag`.
+   */
+  async write (changes: StoreItem): Promise<void> {
+    return trace(StorageTraceDefinitions.write, async ({ record }) => {
+      record({ keyCount: changes ? Object.keys(changes).length : undefined })
+      if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageWriteChangesRequired)
+      }
+
+      for (const [key, newItem] of Object.entries(changes)) {
+        logger.debug(`Writing key: ${key}`)
+        const oldItemStr = this.state.memory[key]
+        if (!oldItemStr || newItem.eTag === '*' || !newItem.eTag) {
+          const { eTag: _eTag, ...value } = newItem
+          this.save(key, { ...value, eTag: (this.state.etag).toString() })
+          continue
+        }
+        const oldItem = JSON.parse(oldItemStr)
+        if (newItem.eTag === this.getVersion(key, oldItem)) {
+          const { eTag: _eTag, ...value } = newItem
+          this.save(key, { ...value, eTag: (this.state.etag).toString() })
+        } else {
+          throw ExceptionHelper.generateException(Error, Errors.StorageETagConflict, undefined, { key })
+        }
+      }
+    })
+  }
+
+  /**
+   * Deletes legacy items from process-local memory.
+   *
+   * @param keys The keys to delete. Missing keys are ignored.
+   */
+  async delete (keys: string[]): Promise<void> {
+    return trace(StorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length })
+      logger.debug(`Deleting keys: ${keys.join(', ')}`)
+      for (const key of keys) {
+        delete this.state.memory[key]
+        delete this.state.versions[key]
+      }
+    })
+  }
+
+  static getSingleInstance (): MemoryStorage {
+    if (!MemoryStorage.instance) MemoryStorage.instance = new MemoryStorage()
+    return MemoryStorage.instance
+  }
+}
+
+/**
+ * An in-memory provider for the structured {@link StorageV2} contract.
+ *
+ * Unlike {@link MemoryStorage}, every read returns an outcome for every requested key, and every
+ * write and delete returns an outcome for every supplied key. Storage versions are returned
+ * separately from application values, so an `eTag` property in a value is preserved. Use
+ * {@link StorageWriteMode.CreateOnly}, {@link StorageWriteMode.Replace}, or `expectedVersion` to
+ * guard concurrent writes.
+ *
+ * This provider is intended for development and testing only; state is process-local.
+ */
+export class MemoryStorageV2 extends StorageV2 {
+  private static instance: MemoryStorageV2
+  private readonly internals: MemoryStorageInternals
+
+  /**
+   * Creates a V2 in-memory storage provider.
+   *
+   * @param memory Optional backing store to share with another in-memory storage instance.
+   */
+  constructor (memory: { [key: string]: string } = {}) {
+    super()
+    this.internals = new MemoryStorageInternals(memory)
+  }
+
+  /**
+   * Reads items from process-local memory.
+   *
+   * @param keys The keys to read. Empty batches are valid.
+   * @returns A result for every key, with `notFound` for missing items and a separate storage
+   * version for successful reads.
+   */
+  async read<T extends object = Record<string, unknown>> (keys: string[]): Promise<StorageReadResults<T>> {
+    return trace(StorageTraceDefinitions.read, async ({ record }) => {
+      record({ keyCount: keys?.length })
+      if (!Array.isArray(keys)) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
+      }
+      if (keys.some(key => typeof key !== 'string' || key.trim() === '')) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageV2KeyRequired)
+      }
+
+      const results: StorageReadResults<T> = {}
+      for (const key of keys) {
+        logger.debug(`Reading key: ${key}`)
+        const item = this.internals.state.memory[key]
+        if (!item) {
+          results[key] = { key, status: StorageOperationStatus.NotFound }
+          continue
+        }
+        const value = JSON.parse(item) as T & StoreItem
+        results[key] = { key, status: StorageOperationStatus.Succeeded, value, version: this.internals.getVersion(key, value) }
+      }
+      return results
+    })
+  }
+
+  /**
+   * Writes items to process-local memory with optional concurrency conditions.
+   *
+   * @param changes The values to write, keyed by storage key.
+   * @param options Create-only, replace, or expected-version conditions.
+   * @returns A result for every supplied key, including `conflict` or `conditionNotMet` when a
+   * condition cannot be satisfied.
+   */
+  async write<T extends object = Record<string, unknown>> (changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults> {
+    return trace(StorageTraceDefinitions.write, async ({ record }) => {
+      record({ keyCount: changes ? Object.keys(changes).length : undefined })
+      if (options?.expectedVersion === '') {
+        throw ExceptionHelper.generateException(RangeError, Errors.StorageV2ExpectedVersionEmpty)
+      }
+      if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageWriteChangesRequired)
+      }
+      if (Object.values(changes).some(value => value === null || typeof value !== 'object' || Array.isArray(value))) {
+        throw ExceptionHelper.generateException(TypeError, Errors.StorageV2ValueRequired)
+      }
+      if (Object.keys(changes).some(key => key.trim() === '')) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageV2KeyRequired)
+      }
+
+      const results: StorageWriteResults = {}
+      const mode = options?.mode ?? StorageWriteMode.Upsert
+      if (!Object.values(StorageWriteMode).includes(mode)) {
+        throw ExceptionHelper.generateException(RangeError, Errors.StorageV2WriteModeUnsupported, undefined, { mode: String(mode) })
+      }
+      for (const [key, newItem] of Object.entries(changes)) {
+        const oldItemStr = this.internals.state.memory[key]
+        const oldItem = oldItemStr ? JSON.parse(oldItemStr) as StoreItem : undefined
+        const currentVersion = oldItem ? this.internals.getVersion(key, oldItem) : undefined
+        if (mode === StorageWriteMode.CreateOnly && oldItemStr) {
+          results[key] = { key, status: StorageOperationStatus.Conflict, version: currentVersion }
+        } else if (mode === StorageWriteMode.Replace && !oldItemStr) {
+          results[key] = { key, status: StorageOperationStatus.NotFound }
+        } else if (options?.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {
+          results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version: currentVersion }
+        } else {
+          results[key] = { key, status: StorageOperationStatus.Succeeded, version: this.internals.save(key, newItem) }
+        }
+      }
+      return results
+    })
+  }
+
+  /**
+   * Deletes items from process-local memory with an optional version condition.
+   *
+   * @param keys The keys to delete. Empty batches are valid.
+   * @param options An optional expected storage version.
+   * @returns A result for every supplied key.
+   */
+  async delete (keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults> {
+    return trace(StorageTraceDefinitions.delete, async ({ record }) => {
+      record({ keyCount: keys?.length })
+      if (options?.expectedVersion === '') {
+        throw ExceptionHelper.generateException(RangeError, Errors.StorageV2ExpectedVersionEmpty)
+      }
+      if (!Array.isArray(keys)) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageReadKeysRequired)
+      }
+      if (keys.some(key => typeof key !== 'string' || key.trim() === '')) {
+        throw ExceptionHelper.generateException(ReferenceError, Errors.StorageV2KeyRequired)
+      }
+
+      const results: StorageDeleteResults = {}
+      for (const key of keys) {
+        const item = this.internals.state.memory[key]
+        if (!item) {
+          results[key] = { key, status: StorageOperationStatus.NotFound }
+          continue
+        }
+        const value = JSON.parse(item) as StoreItem
+        const version = this.internals.getVersion(key, value)
+        if (options?.expectedVersion !== undefined && options.expectedVersion !== version) {
+          results[key] = { key, status: StorageOperationStatus.ConditionNotMet, version }
+          continue
+        }
+        delete this.internals.state.memory[key]
+        delete this.internals.state.versions[key]
+        results[key] = { key, status: StorageOperationStatus.Succeeded, version }
+      }
+      return results
+    })
+  }
+
+  static getSingleInstance (): MemoryStorageV2 {
+    if (!MemoryStorageV2.instance) MemoryStorageV2.instance = new MemoryStorageV2()
+    return MemoryStorageV2.instance
   }
 }
 
@@ -380,10 +312,4 @@ function getNextETag (memory: { [key: string]: string }): number {
       return next
     }
   }, 1)
-}
-
-function validateStorageVersion (storageVersion: number): asserts storageVersion is StorageVersion {
-  if (!Object.values(StorageVersions).some(version => version === storageVersion)) {
-    throw ExceptionHelper.generateException(RangeError, Errors.StorageVersionUnsupported, undefined, { storageVersion: String(storageVersion) })
-  }
 }

@@ -561,9 +561,11 @@ export function buildJwksUri(iss: string, authConfig: AuthConfiguration): string
 // @public
 export interface CachedAgentState {
     hash: string;
+    isNew?: boolean;
     state: {
         [id: string]: any;
     };
+    version?: string;
 }
 
 // @public
@@ -896,14 +898,18 @@ export interface Fact {
 }
 
 // @public
-export class FileStorage<V extends StorageVersion = typeof StorageVersions.V1> implements VersionedStorage<V> {
+export class FileStorage extends FileStorageInternals implements Storage {
+    delete(keys: string[]): Promise<void>;
+    read(keys: string[]): Promise<StoreItem>;
+    write(changes: StoreItem): Promise<void>;
+}
+
+// @public
+export class FileStorageV2 extends StorageV2 {
     constructor(folder: string);
-    constructor(folder: string, options: StorageVersionOptions<V>);
-    delete(keys: string[], ...args: StorageDeleteArguments<V>): Promise<StorageDeleteReturn<V>>;
-    read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadReturn<V, T>>;
-    // (undocumented)
-    readonly storageVersion: V;
-    write<T extends object = Record<string, unknown>>(changes: StorageWriteChanges<V, T>, ...args: StorageWriteArguments<V>): Promise<StorageWriteReturn<V>>;
+    delete(keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults>;
+    read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadResults<T>>;
+    write<T extends object = Record<string, unknown>>(changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults>;
 }
 
 // @public
@@ -1085,21 +1091,27 @@ export interface MediaUrl {
 }
 
 // @public
-export class MemoryStorage<V extends StorageVersion = typeof StorageVersions.V1> implements VersionedStorage<V> {
+export class MemoryStorage extends MemoryStorageInternals implements Storage {
     constructor(memory?: {
         [key: string]: string;
     });
-    constructor(memory: {
+    delete(keys: string[]): Promise<void>;
+    // (undocumented)
+    static getSingleInstance(): MemoryStorage;
+    read(keys: string[]): Promise<StoreItem>;
+    write(changes: StoreItem): Promise<void>;
+}
+
+// @public
+export class MemoryStorageV2 extends StorageV2 {
+    constructor(memory?: {
         [key: string]: string;
-    } | undefined, options: StorageVersionOptions<V>);
-    delete(keys: string[], ...args: StorageDeleteArguments<V>): Promise<StorageDeleteReturn<V>>;
-    static getSingleInstance(): MemoryStorage<typeof StorageVersions.V1>;
+    });
+    delete(keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults>;
     // (undocumented)
-    static getSingleInstance<V extends StorageVersion>(options: StorageVersionOptions<V>): MemoryStorage<V>;
-    read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadReturn<V, T>>;
-    // (undocumented)
-    readonly storageVersion: V;
-    write<T extends object = Record<string, unknown>>(changes: StorageWriteChanges<V, T>, ...args: StorageWriteArguments<V>): Promise<StorageWriteReturn<V>>;
+    static getSingleInstance(): MemoryStorageV2;
+    read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadResults<T>>;
+    write<T extends object = Record<string, unknown>>(changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults>;
 }
 
 // @public
@@ -1454,9 +1466,6 @@ export interface Storage {
 }
 
 // @public
-export type StorageDeleteArguments<V extends StorageVersion> = V extends typeof StorageVersions.V2 ? [options?: StorageDeleteOptions] : [];
-
-// @public
 export interface StorageDeleteOptions {
     // (undocumented)
     expectedVersion?: string;
@@ -1474,9 +1483,6 @@ export interface StorageDeleteResult {
 
 // @public
 export type StorageDeleteResults = Record<string, StorageDeleteResult>;
-
-// @public
-export type StorageDeleteReturn<V extends StorageVersion> = V extends typeof StorageVersions.V2 ? StorageDeleteResults : void;
 
 // @public
 export type StorageKeyFactory = (context: TurnContext) => string | Promise<string>;
@@ -1512,34 +1518,11 @@ export interface StorageReadResult<T extends object = Record<string, unknown>> {
 export type StorageReadResults<T extends object = Record<string, unknown>> = Record<string, StorageReadResult<T>>;
 
 // @public
-export type StorageReadReturn<V extends StorageVersion, T extends object = Record<string, unknown>> = V extends typeof StorageVersions.V2 ? StorageReadResults<T> : StoreItem;
-
-// @public
-export interface StorageV2 extends VersionedStorage<typeof StorageVersions.V2> {
-    // (undocumented)
-    readonly storageVersion: typeof StorageVersions.V2;
+export abstract class StorageV2 {
+    abstract delete(keys: string[], options?: StorageDeleteOptions): Promise<StorageDeleteResults>;
+    abstract read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadResults<T>>;
+    abstract write<T extends object = Record<string, unknown>>(changes: Record<string, T>, options?: StorageWriteOptions): Promise<StorageWriteResults>;
 }
-
-// @public
-export type StorageVersion = typeof StorageVersions[keyof typeof StorageVersions];
-
-// @public
-export interface StorageVersionOptions<V extends StorageVersion> {
-    // (undocumented)
-    storageVersion: V;
-}
-
-// @public
-export const StorageVersions: {
-    readonly V1: 1;
-    readonly V2: 2;
-};
-
-// @public
-export type StorageWriteArguments<V extends StorageVersion> = V extends typeof StorageVersions.V2 ? [options?: StorageWriteOptions] : [];
-
-// @public
-export type StorageWriteChanges<V extends StorageVersion, T extends object = Record<string, unknown>> = V extends typeof StorageVersions.V2 ? Record<string, T> : StoreItem;
 
 // @public
 export enum StorageWriteMode {
@@ -1571,9 +1554,6 @@ export interface StorageWriteResult {
 
 // @public
 export type StorageWriteResults = Record<string, StorageWriteResult>;
-
-// @public
-export type StorageWriteReturn<V extends StorageVersion> = V extends typeof StorageVersions.V2 ? StorageWriteResults : void;
 
 // @public
 export interface StoreItem {
@@ -1640,10 +1620,10 @@ export class TeamsAttachmentDownloader extends M365AttachmentDownloader {
 
 // @public
 export const TeamsServiceEndpoints: {
-    readonly publicGlobal: "https://smba.trafficmanager.net/teams/";
-    readonly gcc: "https://smba.infra.gcc.teams.microsoft.com/teams";
-    readonly gccHigh: "https://smba.infra.gov.teams.microsoft.us/teams";
-    readonly dod: "https://smba.infra.dod.teams.microsoft.us/teams";
+    readonly publicGlobal: 'https://smba.trafficmanager.net/teams/';
+    readonly gcc: 'https://smba.infra.gcc.teams.microsoft.com/teams';
+    readonly gccHigh: 'https://smba.infra.gov.teams.microsoft.us/teams';
+    readonly dod: 'https://smba.infra.dod.teams.microsoft.us/teams';
 };
 
 // @public
@@ -1848,18 +1828,6 @@ export class UserTokenClient {
     signOut(userId: string, connectionName: string, channelIdComposite: string): Promise<void>;
     // (undocumented)
     updateAuthToken(token: string): void;
-}
-
-// @public
-export interface VersionedStorage<V extends StorageVersion> {
-    // (undocumented)
-    delete(keys: string[], ...args: StorageDeleteArguments<V>): Promise<StorageDeleteReturn<V>>;
-    // (undocumented)
-    read<T extends object = Record<string, unknown>>(keys: string[]): Promise<StorageReadReturn<V, T>>;
-    // (undocumented)
-    readonly storageVersion: V;
-    // (undocumented)
-    write<T extends object = Record<string, unknown>>(changes: StorageWriteChanges<V, T>, ...args: StorageWriteArguments<V>): Promise<StorageWriteReturn<V>>;
 }
 
 // @public
