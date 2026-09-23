@@ -140,14 +140,6 @@
       ]
     },
     {
-      "upstreamSymbol": "OnBehalfOf",
-      "usage": "return-model",
-      "exposure": "publicly-exposed",
-      "files": [
-        "src/teamsActivityExtensions.ts"
-      ]
-    },
-    {
       "upstreamSymbol": "TaskModuleRequest",
       "usage": "request-model",
       "exposure": "publicly-exposed",
@@ -183,5 +175,9 @@
         "src/meetings/meeting.ts"
       ]
     }
-  ]
+  ],
+  "sourceReview": {
+  "outcome": "no-usage-metadata-change",
+  "reason": "Teams API consumption is unchanged."
+}
 }
