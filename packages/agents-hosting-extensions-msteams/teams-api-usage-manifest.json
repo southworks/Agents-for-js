@@ -1,6 +1,6 @@
 {
   "dependency": "@microsoft/teams.api",
-  "declaredVersion": "2.0.14",
+  "declaredVersion": "2.1.0",
   "sourceRoot": "src",
   "usages": [
     {
