@@ -6,10 +6,8 @@ import { Client as GraphClient } from '@microsoft/microsoft-graph-client'
 import { AgentApplication, AgentExtension, type Connections, TurnContext, TurnState } from '@microsoft/agents-hosting'
 import { Client as TeamsClient } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from './activity-extensions'
-import { TeamsConfig } from './config/config'
 import { FileConsent } from './fileConsents/fileConsent'
 import { Meeting } from './meetings/meeting'
-import { Message } from './messages/message'
 import { MessageExtension } from './messageExtensions/messageExtension'
 import { TaskModule } from './taskModules/taskModule'
 import { TeamsChannel } from './channels/teamsChannel'
@@ -37,9 +35,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
   private _taskModules: TaskModule<TState>
   private _channels: TeamsChannel<TState>
   private _teams: TeamsTeam<TState>
-  private _messages: Message<TState>
   private _fileConsent: FileConsent<TState>
-  private _config: TeamsConfig<TState>
 
   /**
    * Creates a new Teams extension for the provided agent application.
@@ -57,9 +53,7 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
     this._taskModules = new TaskModule(app)
     this._channels = new TeamsChannel(app)
     this._teams = new TeamsTeam(app)
-    this._messages = new Message(app)
     this._fileConsent = new FileConsent(app)
-    this._config = new TeamsConfig(app)
 
     const headerPropagation = this._app.options.headerPropagation
     this._app.options.headerPropagation = (headers) => {
@@ -116,24 +110,10 @@ export class TeamsAgentExtension<TState extends TurnState = TurnState> extends A
   }
 
   /**
-   * Gets the route registration helper for Teams message lifecycle events.
-   */
-  public get messages (): Message<TState> {
-    return this._messages
-  }
-
-  /**
    * Gets the route registration helper for Teams file consent card actions.
    */
   public get fileConsent (): FileConsent<TState> {
     return this._fileConsent
-  }
-
-  /**
-   * Gets the route registration helper for Teams app configuration invokes.
-   */
-  public get config (): TeamsConfig<TState> {
-    return this._config
   }
 
   /**

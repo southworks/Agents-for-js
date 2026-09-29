@@ -107,18 +107,13 @@ app
         continue
       }
 
-      const targetedActivity = MessageFactory.text(`${member.name}, this is a **targeted message** - only you can see this.`)
-      targetedActivity.channelId = context.activity.channelId ?? Channels.Msteams
-      targetedActivity.conversation = { ...context.activity.conversation }
-      targetedActivity.recipient = {
+      const teamsContext = new TeamsTurnContext(context)
+      await teamsContext.sendTargetedActivity(`${member.name}, this is a **targeted message** - only you can see this.`, {
         id: member.id,
         name: member.name,
         role: RoleTypes.User,
         tenantId: member.tenantId
-      }
-      targetedActivity.makeTargetedActivity()
-
-      await context.sendActivity(targetedActivity)
+      })
     }
   })
   .onMessage('update', async (context: TurnContext) => {

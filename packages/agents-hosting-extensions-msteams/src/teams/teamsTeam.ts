@@ -12,7 +12,6 @@ const TEAM_UNARCHIVED_EVENT = 'teamUnarchived'
 const TEAM_RENAMED_EVENT = 'teamRenamed'
 const TEAM_RESTORED_EVENT = 'teamRestored'
 const TEAM_DELETED_EVENT = 'teamDeleted'
-const TEAM_HARD_DELETED_EVENT = 'teamHardDeleted'
 
 type TeamUpdateHandler<TState extends TurnState> = (context: TeamsTurnContext, state: TState, data: TeamInfo) => Promise<void>
 
@@ -160,25 +159,6 @@ export class TeamsTeam<TState extends TurnState = TurnState> {
   onDeleted (handler: TeamUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
     const routeSel: RouteSelector = (context: TurnContext) => {
       return Promise.resolve(isTeamUpdateEvent(context, TEAM_DELETED_EVENT))
-    }
-    const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
-      await handler(new TeamsTurnContext(context), state, getTeamInfo(context))
-    }
-    this._app.addRoute(routeSel, routeHandler, false, rank, authHandlers)
-    return this
-  }
-
-  /**
-   * Registers a handler for Teams team hard-deleted events.
-   *
-   * @param handler - Handler invoked with the hard-deleted team information.
-   * @param rank - Optional route rank used for route ordering.
-   * @param authHandlers - Optional authorization handlers required by the route.
-   * @returns This team helper for chaining.
-   */
-  onHardDeleted (handler: TeamUpdateHandler<TState>, rank: number = RouteRank.Unspecified, authHandlers: string[] = []) {
-    const routeSel: RouteSelector = (context: TurnContext) => {
-      return Promise.resolve(isTeamUpdateEvent(context, TEAM_HARD_DELETED_EVENT))
     }
     const routeHandler: RouteHandler<TState> = async (context: TurnContext, state: TState) => {
       await handler(new TeamsTurnContext(context), state, getTeamInfo(context))

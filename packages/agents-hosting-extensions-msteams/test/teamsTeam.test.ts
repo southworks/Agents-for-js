@@ -140,21 +140,6 @@ describe('TeamsTeam', () => {
     assert.strictEqual(handled, true)
   })
 
-  it('should fire onHardDeleted when receiving a teamHardDeleted event', async () => {
-    let handled = false
-    const app = new AgentApplication()
-    const teamsExt = new TeamsAgentExtension(app)
-    app.registerExtension(teamsExt, (tae) => {
-      tae.teams.onHardDeleted(async () => { handled = true })
-    })
-
-    const activity = createTeamActivity('teamHardDeleted', { id: 'team-hard-deleted' })
-    const context = new TurnContext(adapter, activity)
-    addConnectorClientToTurnState(context)
-    await app.run(context)
-    assert.strictEqual(handled, true)
-  })
-
   it('should not fire team handlers when the channel is not msteams', async () => {
     let handled = false
     const app = new AgentApplication()
