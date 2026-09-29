@@ -45,7 +45,6 @@
       "files": [
         "src/activity-extensions/teamsChannelData.ts",
         "src/channels/teamsChannel.ts",
-        "src/messages/message.ts",
         "src/teams/teamsTeam.ts",
         "src/teamsActivity.ts",
         "src/teamsActivityExtensions.ts"
@@ -60,14 +59,6 @@
       ]
     },
     {
-      "upstreamSymbol": "ConfigResponse",
-      "usage": "response-model",
-      "exposure": "publicly-exposed",
-      "files": [
-        "src/config/config.ts"
-      ]
-    },
-    {
       "upstreamSymbol": "FileConsentCardResponse",
       "usage": "request-model",
       "exposure": "publicly-exposed",
@@ -79,6 +70,28 @@
       "upstreamSymbol": "MeetingDetails",
       "usage": "event-model",
       "exposure": "publicly-exposed",
+      "files": [
+        "src/meetings/meeting.ts"
+      ]
+    },
+    {
+      "upstreamSymbol": "IMeetingParticipantJoinEventActivity",
+      "usage": "event-model",
+      "exposure": "publicly-exposed",
+      "propertiesRead": [
+        "value"
+      ],
+      "files": [
+        "src/meetings/meeting.ts"
+      ]
+    },
+    {
+      "upstreamSymbol": "IMeetingParticipantLeaveEventActivity",
+      "usage": "event-model",
+      "exposure": "publicly-exposed",
+      "propertiesRead": [
+        "value"
+      ],
       "files": [
         "src/meetings/meeting.ts"
       ]
@@ -132,16 +145,16 @@
       ]
     },
     {
-      "upstreamSymbol": "O365ConnectorCardActionQuery",
-      "usage": "request-model",
+      "upstreamSymbol": "QuotedReplyEntity",
+      "usage": "activity-entity",
       "exposure": "publicly-exposed",
       "files": [
-        "src/messages/message.ts"
+        "src/teamsActivityExtensions.ts"
       ]
     },
     {
-      "upstreamSymbol": "OnBehalfOf",
-      "usage": "return-model",
+      "upstreamSymbol": "TargetedMessageInfoEntity",
+      "usage": "activity-entity",
       "exposure": "publicly-exposed",
       "files": [
         "src/teamsActivityExtensions.ts"
@@ -174,14 +187,10 @@
       "files": [
         "src/teams/teamsTeam.ts"
       ]
-    },
-    {
-      "upstreamSymbol": "TeamsChannelAccount",
-      "usage": "nested-event-model",
-      "exposure": "publicly-exposed",
-      "files": [
-        "src/meetings/meeting.ts"
-      ]
     }
-  ]
+  ],
+  "sourceReview": {
+    "outcome": "no-usage-metadata-change",
+    "reason": "Removed config and message imports and the new meeting and activity-entity symbols are reflected in usages; the remaining changed Teams source files do not alter direct @microsoft/teams.api consumption or public exposure."
+  }
 }

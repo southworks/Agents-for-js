@@ -7,41 +7,48 @@ import {
   type AppBasedLinkQuery,
   type ChannelData,
   type ChannelInfo,
-  type ConfigResponse,
   type FileConsentCardResponse,
+  type IMeetingParticipantJoinEventActivity,
+  type IMeetingParticipantLeaveEventActivity,
   type MeetingDetails,
   type MessagingExtensionAction,
   type MessagingExtensionActionResponse,
   type MessagingExtensionQuery,
   type MessagingExtensionResponse,
-  type O365ConnectorCardActionQuery,
-  type OnBehalfOf,
+  type QuotedReplyEntity,
+  type TargetedMessageInfoEntity,
   type TaskModuleRequest,
   type TaskModuleResponse,
-  type TeamInfo,
-  type TeamsChannelAccount
+  type TeamInfo
 } from '@microsoft/teams.api'
 import { parseTeamsChannelData } from '../../src/activity-extensions/teamsChannelData'
-import { teamsGetChannelId, teamsGetMeetingInfo, teamsGetTeamInfo, teamsGetTeamOnBehalfOf } from '../../src/teamsActivityExtensions'
+import {
+  addQuotedReply,
+  addTargetedMessageInfo,
+  teamsGetChannelId,
+  teamsGetMeetingInfo,
+  getQuotedMessages,
+  getTargetedMessageInfo,
+  teamsGetTeamInfo,
+  isRecipientTargeted
+} from '../../src/teamsActivityExtensions'
 import { teamsGetDataAs } from '../../src/teamsModelExtensions'
 
 declare const activity: Activity
 declare const appBasedLinkQuery: AppBasedLinkQuery
 declare const channelData: ChannelData
 declare const channelInfo: ChannelInfo
-declare const configResponse: ConfigResponse
 declare const fileConsentResponse: FileConsentCardResponse
 declare const meetingDetails: MeetingDetails
+declare const meetingParticipantJoin: IMeetingParticipantJoinEventActivity
+declare const meetingParticipantLeave: IMeetingParticipantLeaveEventActivity
 declare const messageExtensionAction: MessagingExtensionAction
 declare const messageExtensionActionResponse: MessagingExtensionActionResponse
 declare const messageExtensionQuery: MessagingExtensionQuery
 declare const messageExtensionResponse: MessagingExtensionResponse
-declare const o365ConnectorCardActionQuery: O365ConnectorCardActionQuery
-declare const onBehalfOf: OnBehalfOf
 declare const taskModuleRequest: TaskModuleRequest
 declare const taskModuleResponse: TaskModuleResponse
 declare const teamInfo: TeamInfo
-declare const teamsChannelAccount: TeamsChannelAccount
 
 function consume (..._values: unknown[]): void {}
 
@@ -81,27 +88,31 @@ consume(
 const channelId: string | undefined = teamsGetChannelId(activity)
 const meetingInfo: ChannelData['meeting'] | undefined = teamsGetMeetingInfo(activity)
 const returnedTeamInfo: ChannelData['team'] | undefined = teamsGetTeamInfo(activity)
-const onBehalfOfEntries: OnBehalfOf[] | undefined = teamsGetTeamOnBehalfOf(activity)
+const quotedReplies: QuotedReplyEntity[] = getQuotedMessages(activity)
+const targetedMessageInfo: TargetedMessageInfoEntity | undefined = getTargetedMessageInfo(activity)
+const recipientIsTargeted: boolean = isRecipientTargeted(activity)
 const data: { id: string } | undefined = teamsGetDataAs<{ id: string }>(taskModuleRequest)
+addQuotedReply(activity, 'message-id')
+addTargetedMessageInfo(activity, 'message-id')
 
 // Keep all response and event models in the contract even where this package
 // forwards them without reading individual properties.
 consume(
   channelInfo,
-  configResponse,
   fileConsentResponse,
   meetingDetails,
+  meetingParticipantJoin.value,
+  meetingParticipantLeave.value,
   messageExtensionActionResponse,
   messageExtensionResponse,
-  o365ConnectorCardActionQuery,
-  onBehalfOf,
   taskModuleResponse,
   teamInfo,
-  teamsChannelAccount,
   serviceUrl,
   channelId,
   meetingInfo,
   returnedTeamInfo,
-  onBehalfOfEntries,
+  quotedReplies,
+  targetedMessageInfo,
+  recipientIsTargeted,
   data
 )

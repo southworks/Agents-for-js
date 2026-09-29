@@ -10,6 +10,10 @@ schemaVersion: 1
 dependency:
   package: "@microsoft/teams.api"
 
+sourceReview:
+  outcome: "no-capability-metadata-change"
+  reason: "Removed config and message capabilities are reflected below; existing meeting ownership and event/account upstream areas already cover the new upstream join and leave payload aliases."
+
 capabilities:
   teams-api-client:
     description: "Creates, stores, and exposes the Teams API client for a Teams turn."
@@ -25,10 +29,12 @@ capabilities:
     description: "Parses Teams channel data and provides Teams-specific activity helpers."
     owners:
       - "src/activity-extensions/**"
+      - "src/promptPreviewActivityNormalizer.ts"
       - "src/teamsActivity.ts"
       - "src/teamsActivityExtensions.ts"
     upstreamAreas:
       - "models.channel-data"
+      - "models.entity"
       - "activities"
     adoptionPolicy: "strict-compatibility"
 
@@ -88,26 +94,6 @@ capabilities:
       - "src/fileConsents/**"
     upstreamAreas:
       - "models.file"
-    adoptionPolicy: "review-new-members"
-
-  app-configuration:
-    description: "Handles Teams app configuration fetch and submit invokes."
-    owners:
-      - "src/config/**"
-    upstreamAreas:
-      - "models.config"
-      - "activities.invoke.config"
-    adoptionPolicy: "review-new-members"
-
-  message-actions:
-    description: "Handles message lifecycle events, read receipts, and connector-card execute actions."
-    owners:
-      - "src/messages/**"
-      - "src/models/readReceiptInfo.ts"
-    upstreamAreas:
-      - "models.o365"
-      - "activities.message"
-      - "activities.event"
     adoptionPolicy: "review-new-members"
 
   app-routing:

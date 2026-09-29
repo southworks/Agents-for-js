@@ -78,7 +78,7 @@ export function teamsGetTeamInfo (activity: Activity): ChannelData['team'] | und
  * @param activity - Activity containing quoted reply entities.
  * @returns The quoted reply entities in their original order.
  */
-export function teamsGetQuotedMessages (activity: Activity): QuotedReplyEntity[] {
+export function getQuotedMessages (activity: Activity): QuotedReplyEntity[] {
   return (activity.entities ?? []).filter(entity => entity.type === QUOTED_REPLY_ENTITY_TYPE) as QuotedReplyEntity[]
 }
 
@@ -90,7 +90,7 @@ export function teamsGetQuotedMessages (activity: Activity): QuotedReplyEntity[]
  * @param text - Optional text to append after the quote placeholder.
  * @returns The updated activity.
  */
-export function teamsAddQuotedReply (activity: Activity, messageId: string, text?: string): Activity {
+export function addQuotedReply (activity: Activity, messageId: string, text?: string): Activity {
   requireNonEmptyString(messageId, 'messageId')
   activity.entities ??= []
   activity.entities.push({
@@ -107,7 +107,7 @@ export function teamsAddQuotedReply (activity: Activity, messageId: string, text
  * @param activity - Activity containing Teams entities.
  * @returns Targeted message information, if present.
  */
-export function teamsGetTargetedMessageInfo (activity: Activity): TargetedMessageInfoEntity | undefined {
+export function getTargetedMessageInfo (activity: Activity): TargetedMessageInfoEntity | undefined {
   return activity.entities?.find(entity => entity.type === TARGETED_MESSAGE_INFO_ENTITY_TYPE) as TargetedMessageInfoEntity | undefined
 }
 
@@ -118,9 +118,9 @@ export function teamsGetTargetedMessageInfo (activity: Activity): TargetedMessag
  * @param messageId - ID of the original targeted message.
  * @returns The updated activity.
  */
-export function teamsAddTargetedMessageInfo (activity: Activity, messageId: string): Activity {
+export function addTargetedMessageInfo (activity: Activity, messageId: string): Activity {
   requireNonEmptyString(messageId, 'messageId')
-  if (!teamsGetTargetedMessageInfo(activity)) {
+  if (!getTargetedMessageInfo(activity)) {
     activity.entities ??= []
     activity.entities.push({ type: TARGETED_MESSAGE_INFO_ENTITY_TYPE, messageId })
   }
@@ -133,7 +133,7 @@ export function teamsAddTargetedMessageInfo (activity: Activity, messageId: stri
  * @param activity - Activity to inspect.
  * @returns True when the recipient is targeted.
  */
-export function teamsIsRecipientTargeted (activity: Activity): boolean {
+export function isRecipientTargeted (activity: Activity): boolean {
   const recipient = activity.recipient as TeamsRecipient | undefined
   return recipient?.isTargeted === true
 }

@@ -58,7 +58,7 @@ Comprehensive sample demonstrating core Teams conversation features using `Agent
 
 **Features illustrated:**
 - Proactive messaging to all team members (`messageall`) via `CreateConversationOptionsBuilder`
-- Targeted messages visible only to specific users (`targeted`) via `makeTargetedActivity()`
+- Targeted messages visible only to specific users (`targeted`) via `TeamsTurnContext.sendTargetedActivity()`
 - @mention a user (`mentionme` / `atmention`)
 - Identify the current user via the Teams API client (`whoami`)
 - Update an existing card in-place (`update`)
@@ -107,13 +107,13 @@ The base manifest already includes everything needed. No additional sections req
 
 ### `meetingsExample.ts` — Teams Meetings
 
-Handles Teams meeting lifecycle events using `TeamsAgentExtension.meetings`. Handlers receive strongly-typed `MeetingDetails` and `MeetingParticipantsEventDetails` objects from `@microsoft/teams.api`.
+Handles Teams meeting lifecycle events using `TeamsAgentExtension.meetings`. Handlers receive `MeetingDetails` plus distinct `MeetingParticipantJoinValue` and `MeetingParticipantLeaveValue` payloads from `@microsoft/teams.api`.
 
 **Features illustrated:**
 - `meetings.onStart(context, state, details: MeetingDetails)` — triggered when a meeting begins, receives meeting details.
 - `meetings.onEnd(context, state, details: MeetingDetails)` — triggered when a meeting ends, receives meeting details.
-- `meetings.onParticipantsJoin(context, state, details: MeetingParticipantsEventDetails)` — triggered when participants join, receives participant info.
-- `meetings.onParticipantsLeave(context, state, details: MeetingParticipantsEventDetails)` — triggered when participants leave, receives participant info.
+- `meetings.onParticipantsJoin(context, state, details: MeetingParticipantJoinValue)` — triggered when participants join, receives participant info.
+- `meetings.onParticipantsLeave(context, state, details: MeetingParticipantLeaveValue)` — triggered when participants leave, receives participant info.
 - Basic message handling with `help` and `meeting info` commands.
 
 **How to test:**
