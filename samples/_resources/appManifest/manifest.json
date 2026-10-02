@@ -1,8 +1,8 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
-  "manifestVersion": "1.22",
-  "version": "1.0.0",
-  "id": "<bot-app-id>",
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/vDevPreview/MicrosoftTeams.schema.json",
+  "manifestVersion": "devPreview",
+  "version": "1.0.1",
+  "id": "06a19653-9f31-4d65-b7ff-ea4989f79d84",
   "developer": {
     "name": "Teams Features",
     "websiteUrl": "https://example.azurewebsites.net",
@@ -24,7 +24,7 @@
   "accentColor": "#FFFFFF",
   "bots": [
     {
-      "botId": "<bot-app-id>",
+      "botId": "06a19653-9f31-4d65-b7ff-ea4989f79d84",
       "scopes": [
         "personal",
         "team",
@@ -33,18 +33,88 @@
       "isNotificationOnly": false,
       "supportsCalling": false,
       "supportsVideo": false,
-      "supportsFiles": false
+      "supportsFiles": true,
+      "supportsTargetedMessages": true
     }
   ],
+  "composeExtensions": [
+    {
+      "botId": "06a19653-9f31-4d65-b7ff-ea4989f79d84",
+      "commands": [
+        {
+          "id": "searchQuery",
+          "type": "query",
+          "title": "Search",
+          "description": "Search for items",
+          "initialRun": true,
+          "fetchTask": false,
+          "context": [
+            "commandBox",
+            "compose"
+          ],
+          "parameters": [
+            {
+              "name": "query",
+              "title": "Search query",
+              "description": "Your search query",
+              "inputType": "text"
+            }
+          ]
+        },
+        {
+          "id": "createCard",
+          "type": "action",
+          "title": "Create Card",
+          "description": "Create a card from user input",
+          "initialRun": false,
+          "fetchTask": false,
+          "context": [
+            "commandBox",
+            "compose",
+            "message"
+          ],
+          "parameters": [
+            { "name": "title", "title": "Title", "inputType": "text" },
+            { "name": "description", "title": "Description", "inputType": "text" }
+          ]
+        }
+      ],
+      "messageHandlers": [
+        {
+          "type": "link",
+          "value": { "domains": ["github.com"] }
+        }
+      ],
+      "canUpdateConfiguration": true
+    }
+  ],
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+            "name": "OnlineMeeting.ReadBasic.Chat",
+            "type": "Application"
+        },
+        {
+            "name": "ChannelMeeting.ReadBasic.Group",
+            "type": "Application"
+        },
+        {
+            "name": "OnlineMeetingParticipant.Read.Chat",
+            "type": "Application"
+        }
+      ]
+    }
+  },
   "permissions": [
     "identity",
     "messageTeamMembers"
   ],
   "webApplicationInfo": {
-    "id": "<bot-app-id>",
-    "resource": "api://<bot-app-id>"
+    "id": "06a19653-9f31-4d65-b7ff-ea4989f79d84",
+    "resource": "api://06a19653-9f31-4d65-b7ff-ea4989f79d84"
   },
   "validDomains": [
-    "<<BOT_DOMAIN>>"
+    "*.devtunnels.ms"
   ]
 }
