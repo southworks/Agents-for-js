@@ -12,6 +12,7 @@ import { CopilotStudioClient } from './copilotStudioClient'
 import { debug, pseudonymizeConversationId, redactDiagnosticObject, redactUrl, trace } from '@microsoft/agents-telemetry'
 import { CopilotStudioClientTraceDefinitions } from './observability'
 import { Errors } from './errorHelper'
+import { createPostAnswerActivityFilter } from './postAnswerActivityFilter'
 
 const logger = debug('copilot-studio:webchat')
 
@@ -301,10 +302,11 @@ export class CopilotStudioWebChat {
 
         logger.debug('--> Connection established.')
         started = true
-        notifyTyping()
+        const clearTyping = notifyTyping()
 
         await trace(CopilotStudioClientTraceDefinitions.webchatStartConversation, async ({ record }) => {
           let activityCount = 0
+          const shouldForward = createPostAnswerActivityFilter()
 
           for await (const activity of client.startConversationStreaming()) {
             delete activity.replyToId
@@ -321,7 +323,12 @@ export class CopilotStudioWebChat {
               conversationId: pseudomizedConversationId
             })
             await handleAcknowledgementOnce()
-            notifyActivity(activity)
+            if (shouldForward(activity)) {
+              if (activity.type === 'typing' || activity.type === 'message') {
+                clearTyping()
+              }
+              notifyActivity(activity)
+            }
 
             trace(CopilotStudioClientTraceDefinitions.webchatReceiveActivity, ({ record }) => {
               record({
@@ -333,7 +340,7 @@ export class CopilotStudioWebChat {
           }
           // If no activities received from bot, we should still acknowledge.
           await handleAcknowledgementOnce()
-        })
+        }).finally(clearTyping)
       })
 
       const notifyActivity = (activity: Partial<Activity>) => {
@@ -352,13 +359,37 @@ export class CopilotStudioWebChat {
 
       const notifyTyping = () => {
         if (!settings?.showTyping) {
-          return
+          return () => {}
         }
 
         const from = conversation
           ? { id: conversation.id, name: conversation.name }
           : { id: 'agent', name: 'Agent' }
-        notifyActivity({ type: 'typing', from })
+        const streamId = randomUUID()
+        let pending = true
+        // An explicit contentless stream lets us retire the fallback indicator
+        // even when the service uses a different sender ID.
+        notifyActivity({
+          id: streamId,
+          type: 'typing',
+          from,
+          channelData: { streamType: 'streaming', streamSequence: 1 },
+          entities: [{ type: 'streaminfo', streamType: 'streaming', streamSequence: 1 }]
+        })
+        return () => {
+          if (!pending) {
+            return
+          }
+          pending = false
+          notifyActivity({
+            id: randomUUID(),
+            type: 'typing',
+            text: '',
+            from,
+            channelData: { streamType: 'final', streamId },
+            entities: [{ type: 'streaminfo', streamType: 'final', streamId }]
+          })
+        }
       }
 
       return {
@@ -385,6 +416,7 @@ export class CopilotStudioWebChat {
           }
 
           const result = createObservable<string>(async (subscriber) => {
+            let clearTyping = () => {}
             try {
               await trace(CopilotStudioClientTraceDefinitions.webchatPostActivity, async ({ record, actions }) => {
                 logger.info('--> Sending activity to Copilot Studio ...')
@@ -407,12 +439,13 @@ export class CopilotStudioWebChat {
                 )
 
                 notifyActivity(newActivity)
-                notifyTyping()
+                clearTyping = notifyTyping()
 
                 // Notify WebChat immediately that the message was sent
                 subscriber.next(newActivity.id!)
 
                 // Stream the agent's response, passing activeConversationId for URL routing
+                const shouldForward = createPostAnswerActivityFilter()
                 for await (const responseActivity of client.sendActivityStreaming(newActivity, activeConversationId)) {
                   if (!activeConversationId && responseActivity.conversation?.id) {
                     activeConversationId = responseActivity.conversation.id
@@ -428,15 +461,23 @@ export class CopilotStudioWebChat {
                       activityType: responseActivity.type,
                       conversationId: pseudomizedConversationId
                     })
-                    notifyActivity(responseActivity)
+                    if (shouldForward(responseActivity)) {
+                      if (responseActivity.type === 'typing' || responseActivity.type === 'message') {
+                        clearTyping()
+                      }
+                      notifyActivity(responseActivity)
+                    }
                   })
                   logger.info('<-- Activity received correctly from Copilot Studio.')
                 }
               })
+              clearTyping()
               subscriber.complete()
             } catch (error) {
               logger.error('Error sending Activity to Copilot Studio:', error)
               subscriber.error(error)
+            } finally {
+              clearTyping()
             }
           })
 
