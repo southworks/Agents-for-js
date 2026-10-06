@@ -564,6 +564,25 @@ describe('CloudAdapter', function () {
       sinon.assert.notCalled(onTurnError)
     })
 
+    it('does not retain propagated errors between independent continuations', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await assert.rejects(
+        cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+          throw error
+        }, undefined, { errorBehavior: 'propagate' }),
+        error
+      )
+      await cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+        throw error
+      })
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
+    })
+
     it('does not handle a propagated error in enclosing adapter middleware', async function () {
       const error = new Error('send failed')
       const onTurnError = sinon.stub().resolves()

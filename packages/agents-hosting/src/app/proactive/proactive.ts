@@ -4,6 +4,7 @@
 import type { Activity } from '@microsoft/agents-activity'
 import type { ResourceResponse } from '../../connector-client'
 import type { BaseAdapter, TurnErrorHandlingOptions } from '../../baseAdapter'
+import { registerHandledMiddlewareError } from '../../middlewareErrorHandling'
 import type { TurnContext } from '../../turnContext'
 import type { TurnState } from '../turnState'
 import type { RouteHandler } from '../routeHandler'
@@ -276,8 +277,9 @@ export class Proactive<TState extends TurnState> {
 
       let response: ResourceResponse | undefined
       let operationFailed = false
+      let middlewareFailureHandled = false
 
-      await adapter.continueConversation(conv.identity, conv.reference, async (ctx: TurnContext) => {
+      const logic = async (ctx: TurnContext) => {
         try {
           const result = await ctx.sendActivity(activityToSend as Activity)
           response = result as ResourceResponse
@@ -285,9 +287,11 @@ export class Proactive<TState extends TurnState> {
           operationFailed = true
           throw error
         }
-      }, undefined, options)
+      }
+      registerHandledMiddlewareError(logic, () => { middlewareFailureHandled = true })
+      await adapter.continueConversation(conv.identity, conv.reference, logic, undefined, options)
 
-      if (operationFailed) return { id: '' }
+      if (operationFailed || middlewareFailureHandled) return { id: '' }
       if (response === undefined) throw ExceptionHelper.generateException(Error, Errors.ProactiveSendActivityNoResponse)
       logger.debug('sendActivity: sent activity id=%s', response.id)
       return response

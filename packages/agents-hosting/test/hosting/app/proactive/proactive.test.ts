@@ -13,6 +13,12 @@ import { AgentApplication } from '../../../../src/app'
 import { Conversation } from '../../../../src/app/proactive/conversation'
 import { Proactive } from '../../../../src/app/proactive/proactive'
 
+class MiddlewareTestAdapter extends TestAdapter {
+  async runMiddlewareForTest (context: TurnContext, logic: (context: TurnContext) => Promise<void>): Promise<void> {
+    await this.runMiddleware(context, logic)
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -207,6 +213,26 @@ describe('Proactive', () => {
       const response = await proactive.sendActivity(adapter, conv, { text: 'hi' })
 
       assert.deepEqual(response, { id: '' })
+    })
+
+    it('returns an empty ResourceResponse when middleware handles a failure before the send callback', async () => {
+      const conv = makeConversation()
+      const middlewareAdapter = new MiddlewareTestAdapter()
+      const onTurnError = sinon.stub().resolves()
+      middlewareAdapter.onTurnError = onTurnError
+      middlewareAdapter.use(async () => {
+        throw new Error('middleware-failed')
+      })
+      sinon.stub(middlewareAdapter, 'continueConversation').callsFake(async (_identity, reference, logic) => {
+        const activity = Activity.getContinuationActivity(reference as any)
+        const context = new TurnContext(middlewareAdapter, activity)
+        await middlewareAdapter.runMiddlewareForTest(context, logic)
+      })
+
+      const response = await proactive.sendActivity(middlewareAdapter, conv, { text: 'hi' })
+
+      assert.deepEqual(response, { id: '' })
+      sinon.assert.calledOnce(onTurnError)
     })
 
     it('surfaces errors rejected by the adapter', async () => {

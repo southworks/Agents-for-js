@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Middleware, MiddlewareHandler, MiddlewareSet } from './middlewareSet'
 import { TurnContext } from './turnContext'
 import { debug } from '@microsoft/agents-telemetry'
@@ -12,9 +13,10 @@ import { AttachmentData } from './connector-client/attachmentData'
 import { AttachmentInfo } from './connector-client/attachmentInfo'
 import { JwtPayload } from 'jsonwebtoken'
 import { Errors } from './errorHelper'
+import { notifyHandledMiddlewareError } from './middlewareErrorHandling'
 
 const logger = debug('agents:base-adapter')
-const propagatedErrors = new WeakSet<Error>()
+const propagatedErrors = new AsyncLocalStorage<Set<Error>>()
 
 /**
  * Controls how an error thrown during a turn is handled.
@@ -224,6 +226,17 @@ export abstract class BaseAdapter {
     next: (revocableContext: TurnContext) => Promise<void>,
     errorBehavior: TurnErrorBehavior = 'handle'
   ): Promise<void> {
+    if (!propagatedErrors.getStore()) {
+      const errorsInChain = new Set<Error>()
+      return await propagatedErrors.run(errorsInChain, async () => {
+        try {
+          await this.runMiddleware(context, next, errorBehavior)
+        } finally {
+          errorsInChain.clear()
+        }
+      })
+    }
+
     if (context && context.activity && context.activity.locale) {
       context.locale = context.activity.locale
     }
@@ -234,12 +247,13 @@ export abstract class BaseAdapter {
     try {
       await this.middleware.run(pContext.proxy, async () => await next(pContext.proxy))
     } catch (err: Error | any) {
-      if (err instanceof Error && propagatedErrors.has(err)) {
+      const currentPropagatedErrors = propagatedErrors.getStore()!
+      if (err instanceof Error && currentPropagatedErrors.has(err)) {
         throw err
       }
 
       if (errorBehavior === 'propagate') {
-        if (err instanceof Error) propagatedErrors.add(err)
+        if (err instanceof Error) currentPropagatedErrors.add(err)
         throw err
       }
 
@@ -248,11 +262,12 @@ export abstract class BaseAdapter {
           try {
             await this.onTurnError(pContext.proxy, err)
           } catch (onTurnErrorError) {
-            if (onTurnErrorError instanceof Error) propagatedErrors.add(onTurnErrorError)
+            if (onTurnErrorError instanceof Error) currentPropagatedErrors.add(onTurnErrorError)
             throw onTurnErrorError
           }
+          notifyHandledMiddlewareError(next)
           if (errorBehavior === 'handleAndPropagate') {
-            propagatedErrors.add(err)
+            currentPropagatedErrors.add(err)
             throw err
           }
         } else {
