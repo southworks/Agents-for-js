@@ -208,6 +208,7 @@ error inside the continuation callback and throw it after `continueConversation(
 completes:
 
 ```ts
+import type { ResourceResponse } from '@microsoft/agents-hosting'
 let sendResponse: ResourceResponse | undefined
 let sendFailed = false
 let sendError: unknown
