@@ -14,6 +14,35 @@ import { JwtPayload } from 'jsonwebtoken'
 import { Errors } from './errorHelper'
 
 const logger = debug('agents:base-adapter')
+const propagatedErrors = new WeakSet<Error>()
+
+/**
+ * Controls how an error thrown during a turn is handled.
+ */
+export type TurnErrorBehavior =
+  | 'handle'
+  | 'handleAndPropagate'
+  | 'propagate'
+
+/**
+ * Options for handling errors during a turn.
+ */
+export interface TurnErrorHandlingOptions {
+  /**
+   * Controls whether the adapter invokes `onTurnError` and whether the original error is
+   * propagated to the caller.
+   *
+   * - `handle` invokes `onTurnError` and resolves if the handler completes normally.
+   * - `handleAndPropagate` invokes `onTurnError`, then rejects with the original error if the
+   *   handler completes normally.
+   * - `propagate` rejects with the original error without invoking `onTurnError`.
+   *
+   * Propagated errors bypass `onTurnError` in enclosing adapter middleware as well.
+   *
+   * @defaultValue `'handle'`
+   */
+  errorBehavior?: TurnErrorBehavior
+}
 
 /**
  * Abstract base class for all adapters in the Agents framework.
@@ -90,12 +119,16 @@ export abstract class BaseAdapter {
    * Continues a conversation.
    * @param reference - The conversation reference to continue.
    * @param logic - The logic to execute.
+   * @param isResponse - Unused. Retained for backward compatibility.
+   * @param options - Options controlling error handling for the continuation.
    * @returns A promise representing the completion of the continue operation.
    */
   abstract continueConversation (
     botAppIdOrIdentity: string | JwtPayload,
     reference: Partial<ConversationReference>,
-    logic: (revocableContext: TurnContext) => Promise<void>
+    logic: (revocableContext: TurnContext) => Promise<void>,
+    isResponse?: Boolean,
+    options?: TurnErrorHandlingOptions
   ): Promise<void>
 
   /**
@@ -183,11 +216,13 @@ export abstract class BaseAdapter {
    * Runs the middleware pipeline in sequence.
    * @param context - The TurnContext for the current turn.
    * @param next - The next function to call in the pipeline.
+   * @param errorBehavior - Controls how errors from the pipeline are handled.
    * @returns A promise representing the completion of the middleware pipeline.
    */
   protected async runMiddleware (
     context: TurnContext,
-    next: (revocableContext: TurnContext) => Promise<void>
+    next: (revocableContext: TurnContext) => Promise<void>,
+    errorBehavior: TurnErrorBehavior = 'handle'
   ): Promise<void> {
     if (context && context.activity && context.activity.locale) {
       context.locale = context.activity.locale
@@ -199,9 +234,27 @@ export abstract class BaseAdapter {
     try {
       await this.middleware.run(pContext.proxy, async () => await next(pContext.proxy))
     } catch (err: Error | any) {
+      if (err instanceof Error && propagatedErrors.has(err)) {
+        throw err
+      }
+
+      if (errorBehavior === 'propagate') {
+        if (err instanceof Error) propagatedErrors.add(err)
+        throw err
+      }
+
       if (this.onTurnError) {
         if (err instanceof Error) {
-          await this.onTurnError(pContext.proxy, err)
+          try {
+            await this.onTurnError(pContext.proxy, err)
+          } catch (onTurnErrorError) {
+            if (onTurnErrorError instanceof Error) propagatedErrors.add(onTurnErrorError)
+            throw onTurnErrorError
+          }
+          if (errorBehavior === 'handleAndPropagate') {
+            propagatedErrors.add(err)
+            throw err
+          }
         } else {
           throw ExceptionHelper.generateException(Error, Errors.UnknownErrorType, undefined, { errorMessage: err.message })
         }

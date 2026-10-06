@@ -3,7 +3,7 @@
 
 import type { Activity } from '@microsoft/agents-activity'
 import type { ResourceResponse } from '../../connector-client'
-import type { BaseAdapter } from '../../baseAdapter'
+import type { BaseAdapter, TurnErrorHandlingOptions } from '../../baseAdapter'
 import type { TurnContext } from '../../turnContext'
 import type { TurnState } from '../turnState'
 import type { RouteHandler } from '../routeHandler'
@@ -217,7 +217,9 @@ export class Proactive<TState extends TurnState> {
    * @param adapter - The channel adapter used to send the activity.
    * @param conversationId - The ID of a conversation previously stored via {@link storeConversation}.
    * @param activity - The activity to send. If `type` is not set it defaults to `'message'`.
-   * @returns A {@link ResourceResponse} with the ID of the sent activity.
+   * @param options - Options controlling error handling for this operation.
+   * @returns A {@link ResourceResponse} with the ID of the sent activity. The ID is empty when an
+   *   operation error is handled and consumed.
    * @throws `Error` if no conversation reference is found for the specified ID.
    * @example
    * ```typescript
@@ -225,7 +227,7 @@ export class Proactive<TState extends TurnState> {
    * await app.proactive.sendActivity(adapter, storedConvId, { text: 'Your order has shipped!' })
    * ```
    */
-  sendActivity (adapter: BaseAdapter, conversationId: string, activity: Partial<Activity>): Promise<ResourceResponse>
+  sendActivity (adapter: BaseAdapter, conversationId: string, activity: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<ResourceResponse>
   /**
    * Sends an activity to an existing conversation using the provided {@link Conversation} reference.
    *
@@ -233,7 +235,9 @@ export class Proactive<TState extends TurnState> {
    * @param conversation - A `Conversation` instance created via its constructor or
    *   {@link ConversationBuilder}.
    * @param activity - The activity to send. If `type` is not set it defaults to `'message'`.
-   * @returns A {@link ResourceResponse} with the ID of the sent activity.
+   * @param options - Options controlling error handling for this operation.
+   * @returns A {@link ResourceResponse} with the ID of the sent activity. The ID is empty when an
+   *   operation error is handled and consumed.
    * @example
    * ```typescript
    * // Build a Conversation from a stored reference and send a message
@@ -242,11 +246,12 @@ export class Proactive<TState extends TurnState> {
    * console.log('Sent activity ID:', response.id)
    * ```
    */
-  sendActivity (adapter: BaseAdapter, conversation: Conversation, activity: Partial<Activity>): Promise<ResourceResponse>
+  sendActivity (adapter: BaseAdapter, conversation: Conversation, activity: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<ResourceResponse>
   async sendActivity (
     adapter: BaseAdapter,
     conversationOrId: Conversation | string,
-    activity: Partial<Activity>
+    activity: Partial<Activity>,
+    options?: TurnErrorHandlingOptions
   ): Promise<ResourceResponse> {
     return trace(ProactiveTraceDefinitions.sendActivity, async ({ record, actions }) => {
       const conv = typeof conversationOrId === 'string'
@@ -270,21 +275,19 @@ export class Proactive<TState extends TurnState> {
         id, conv.reference.channelId, conv.reference.serviceUrl)
 
       let response: ResourceResponse | undefined
-      let caughtError: unknown
+      let operationFailed = false
 
       await adapter.continueConversation(conv.identity, conv.reference, async (ctx: TurnContext) => {
         try {
           const result = await ctx.sendActivity(activityToSend as Activity)
           response = result as ResourceResponse
-        } catch (err) {
-          caughtError = err
+        } catch (error) {
+          operationFailed = true
+          throw error
         }
-      })
+      }, undefined, options)
 
-      if (caughtError !== undefined) {
-        logger.warn('sendActivity: failed for conversation=%s: %s', id, caughtError)
-        throw caughtError
-      }
+      if (operationFailed) return { id: '' }
       if (response === undefined) throw ExceptionHelper.generateException(Error, Errors.ProactiveSendActivityNoResponse)
       logger.debug('sendActivity: sent activity id=%s', response.id)
       return response
@@ -319,7 +322,7 @@ export class Proactive<TState extends TurnState> {
    * }
    * ```
    */
-  continueConversation (adapter: BaseAdapter, conversationId: string, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>): Promise<void>
+  continueConversation (adapter: BaseAdapter, conversationId: string, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<void>
   /**
    * Continues an existing conversation by executing the given handler within the context of the
    * provided {@link Conversation} reference. The handler receives a {@link TurnContext} and a
@@ -327,8 +330,8 @@ export class Proactive<TState extends TurnState> {
    * respond as if replying to an incoming activity.
    *
    * @remarks
-   * Exceptions thrown inside the handler are captured and re-thrown after the adapter callback
-   * completes, since the adapter would otherwise silently swallow them.
+   * Error handling is controlled by `options.errorBehavior`. The default behavior invokes the
+   * adapter's `onTurnError` handler and consumes the error.
    *
    * If `autoSignInHandlers` are supplied and the application has user authorization configured,
    * tokens are acquired before the handler is called. If not all tokens are available and
@@ -342,6 +345,7 @@ export class Proactive<TState extends TurnState> {
    *   acquired before invoking the handler.
    * @param continuationActivity - Optional activity fields merged into the continuation activity,
    *   making them available on `ctx.activity` inside the handler (e.g. `value`, `valueType`).
+   * @param options - Options controlling error handling for this operation.
    * @example
    * ```typescript
    * // Continue a conversation with a custom value payload
@@ -358,13 +362,14 @@ export class Proactive<TState extends TurnState> {
    * )
    * ```
    */
-  continueConversation (adapter: BaseAdapter, conversation: Conversation, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>): Promise<void>
+  continueConversation (adapter: BaseAdapter, conversation: Conversation, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<void>
   async continueConversation (
     adapter: BaseAdapter,
     conversationOrId: Conversation | string,
     handler: RouteHandler<TState>,
     autoSignInHandlers?: string[],
-    continuationActivity?: Partial<Activity>
+    continuationActivity?: Partial<Activity>,
+    options?: TurnErrorHandlingOptions
   ): Promise<void> {
     return trace(ProactiveTraceDefinitions.continueConversation, async ({ record, actions }) => {
       const conv = typeof conversationOrId === 'string'
@@ -385,8 +390,6 @@ export class Proactive<TState extends TurnState> {
 
       logger.info('continueConversation: conversation=%s channel=%s serviceUrl=%s',
         id, conv.reference.channelId, conv.reference.serviceUrl)
-
-      let caughtError: unknown
 
       await adapter.continueConversation(conv.identity, conv.reference, async (ctx: TurnContext) => {
         try {
@@ -419,19 +422,13 @@ export class Proactive<TState extends TurnState> {
 
           await handler(ctx, state)
           await state.save(ctx, this.requireAppStorage())
-        } catch (err) {
-          caughtError = err
         } finally {
           if ((ctx as any).streamingResponse?.isStreamStarted?.()) {
             await (ctx as any).streamingResponse.endStream()
           }
         }
-      })
+      }, undefined, options)
 
-      if (caughtError !== undefined) {
-        logger.warn('continueConversation: failed for conversation=%s: %s', id, caughtError)
-        throw caughtError
-      }
       logger.debug('continueConversation: complete for conversation=%s', id)
     })
   }

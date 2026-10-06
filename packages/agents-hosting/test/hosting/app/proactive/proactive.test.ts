@@ -148,12 +148,14 @@ describe('Proactive', () => {
   describe('sendActivity() — Conversation overload', () => {
     it('calls adapter.continueConversation with the correct identity and reference', async () => {
       const conv = makeConversation()
-      await proactive.sendActivity(adapter, conv, { text: 'hi' })
+      await proactive.sendActivity(adapter, conv, { text: 'hi' }, { errorBehavior: 'propagate' })
       const stub = adapter.continueConversation as sinon.SinonStub
       assert.ok(stub.calledOnce)
-      const [identity, ref] = stub.firstCall.args
+      const [identity, ref, , isResponse, options] = stub.firstCall.args
       assert.equal(identity.aud, 'bot-app-id')
       assert.equal(ref.conversation.id, 'conv-1')
+      assert.equal(isResponse, undefined)
+      assert.deepEqual(options, { errorBehavior: 'propagate' })
     })
 
     it('defaults activity.type to "message" when not set', async () => {
@@ -188,7 +190,26 @@ describe('Proactive', () => {
       )
     })
 
-    it('re-throws exceptions that occur inside the adapter callback', async () => {
+    it('returns an empty ResourceResponse when the adapter handles a send error', async () => {
+      const conv = makeConversation()
+      sinon.restore()
+      sinon.stub(adapter, 'continueConversation').callsFake(async (_identity, _ref, logic) => {
+        const act = Activity.fromObject({ type: 'event', channelId: 'webchat', conversation: { id: 'c1' } })
+        const ctx = new TurnContext(adapter, act)
+        sinon.stub(ctx, 'sendActivity').rejects(new Error('send-failed'))
+        try {
+          await logic(ctx)
+        } catch {
+          // Simulate the adapter's default `handle` behavior.
+        }
+      })
+
+      const response = await proactive.sendActivity(adapter, conv, { text: 'hi' })
+
+      assert.deepEqual(response, { id: '' })
+    })
+
+    it('surfaces errors rejected by the adapter', async () => {
       const conv = makeConversation()
       sinon.restore()
       sinon.stub(adapter, 'continueConversation').callsFake(async (_identity, _ref, logic) => {
@@ -198,7 +219,7 @@ describe('Proactive', () => {
         await logic(ctx)
       })
       await assert.rejects(
-        () => proactive.sendActivity(adapter, conv, { text: 'hi' }),
+        () => proactive.sendActivity(adapter, conv, { text: 'hi' }, { errorBehavior: 'propagate' }),
         /send-failed/
       )
     })
@@ -226,12 +247,21 @@ describe('Proactive', () => {
   describe('continueConversation() — Conversation overload', () => {
     it('calls adapter.continueConversation with correct identity and reference', async () => {
       const conv = makeConversation()
-      await proactive.continueConversation(adapter, conv, async () => {})
+      await proactive.continueConversation(
+        adapter,
+        conv,
+        async () => {},
+        undefined,
+        undefined,
+        { errorBehavior: 'handleAndPropagate' }
+      )
       const stub = adapter.continueConversation as sinon.SinonStub
       assert.ok(stub.calledOnce)
-      const [identity, ref] = stub.firstCall.args
+      const [identity, ref, , isResponse, options] = stub.firstCall.args
       assert.equal(identity.aud, 'bot-app-id')
       assert.equal(ref.conversation.id, 'conv-1')
+      assert.equal(isResponse, undefined)
+      assert.deepEqual(options, { errorBehavior: 'handleAndPropagate' })
     })
 
     it('creates a fresh TurnState and loads/saves it around the handler', async () => {
@@ -269,13 +299,18 @@ describe('Proactive', () => {
       assert.ok(receivedState instanceof TurnState)
     })
 
-    it('re-throws exceptions from inside the handler', async () => {
+    it('surfaces handler errors rejected by the adapter', async () => {
       const conv = makeConversation()
       await assert.rejects(
         () =>
-          proactive.continueConversation(adapter, conv, async () => {
-            throw new Error('handler-error')
-          }),
+          proactive.continueConversation(
+            adapter,
+            conv,
+            async () => { throw new Error('handler-error') },
+            undefined,
+            undefined,
+            { errorBehavior: 'handleAndPropagate' }
+          ),
         /handler-error/
       )
     })

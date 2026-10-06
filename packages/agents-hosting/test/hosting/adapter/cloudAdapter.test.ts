@@ -467,6 +467,16 @@ describe('CloudAdapter', function () {
   })
 
   describe('continueConversation', function () {
+    const conversationReference: ConversationReference = {
+      activityId: '1234',
+      user: { id: 'user1', name: 'User' },
+      agent: { id: 'bot1', name: 'Bot' },
+      conversation: { id: 'conversation1' },
+      channelId: 'channel123',
+      locale: 'en-US',
+      serviceUrl: 'http://example.com'
+    }
+
     const bootstrap = () => {
       const logic = sinon.fake((context) => {
         sinon.assert.match(
@@ -489,22 +499,117 @@ describe('CloudAdapter', function () {
     }
 
     it('works with a botId', async function () {
-      const conversationReference: ConversationReference = {
-        activityId: '1234',
-        user: { id: 'user1', name: 'User' },
-        agent: { id: 'bot1', name: 'Bot' },
-        conversation: { id: 'conversation1' },
-        channelId: 'channel123',
-        locale: 'en-US',
-        serviceUrl: 'http://example.com'
-      }
-
       const { logic, verify } = bootstrap()
 
       // @ts-expect-error
       await cloudAdapter.continueConversation(authentication.clientId, conversationReference, logic)
 
       verify()
+    })
+
+    it('handles continuation errors by default', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+        throw error
+      })
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
+    })
+
+    it('handles continuation errors when requested', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+        throw error
+      }, undefined, { errorBehavior: 'handle' })
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
+    })
+
+    it('handles and propagates the original continuation error when requested', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await assert.rejects(
+        cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+          throw error
+        }, undefined, { errorBehavior: 'handleAndPropagate' }),
+        error
+      )
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
+    })
+
+    it('propagates the original continuation error without handling it when requested', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await assert.rejects(
+        cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+          throw error
+        }, undefined, { errorBehavior: 'propagate' }),
+        error
+      )
+
+      sinon.assert.notCalled(onTurnError)
+    })
+
+    it('does not handle a propagated error in enclosing adapter middleware', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await assert.rejects(
+        cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+          await cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+            throw error
+          }, undefined, { errorBehavior: 'propagate' })
+        }),
+        error
+      )
+
+      sinon.assert.notCalled(onTurnError)
+    })
+
+    it('handles only once before propagating through enclosing adapter middleware', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await assert.rejects(
+        cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+          await cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+            throw error
+          }, undefined, { errorBehavior: 'handleAndPropagate' })
+        }),
+        error
+      )
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
+    })
+
+    it('continues to accept the unused isResponse argument', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+
+      await cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+        throw error
+      }, false)
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
     })
 
     it('throws error', async function () {

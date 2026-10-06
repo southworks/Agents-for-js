@@ -551,7 +551,7 @@ export const AzureBotScope = "https://api.botframework.com";
 // @public
 export abstract class BaseAdapter {
     readonly ConnectorClientKey: symbol;
-    abstract continueConversation(botAppIdOrIdentity: string | JwtPayload, reference: Partial<ConversationReference>, logic: (revocableContext: TurnContext) => Promise<void>): Promise<void>;
+    abstract continueConversation(botAppIdOrIdentity: string | JwtPayload, reference: Partial<ConversationReference>, logic: (revocableContext: TurnContext) => Promise<void>, isResponse?: Boolean, options?: TurnErrorHandlingOptions): Promise<void>;
     abstract deleteActivity(context: TurnContext, reference: Partial<ConversationReference>): Promise<void>;
     // @deprecated (undocumented)
     abstract getAttachment(context: TurnContext, attachmentId: string, viewId: string): Promise<NodeJS.ReadableStream>;
@@ -560,7 +560,7 @@ export abstract class BaseAdapter {
     protected middleware: MiddlewareSet;
     get onTurnError(): (context: TurnContext, error: Error) => Promise<void>;
     set onTurnError(value: (context: TurnContext, error: Error) => Promise<void>);
-    protected runMiddleware(context: TurnContext, next: (revocableContext: TurnContext) => Promise<void>): Promise<void>;
+    protected runMiddleware(context: TurnContext, next: (revocableContext: TurnContext) => Promise<void>, errorBehavior?: TurnErrorBehavior): Promise<void>;
     abstract sendActivities(context: TurnContext, activities: Activity[]): Promise<ResourceResponse[]>;
     abstract updateActivity(context: TurnContext, activity: Activity): Promise<ResourceResponse | void>;
     // @deprecated (undocumented)
@@ -625,7 +625,7 @@ export class CloudAdapter extends BaseAdapter {
     protected readonly authConfig: AuthConfiguration;
     authorizeRequest(req: Request_2, res: WebResponse, next: NextFunction): Promise<void>;
     connectionManager: Connections;
-    continueConversation(botAppIdOrIdentity: string | JwtPayload, reference: ConversationReference, logic: (revocableContext: TurnContext) => Promise<void>, isResponse?: Boolean): Promise<void>;
+    continueConversation(botAppIdOrIdentity: string | JwtPayload, reference: ConversationReference, logic: (revocableContext: TurnContext) => Promise<void>, isResponse?: Boolean, options?: TurnErrorHandlingOptions): Promise<void>;
     protected createConnectorClient(serviceUrl: string, scope: string, identity: JwtPayload, headers?: HeaderPropagationCollection): Promise<ConnectorClient>;
     protected createConnectorClientWithIdentity(identity: JwtPayload, activity: Activity, headers?: HeaderPropagationCollection): Promise<ConnectorClient>;
     createConversationAsync(agentAppId: string, channelId: string, serviceUrl: string, audience: string, conversationParameters: ConversationParameters, logic: (context: TurnContext) => Promise<void>): Promise<void>;
@@ -1334,15 +1334,15 @@ export function preloadConfigurationSources(registrations: readonly Configuratio
 // @public
 export class Proactive<TState extends TurnState> {
     constructor(app: AgentApplication<TState>, options: ProactiveOptions);
-    continueConversation(adapter: BaseAdapter, conversationId: string, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>): Promise<void>;
-    continueConversation(adapter: BaseAdapter, conversation: Conversation, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>): Promise<void>;
+    continueConversation(adapter: BaseAdapter, conversationId: string, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<void>;
+    continueConversation(adapter: BaseAdapter, conversation: Conversation, handler: RouteHandler<TState>, autoSignInHandlers?: string[], continuationActivity?: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<void>;
     static readonly ContinueConversationValueType = "application/vnd.microsoft.activity.continueconversation+json";
     createConversation(adapter: BaseAdapter, createOptions: CreateConversationOptions, handler?: RouteHandler<TState>): Promise<Conversation>;
     deleteConversation(conversationId: string): Promise<void>;
     getConversation(conversationId: string): Promise<Conversation | undefined>;
     getConversationOrThrow(conversationId: string): Promise<Conversation>;
-    sendActivity(adapter: BaseAdapter, conversationId: string, activity: Partial<Activity>): Promise<ResourceResponse>;
-    sendActivity(adapter: BaseAdapter, conversation: Conversation, activity: Partial<Activity>): Promise<ResourceResponse>;
+    sendActivity(adapter: BaseAdapter, conversationId: string, activity: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<ResourceResponse>;
+    sendActivity(adapter: BaseAdapter, conversation: Conversation, activity: Partial<Activity>, options?: TurnErrorHandlingOptions): Promise<ResourceResponse>;
     storeConversation(context: TurnContext): Promise<string>;
     storeConversation(conversation: Conversation): Promise<string>;
 }
@@ -1753,6 +1753,14 @@ export class TurnContextStateCollection extends Map<any, any> {
     get(key: any): any;
     pop(key: any): any;
     push(key: any, value: any): void;
+}
+
+// @public
+export type TurnErrorBehavior = 'handle' | 'handleAndPropagate' | 'propagate';
+
+// @public
+export interface TurnErrorHandlingOptions {
+    errorBehavior?: TurnErrorBehavior;
 }
 
 // @public

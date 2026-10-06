@@ -4,7 +4,7 @@
  */
 
 import { AgentHandler, INVOKE_RESPONSE_KEY } from './activityHandler'
-import { BaseAdapter } from './baseAdapter'
+import { BaseAdapter, TurnErrorHandlingOptions } from './baseAdapter'
 import { TurnContext } from './turnContext'
 import { Request } from './auth/request'
 import { NextFunction, WebResponse } from './interfaces/webResponse'
@@ -756,13 +756,15 @@ export class CloudAdapter extends BaseAdapter {
    * @param reference - The conversation reference to continue.
    * @param logic - The logic to execute.
    * @param isResponse - No longer used.
+   * @param options - Options controlling error handling for this continuation.
    * @returns A promise representing the completion of the continue operation.
    */
   async continueConversation (
     botAppIdOrIdentity: string | JwtPayload,
     reference: ConversationReference,
     logic: (revocableContext: TurnContext) => Promise<void>,
-    isResponse: Boolean = false): Promise<void> {
+    isResponse: Boolean = false,
+    options?: TurnErrorHandlingOptions): Promise<void> {
     return trace(AdapterTraceDefinitions.continueConversation, async ({ record }) => {
       if (!reference || !reference.serviceUrl || (reference.conversation == null) || !reference.conversation.id) {
         throw ExceptionHelper.generateException(Error, Errors.ContinueConversationInvalidReference)
@@ -772,6 +774,7 @@ export class CloudAdapter extends BaseAdapter {
         throw ExceptionHelper.generateException(TypeError, Errors.ContinueConversationBotAppIdOrIdentityRequired)
       }
       const botAppId = typeof botAppIdOrIdentity === 'string' ? botAppIdOrIdentity : botAppIdOrIdentity.aud as string
+      const errorBehavior = options?.errorBehavior ?? 'handle'
 
       // Only having the botId will only work against ABS or Agentic.  Proactive to other agents will
       // not work with just botId.  Use a JwtPayload with property aud (which is botId) and appid populated.
@@ -798,7 +801,7 @@ export class CloudAdapter extends BaseAdapter {
         this.setUserTokenClient(context, userTokenClient)
       }
 
-      await this.runMiddleware(context, logic)
+      await this.runMiddleware(context, logic, errorBehavior)
     })
   }
 
