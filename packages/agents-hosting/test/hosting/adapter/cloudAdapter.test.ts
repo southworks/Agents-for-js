@@ -584,6 +584,35 @@ describe('CloudAdapter', function () {
       assert.strictEqual(onTurnError.firstCall.args[1], error)
     })
 
+    it('handles a propagated error reused by a detached continuation', async function () {
+      const error = new Error('send failed')
+      const onTurnError = sinon.stub().resolves()
+      cloudAdapter.onTurnError = onTurnError
+      let resolveDetachedContinuation!: () => void
+      let rejectDetachedContinuation!: (error: unknown) => void
+      const detachedContinuation = new Promise<void>((resolve, reject) => {
+        resolveDetachedContinuation = resolve
+        rejectDetachedContinuation = reject
+      })
+
+      await assert.rejects(
+        cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+          setTimeout(() => {
+            cloudAdapter.continueConversation(authentication.clientId!, conversationReference, async () => {
+              throw error
+            }).then(resolveDetachedContinuation, rejectDetachedContinuation)
+          }, 0)
+          throw error
+        }, undefined, { errorBehavior: 'propagate' }),
+        error
+      )
+      await sandbox.clock.tickAsync(0)
+      await detachedContinuation
+
+      sinon.assert.calledOnce(onTurnError)
+      assert.strictEqual(onTurnError.firstCall.args[1], error)
+    })
+
     it('does not handle a propagated error in enclosing adapter middleware', async function () {
       const error = new Error('send failed')
       const onTurnError = sinon.stub().resolves()

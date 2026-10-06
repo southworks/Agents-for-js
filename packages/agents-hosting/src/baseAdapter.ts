@@ -15,7 +15,7 @@ import { JwtPayload } from 'jsonwebtoken'
 import { Errors } from './errorHelper'
 
 const logger = debug('agents:base-adapter')
-const propagatedErrors = new AsyncLocalStorage<WeakSet<Error>>()
+const propagatedErrors = new AsyncLocalStorage<{ errors: WeakSet<Error>, active: boolean }>()
 
 /**
  * Controls how an error thrown during a turn is handled.
@@ -225,9 +225,18 @@ export abstract class BaseAdapter {
     next: (revocableContext: TurnContext) => Promise<void>,
     errorBehavior: TurnErrorBehavior = 'handle'
   ): Promise<void> {
-    if (propagatedErrors.getStore() === undefined) {
-      return await propagatedErrors.run(new WeakSet<Error>(), async () => await this.runMiddleware(context, next, errorBehavior))
+    const scope = propagatedErrors.getStore()
+    if (scope === undefined || !scope.active) {
+      const newScope = { errors: new WeakSet<Error>(), active: true }
+      return await propagatedErrors.run(newScope, async () => {
+        try {
+          await this.runMiddleware(context, next, errorBehavior)
+        } finally {
+          newScope.active = false
+        }
+      })
     }
+    const propagatedErrorScope = propagatedErrors.getStore()!
 
     if (context && context.activity && context.activity.locale) {
       context.locale = context.activity.locale
@@ -239,12 +248,12 @@ export abstract class BaseAdapter {
     try {
       await this.middleware.run(pContext.proxy, async () => await next(pContext.proxy))
     } catch (err: Error | any) {
-      if (err instanceof Error && propagatedErrors.getStore()!.has(err)) {
+      if (err instanceof Error && propagatedErrorScope.errors.has(err)) {
         throw err
       }
 
       if (errorBehavior === 'propagate') {
-        if (err instanceof Error) propagatedErrors.getStore()!.add(err)
+        if (err instanceof Error) propagatedErrorScope.errors.add(err)
         throw err
       }
 
@@ -253,11 +262,11 @@ export abstract class BaseAdapter {
           try {
             await this.onTurnError(pContext.proxy, err)
           } catch (onTurnErrorError) {
-            if (onTurnErrorError instanceof Error) propagatedErrors.getStore()!.add(onTurnErrorError)
+            if (onTurnErrorError instanceof Error) propagatedErrorScope.errors.add(onTurnErrorError)
             throw onTurnErrorError
           }
           if (errorBehavior === 'handleAndPropagate') {
-            propagatedErrors.getStore()!.add(err)
+            propagatedErrorScope.errors.add(err)
             throw err
           }
         } else {
