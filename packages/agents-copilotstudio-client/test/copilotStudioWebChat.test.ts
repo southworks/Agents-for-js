@@ -41,10 +41,12 @@ function createMockClient (sandbox: SinonSandbox, opts: {
   ]
 
   // Async generator that yields greeting activities
-  async function * fakeStartConversationStreaming (): AsyncGenerator<Activity> {
-    for (const a of greetingActivities) {
-      yield Activity.fromObject(a)
+  async function * fakeStartConversationStreaming (): AsyncGenerator<Activity, string> {
+    const activities = greetingActivities.map(a => Activity.fromObject(a))
+    for (const activity of activities) {
+      yield activity
     }
+    return activities.find(activity => activity.conversation?.id)?.conversation?.id ?? 'header-conversation-id'
   }
 
   // Async generator that yields response activities
@@ -344,34 +346,18 @@ describe('CopilotStudioWebChat.createConnection', function () {
       conn.end()
     })
 
-    it('conversationId captured from sendActivityStreaming response when not set upfront', async function () {
+    it('uses start metadata when greeting activities have no conversation ID', async function () {
       const client = createMockClient(sandbox, {
-        greetingActivities: [
-          // greeting with no conversation id
-          { type: 'message', text: 'Hello' },
-        ],
-        responseActivities: [
-          { type: 'message', text: 'Response', conversation: { id: 'captured-conv-id' } },
-        ],
+        greetingActivities: [{ type: 'message', text: 'Hello' }],
       })
-
       const conn = CopilotStudioWebChat.createConnection(client)
       conn.activity$.subscribe({})
       await new Promise((resolve) => setTimeout(resolve, 50))
-
-      // conversationId should still be undefined (greeting had no conversation)
-      assert.strictEqual(conn.conversationId, undefined, 'conversationId should be undefined before sendActivity response')
-
-      const activity = makeActivity()
-      // Wait for the postActivity observable to complete (not just first value)
+      assert.equal(conn.conversationId, 'header-conversation-id')
       await new Promise<void>((resolve, reject) => {
-        conn.postActivity(activity).subscribe({
-          complete: () => resolve(),
-          error: (e) => reject(e),
-        })
+        conn.postActivity(makeActivity()).subscribe({ complete: resolve, error: reject })
       })
-
-      assert.strictEqual(conn.conversationId, 'captured-conv-id', 'conversationId should be captured from sendActivity response')
+      assert.equal(client.sendActivityStreaming.firstCall.args[1], 'header-conversation-id')
       conn.end()
     })
   })
