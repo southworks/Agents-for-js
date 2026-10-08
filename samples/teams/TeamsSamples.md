@@ -68,7 +68,7 @@ Comprehensive sample demonstrating core Teams conversation features using `Agent
 - Member added / removed events
 - Hero cards with `MessageBack` actions
 - Quoted replies
-- Custom Feedback
+- Custom feedback dialog (`customfeedback`) with thumbs-up/down reactions and optional comments
 
 **How to test:**
 1. Install the sample in a **team channel** or **groupChat**.
@@ -80,6 +80,11 @@ Comprehensive sample demonstrating core Teams conversation features using `Agent
 7. Click **"Delete Card"** — the card is removed from the conversation.
 8. Click **"Send Targeted"** (in a group chat) — each member receives a targeted message only they can see.
 9. Add/remove members or create/rename/delete channels or rename the team to see the event handlers fire.
+10. Click **"Custom Feedback"** or send `customfeedback`. Select thumbs up or thumbs down on the response, enter optional comments in the dialog, and select **Submit**. The console logs the original activity ID, reaction, and feedback length without logging the comment text.
+
+Custom feedback uses `channelData.feedbackLoop.type: "custom"`. The sample handles `message/fetchTask` to return the Adaptive Card dialog, accepting either a root feedback payload or one wrapped in `data`. Submission arrives as `message/submitAction` with `actionName: "feedback"`; `onTeamsFeedbackLoop` handles it and acknowledges the invoke. The sample does not persist feedback.
+
+Teams does not store custom feedback for the application. For protocol details, see [Bot messages with AI-generated content](https://learn.microsoft.com/microsoftteams/platform/bots/how-to/bot-messages-ai-generated-content#feedback-buttons).
 
 **Manifest — additional sections:**
 
