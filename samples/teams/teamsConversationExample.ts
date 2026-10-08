@@ -1,6 +1,6 @@
 import { ActionTypes, Activity, ChannelAccount, Channels, Entity, RoleTypes } from '@microsoft/agents-activity'
 import { AgentApplication, CardFactory, CreateConversationOptionsBuilder, MemoryStorage, MessageFactory, TurnContext, TurnState } from '@microsoft/agents-hosting'
-import { addQuotedReply, parseTeamsChannelData, TeamsAgentExtension, teamsGetTeamInfo, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
+import { addQuotedReply, isRecipientTargeted, parseTeamsChannelData, TeamsAgentExtension, teamsGetTeamInfo, TeamsTurnContext } from '@microsoft/agents-hosting-extensions-msteams'
 import { startServer } from '@microsoft/agents-hosting-express'
 import { ChannelInfo, PagedMembersResult, TeamInfo, TeamsChannelAccount } from '@microsoft/teams.api'
 
@@ -200,14 +200,25 @@ app
 
     await context.sendActivity(reply)
   })
-  .onMessage('promptpreview', async (context: TurnContext) => {
-    const response = Activity.fromObject({ type: 'message', text: 'This targeted response includes Prompt Preview metadata for your slash command.' })
-    response.withTargetedRecipient(context.activity.from as ChannelAccount)
-
-    // TeamsTurnContext adds TargetedMessageInfoEntity when the incoming slash command is targeted.
-    await new TeamsTurnContext(context).sendActivity(response)
-  })
   .onActivity('message', async (context: TurnContext) => {
+    if (isRecipientTargeted(context.activity)) {
+      // this is an agent-targeted message.
+      const response = Activity.fromObject({
+        type: 'message',
+        text: [
+          '🔒 **Private response**',
+          '',
+          'Your original private message appears in the Prompt Preview above this message.',
+          'Only you can see this response.'
+        ].join('\n')
+      })
+      response.withTargetedRecipient(context.activity.from as ChannelAccount)
+
+      // TeamsTurnContext adds the targetedMessageInfo entity which enables the prompt-preview.
+      await new TeamsTurnContext(context).sendActivity(response)
+      return
+    }
+    // a normal message from the conversation
     await context.sendActivity(MessageFactory.attachment(createConversationCard('Welcome!', 'Choose a Teams conversation demo action.', 0)))
   })
 
