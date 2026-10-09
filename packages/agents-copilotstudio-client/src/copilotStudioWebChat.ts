@@ -343,7 +343,7 @@ export class CopilotStudioWebChat {
         }).finally(clearTyping)
       })
 
-      const notifyActivity = (activity: Partial<Activity>) => {
+      const notifyActivity = (activity: Partial<Activity>, subscriber = activitySubscriber) => {
         const newActivity = {
           ...activity,
           timestamp: new Date().toISOString(),
@@ -354,7 +354,7 @@ export class CopilotStudioWebChat {
         }
         sequence++
         logger.debug(`Notify '${newActivity.type}' activity to WebChat:`, redactDiagnosticObject(newActivity, client.diagnosticsPseudonymKey))
-        activitySubscriber?.next(newActivity)
+        subscriber?.next(newActivity)
       }
 
       const notifyTyping = () => {
@@ -366,6 +366,8 @@ export class CopilotStudioWebChat {
           ? { id: conversation.id, name: conversation.name }
           : { id: 'agent', name: 'Agent' }
         const streamId = randomUUID()
+        // Keep cleanup paired with the observer that receives the stream start.
+        const subscriber = activitySubscriber
         let pending = true
         // An explicit contentless stream lets us retire the fallback indicator
         // even when the service uses a different sender ID.
@@ -375,7 +377,7 @@ export class CopilotStudioWebChat {
           from,
           channelData: { streamType: 'streaming', streamSequence: 1 },
           entities: [{ type: 'streaminfo', streamType: 'streaming', streamSequence: 1 }]
-        })
+        }, subscriber)
         return () => {
           if (!pending) {
             return
@@ -388,7 +390,7 @@ export class CopilotStudioWebChat {
             from,
             channelData: { streamType: 'final', streamId },
             entities: [{ type: 'streaminfo', streamType: 'final', streamId }]
-          })
+          }, subscriber)
         }
       }
 

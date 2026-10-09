@@ -30,6 +30,63 @@ function assertFallbackClosed (received: Partial<Activity>[]) {
   assert.equal(finals[0].type, 'typing')
 }
 
+for (const scenario of ['greeting', 'request'] as const) {
+  for (const response of ['empty', 'message'] as const) {
+    it(`cleans up ${scenario} typing on the original subscriber after a response (${response})`, async (t) => {
+      let release!: () => void
+      let started!: () => void
+      const waiting = new Promise<void>(resolve => { release = resolve })
+      const ready = new Promise<void>(resolve => { started = resolve })
+      async function * activities () {
+        started()
+        await waiting
+        if (response === 'message') {
+          yield Activity.fromObject({ id: 'answer', type: 'message', text: 'Answer', from: { id: 'service-bot' } })
+        }
+      }
+      const client = {
+        startConversationStreaming: activities,
+        sendActivityStreaming: activities
+      } as unknown as CopilotStudioClient
+      const connection = CopilotStudioWebChat.createConnection(client, {
+        startConversation: scenario === 'greeting',
+        showTyping: true
+      })
+      const first: Partial<Activity>[] = []
+      const second: Partial<Activity>[] = []
+      const originalSubscription = connection.activity$.subscribe(activity => first.push(activity))
+      t.after(() => {
+        release()
+        connection.end()
+        originalSubscription.unsubscribe()
+      })
+      const done = scenario === 'request'
+        ? new Promise<void>((resolve, reject) => {
+          connection.postActivity(Activity.fromObject({ type: 'message', text: 'test' })).subscribe({
+            complete: resolve,
+            error: reject
+          })
+        })
+        : undefined
+      await ready
+      connection.activity$.subscribe(activity => second.push(activity))
+      release()
+      await done
+      // Allow greeting completion and its finally cleanup to finish too.
+      await new Promise<void>(resolve => setImmediate(resolve))
+
+      assert.equal(originalSubscription.closed, false)
+      assertFallbackClosed(first)
+      assert.ok(!second.some(activity => activity.from?.id === 'agent'))
+      assert.deepEqual(second.map(activity => activity.id), response === 'message' ? ['answer'] : [])
+      const initial = first.find(activity => activity.channelData?.streamType === 'streaming')!
+      const final = first.find(activity => activity.channelData?.streamType === 'final')!
+      assert.ok(final.timestamp)
+      assert.ok(final.channelData['webchat:sequence-id'] > initial.channelData['webchat:sequence-id'])
+    })
+  }
+}
+
 it('hands SDK typing over to service progress before the response ends', async (t) => {
   let release!: () => void
   let progressReceived!: () => void
