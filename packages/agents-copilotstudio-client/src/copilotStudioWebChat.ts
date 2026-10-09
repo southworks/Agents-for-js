@@ -416,8 +416,12 @@ export class CopilotStudioWebChat {
                   id: randomUUID(),
                   attachments: await processAttachments(activity)
                 })
-                const conversationId = newActivity.conversation?.id?.trim() || activeConversationId
-                if (conversationId) {
+                // An ID-less start must not fall back to another connection's client default.
+                // Keep implicit routing only for connections that skipped startup.
+                const conversationId = newActivity.conversation?.id?.trim() ||
+                  activeConversationId ||
+                  (shouldStart ? '' : undefined)
+                if (conversationId !== undefined) {
                   newActivity.conversation = { ...newActivity.conversation, id: conversationId }
                 }
                 let responseActivityCount = 0

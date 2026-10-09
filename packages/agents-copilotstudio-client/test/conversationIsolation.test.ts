@@ -335,7 +335,7 @@ describe('shared client conversation isolation', () => {
     assert.equal(result.activities[0].text, 'Custom start')
   })
 
-  it('preserves header metadata when a start override discards the generator return value', async (t) => {
+  it('does not borrow the default when a start override discards metadata', async (t) => {
     const response = startResponse('custom-header-A')
     response.finish.resolve()
     t.mock.method(globalThis, 'fetch', async () => response.response)
@@ -347,9 +347,122 @@ describe('shared client conversation isolation', () => {
 
     const result = await shared.startConversationWithResponse()
 
-    assert.equal(result.conversationId, 'custom-header-A')
+    assert.equal(result.conversationId, '')
     assert.equal(result.activities.length, 0)
   })
+
+  for (const forwardMetadata of [false, true]) {
+    for (const finishFirst of [0, 1]) {
+      it(`isolates overridden starts with forwarding=${forwardMetadata}, first=${finishFirst}`, async (t) => {
+        const responses = [startResponse('A'), startResponse('B')]
+        let index = 0
+        t.mock.method(globalThis, 'fetch', async () => responses[index++].response)
+        const shared = client()
+        const originalStart = shared.startConversationStreaming.bind(shared)
+        t.mock.method(shared, 'startConversationStreaming', async function * () {
+          await Promise.resolve()
+          const id = yield * originalStart()
+          if (forwardMetadata) {
+            return id
+          }
+        })
+        const starts = [shared.startConversationWithResponse(), shared.startConversationWithResponse()]
+        try {
+          await Promise.all(responses.map(response => response.reading.promise))
+          responses[finishFirst].finish.resolve()
+          await starts[finishFirst]
+          responses[1 - finishFirst].finish.resolve()
+          const results = await Promise.all(starts)
+          assert.deepEqual(results.map(result => result.conversationId), forwardMetadata ? ['A', 'B'] : ['', ''])
+          assert.deepEqual(results.map(result => result.activities), [[], []])
+        } finally {
+          responses.forEach(response => response.finish.resolve())
+          await Promise.allSettled(starts)
+        }
+      })
+
+      it(`isolates overridden WebChat starts with forwarding=${forwardMetadata}, first=${finishFirst}`, async (t) => {
+        const responses = [startResponse('A'), startResponse('B')]
+        const requests: { url: string, id: string | undefined }[] = []
+        let index = 0
+        t.mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+          const body = JSON.parse(String(init?.body))
+          if (!body.activity) {
+            return responses[index++].response
+          }
+          requests.push({ url: String(url), id: body.activity.conversation?.id })
+          const response = startResponse()
+          response.finish.resolve()
+          return response.response
+        })
+        const shared = client()
+        const originalStart = shared.startConversationStreaming.bind(shared)
+        t.mock.method(shared, 'startConversationStreaming', async function * () {
+          await Promise.resolve()
+          const id = yield * originalStart()
+          if (forwardMetadata) {
+            return id
+          }
+        })
+        const connections = [CopilotStudioWebChat.createConnection(shared), CopilotStudioWebChat.createConnection(shared)]
+        const subscriptions = connections.map(connection => connection.activity$.subscribe())
+        try {
+          await Promise.all(responses.map(response => response.reading.promise))
+          responses[finishFirst].finish.resolve()
+          await firstValueFrom(connections[finishFirst].connectionStatus$.pipe(filter(status => status === 2)))
+          responses[1 - finishFirst].finish.resolve()
+          await firstValueFrom(connections[1 - finishFirst].connectionStatus$.pipe(filter(status => status === 2)))
+          for (const connection of connections) {
+            await new Promise<void>((resolve, reject) => {
+              connection.postActivity(Activity.fromObject({ type: 'message', text: 'Follow-up' })).subscribe({ complete: resolve, error: reject })
+            })
+          }
+          assert.deepEqual(connections.map(connection => connection.conversationId), forwardMetadata ? ['A', 'B'] : [undefined, undefined])
+          assert.deepEqual(requests.map(request => request.id), forwardMetadata ? ['A', 'B'] : ['', ''])
+          assert.deepEqual(requests.map(request => new URL(request.url).pathname), forwardMetadata ? ['/api/conversations/A', '/api/conversations/B'] : ['/api/conversations', '/api/conversations'])
+        } finally {
+          responses.forEach(response => response.finish.resolve())
+          connections.forEach(connection => connection.end())
+          subscriptions.forEach(subscription => subscription.unsubscribe())
+        }
+      })
+    }
+  }
+
+  for (const activityId of [undefined, ' ', 'explicit-C']) {
+    it(`does not borrow another start ID after ID-less WebChat startup, activity ID=${activityId}`, async (t) => {
+      const responses = [startResponse(), startResponse('B'), startResponse()]
+      responses[1].finish.resolve()
+      responses[2].finish.resolve()
+      let index = 0
+      const fetchMock = t.mock.method(globalThis, 'fetch', async () => responses[index++].response)
+      const shared = client()
+      const connection = CopilotStudioWebChat.createConnection(shared)
+      const subscription = connection.activity$.subscribe()
+      try {
+        await responses[0].reading.promise
+        await shared.startConversationWithResponse()
+        responses[0].finish.resolve()
+        await firstValueFrom(connection.connectionStatus$.pipe(filter(status => status === 2)))
+        await new Promise<void>((resolve, reject) => {
+          connection.postActivity(Activity.fromObject({
+            type: 'message',
+            text: 'Follow-up',
+            ...(activityId !== undefined && { conversation: { id: activityId } })
+          })).subscribe({ complete: resolve, error: reject })
+        })
+        const expectedId = activityId?.trim() || ''
+        const call = fetchMock.mock.calls[2]
+        assert.equal(new URL(String(call.arguments[0])).pathname, `/api/conversations${expectedId ? '/' + expectedId : ''}`)
+        const body = JSON.parse(String(call.arguments[1]?.body))
+        assert.equal(body.activity.conversation.id, expectedId)
+      } finally {
+        responses[0].finish.resolve()
+        connection.end()
+        subscription.unsubscribe()
+      }
+    })
+  }
 
   it('queues a send triggered synchronously by the first typing notification', async (t) => {
     const startup = startResponse('A')

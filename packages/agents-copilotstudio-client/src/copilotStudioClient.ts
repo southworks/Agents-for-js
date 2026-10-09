@@ -276,6 +276,9 @@ export class CopilotStudioClient {
    * @param request The request parameters for starting the conversation.
    * @returns An async generator yielding the Agent's Activities.
    * @remarks Use a metadata-returning start method when the conversation ID is needed independently of activities.
+   * Overrides must forward the generator return value with `return yield *` to preserve
+   * header-only conversation metadata. An override returning no metadata or activity ID
+   * produces an empty conversation ID; the shared implicit default is never borrowed.
    */
   public startConversationStreaming (request: StartRequest): AsyncGenerator<Activity>
 
@@ -284,6 +287,9 @@ export class CopilotStudioClient {
    * @param emitStartConversationEvent Whether to emit a start conversation event. Defaults to true.
    * @returns An async generator yielding the Agent's Activities.
    * @remarks Use a metadata-returning start method when the conversation ID is needed independently of activities.
+   * Overrides must forward the generator return value with `return yield *` to preserve
+   * header-only conversation metadata. An override returning no metadata or activity ID
+   * produces an empty conversation ID; the shared implicit default is never borrowed.
    */
   public startConversationStreaming (emitStartConversationEvent?: boolean): AsyncGenerator<Activity>
 
@@ -526,8 +532,8 @@ export class CopilotStudioClient {
       }
       // Preserve activity-ID precedence and implicit-default updates for existing callers.
       // Header fallback is request-local; a missing ID still returns an empty string.
-      // Existing overrides may discard the generator return value; retain their legacy fallback.
-      const responseId = typeof result.value === 'string' ? result.value : this.conversationId
+      // Overrides must forward metadata explicitly; the shared default belongs to no request.
+      const responseId = typeof result.value === 'string' ? result.value : ''
       return createStartResponse(activities, activityConversationId || responseId)
     } finally {
       await stream.return(undefined)
