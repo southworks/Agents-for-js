@@ -77,17 +77,24 @@ function declarations (source) {
     ts.forEachChild(node, child => visit(child, key))
   }
   for (const statement of file.statements) visit(statement)
+  const aliases = new Map()
   for (const statement of file.statements) {
     if (!ts.isExportDeclaration(statement) || statement.moduleSpecifier || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue
     for (const specifier of statement.exportClause.elements) {
       const local = specifier.propertyName?.text ?? specifier.name.text
       const exported = specifier.name.text
-      if (local === exported) continue
-      for (const [key, text] of [...definitions]) {
-        if (key === local || key.startsWith(`${local}.`)) {
-          definitions.set(exported + key.slice(local.length), text)
-          definitions.delete(key)
-        }
+      aliases.set(local, [...(aliases.get(local) ?? []), exported])
+    }
+  }
+  // Use the same public names for declaration text, coverage gaps, and their reasons.
+  // Read each map before replacing keys so one declaration can have multiple exports.
+  for (const map of [definitions, unsupported, reasons]) {
+    const original = [...map]
+    for (const [local, exportedNames] of aliases) {
+      for (const [key, value] of original) {
+        if (key !== local && !key.startsWith(`${local}.`) && key !== `${local} modifiers`) continue
+        map.delete(key)
+        for (const exported of exportedNames) map.set(exported + key.slice(local.length), value)
       }
     }
   }
@@ -101,8 +108,8 @@ function detail (definitions, location) {
   return key ? definitions.get(key).trim() : ''
 }
 
-/** Stable import bindings remove Extractor's Storage / Storage_2 alias churn. */
-function normalizeImports (source) {
+/** Stable bindings remove internal alias churn without changing public export names. */
+function normalizeBindings (source, sharedExports) {
   const file = ts.createSourceFile('api.d.ts', source, ts.ScriptTarget.Latest, true)
   const options = { noLib: true, noResolve: true }
   const host = ts.createCompilerHost(options)
@@ -110,6 +117,37 @@ function normalizeImports (source) {
   const checker = ts.createProgram(['api.d.ts'], options, host).getTypeChecker()
   const replacements = new Map()
   const display = new Map()
+  const localExports = new Map()
+  const directExports = new Map()
+  for (const statement of file.statements) {
+    if (statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword) &&
+        !statement.modifiers.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)) {
+      const names = ts.isVariableStatement(statement)
+        ? statement.declarationList.declarations.map(declaration => declaration.name)
+        : statement.name ? [statement.name] : []
+      for (const name of names.filter(ts.isIdentifier)) {
+        const symbol = checker.getSymbolAtLocation(name)
+        if (!symbol) continue
+        directExports.set(symbol, name.text)
+        localExports.set(symbol, [...(localExports.get(symbol) ?? []), name.text])
+      }
+    }
+    if (!ts.isExportDeclaration(statement) || statement.moduleSpecifier || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue
+    for (const specifier of statement.exportClause.elements) {
+      const symbol = checker.getExportSpecifierLocalTargetSymbol(specifier)
+      if (!symbol || symbol.flags & ts.SymbolFlags.Alias) continue
+      localExports.set(symbol, [...(localExports.get(symbol) ?? []), specifier.name.text])
+    }
+  }
+  for (const [symbol, names] of localExports) {
+    names.sort()
+    // Prefer a name present on both sides so adding/removing another alias does
+    // not change self-references in the surviving public contract.
+    const exported = names.find(name => sharedExports.has(name)) ?? names[0]
+    const name = `__api_local_${createHash('sha256').update(exported).digest('hex').slice(0, 12)}`
+    replacements.set(symbol, name)
+    display.set(name, exported)
+  }
   for (const statement of file.statements) {
     if (!ts.isImportDeclaration(statement) || !statement.importClause) continue
     const clause = statement.importClause
@@ -127,6 +165,30 @@ function normalizeImports (source) {
   }
   const transformed = ts.transform(file, [context => {
     const visit = node => {
+      if (ts.isSourceFile(node)) {
+        const statements = node.statements.map(statement => {
+          const transformed = ts.visitNode(statement, visit)
+          const direct = statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword) &&
+            !statement.modifiers.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword) &&
+            (statement.name || ts.isVariableStatement(statement))
+          return direct
+            ? ts.factory.replaceModifiers(transformed, transformed.modifiers.filter(modifier => modifier.kind !== ts.SyntaxKind.ExportKeyword))
+            : transformed
+        })
+        if (directExports.size) {
+          const exports = [...directExports].map(([symbol, name]) => ts.factory.createExportSpecifier(
+            false, ts.factory.createIdentifier(replacements.get(symbol)), ts.factory.createIdentifier(name)
+          ))
+          statements.push(ts.factory.createExportDeclaration(undefined, false, ts.factory.createNamedExports(exports)))
+        }
+        return ts.factory.updateSourceFile(node, statements)
+      }
+      if (ts.isExportSpecifier(node)) {
+        const symbol = checker.getExportSpecifierLocalTargetSymbol(node)
+        const local = replacements.get(symbol) ?? node.propertyName?.text ?? node.name.text
+        return ts.factory.updateExportSpecifier(node, node.isTypeOnly,
+          local === node.name.text ? undefined : ts.factory.createIdentifier(local), node.name)
+      }
       if (ts.isIndexSignatureDeclaration(node)) {
         const parameters = node.parameters.map(parameter => ts.factory.updateParameterDeclaration(
           parameter, parameter.modifiers, parameter.dotDotDotToken, '__key', parameter.questionToken, parameter.type, parameter.initializer
@@ -185,8 +247,9 @@ export function compareDeclarations (before, after, directory, currentEntry) {
   const oldOriginal = declarations(before)
   const newOriginal = declarations(after)
   if (canonicalTokens(before) === canonicalTokens(after)) return []
-  const oldNormalized = normalizeImports(before)
-  const newNormalized = normalizeImports(after)
+  const sharedExports = new Set([...oldOriginal.definitions.keys()].filter(name => newOriginal.definitions.has(name)))
+  const oldNormalized = normalizeBindings(before, sharedExports)
+  const newNormalized = normalizeBindings(after, sharedExports)
   const oldDeclarations = declarations(oldNormalized.text)
   const newDeclarations = declarations(newNormalized.text)
   if (canonicalTokens(oldNormalized.text) === canonicalTokens(newNormalized.text)) return []

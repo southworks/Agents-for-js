@@ -58,7 +58,9 @@ Keep `compat/baseline/inventory.json` with the approved baselines: compat reads 
 
 ## Scope
 
-API Extractor generates the public reports; the semantic checker and regression-tested adapters identify potential source compatibility problems. Known harmless additions, import aliases, and index-parameter renames do not trigger warnings. Current declarations resolve inherited constructors omitted from reports; missing historical information remains uncertain.
+API Extractor generates the public reports; the semantic checker and regression-tested adapters identify potential source compatibility problems. Known harmless additions, import aliases, internal names behind public export aliases, and index-parameter renames do not trigger warnings. Changes to public export names remain subject to compatibility checks. Current declarations resolve inherited constructors omitted from reports; missing historical information remains uncertain.
+
+Conditional exports need explicit type coverage for each reachable import and require branch, including nested custom conditions. A shared `types` entry can cover sibling runtime targets. Types declared only for `import` do not cover an untyped `require` branch; analysis fails instead of silently skipping it. A later `default` fallback needs no separate entry when earlier branches already cover both resolution modes.
 
 This is not a guarantee of runtime compatibility. Generic-dependent and overloaded changes may remain uncertain. External types resolve from installed dependencies on both sides; declared dependency changes warn, while lockfile-only changes, runtime behavior, and package contents need separate review/tests. Unsupported export patterns and missing declarations fail analysis.
 

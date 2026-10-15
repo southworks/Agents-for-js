@@ -123,6 +123,38 @@ describe('compatibility classification against actual declarations', () => {
     const after = 'import { Buffer as Buffer_2 } from "node:buffer"; export interface A { value: Buffer_2; }'
     assert.deepEqual(compareDeclarations(before, after, scratch()), [])
   })
+  it('treats new aliased abstract exports as compatible additions', () => {
+    const after = 'declare abstract class Added_2 { abstract run(): void; static create(): Added_2; } export { Added_2 as Added };'
+    const findings = compareDeclarations('export {};', after, scratch())
+    assert.ok(findings.some(finding => finding.code === 'export.added' && finding.symbol === 'Added'))
+    assert.ok(findings.every(finding => finding.kind === 'compatible'), JSON.stringify(findings))
+  })
+  it('ignores internal export renames while retaining public API changes', () => {
+    const before = 'declare abstract class C { abstract run(): void; static create(): C; } export { C };'
+    const after = 'declare abstract class C_2 { abstract run(): void; static create(): C_2; } export { C_2 as C };'
+    assert.deepEqual(compareDeclarations(before, after, scratch()), [])
+    assert.deepEqual(compareDeclarations('export declare abstract class C { abstract run(): void; static create(): C; }', after, scratch()), [])
+    const renamed = compareDeclarations(before, after.replace('as C }', 'as Other }'), scratch())
+    assert.ok(renamed.some(finding => finding.code === 'export.removed' && finding.symbol === 'C'))
+    const changed = compareDeclarations(before, after.replace('run()', 'run(required: string)'), scratch())
+    assert.ok(changed.some(finding => finding.kind === 'breaking' && finding.symbol.startsWith('C.run.')), JSON.stringify(changed))
+  })
+  it('preserves multiple aliases and keeps internal names distinct from public names', () => {
+    const before = 'declare abstract class C { abstract run(): void; } export { C as A, C as B };'
+    const after = 'declare abstract class C_2 { abstract run(): void; } export { C_2 as A, C_2 as B };'
+    assert.deepEqual(compareDeclarations(before, after, scratch()), [])
+    const singleAlias = 'declare abstract class C { abstract run(): void; static make(): C; } export { C as Z };'
+    const extraAlias = singleAlias.replace('C as Z', 'C as Z, C as A')
+    const added = compareDeclarations(singleAlias, extraAlias, scratch())
+    assert.ok(added.some(finding => finding.code === 'export.added' && finding.symbol === 'A'))
+    assert.ok(added.every(finding => finding.kind === 'compatible'), JSON.stringify(added))
+    const removed = compareDeclarations(extraAlias, singleAlias, scratch())
+    assert.ok(removed.some(finding => finding.code === 'export.removed' && finding.symbol === 'A'))
+    assert.ok(!removed.some(finding => finding.symbol === 'Z' || finding.symbol.startsWith('Z.')), JSON.stringify(removed))
+    const collision = 'declare class C { value: string; } declare class C_2 { nested: C; own: string; } export { C_2 as C };'
+    const changed = compareDeclarations(collision, collision.replace('own: string', 'own: number'), scratch())
+    assert.ok(changed.some(finding => finding.kind === 'breaking' && finding.symbol === 'C.own'), JSON.stringify(changed))
+  })
   it('does not hide an unsupported static removal behind a compatible method change', () => {
     const findings = compareDeclarations('export declare class C { static value: string; f(): void; }', 'export declare class C { f(a?: string): void; }', scratch())
     assert.ok(findings.some(finding => finding.kind === 'possible'))
@@ -174,6 +206,20 @@ describe('compatibility command and inventory', () => {
     assert.deepEqual(pkg.unsupported, [])
     assert.ok(packageInfo('packages/x', { name: 'x', exports: { './*': './*.js' } }).unsupported.length)
     assert.ok(packageInfo('packages/x', { name: 'x', types: './index.d.ts', typesVersions: { '*': { '*': ['legacy/*'] } } }).unsupported.length)
+  })
+  it('rejects uncovered conditional branches without rejecting shared types or covered fallbacks', () => {
+    const inspect = exports => packageInfo('packages/example', { name: 'example', exports: { '.': exports } })
+    const typedImport = { types: './esm.d.mts', default: './esm.mjs' }
+    const mixed = inspect({ import: typedImport, require: './cjs.cjs' })
+    assert.ok(mixed.unsupported.some(message => message.includes('.#require')), JSON.stringify(mixed))
+    const nested = inspect({ import: typedImport, require: { node: './cjs.cjs' } })
+    assert.ok(nested.unsupported.some(message => message.includes('.#require/node')), JSON.stringify(nested))
+    const shared = inspect({ types: './shared.d.ts', import: './esm.js', require: './cjs.js' })
+    assert.deepEqual(shared.unsupported, [])
+    assert.deepEqual(Object.keys(shared.entries), ['.'])
+    const covered = inspect({ import: typedImport, require: { types: './cjs.d.cts', default: './cjs.cjs' }, default: './esm.mjs' })
+    assert.deepEqual(covered.unsupported, [])
+    assert.deepEqual(Object.keys(covered.entries), ['.#import', '.#require'])
   })
   it('includes removed packages and accepts explicit package names or paths', () => {
     const pkg = packageInfo('packages/example', { name: '@test/example', types: './index.d.ts' })

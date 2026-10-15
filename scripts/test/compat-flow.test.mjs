@@ -90,6 +90,29 @@ describe('compatibility execution', () => {
     assert.equal(await run(root), 0)
   })
 
+  it('blocks baseline updates when a conditional export has no explicit type coverage', async () => {
+    const root = fixture()
+    const baselinePath = path.join(root, 'compat/baseline/example.api.md')
+    const baseline = fs.readFileSync(baselinePath, 'utf8')
+    const manifestPath = path.join(root, 'packages/example/package.json')
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      ...manifest,
+      exports: {
+        '.': {
+          import: { types: './index.d.ts', default: './index.js' },
+          require: './index.cjs',
+        },
+      },
+    }))
+    fs.writeFileSync(path.join(root, 'packages/example/index.d.cts'), source)
+    assert.equal(await run(root, ['--update']), 2)
+    assert.match(report(root).results[0].error, /No explicit types declaration for export .#require/)
+    assert.equal(report(root).updateCompleted, false)
+    assert.equal(fs.readFileSync(baselinePath, 'utf8'), baseline)
+    assert.equal(fs.existsSync(path.join(root, 'compat/baseline/inventory.json')), false)
+  })
+
   it('replaces old success results after missing declarations, invalid references, or build failures', async () => {
     const root = fixture()
     fs.mkdirSync(path.join(root, 'compat/generated'), { recursive: true })

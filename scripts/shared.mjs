@@ -47,18 +47,39 @@ export function packageInfo (directory, manifest) {
     const canonical = target === manifest.types && key.startsWith('.#')
     entries[key] = { types: target, report: reportName(directory, canonical ? '.' : key) }
   }
-  const visit = (value, subpath, conditions = []) => {
-    if (!value || typeof value === 'string') return
+  const visit = (value, subpath, conditions = [], covered = false, modes = ['import', 'require']) => {
+    const key = conditions.length ? `${subpath}#${conditions.join('/')}` : subpath
+    if (value === null) return modes
+    if (typeof value === 'string') {
+      if (!covered) unsupported.push(`No explicit types declaration for export ${key}.`)
+      return modes
+    }
+    if (!value || typeof value !== 'object') {
+      unsupported.push(`Unsupported export target for ${key}.`)
+      return modes
+    }
     if (Array.isArray(value)) {
-      unsupported.push(`Export fallback arrays are not analyzed: ${subpath}.`)
-      return
+      unsupported.push(`Export fallback arrays are not analyzed: ${key}.`)
+      return modes
     }
     if (Object.hasOwn(value, 'types')) {
-      add(conditions.length ? `${subpath}#${conditions.join('/')}` : subpath, value.types)
+      add(key, value.types)
+      covered ||= typeof value.types === 'string'
     }
+    let remaining = [...modes]
     for (const [condition, child] of Object.entries(value)) {
-      if (condition !== 'types') visit(child, subpath, [...conditions, condition])
+      if (condition === 'types') continue
+      const active = remaining.filter(mode => !['import', 'require'].includes(condition) || condition === mode)
+      if (!active.length) continue
+      const handled = visit(child, subpath, [...conditions, condition], covered, active)
+      // Import/require always match their resolution mode. Custom conditions may
+      // be absent, so their siblings still need checking. A later default is
+      // unreachable when both modes already have a target (as in telemetry).
+      if (['import', 'require', 'default'].includes(condition)) {
+        remaining = remaining.filter(mode => !handled.includes(mode))
+      }
     }
+    return covered ? modes : modes.filter(mode => !remaining.includes(mode))
   }
   if (manifest.exports) {
     const exports = typeof manifest.exports === 'object' && Object.keys(manifest.exports).some(key => key.startsWith('.'))
@@ -71,7 +92,12 @@ export function packageInfo (directory, manifest) {
         continue
       }
       const count = Object.keys(entries).length
-      visit(value, subpath)
+      // Preserve legacy root declarations only when there are no explicit type
+      // conditions; a top-level types field must not hide an uncovered sibling.
+      const hasTypes = target => target && typeof target === 'object' &&
+        (Object.hasOwn(target, 'types') || Object.values(target).some(hasTypes))
+      const legacyRoot = subpath === '.' && !!manifest.types && !hasTypes(value)
+      visit(value, subpath, [], legacyRoot)
       if (Object.keys(entries).length === count) {
         if (subpath === '.' && manifest.types) add('.', manifest.types)
         else unsupported.push(`No explicit types declaration for export ${subpath}.`)
