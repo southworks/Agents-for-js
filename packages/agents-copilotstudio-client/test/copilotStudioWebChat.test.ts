@@ -411,7 +411,13 @@ describe('WebChat conversation isolation', () => {
     const connection = CopilotStudioWebChat.createConnection(client())
     const subscription = connection.activity$.subscribe()
     try {
-      await firstValueFrom(connection.postActivity(Activity.fromObject({ type: 'message', text: 'Follow-up' })))
+      // postActivity emits an acknowledgement before the request; wait for completion.
+      await new Promise<void>((resolve, reject) => {
+        connection.postActivity(Activity.fromObject({ type: 'message', text: 'Follow-up' })).subscribe({
+          complete: resolve,
+          error: reject
+        })
+      })
       assert.match(String(fetchMock.mock.calls[1].arguments[0]), /\/conversations\/activity-A\?/)
     } finally {
       connection.end()
