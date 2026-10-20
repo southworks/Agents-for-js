@@ -26,12 +26,12 @@
     "@fastify/rate-limit": "10.3.0"
   },
   "peerDependencies": {
-    "fastify": ">=5.0.0"
+    "fastify": ">=5.12.5"
   },
   "devDependencies": {
     "@microsoft/agents-hosting-express": "file:../agents-hosting-express",
-    "express": "5.2.1",
-    "fastify": "5.12.1"
+    "express": "5.3.0",
+    "fastify": "5.12.5"
   },
   "license": "MIT",
   "files": [

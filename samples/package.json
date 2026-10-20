@@ -8,6 +8,8 @@
     "rateLimit": "tsx --env-file ./.env ./basic/rateLimit.ts"
   },
   "devDependencies": {
+    "@microsoft/teams.api": "2.1.0",
+    "express": "5.3.0",
     "tsx": "4.21.0"
   }
 }

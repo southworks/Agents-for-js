@@ -16,9 +16,12 @@
     // Set as "off" because SDK enums intentionally include all possible values.
     "enumMembers": "off",
     "nsExports": "off",
-    "nsTypes": "off",
-    "classMembers": "off"
+    "nsTypes": "off"
   },
+  // Types used within their declaring file are intentional API building blocks.
+  "ignoreExportsUsedInFile": { "interface": true, "type": true },
+  // Analyze source files instead of generated build output.
+  "ignore": ["**/dist/**"],
   "workspaces": {
     // Root
     ".": {
@@ -55,14 +58,9 @@
         "src/browser/crypto.ts"
       ]
     },
-    "packages/*/test": {
-      "entry": ["**/*.test.ts"],
-      "project": ["**/*.ts"]
-    },
-
     // Samples & test agents
-    "samples/**": {
-      "entry": ["*.ts"],
+    "samples": {
+      "entry": ["**/*.ts"],
       "project": ["**/*.ts"]
     },
     "test-agents/*": {

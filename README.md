@@ -49,7 +49,7 @@ The nightly build contains the code from our `main` branch and may contain featu
 
 The packages require Node.js 22 or greater, and can be used from JavaScript using CommonJS or ES6 modules, or from TypeScript.
 
-> Note: Development and CI use Node.js 24.
+> Note: Development and CI use Node.js 24. Development tooling requires Node.js 22.12 or greater.
 
 ### Debugging
 
