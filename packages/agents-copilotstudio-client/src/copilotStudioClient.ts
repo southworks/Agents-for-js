@@ -28,7 +28,7 @@ interface RequestConversation {
  * Client for interacting with Microsoft Copilot Studio services.
  * Provides functionality to start conversations and send messages to Copilot Studio bots.
  * @remarks For concurrent reuse, obtain request-local start metadata and pass IDs explicitly.
- * Implicit routing uses a conversation-scoped default and is not safe for concurrent conversations.
+ * Implicit routing uses a client-scoped mutable legacy default and is not safe for concurrent conversations.
  */
 export class CopilotStudioClient {
   /** Header key for conversation ID. */
