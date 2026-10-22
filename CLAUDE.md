@@ -172,6 +172,18 @@ Use `authorizeJWT()` middleware for Express applications to validate incoming re
 
 Each package has its own `tsconfig.json` that extends the root configuration.
 
+## Code Formatting and Readability
+
+When writing or editing code, optimize for human readability and ease of review. Apply these conventions across the repository, including source files, scripts, and tests:
+
+- Follow the existing Neostandard ESLint style: two-space indentation, single quotes, and no unnecessary semicolons.
+- Use braces and multiline bodies for control statements and functions. Put each statement on its own line; do not compress several operations into a single line.
+- Separate logical steps with a single blank line, such as setup, validation, execution, and reporting. Separate function declarations and add a blank line before a return that follows other work.
+- Keep related imports and variable declarations grouped together. Avoid inserting blank lines between every statement.
+- Wrap long argument lists, object literals, arrays, compound conditions, and chained operations across multiple lines. Aim for roughly 100 characters per line where practical, with indentation that makes nesting clear.
+- Preserve string, regular-expression, and template-literal contents when wrapping surrounding code; formatting must not change messages, generated output, or fixtures.
+- For formatting-only tasks, preserve names, expressions, evaluation order, and control flow. Do not introduce refactors or functionality changes. Verify that the code still passes ESLint and the relevant existing checks.
+
 ## Testing Guidelines
 
 - Use Node's built-in `node:test` module (import from `node:test`)

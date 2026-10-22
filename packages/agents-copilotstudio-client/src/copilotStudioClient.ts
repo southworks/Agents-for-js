@@ -97,7 +97,9 @@ export class CopilotStudioClient {
       const eventSourceRef: { current?: EventSourceClient } = {}
       const responseHandlers = this.createEventSourceResponseHandlers(
         () => eventSourceRef.current,
-        (error) => { requestError = error }
+        (error) => {
+          requestError = error
+        }
       )
 
       const eventSource: EventSourceClient = createEventSource({
@@ -537,7 +539,9 @@ export class CopilotStudioClient {
       const eventSourceRef: { current?: EventSourceClient } = {}
       const responseHandlers = this.createEventSourceResponseHandlers(
         () => eventSourceRef.current,
-        (error) => { requestError = error }
+        (error) => {
+          requestError = error
+        }
       )
 
       const eventSource: EventSourceClient = createEventSource({

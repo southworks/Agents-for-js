@@ -5,9 +5,9 @@ import { runCompat } from './compat/runner.mjs'
 import { prepareArtifacts, writeFailure } from './compat/artifacts.mjs'
 
 function formatHelp (color) {
-  const cyan = text => color ? `\u001B[36m${text}\u001B[39m` : text
-  const bold = text => color ? `\u001B[1m${text}\u001B[22m` : text
-  const dim = text => color ? `\u001B[2m${text}\u001B[22m` : text
+  const cyan = text => (color ? `\u001B[36m${text}\u001B[39m` : text)
+  const bold = text => (color ? `\u001B[1m${text}\u001B[22m` : text)
+  const dim = text => (color ? `\u001B[2m${text}\u001B[22m` : text)
   const row = (command, description, width) => `  ${bold(command.padEnd(width))}${dim(description)}`
 
   return `${cyan('API compatibility')}
@@ -53,8 +53,10 @@ let started = false
 
 try {
   const settings = parseArguments(process.argv.slice(2))
+
   if (settings.help) {
     const color = settings.color && !!process.stdout.isTTY && process.env.TERM !== 'dumb'
+
     process.stdout.write(formatHelp(color))
   } else {
     started = true
@@ -68,6 +70,7 @@ try {
       console.error(`Cannot write compatibility diagnostics: ${reportError.message}`)
     }
   }
+
   console.error(`API compatibility: ${error.message}`)
   process.exitCode = 2
 }

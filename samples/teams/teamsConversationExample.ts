@@ -101,7 +101,9 @@ app
       const currentPage = await getPagedMembers(context, 100, continuationToken)
       continuationToken = currentPage.continuationToken ?? undefined
       for (const teamMember of currentPage.members) {
-        if (!teamMember) { throw new Error('The Teams members response contained a null member.') }
+        if (!teamMember) {
+          throw new Error('The Teams members response contained a null member.')
+        }
         if (teamMember.id === context.activity.recipient?.id) {
           continue
         }
