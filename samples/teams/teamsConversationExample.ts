@@ -349,7 +349,10 @@ function asRecord (value: unknown): Record<string, unknown> | undefined {
 
 function readFeedbackText (feedback: unknown): string | undefined {
   if (typeof feedback === 'string') {
-    if (!feedback.trim()) return undefined
+    if (!feedback.trim()) {
+      return undefined
+    }
+
     try {
       const text = asRecord(JSON.parse(feedback))?.feedbackText
       return typeof text === 'string' ? text : feedback
