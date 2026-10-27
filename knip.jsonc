@@ -22,7 +22,7 @@
   "workspaces": {
     // Root
     ".": {
-      "project": ["*.{js,mjs,ts}"],
+      "project": ["*.{js,mjs,ts}", "scripts/repo-doctor/**/*.mjs"],
       "ignoreDependencies": [
         "@microsoft/microsoft-graph-client",
         "@microsoft/microsoft-graph-types"
