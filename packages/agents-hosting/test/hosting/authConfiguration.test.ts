@@ -57,57 +57,52 @@ describe('AuthConfiguration', () => {
   })
 
   describe('environment loading lifecycle', () => {
-    const environmentFormats = [
-      {
-        name: 'flat settings',
-        clientIdKey: 'clientId',
-        secretKey: 'clientSecret',
-        load: loadAuthConfigFromEnv
-      },
-      {
-        name: 'previous Bot Framework settings',
-        clientIdKey: 'MicrosoftAppId',
-        secretKey: 'MicrosoftAppPassword',
-        load: loadPrevAuthConfigFromEnv
-      },
-      {
-        name: 'modern connections',
-        clientIdKey: 'Connections__primary__Settings__ClientId',
-        secretKey: 'Connections__primary__Settings__ClientSecret',
-        load: loadAuthConfigFromEnv
-      },
-      {
-        name: 'runtime environment fallback',
-        clientIdKey: 'clientId',
-        secretKey: 'clientSecret',
-        load: getAuthConfigWithDefaults
-      }
-    ]
+    function assertEnvironmentLifecycle (
+      load: () => AuthConfiguration,
+      clientIdKey: string,
+      secretKey: string
+    ) {
+      process.env = { NODE_ENV: 'development' }
+      assert.strictEqual(load().clientId, undefined)
 
-    for (const format of environmentFormats) {
-      it(`should read injected, changed, and deleted ${format.name} without TEST_MODE`, () => {
-        process.env = { NODE_ENV: 'development' }
-        assert.strictEqual(format.load().clientId, undefined)
+      process.env[clientIdKey] = 'first-client-id'
+      process.env[secretKey] = 'first-secret'
+      const first = load()
 
-        process.env[format.clientIdKey] = 'first-client-id'
-        process.env[format.secretKey] = 'first-secret'
-        const first = format.load()
+      process.env[clientIdKey] = 'second-client-id'
+      process.env[secretKey] = 'second-secret'
+      const second = load()
 
-        process.env[format.clientIdKey] = 'second-client-id'
-        process.env[format.secretKey] = 'second-secret'
-        const second = format.load()
+      delete process.env[secretKey]
+      const withoutSecret = load()
 
-        delete process.env[format.secretKey]
-        const withoutSecret = format.load()
-
-        assert.strictEqual(first.clientId, 'first-client-id')
-        assert.strictEqual(first.clientSecret, 'first-secret')
-        assert.strictEqual(second.clientId, 'second-client-id')
-        assert.strictEqual(second.clientSecret, 'second-secret')
-        assert.strictEqual(withoutSecret.clientId, 'second-client-id')
-        assert.strictEqual(withoutSecret.clientSecret, undefined)
-      })
+      assert.strictEqual(first.clientId, 'first-client-id')
+      assert.strictEqual(first.clientSecret, 'first-secret')
+      assert.strictEqual(second.clientId, 'second-client-id')
+      assert.strictEqual(second.clientSecret, 'second-secret')
+      assert.strictEqual(withoutSecret.clientId, 'second-client-id')
+      assert.strictEqual(withoutSecret.clientSecret, undefined)
     }
+
+    it('should read injected, changed, and deleted flat settings', () => {
+      assertEnvironmentLifecycle(loadAuthConfigFromEnv, 'clientId', 'clientSecret')
+    })
+
+    it('should read injected, changed, and deleted previous Bot Framework settings', () => {
+      assertEnvironmentLifecycle(loadPrevAuthConfigFromEnv, 'MicrosoftAppId', 'MicrosoftAppPassword')
+    })
+
+    it('should read injected, changed, and deleted modern connections', () => {
+      assertEnvironmentLifecycle(
+        loadAuthConfigFromEnv,
+        'Connections__primary__Settings__ClientId',
+        'Connections__primary__Settings__ClientSecret'
+      )
+    })
+
+    it('should read injected, changed, and deleted runtime environment fallback settings', () => {
+      assertEnvironmentLifecycle(getAuthConfigWithDefaults, 'clientId', 'clientSecret')
+    })
 
     it('should keep an adapter and its routing stable when later loads replace modern connections', () => {
       process.env = {

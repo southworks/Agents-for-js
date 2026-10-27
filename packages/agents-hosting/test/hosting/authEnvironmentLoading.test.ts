@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { it } from 'node:test'
 
-it('loads credentials injected after importing the SDK without TEST_MODE', () => {
+it('loads credentials injected after importing the SDK', () => {
   const fixture = fileURLToPath(new URL('./fixtures/authEnvironmentAfterImport.ts', import.meta.url))
   const result = spawnSync(process.execPath, ['--import', 'tsx', fixture], {
     encoding: 'utf8',

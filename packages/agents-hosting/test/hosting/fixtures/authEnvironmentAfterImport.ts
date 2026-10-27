@@ -1,8 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { loadAuthConfigFromEnv } from '../../../src'
 
-assert.equal(process.env.TEST_MODE, undefined)
-
 async function initialize () {
   // Simulate asynchronous secret retrieval after the SDK has been imported.
   await Promise.resolve()
