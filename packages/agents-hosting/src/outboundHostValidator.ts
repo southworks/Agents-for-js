@@ -79,27 +79,39 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
 
     const suffixes = new Set<string>()
     if (resolved.includeDefaultMicrosoftHosts ?? true) {
-      for (const host of DEFAULT_MICROSOFT_HOSTS) suffixes.add(host)
+      for (const host of DEFAULT_MICROSOFT_HOSTS) {
+        suffixes.add(host)
+      }
     }
 
     for (const host of resolved.hosts ?? []) {
       const normalized = normalizeConfiguredHost(host)
-      if (normalized) suffixes.add(normalized)
+      if (normalized) {
+        suffixes.add(normalized)
+      }
     }
 
     this.suffixes = suffixes
   }
 
   public isAllowed (input: string | URL | null | undefined): boolean {
-    if (!this.enabled) return true
+    if (!this.enabled) {
+      return true
+    }
 
     const url = getHttpsUrl(input)
-    if (!url) return false
+    if (!url) {
+      return false
+    }
     const host = normalizeHostname(url.hostname)
-    if (!host || (!this.allowPrivateNetworkAddresses && isLocalOrBlockedHost(host))) return false
+    if (!host || (!this.allowPrivateNetworkAddresses && isLocalOrBlockedHost(host))) {
+      return false
+    }
 
     for (const suffix of this.suffixes) {
-      if (host === suffix || host.endsWith(`.${suffix}`)) return true
+      if (host === suffix || host.endsWith(`.${suffix}`)) {
+        return true
+      }
     }
 
     return false
@@ -110,8 +122,12 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
    * DNS prevalidation does not pin the HTTP connection to the checked addresses.
    */
   public async isAllowedAsync (input: string | URL | null | undefined): Promise<boolean> {
-    if (!this.isAllowed(input)) return false
-    if (!this.enabled) return true
+    if (!this.isAllowed(input)) {
+      return false
+    }
+    if (!this.enabled) {
+      return true
+    }
     const url = getHttpsUrl(input)
     return url !== undefined && await hasAllowedOutboundAddresses(url, this.allowPrivateNetworkAddresses)
   }
@@ -139,11 +155,15 @@ function resolveOutboundHostValidatorOptions (
   const external = getConfigurationSnapshot(options.configurationContext)
   const fromEnv = loadOutboundHostValidatorOptionsFromEnv()
   const direct: OutboundHostValidatorOptions = {}
-  if (options.enabled !== undefined) direct.enabled = options.enabled
+  if (options.enabled !== undefined) {
+    direct.enabled = options.enabled
+  }
   if (options.includeDefaultMicrosoftHosts !== undefined) {
     direct.includeDefaultMicrosoftHosts = options.includeDefaultMicrosoftHosts
   }
-  if (options.hosts !== undefined) direct.hosts = options.hosts
+  if (options.hosts !== undefined) {
+    direct.hosts = options.hosts
+  }
   if (options.allowPrivateNetworkAddresses !== undefined) {
     direct.allowPrivateNetworkAddresses = options.allowPrivateNetworkAddresses
   }
@@ -158,12 +178,18 @@ function resolveOutboundHostValidatorOptions (
 
 function normalizeConfiguredHost (input: string): string | undefined {
   let candidate = input?.trim()
-  if (!candidate) return undefined
-  if (candidate.startsWith('*.')) candidate = candidate.slice(2)
+  if (!candidate) {
+    return undefined
+  }
+  if (candidate.startsWith('*.')) {
+    candidate = candidate.slice(2)
+  }
 
   try {
     const absolute = new URL(candidate)
-    if (absolute.hostname) return normalizeHostname(absolute.hostname)
+    if (absolute.hostname) {
+      return normalizeHostname(absolute.hostname)
+    }
   } catch {
     // A bare host, host:port, or host/path is handled below.
   }

@@ -108,7 +108,9 @@ export class AttachmentDownloader<TState extends TurnState = TurnState> implemen
       }
       const response = await new AttachmentDownloadHttpClient(this._httpClient, this._hostValidator)
         .get(attachment.contentUrl, headers)
-      if (!response) return undefined
+      if (!response) {
+        return undefined
+      }
 
       const content = Buffer.from(response.data as ArrayBuffer)
 

@@ -131,7 +131,9 @@ describe('validated attachment fetching', () => {
     await assert.rejects(client().get('https://files.example/file'), { code: Errors.AttachmentDownloadRedirectLimit.code })
     assert.equal(fetchStub.callCount, 51)
     assert.equal(cancellations.length, 51)
-    for (const cancel of cancellations) sinon.assert.calledOnce(cancel)
+    for (const cancel of cancellations) {
+      sinon.assert.calledOnce(cancel)
+    }
   })
 
   it('allows a successful response after exactly 50 redirect hops', async () => {

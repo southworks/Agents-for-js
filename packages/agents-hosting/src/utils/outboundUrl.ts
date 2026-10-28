@@ -11,7 +11,9 @@ import { isBlockedOutboundAddress } from './ipAddress'
 const logger = debug('agents:outboundHostValidator')
 
 export function getHttpsUrl (input: string | URL | null | undefined): URL | undefined {
-  if (!input) return undefined
+  if (!input) {
+    return undefined
+  }
   try {
     const url = input instanceof URL ? input : new URL(input)
     return url.protocol === 'https:' && !url.username && !url.password ? url : undefined
@@ -27,10 +29,16 @@ export function isLocalOrBlockedHost (host: string): boolean {
 }
 
 export async function hasAllowedOutboundAddresses (url: URL, allowPrivateNetworkAddresses = false): Promise<boolean> {
-  if (allowPrivateNetworkAddresses) return true
+  if (allowPrivateNetworkAddresses) {
+    return true
+  }
   const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '')
-  if (isLocalOrBlockedHost(host)) return false
-  if (isIP(host) !== 0) return true
+  if (isLocalOrBlockedHost(host)) {
+    return false
+  }
+  if (isIP(host) !== 0) {
+    return true
+  }
 
   try {
     const addresses = await dns.lookup(host, { all: true })

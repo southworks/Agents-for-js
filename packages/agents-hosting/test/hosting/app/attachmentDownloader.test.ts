@@ -93,7 +93,9 @@ describe('attachment downloader outbound host validation', () => {
       it(`${name} keeps default token forwarding and native redirects without DNS checks`, async () => {
         const fetchStub = sinon.stub(globalThis, 'fetch').resolves(new Response('legacy'))
         const context = m365 ? createM365Context('http://127.0.0.1/file') : createContext()
-        if (!m365) context.activity.attachments![0].contentUrl = 'http://localhost/file'
+        if (!m365) {
+          context.activity.attachments![0].contentUrl = 'http://localhost/file'
+        }
         const downloader = m365 ? new M365AttachmentDownloader() : new AttachmentDownloader()
 
         const files = await downloader.downloadFiles(context)
@@ -136,7 +138,9 @@ describe('attachment downloader outbound host validation', () => {
       it(`${name} skips a disallowed destination without fetching or storing bytes`, async () => {
         const fetchStub = sinon.stub(globalThis, 'fetch')
         const context = m365 ? createM365Context('https://evil.example/file') : createContext()
-        if (!m365) context.activity.attachments![0].contentUrl = 'https://evil.example/file'
+        if (!m365) {
+          context.activity.attachments![0].contentUrl = 'https://evil.example/file'
+        }
         const policy = new OutboundHostValidator({ enabled: true })
         const downloader = m365 ? new M365AttachmentDownloader('inputFiles', policy) : new AttachmentDownloader('inputFiles', policy)
         const state = new TurnState()

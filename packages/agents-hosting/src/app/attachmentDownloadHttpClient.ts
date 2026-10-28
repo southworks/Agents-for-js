@@ -22,7 +22,9 @@ export class AttachmentDownloadHttpClient {
 
   public async get (url: string, headers: Record<string, string> = {}): Promise<HttpResponse<ArrayBuffer> | undefined> {
     if (!this.hostValidator.enabled) {
-      if (!this.hostValidator.isAllowed(url)) return this.blocked(url)
+      if (!this.hostValidator.isAllowed(url)) {
+        return this.blocked(url)
+      }
       return this.httpClient.get<ArrayBuffer>(url, { headers, responseType: 'arraybuffer' })
     }
 
@@ -32,7 +34,9 @@ export class AttachmentDownloadHttpClient {
       const allowed = parsed && (this.hostValidator instanceof OutboundHostValidator
         ? await this.hostValidator.isAllowedAsync(parsed)
         : this.hostValidator.isAllowed(currentUrl) && await hasAllowedOutboundAddresses(parsed))
-      if (!allowed) return this.blocked(currentUrl)
+      if (!allowed) {
+        return this.blocked(currentUrl)
+      }
 
       const requestHeaders = new Headers(redirects === 0 ? headers : undefined)
       const response = await fetch(currentUrl, { method: 'GET', headers: requestHeaders, redirect: 'manual' })
@@ -67,7 +71,9 @@ export class AttachmentDownloadHttpClient {
 
   private blocked (input: string): undefined {
     let host = '[invalid-url]'
-    try { host = new URL(input).hostname } catch { /* Invalid URLs have no safe host to log. */ }
+    try {
+      host = new URL(input).hostname
+    } catch { /* Invalid URLs have no safe host to log. */ }
     logger.warn(`Attachment destination blocked by outbound policy or address validation. Host='${host}'`)
     return undefined
   }

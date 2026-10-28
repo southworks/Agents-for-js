@@ -77,7 +77,9 @@ export class M365AttachmentDownloader<TState extends TurnState = TurnState> impl
         const downloadUrl = parsed.success ? parsed.data.downloadUrl : attachment.contentUrl
         const response = await new AttachmentDownloadHttpClient(this._httpClient, this._hostValidator)
           .get(downloadUrl, headers)
-        if (!response) return undefined
+        if (!response) {
+          return undefined
+        }
 
         const content = Buffer.from(response.data as ArrayBuffer)
         const contentTypeHeader = response.headers.get('content-type')
