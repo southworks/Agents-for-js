@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { Container, CosmosClient, CosmosClientOptions } from '@azure/cosmos'
-import { describe, it } from 'node:test'
+import { describe, it, type TestContext } from 'node:test'
 import {
   AuthType,
   MsalTokenCredential,
@@ -133,243 +133,520 @@ function createTransport (options: { allowDatabaseRead?: boolean } = {}) {
   return { httpClient, requests, documents }
 }
 
-for (const StorageClass of constructors) {
-  describe(`${StorageClass.name} identity authentication`, () => {
-    it('accepts credentials without requesting a token or creating a client in the constructor', () => {
-      let tokenCalls = 0
-      const credential: Credential = {
-        async getToken () {
-          tokenCalls++
-          return { token: 'unused', expiresOnTimestamp: Date.now() + 3600000 }
-        },
-      }
-      const storage = new StorageClass(createOptions({ aadCredentials: credential }))
+function assertLazyCredentialConstruction (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2
+) {
+  let tokenCalls = 0
+  const credential: Credential = {
+    async getToken () {
+      tokenCalls++
+      return { token: 'unused', expiresOnTimestamp: Date.now() + 3600000 }
+    },
+  }
+  const storage = new StorageClass(createOptions({ aadCredentials: credential }))
 
-      assert.equal(tokenCalls, 0)
-      assert.equal(getInternals(storage).client, undefined)
-    })
-
-    it('retains missing-credential validation', () => {
-      assert.throws(
-        () => new StorageClass(createOptions({ aadCredentials: undefined })),
-        { code: Errors.MissingCosmosCredentials.code }
-      )
-    })
-
-    it('keeps empty reads and writes lazy', async () => {
-      const storage = new StorageClass(createOptions())
-
-      assert.deepEqual(await storage.read([]), {})
-      await storage.write({})
-      assert.equal(getInternals(storage).client, undefined)
-    })
-
-    it('uses the real SDK credential pipeline for CRUD without database reads or provisioning', async t => {
-      const transport = createTransport()
-      const requestedScopes: Array<string | string[]> = []
-      const credential: Credential = {
-        async getToken (scopes) {
-          requestedScopes.push(scopes)
-          return { token: 'identity-for-crud', expiresOnTimestamp: Date.now() + 3600000 }
-        },
-      }
-      const storage = new StorageClass(createOptions({ aadCredentials: credential, httpClient: transport.httpClient }))
-      t.after(() => getInternals(storage).client?.dispose())
-
-      await storage.write({ key: { value: 'saved' } })
-      const results = await storage.read(['key'])
-      if (storage instanceof CosmosDbPartitionedStorageV2) {
-        assert.equal(results.key.status, StorageOperationStatus.Succeeded)
-        assert.deepEqual(results.key.value, { value: 'saved' })
-        assert.equal(results.key.version, 'test-version')
-      } else {
-        assert.deepEqual(results.key, { value: 'saved', eTag: 'test-version' })
-      }
-      await storage.delete(['key'])
-
-      assert.equal(transport.documents.size, 0)
-      assert.deepEqual(requestedScopes, [[`${endpoint}/.default`]])
-      assert.equal(transport.requests.filter(request => request.path === containerPath).length, 1)
-      for (const request of transport.requests) {
-        assert.equal(request.authorization, 'type=aad&ver=1.0&sig=identity-for-crud')
-        if (request.path.includes('/docs')) {
-          assert.equal(request.partitionKey, '["key"]')
-        }
-      }
-    })
-
-    for (const compatibilityMode of [true, false]) {
-      it(`validates /id with compatibilityMode=${compatibilityMode}`, async () => {
-        const storage = new StorageClass({ ...createOptions(), compatibilityMode })
-        const internals = getInternals(storage)
-        let metadataReads = 0
-        const container = {
-          read: async () => {
-            metadataReads++
-            return { resource: { partitionKey: { paths: ['/id'] } } }
-          },
-        } as unknown as Container
-        internals.client = {
-          database: (databaseId: string) => {
-            assert.equal(databaseId, 'agents')
-            return {
-              container: (containerId: string) => {
-                assert.equal(containerId, 'state')
-                return container
-              },
-            }
-          },
-        } as unknown as CosmosClient
-
-        await internals.initialize()
-        assert.equal(metadataReads, 1)
-        assert.equal(internals.container, container)
-        assert.equal(internals.compatibilityModePartitionKey, false)
-      })
-    }
-
-    for (const paths of [undefined, ['/_partitionKey'], ['/tenant'], ['/id', '/tenant'], ['/_partitionKey', '/tenant'], []]) {
-      for (const compatibilityMode of [true, false]) {
-        it(`handles partition paths ${JSON.stringify(paths)} with compatibilityMode=${compatibilityMode}`, async () => {
-          const storage = new StorageClass({ ...createOptions(), compatibilityMode })
-          const internals = getInternals(storage)
-          const container = {
-            read: async () => ({ resource: { partitionKey: paths === undefined ? undefined : { paths } } }),
-          } as unknown as Container
-          internals.client = {
-            database: () => ({ container: () => container }),
-          } as unknown as CosmosClient
-
-          const supportsLegacy = paths === undefined || (paths.length === 1 && paths[0] === '/_partitionKey')
-          if (compatibilityMode && supportsLegacy) {
-            await internals.initialize()
-            assert.equal(internals.compatibilityModePartitionKey, true)
-          } else {
-            await assert.rejects(internals.initialize(), error => {
-              assertInitializationError(error)
-              assert.equal(error.innerException.code, Errors.UnsupportedCustomPartitionKeyPath.code)
-              return true
-            })
-          }
-        })
-      }
-    }
-
-    for (const status of [404, 401, 403, 429, 'transport'] as const) {
-      it(`preserves ${status} initialization failures and permits retry`, async () => {
-        const storage = new StorageClass(createOptions())
-        const internals = getInternals(storage)
-        const original = status === 'transport'
-          ? Object.assign(ExceptionHelper.generateException(Error, Errors.ContainerReadError), { code: 'ECONNRESET' })
-          : createStatusError(status)
-        let attempts = 0
-        const container = {
-          read: async () => {
-            attempts++
-            if (attempts === 1) {
-              throw original
-            }
-            return { resource: { partitionKey: { paths: ['/id'] } } }
-          },
-        } as unknown as Container
-        internals.client = {
-          database: () => ({ container: () => container }),
-        } as unknown as CosmosClient
-
-        await assert.rejects(internals.initialize(), error => {
-          assertInitializationError(error)
-          if (status === 404) {
-            assert.equal(error.innerException.code, Errors.ExistingContainerNotFound.code)
-            assert.equal(error.innerException.innerException, original)
-            assert.match(error.innerException.message, /preprovisioned/)
-            assert.match(error.innerException.message, /agents/)
-            assert.match(error.innerException.message, /state/)
-          } else {
-            assert.equal(error.innerException, original)
-          }
-          return true
-        })
-        await internals.initialize()
-        assert.equal(attempts, 2)
-      })
-    }
-
-    for (const authentication of ['key', 'tokenProvider', 'mixedKey', 'mixedTokenProvider']) {
-      for (const compatibilityMode of [true, false]) {
-        it(`preserves ${authentication} provisioning with compatibilityMode=${compatibilityMode}`, async () => {
-          const credential = createCredential()
-          const tokenProvider = async () => 'test-resource-token'
-          const clientOptions: Partial<CosmosClientOptions> = {}
-          if (authentication === 'key' || authentication === 'mixedKey') {
-            clientOptions.key = 'test-key'
-          } else {
-            clientOptions.tokenProvider = tokenProvider
-          }
-          clientOptions.aadCredentials = authentication.startsWith('mixed') ? credential : undefined
-          const storage = new StorageClass({ ...createOptions(clientOptions), compatibilityMode })
-          const internals = getInternals(storage)
-          const container = {
-            read: async () => {
-              throw createStatusError(404)
-            },
-          } as unknown as Container
-          const calls: string[] = []
-          internals.client = {
-            databases: {
-              createIfNotExists: async (body: { id: string }) => {
-                assert.equal(body.id, 'agents')
-                calls.push('database')
-                return {
-                  database: {
-                    container: () => container,
-                    containers: {
-                      createIfNotExists: async (body: object) => {
-                        assert.deepEqual(body, {
-                          id: 'state',
-                          partitionKey: { paths: ['/id'] },
-                          defaultTtl: -1,
-                          throughput: undefined,
-                        })
-                        calls.push('container')
-                        return { container }
-                      },
-                    },
-                  },
-                }
-              },
-            },
-          } as unknown as CosmosClient
-
-          await internals.initialize()
-          assert.deepEqual(calls, ['database', 'container'])
-          assert.equal(internals.container, container)
-        })
-      }
-    }
-
-    for (const authentication of ['key', 'tokenProvider']) {
-      it(`preserves SDK authorization precedence when aadCredentials is combined with ${authentication}`, async t => {
-        const transport = createTransport({ allowDatabaseRead: true })
-        const clientOptions: Partial<CosmosClientOptions> = {
-          aadCredentials: createCredential('mixed-identity'),
-          httpClient: transport.httpClient,
-        }
-        if (authentication === 'key') {
-          clientOptions.key = Buffer.from('test-key').toString('base64')
-        } else {
-          clientOptions.tokenProvider = async () => 'test-resource-token'
-        }
-        const storage = new StorageClass(createOptions(clientOptions))
-        t.after(() => getInternals(storage).client?.dispose())
-
-        await getInternals(storage).initialize()
-
-        assert.ok(transport.requests.some(request => request.path === '/dbs/agents'))
-        assert.ok(transport.requests.every(request => request.authorization === 'type=aad&ver=1.0&sig=mixed-identity'))
-      })
-    }
-  })
+  assert.equal(tokenCalls, 0)
+  assert.equal(getInternals(storage).client, undefined)
 }
+
+function assertMissingCredentialValidation (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2
+) {
+  assert.throws(
+    () => new StorageClass(createOptions({ aadCredentials: undefined })),
+    { code: Errors.MissingCosmosCredentials.code }
+  )
+}
+
+async function assertLazyEmptyOperations (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2
+) {
+  const storage = new StorageClass(createOptions())
+
+  assert.deepEqual(await storage.read([]), {})
+  await storage.write({})
+  assert.equal(getInternals(storage).client, undefined)
+}
+
+async function assertCredentialCrud (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2,
+  t: TestContext
+) {
+  const transport = createTransport()
+  const requestedScopes: Array<string | string[]> = []
+  const credential: Credential = {
+    async getToken (scopes) {
+      requestedScopes.push(scopes)
+      return { token: 'identity-for-crud', expiresOnTimestamp: Date.now() + 3600000 }
+    },
+  }
+  const storage = new StorageClass(createOptions({ aadCredentials: credential, httpClient: transport.httpClient }))
+  t.after(() => getInternals(storage).client?.dispose())
+
+  await storage.write({ key: { value: 'saved' } })
+  const results = await storage.read(['key'])
+  if (storage instanceof CosmosDbPartitionedStorageV2) {
+    assert.equal(results.key.status, StorageOperationStatus.Succeeded)
+    assert.deepEqual(results.key.value, { value: 'saved' })
+    assert.equal(results.key.version, 'test-version')
+  } else {
+    assert.deepEqual(results.key, { value: 'saved', eTag: 'test-version' })
+  }
+  await storage.delete(['key'])
+
+  assert.equal(transport.documents.size, 0)
+  assert.deepEqual(requestedScopes, [[`${endpoint}/.default`]])
+  assert.equal(transport.requests.filter(request => request.path === containerPath).length, 1)
+  for (const request of transport.requests) {
+    assert.equal(request.authorization, 'type=aad&ver=1.0&sig=identity-for-crud')
+    if (request.path.includes('/docs')) {
+      assert.equal(request.partitionKey, '["key"]')
+    }
+  }
+}
+
+async function assertIdPartition (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2,
+  compatibilityMode: boolean
+) {
+  const storage = new StorageClass({ ...createOptions(), compatibilityMode })
+  const internals = getInternals(storage)
+  let metadataReads = 0
+  const container = {
+    read: async () => {
+      metadataReads++
+      return { resource: { partitionKey: { paths: ['/id'] } } }
+    },
+  } as unknown as Container
+  internals.client = {
+    database: (databaseId: string) => {
+      assert.equal(databaseId, 'agents')
+      return {
+        container: (containerId: string) => {
+          assert.equal(containerId, 'state')
+          return container
+        },
+      }
+    },
+  } as unknown as CosmosClient
+
+  await internals.initialize()
+  assert.equal(metadataReads, 1)
+  assert.equal(internals.container, container)
+  assert.equal(internals.compatibilityModePartitionKey, false)
+}
+
+async function assertPartitionPaths (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2,
+  paths: string[] | undefined,
+  compatibilityMode: boolean
+) {
+  const storage = new StorageClass({ ...createOptions(), compatibilityMode })
+  const internals = getInternals(storage)
+  const container = {
+    read: async () => ({ resource: { partitionKey: paths === undefined ? undefined : { paths } } }),
+  } as unknown as Container
+  internals.client = {
+    database: () => ({ container: () => container }),
+  } as unknown as CosmosClient
+
+  const supportsLegacy = paths === undefined || (paths.length === 1 && paths[0] === '/_partitionKey')
+  if (compatibilityMode && supportsLegacy) {
+    await internals.initialize()
+    assert.equal(internals.compatibilityModePartitionKey, true)
+  } else {
+    await assert.rejects(internals.initialize(), error => {
+      assertInitializationError(error)
+      assert.equal(error.innerException.code, Errors.UnsupportedCustomPartitionKeyPath.code)
+      return true
+    })
+  }
+}
+
+async function assertInitializationRetry (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2,
+  status: number | 'transport'
+) {
+  const storage = new StorageClass(createOptions())
+  const internals = getInternals(storage)
+  const original = status === 'transport'
+    ? Object.assign(ExceptionHelper.generateException(Error, Errors.ContainerReadError), { code: 'ECONNRESET' })
+    : createStatusError(status)
+  let attempts = 0
+  const container = {
+    read: async () => {
+      attempts++
+      if (attempts === 1) {
+        throw original
+      }
+      return { resource: { partitionKey: { paths: ['/id'] } } }
+    },
+  } as unknown as Container
+  internals.client = {
+    database: () => ({ container: () => container }),
+  } as unknown as CosmosClient
+
+  await assert.rejects(internals.initialize(), error => {
+    assertInitializationError(error)
+    if (status === 404) {
+      assert.equal(error.innerException.code, Errors.ExistingContainerNotFound.code)
+      assert.equal(error.innerException.innerException, original)
+      assert.match(error.innerException.message, /preprovisioned/)
+      assert.match(error.innerException.message, /agents/)
+      assert.match(error.innerException.message, /state/)
+    } else {
+      assert.equal(error.innerException, original)
+    }
+    return true
+  })
+  await internals.initialize()
+  assert.equal(attempts, 2)
+}
+
+async function assertProvisioning (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2,
+  authentication: string,
+  compatibilityMode: boolean
+) {
+  const credential = createCredential()
+  const tokenProvider = async () => 'test-resource-token'
+  const clientOptions: Partial<CosmosClientOptions> = {}
+  if (authentication === 'key' || authentication === 'mixedKey') {
+    clientOptions.key = 'test-key'
+  } else {
+    clientOptions.tokenProvider = tokenProvider
+  }
+  clientOptions.aadCredentials = authentication.startsWith('mixed') ? credential : undefined
+  const storage = new StorageClass({ ...createOptions(clientOptions), compatibilityMode })
+  const internals = getInternals(storage)
+  const container = {
+    read: async () => {
+      throw createStatusError(404)
+    },
+  } as unknown as Container
+  const calls: string[] = []
+  internals.client = {
+    databases: {
+      createIfNotExists: async (body: { id: string }) => {
+        assert.equal(body.id, 'agents')
+        calls.push('database')
+        return {
+          database: {
+            container: () => container,
+            containers: {
+              createIfNotExists: async (body: object) => {
+                assert.deepEqual(body, {
+                  id: 'state',
+                  partitionKey: { paths: ['/id'] },
+                  defaultTtl: -1,
+                  throughput: undefined,
+                })
+                calls.push('container')
+                return { container }
+              },
+            },
+          },
+        }
+      },
+    },
+  } as unknown as CosmosClient
+
+  await internals.initialize()
+  assert.deepEqual(calls, ['database', 'container'])
+  assert.equal(internals.container, container)
+}
+
+async function assertMixedCredentialPrecedence (
+  StorageClass: typeof CosmosDbPartitionedStorage | typeof CosmosDbPartitionedStorageV2,
+  authentication: string,
+  t: TestContext
+) {
+  const transport = createTransport({ allowDatabaseRead: true })
+  const clientOptions: Partial<CosmosClientOptions> = {
+    aadCredentials: createCredential('mixed-identity'),
+    httpClient: transport.httpClient,
+  }
+  if (authentication === 'key') {
+    clientOptions.key = Buffer.from('test-key').toString('base64')
+  } else {
+    clientOptions.tokenProvider = async () => 'test-resource-token'
+  }
+  const storage = new StorageClass(createOptions(clientOptions))
+  t.after(() => getInternals(storage).client?.dispose())
+
+  await getInternals(storage).initialize()
+
+  assert.ok(transport.requests.some(request => request.path === '/dbs/agents'))
+  assert.ok(transport.requests.every(request => request.authorization === 'type=aad&ver=1.0&sig=mixed-identity'))
+}
+
+describe('CosmosDbPartitionedStorage identity authentication', () => {
+  it('accepts credentials without requesting a token or creating a client in the constructor', () => {
+    return assertLazyCredentialConstruction(CosmosDbPartitionedStorage)
+  })
+
+  it('retains missing-credential validation', () => {
+    return assertMissingCredentialValidation(CosmosDbPartitionedStorage)
+  })
+
+  it('keeps empty reads and writes lazy', () => {
+    return assertLazyEmptyOperations(CosmosDbPartitionedStorage)
+  })
+
+  it('uses the real SDK credential pipeline for CRUD without database reads or provisioning', t => {
+    return assertCredentialCrud(CosmosDbPartitionedStorage, t)
+  })
+
+  it('validates /id with compatibilityMode=true', () => {
+    return assertIdPartition(CosmosDbPartitionedStorage, true)
+  })
+
+  it('validates /id with compatibilityMode=false', () => {
+    return assertIdPartition(CosmosDbPartitionedStorage, false)
+  })
+
+  it('handles partition paths undefined with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, undefined, true)
+  })
+
+  it('handles partition paths undefined with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, undefined, false)
+  })
+
+  it('handles partition paths ["/_partitionKey"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/_partitionKey'], true)
+  })
+
+  it('handles partition paths ["/_partitionKey"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/_partitionKey'], false)
+  })
+
+  it('handles partition paths ["/tenant"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/tenant'], true)
+  })
+
+  it('handles partition paths ["/tenant"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/tenant'], false)
+  })
+
+  it('handles partition paths ["/id","/tenant"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/id', '/tenant'], true)
+  })
+
+  it('handles partition paths ["/id","/tenant"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/id', '/tenant'], false)
+  })
+
+  it('handles partition paths ["/_partitionKey","/tenant"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/_partitionKey', '/tenant'], true)
+  })
+
+  it('handles partition paths ["/_partitionKey","/tenant"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, ['/_partitionKey', '/tenant'], false)
+  })
+
+  it('handles partition paths [] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, [], true)
+  })
+
+  it('handles partition paths [] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorage, [], false)
+  })
+
+  it('preserves 404 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorage, 404)
+  })
+
+  it('preserves 401 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorage, 401)
+  })
+
+  it('preserves 403 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorage, 403)
+  })
+
+  it('preserves 429 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorage, 429)
+  })
+
+  it('preserves transport initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorage, 'transport')
+  })
+
+  it('preserves key provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'key', true)
+  })
+
+  it('preserves key provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'key', false)
+  })
+
+  it('preserves tokenProvider provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'tokenProvider', true)
+  })
+
+  it('preserves tokenProvider provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'tokenProvider', false)
+  })
+
+  it('preserves mixedKey provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'mixedKey', true)
+  })
+
+  it('preserves mixedKey provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'mixedKey', false)
+  })
+
+  it('preserves mixedTokenProvider provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'mixedTokenProvider', true)
+  })
+
+  it('preserves mixedTokenProvider provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorage, 'mixedTokenProvider', false)
+  })
+
+  it('preserves SDK authorization precedence when aadCredentials is combined with key', t => {
+    return assertMixedCredentialPrecedence(CosmosDbPartitionedStorage, 'key', t)
+  })
+
+  it('preserves SDK authorization precedence when aadCredentials is combined with tokenProvider', t => {
+    return assertMixedCredentialPrecedence(CosmosDbPartitionedStorage, 'tokenProvider', t)
+  })
+})
+
+describe('CosmosDbPartitionedStorageV2 identity authentication', () => {
+  it('accepts credentials without requesting a token or creating a client in the constructor', () => {
+    return assertLazyCredentialConstruction(CosmosDbPartitionedStorageV2)
+  })
+
+  it('retains missing-credential validation', () => {
+    return assertMissingCredentialValidation(CosmosDbPartitionedStorageV2)
+  })
+
+  it('keeps empty reads and writes lazy', () => {
+    return assertLazyEmptyOperations(CosmosDbPartitionedStorageV2)
+  })
+
+  it('uses the real SDK credential pipeline for CRUD without database reads or provisioning', t => {
+    return assertCredentialCrud(CosmosDbPartitionedStorageV2, t)
+  })
+
+  it('validates /id with compatibilityMode=true', () => {
+    return assertIdPartition(CosmosDbPartitionedStorageV2, true)
+  })
+
+  it('validates /id with compatibilityMode=false', () => {
+    return assertIdPartition(CosmosDbPartitionedStorageV2, false)
+  })
+
+  it('handles partition paths undefined with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, undefined, true)
+  })
+
+  it('handles partition paths undefined with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, undefined, false)
+  })
+
+  it('handles partition paths ["/_partitionKey"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/_partitionKey'], true)
+  })
+
+  it('handles partition paths ["/_partitionKey"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/_partitionKey'], false)
+  })
+
+  it('handles partition paths ["/tenant"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/tenant'], true)
+  })
+
+  it('handles partition paths ["/tenant"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/tenant'], false)
+  })
+
+  it('handles partition paths ["/id","/tenant"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/id', '/tenant'], true)
+  })
+
+  it('handles partition paths ["/id","/tenant"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/id', '/tenant'], false)
+  })
+
+  it('handles partition paths ["/_partitionKey","/tenant"] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/_partitionKey', '/tenant'], true)
+  })
+
+  it('handles partition paths ["/_partitionKey","/tenant"] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, ['/_partitionKey', '/tenant'], false)
+  })
+
+  it('handles partition paths [] with compatibilityMode=true', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, [], true)
+  })
+
+  it('handles partition paths [] with compatibilityMode=false', () => {
+    return assertPartitionPaths(CosmosDbPartitionedStorageV2, [], false)
+  })
+
+  it('preserves 404 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorageV2, 404)
+  })
+
+  it('preserves 401 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorageV2, 401)
+  })
+
+  it('preserves 403 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorageV2, 403)
+  })
+
+  it('preserves 429 initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorageV2, 429)
+  })
+
+  it('preserves transport initialization failures and permits retry', () => {
+    return assertInitializationRetry(CosmosDbPartitionedStorageV2, 'transport')
+  })
+
+  it('preserves key provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'key', true)
+  })
+
+  it('preserves key provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'key', false)
+  })
+
+  it('preserves tokenProvider provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'tokenProvider', true)
+  })
+
+  it('preserves tokenProvider provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'tokenProvider', false)
+  })
+
+  it('preserves mixedKey provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'mixedKey', true)
+  })
+
+  it('preserves mixedKey provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'mixedKey', false)
+  })
+
+  it('preserves mixedTokenProvider provisioning with compatibilityMode=true', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'mixedTokenProvider', true)
+  })
+
+  it('preserves mixedTokenProvider provisioning with compatibilityMode=false', () => {
+    return assertProvisioning(CosmosDbPartitionedStorageV2, 'mixedTokenProvider', false)
+  })
+
+  it('preserves SDK authorization precedence when aadCredentials is combined with key', t => {
+    return assertMixedCredentialPrecedence(CosmosDbPartitionedStorageV2, 'key', t)
+  })
+
+  it('preserves SDK authorization precedence when aadCredentials is combined with tokenProvider', t => {
+    return assertMixedCredentialPrecedence(CosmosDbPartitionedStorageV2, 'tokenProvider', t)
+  })
+})
 
 describe('Cosmos client isolation and Agents credential interoperability', () => {
   it('keeps each identity and custom transport bound to its own client', async t => {
@@ -460,6 +737,10 @@ describe('Cosmos client isolation and Agents credential interoperability', () =>
         { key: 'key-must-remain-private' },
         { tokenProvider: async () => 'callback-must-remain-private' },
         {
+          key: 'mixed-key-must-remain-private',
+          tokenProvider: async () => 'mixed-callback-must-remain-private',
+        },
+        {
           aadCredentials: {
             privateField: 'credential-must-remain-private',
             getToken: async () => ({ token: 'token-must-remain-private', expiresOnTimestamp: 0 }),
@@ -486,9 +767,10 @@ describe('Cosmos client isolation and Agents credential interoperability', () =>
 
     assert.equal(result.status, 0, result.stderr)
     const output = result.stdout + result.stderr
-    assert.match(output, /mode: 'key'/)
-    assert.match(output, /mode: 'tokenProvider'/)
-    assert.match(output, /mode: 'tokenCredential'/)
+    assert.deepEqual(
+      [...output.matchAll(/mode: '([^']+)'/g)].map(match => match[1]),
+      ['connectionString', 'tokenProvider', 'tokenProvider', 'tokenCredential']
+    )
     assert.doesNotMatch(output, /must-remain-private/)
   })
 })

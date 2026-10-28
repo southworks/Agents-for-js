@@ -354,40 +354,46 @@ describe('CosmosDbPartitionedStorage initialization', () => {
     assert.strictEqual(storage.getPartitionKey('key'), undefined)
   })
 
-  for (const synchronousFailure of [false, true]) {
-    it(`retries ${synchronousFailure ? 'synchronous' : 'asynchronous'} initialization failures on the same instance`, async () => {
-      const storage = createStorage('https://retry-instance.documents.azure.com/')
-      const internals = getInternals(storage)
-      const container = {} as Container
-      const failure = createStatusError(503)
-      let attempts = 0
+  async function assertInitializationRetry (synchronousFailure: boolean) {
+    const storage = createStorage('https://retry-instance.documents.azure.com/')
+    const internals = getInternals(storage)
+    const container = {} as Container
+    const failure = createStatusError(503)
+    let attempts = 0
 
-      internals.client = {} as CosmosClient
-      internals.getOrCreateContainer = () => {
-        attempts++
-        if (attempts === 1) {
-          if (synchronousFailure) {
-            throw failure
-          }
-          return Promise.reject(failure)
+    internals.client = {} as CosmosClient
+    internals.getOrCreateContainer = () => {
+      attempts++
+      if (attempts === 1) {
+        if (synchronousFailure) {
+          throw failure
         }
-        return Promise.resolve({ container, compatibilityModePartitionKey: false })
+        return Promise.reject(failure)
       }
+      return Promise.resolve({ container, compatibilityModePartitionKey: false })
+    }
 
-      const results = await Promise.allSettled([storage.initialize(), storage.initialize()])
-      assert.deepStrictEqual(results.map(result => result.status), ['rejected', 'rejected'])
-      for (const result of results) {
-        if (result.status === 'rejected') {
-          assert.strictEqual(result.reason, failure)
-        }
+    const results = await Promise.allSettled([storage.initialize(), storage.initialize()])
+    assert.deepStrictEqual(results.map(result => result.status), ['rejected', 'rejected'])
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        assert.strictEqual(result.reason, failure)
       }
-      assert.strictEqual(attempts, 1)
+    }
+    assert.strictEqual(attempts, 1)
 
-      await storage.initialize()
-      assert.strictEqual(attempts, 2)
-      assert.strictEqual(internals.container, container)
-    })
+    await storage.initialize()
+    assert.strictEqual(attempts, 2)
+    assert.strictEqual(internals.container, container)
   }
+
+  it('retries asynchronous initialization failures on the same instance', async () => {
+    await assertInitializationRetry(false)
+  })
+
+  it('retries synchronous initialization failures on the same instance', async () => {
+    await assertInitializationRetry(true)
+  })
 
   it('should preserve the upsert error for circular documents', async () => {
     const storage = createStorage('https://circular-document-account.documents.azure.com/')

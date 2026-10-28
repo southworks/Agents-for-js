@@ -119,10 +119,10 @@ class CosmosDbPartitionedStorageInternals {
         )
       }
     }
-    let authenticationMode = 'key'
+    let authenticationMode = 'connectionString'
     if (cosmosClientOptions.aadCredentials) {
       authenticationMode = 'tokenCredential'
-    } else if (!cosmosClientOptions.key && cosmosClientOptions.tokenProvider) {
+    } else if (cosmosClientOptions.tokenProvider !== undefined) {
       authenticationMode = 'tokenProvider'
     }
 
