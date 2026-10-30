@@ -31,7 +31,9 @@ async function ignoreCosmosErrors (operation: Promise<unknown>, ...ignoredCodes:
   try {
     await operation
   } catch (err: any) {
-    if (!ignored.has(err.code)) throw err
+    if (!ignored.has(err.code)) {
+      throw err
+    }
   }
 }
 
@@ -51,9 +53,16 @@ function isNotFoundError (err: unknown): boolean {
 }
 
 class CosmosDbPartitionedStorageInternals {
+  /**
+   * Cosmos DB container used for storage operations after initialization.
+   */
   container!: Container
   private client!: CosmosClient
   private initializationPromise?: Promise<void>
+
+  /**
+   * Indicates whether the container uses the legacy `/_partitionKey` partition key.
+   */
   compatibilityModePartitionKey = false;
   [key: string]: any;
 
@@ -68,6 +77,7 @@ class CosmosDbPartitionedStorageInternals {
    *
    */
   constructor (
+    /** Options used to connect to and configure Cosmos DB storage. */
     readonly cosmosDbStorageOptions: CosmosDbPartitionedStorageOptions
   ) {
     if (!cosmosDbStorageOptions) {
@@ -285,14 +295,33 @@ class CosmosDbPartitionedStorageInternals {
     })
   }
 
+  /**
+   * Gets the partition key used to address a document.
+   *
+   * @param key The escaped document key.
+   * @returns The document key, or `undefined` for legacy compatibility containers.
+   */
   getPartitionKey (key: string) {
     return this.compatibilityModePartitionKey ? undefined : key
   }
 
+  /**
+   * Determines whether a stored item has passed its expiration time.
+   *
+   * @param item The item to inspect.
+   * @returns `true` when the item has expired; otherwise, `false`.
+   */
   isExpired (item: DocumentStoreItem): boolean {
     return item.expiresAt !== undefined && item.expiresAt <= Date.now()
   }
 
+  /**
+   * Checks serialized data for nesting beyond the Cosmos DB limit.
+   *
+   * @param json The data being written.
+   * @param err The serialization or storage error that triggered the check.
+   * @throws When the data exceeds the supported nesting depth.
+   */
   checkForNestingError (json: object, err: Error | Record<'message', string> | string): void {
     const ancestors = new WeakSet<object>()
 
@@ -365,7 +394,9 @@ export class CosmosDbPartitionedStorage extends CosmosDbPartitionedStorageIntern
       if (!keys) {
         throw ExceptionHelper.generateException(ReferenceError, Errors.MissingReadKeys)
       }
-      if (keys.length === 0) return {}
+      if (keys.length === 0) {
+        return {}
+      }
       await this.initialize()
       const storeItems: StoreItems = {}
       await Promise.all(keys.map(async key => {
@@ -378,8 +409,12 @@ export class CosmosDbPartitionedStorage extends CosmosDbPartitionedStorageIntern
             storeItems[item.realId].eTag = item._etag
           }
         } catch (err: any) {
-          if (err.code === 404) return
-          if (err.code === 400) throw ExceptionHelper.generateException(Error, Errors.ContainerReadBadRequest, err)
+          if (err.code === 404) {
+            return
+          }
+          if (err.code === 400) {
+            throw ExceptionHelper.generateException(Error, Errors.ContainerReadBadRequest, err)
+          }
           throw ExceptionHelper.generateException(Error, Errors.ContainerReadError, err)
         }
       }))
@@ -399,7 +434,9 @@ export class CosmosDbPartitionedStorage extends CosmosDbPartitionedStorageIntern
       if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
         throw ExceptionHelper.generateException(ReferenceError, Errors.MissingWriteChanges)
       }
-      if (Object.keys(changes).length === 0) return
+      if (Object.keys(changes).length === 0) {
+        return
+      }
       await this.initialize()
       await Promise.all(Object.entries(changes).map(async ([key, { eTag, ...change }]) => {
         const document = new DocumentStoreItem({
@@ -435,7 +472,9 @@ export class CosmosDbPartitionedStorage extends CosmosDbPartitionedStorageIntern
         try {
           await this.container.item(escapedKey, this.getPartitionKey(escapedKey)).delete()
         } catch (err: any) {
-          if (err.code !== 404) throw ExceptionHelper.generateException(Error, Errors.DocumentDeleteError, err)
+          if (err.code !== 404) {
+            throw ExceptionHelper.generateException(Error, Errors.DocumentDeleteError, err)
+          }
         }
       }))
     })
@@ -474,7 +513,9 @@ export class CosmosDbPartitionedStorageV2 extends StorageV2 {
     return trace(CosmosStorageTraceDefinitions.read, async ({ record }) => {
       record({ keyCount: keys?.length })
       validateV2Keys(keys)
-      if (keys.length === 0) return {}
+      if (keys.length === 0) {
+        return {}
+      }
       await this.internals.initialize()
       const results: StorageReadResults<T> = {}
       await Promise.all(keys.map(async key => {
@@ -532,7 +573,9 @@ export class CosmosDbPartitionedStorageV2 extends StorageV2 {
       const mode = options?.mode ?? StorageWriteMode.Upsert
       const expiresAt = getStorageWriteExpiry(options)
       validateWriteMode(mode)
-      if (Object.keys(changes).length === 0) return {}
+      if (Object.keys(changes).length === 0) {
+        return {}
+      }
       validateV2ChangeKeys(changes)
       if (Object.values(changes).some(value => value === null || typeof value !== 'object' || Array.isArray(value))) {
         throw ExceptionHelper.generateException(TypeError, Errors.StorageV2ValueRequired)
@@ -607,7 +650,9 @@ export class CosmosDbPartitionedStorageV2 extends StorageV2 {
       record({ keyCount: keys?.length })
       validateExpectedVersion(options?.expectedVersion)
       validateV2Keys(keys)
-      if (keys.length === 0) return {}
+      if (keys.length === 0) {
+        return {}
+      }
       await this.internals.initialize()
       const results: StorageDeleteResults = {}
       await Promise.all(keys.map(async key => {
