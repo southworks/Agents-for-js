@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { fileURLToPath } from 'node:url'
+import { inspectEnvironment, isIncompatibleOAuthKey } from '../samples/_shared/environment.mjs'
 
 import { checkTeamsApiMetadata } from './teams-api-drift/validate-teams-api-metadata.mjs'
 import { loadBaseline } from './shared.mjs'
@@ -216,6 +217,36 @@ export const ruleDefinitions = {
     why: 'Keeps test agents reproducible for contributors and automation.',
     fix: 'Keep one declaration for each environment key.'
   },
+  'samples/mode-config-missing': {
+    what: 'The coordinator declares settings for all three modes.',
+    why: 'Template checks and runtime scenario availability use the same settings.',
+    fix: 'Restore the mode definition in samples/_shared/modes.json.'
+  },
+  'samples/env-template-missing': {
+    what: 'Each coordinator mode has an environment template.',
+    why: 'Contributors need a starting configuration for every mode.',
+    fix: 'Create the mode environment template under samples/.'
+  },
+  'samples/env-key-missing': {
+    what: 'Each mode template declares the settings required by its scenarios.',
+    why: 'Contributors can see which settings a sample needs before starting it.',
+    fix: 'Add the required key to the mode template.'
+  },
+  'samples/env-key-duplicate': {
+    what: 'Environment template keys are unique regardless of case.',
+    why: 'The SDK resolves many settings case-insensitively.',
+    fix: 'Keep one declaration for each setting.'
+  },
+  'samples/env-syntax': {
+    what: 'Mode templates use valid environment assignments.',
+    why: 'Malformed assignments can be ignored by dotenv parsers.',
+    fix: 'Use NAME=value and close quoted values.'
+  },
+  'samples/env-oauth-format': {
+    what: 'OAuth settings match the template mode.',
+    why: 'Each mode demonstrates a specific authorization configuration or compatibility interface.',
+    fix: 'Use the OAuth keys for the selected mode.'
+  },
   'test-agent/dockerfile-missing': {
     what: 'Docker scripts point to an existing Dockerfile.',
     why: 'Keeps test agents reproducible for contributors and automation.',
@@ -341,6 +372,7 @@ const ruleCategories = {
   package: 'Published packages',
   runtime: 'Runtime and toolchain',
   'test-agent': 'Test agents',
+  samples: 'Development samples',
   docs: 'Documentation',
   compat: 'API compatibility'
 }
@@ -469,6 +501,7 @@ export function checkRepository (root, options = {}) {
 
   checkPackages(normalizedRoot, packages, rootManifest, findings)
   checkTestAgents(normalizedRoot, testAgents, findings)
+  checkSampleTemplates(normalizedRoot, findings)
   checkInternalDependencies(normalizedRoot, manifests, buildReferences, findings)
   checkCatalogs(normalizedRoot, packages, catalogAgents, findings)
   checkDocumentationImports(normalizedRoot, documents, packages, findings)
@@ -2104,6 +2137,65 @@ function checkPackageExports (workspace, invalidFields, findings) {
       typesLocation.column,
       `Change "types" from "${manifest.types}" to "${typeTargets[0]}".`
     )
+  }
+}
+
+function isSettingList (keys) {
+  return Array.isArray(keys) && keys.every(key => typeof key === 'string' && key.trim())
+}
+
+function checkSampleTemplates (root, findings) {
+  const configFile = 'samples/_shared/modes.json'
+  if (!fs.existsSync(path.join(root, configFile))) {
+    if (fs.existsSync(path.join(root, 'samples/agent.ts'))) {
+      add(findings, 'samples/mode-config-missing', configFile, 'The samples coordinator is missing its mode settings.')
+    }
+    return
+  }
+
+  const modes = parseJson(configFile, readRequiredText(root, configFile))
+  for (const mode of ['latest', 'legacy', 'compat']) {
+    const config = modes?.[mode]
+    if (!isSettingList(config?.hostCredentials) || !config.scenarios || typeof config.scenarios !== 'object' ||
+      Array.isArray(config.scenarios) || !Object.values(config.scenarios).every(isSettingList)) {
+      add(findings, 'samples/mode-config-missing', configFile, `Missing or invalid settings for ${mode} mode.`, 0, mode)
+      continue
+    }
+    const templateFile = `samples/${mode}.env.TEMPLATE`
+    const templatePath = path.join(root, templateFile)
+    if (!fs.existsSync(templatePath)) {
+      add(findings, 'samples/env-template-missing', templateFile, `Missing the ${mode} mode environment template.`)
+      continue
+    }
+
+    const { declarations, issues } = inspectEnvironment(fs.readFileSync(templatePath, 'utf8'))
+    for (const { name, line, message } of issues) {
+      const rule = name ? 'samples/env-key-duplicate' : 'samples/env-syntax'
+      add(findings, rule, templateFile, message, line, name)
+    }
+
+    const keys = new Set()
+    for (const { name, line } of declarations) {
+      keys.add(name.toLowerCase())
+      if (isIncompatibleOAuthKey(mode, name)) {
+        add(findings, 'samples/env-oauth-format', templateFile, `${name} uses a different OAuth configuration format.`, line, name)
+      }
+    }
+
+    const requirements = [
+      ['bot identity', config.hostCredentials],
+      ...Object.entries(config.scenarios)
+    ]
+    const missingKeys = new Set()
+    for (const [scenario, settings] of requirements) {
+      for (const name of settings) {
+        const key = name.toLowerCase()
+        if (!keys.has(key) && !missingKeys.has(key)) {
+          add(findings, 'samples/env-key-missing', templateFile, `${scenario} requires ${name}.`, 0, name)
+          missingKeys.add(key)
+        }
+      }
+    }
   }
 }
 

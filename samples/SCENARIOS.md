@@ -212,3 +212,16 @@ trusted file host outside the default list, set
 **Mode** Latest. Use the [Teams sample guide](teams/TeamsSamples.md) to set up
 the Azure Bot and app manifest, then test attachments, conversations, card actions,
 meetings, message extensions, and task modules.
+
+## Upstream sources
+
+These Microsoft Agents manifests track the latest version on the upstream
+main branch. The local Teams guide explains which declarations this coordinator uses.
+
+- [agent-targeted-messages](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/agent-targeted-messages/manifest/manifest.json)
+- [bot-ai-messages](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/bot-ai-messages/manifest/manifest.json)
+- [bot-attachments](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/bot-attachments/manifest/manifest.json)
+- [bot-cards](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/bot-cards/manifest/manifest.json)
+- [bot-meetings](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/bot-meetings/manifest/manifest.json)
+- [bot-message-extensions](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/bot-message-extensions/manifest/manifest.json)
+- [bot-task-modules](https://github.com/microsoft/Agents/blob/main/samples/nodejs/teams/bot-task-modules/manifest/manifest.json)

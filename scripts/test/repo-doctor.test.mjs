@@ -438,6 +438,38 @@ describe('repo:doctor', () => {
     assert.equal(rules.includes('docs/relative-link-missing'), true)
   })
 
+  it('checks the coordinator templates and keeps bot identity separate from OAuth format', () => {
+    const root = fixture(({ write }) => {
+      write('samples/_shared/modes.json', JSON.stringify({
+        latest: { hostCredentials: ['connections__bot__settings__clientId'], scenarios: { 'state-blob': ['BLOB_CONTAINER_ID'] } },
+        legacy: { hostCredentials: ['clientId'], scenarios: { authorization: ['auth_connectionName'] } },
+        compat: { hostCredentials: ['clientId'], scenarios: {} }
+      }))
+      write('samples/latest.env.TEMPLATE', 'connections__bot__settings__clientId=\nNOTES="example\nBLOB_CONTAINER_ID=inside-quotes\n"\n')
+      write('samples/legacy.env.TEMPLATE', [
+        'clientId=',
+        'CLIENTID=',
+        'connections__bot__settings__clientId=',
+        'auth_connectionName=Sample',
+        'AgentApplication__UserAuthorization__Handlers__auth__Settings__azureBotOAuthConnectionName=WrongFormat'
+      ].join('\n'))
+    })
+
+    const findings = checkRepository(root).findings.filter(finding => finding.ruleId.startsWith('samples/'))
+    assert.deepEqual(findings.map(finding => [finding.ruleId, finding.path]).sort(), [
+      ['samples/env-key-duplicate', 'samples/legacy.env.TEMPLATE'],
+      ['samples/env-key-missing', 'samples/latest.env.TEMPLATE'],
+      ['samples/env-oauth-format', 'samples/legacy.env.TEMPLATE'],
+      ['samples/env-template-missing', 'samples/compat.env.TEMPLATE']
+    ])
+  })
+
+  it('reports missing sample mode configuration', () => {
+    const root = fixture(({ write }) => write('samples/agent.ts', "console.log('sample')\n"))
+    const finding = checkRepository(root).findings.find(finding => finding.ruleId === 'samples/mode-config-missing')
+    assert.equal(finding?.path, 'samples/_shared/modes.json')
+  })
+
   it('accepts JSON-form Docker COPY when the artifact chain matches', () => {
     const root = fixture(({ write, readJson }) => {
       const manifest = readJson('test-agents/example/package.json')

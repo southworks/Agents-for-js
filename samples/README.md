@@ -32,6 +32,9 @@ credentials. Leave bot credentials blank for local Playground testing. Storage,
 proactive messaging, and the interactive Telemetry scenario are in Latest.
 Console telemetry can be enabled in all modes.
 
+Run `npm run repo:doctor` to check that the mode templates exist, use unique keys,
+declare the settings their scenarios need, and use the correct OAuth format.
+
 ## Connect chat
 
 Start the coordinator with `npx tsx samples/agent.ts`, or use

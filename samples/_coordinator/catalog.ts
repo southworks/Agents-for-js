@@ -12,7 +12,10 @@ import { createTelemetryAgent } from '../telemetry/agent.js'
 import { isTelemetryEnabled } from '../telemetry/config.js'
 import { createTeamsAttachmentAgent } from '../teams/attachments.js'
 import { createTeamsConversationAgent, ownsConversationActivity } from '../teams/conversations.js'
+import { createTeamsCardAgent, ownsTeamsCardAction, citySearchInput } from '../teams/cards.js'
 import { createTeamsMeetingAgent, ownsMeetingEvent } from '../teams/meetings.js'
+import { createTeamsMessageExtensionAgent, ownsMessageExtension } from '../teams/messageExtensions.js'
+import { createTeamsTaskAgent, ownsTeamsTask } from '../teams/tasks.js'
 import type { CloudAdapter, TurnContext } from '@microsoft/agents-hosting'
 import type { Mode } from '../agent.js'
 import { createEchoAgent } from '../echo/agent.js'
@@ -175,6 +178,19 @@ export const scenarios: Scenario[] = [
     create: createTeamsConversationAgent
   },
   {
+    id: 'teams-cards',
+    group: 'Teams',
+    menuLabel: 'Card actions',
+    name: 'Teams card actions',
+    modes: ['latest'],
+    introduction: 'Search for a city below, or show a card to try Submit and Execute.',
+    cardBody: [citySearchInput],
+    quickActions: [{ label: 'Show card', command: 'show-card' }],
+    handlesActivity: ownsTeamsCardAction,
+    initializeOnActivity: true,
+    create: createTeamsCardAgent
+  },
+  {
     id: 'teams-meetings',
     group: 'Teams',
     menuLabel: 'Meetings',
@@ -188,6 +204,28 @@ export const scenarios: Scenario[] = [
     handlesActivity: ownsMeetingEvent,
     initializeOnActivity: true,
     create: createTeamsMeetingAgent
+  },
+  {
+    id: 'teams-message-extensions',
+    group: 'Teams',
+    menuLabel: 'Message extensions',
+    name: 'Teams message extensions',
+    modes: ['latest'],
+    introduction: 'Use Search or Create Card from the Teams compose box Apps menu.',
+    handlesActivity: ownsMessageExtension,
+    initializeOnActivity: true,
+    create: createTeamsMessageExtensionAgent
+  },
+  {
+    id: 'teams-tasks',
+    group: 'Teams',
+    menuLabel: 'Task modules',
+    name: 'Teams task modules',
+    modes: ['latest'],
+    introduction: 'Try a simple or multi-step form in Teams.',
+    handlesActivity: ownsTeamsTask,
+    initializeOnActivity: true,
+    create: (adapter, _addResultNavigation, mode) => createTeamsTaskAgent(adapter, mode)
   },
   ...chatScenarios,
   ...httpScenarios,
