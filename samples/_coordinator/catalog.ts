@@ -10,6 +10,9 @@ import { LongRunningSample } from '../long-running/agent.js'
 import { createProactiveAgent } from '../proactive/agent.js'
 import { createTelemetryAgent } from '../telemetry/agent.js'
 import { isTelemetryEnabled } from '../telemetry/config.js'
+import { createTeamsAttachmentAgent } from '../teams/attachments.js'
+import { createTeamsConversationAgent, ownsConversationActivity } from '../teams/conversations.js'
+import { createTeamsMeetingAgent, ownsMeetingEvent } from '../teams/meetings.js'
 import type { CloudAdapter, TurnContext } from '@microsoft/agents-hosting'
 import type { Mode } from '../agent.js'
 import { createEchoAgent } from '../echo/agent.js'
@@ -142,6 +145,49 @@ export const scenarios: Scenario[] = [
       { label: 'Trace activity', command: 'trace-activity' }
     ],
     create: createTelemetryAgent
+  },
+  {
+    id: 'teams-attachments',
+    group: 'Teams',
+    menuLabel: 'Attachments',
+    name: 'Teams attachments',
+    modes: ['latest'],
+    introduction: 'Send a file in a Teams personal chat to download it through the SDK.',
+    create: createTeamsAttachmentAgent
+  },
+  {
+    id: 'teams-conversations',
+    group: 'Teams',
+    menuLabel: 'Conversations',
+    name: 'Teams conversations',
+    modes: ['latest'],
+    introduction: 'Try a member lookup, mention, quoted reply, card update, or feedback. Use samples/SCENARIOS.md for private messages and conversation events.',
+    quickActions: [
+      { label: 'Who am I?', command: 'whoami' },
+      { label: 'Mention me', command: 'mentionme' },
+      { label: 'Quote reply', command: 'quote' },
+      { label: 'Show editable card', command: 'editable-card' },
+      { label: 'Try feedback', command: 'customfeedback' },
+      { label: 'Try message reactions', command: 'test-reaction' }
+    ],
+    handlesActivity: ownsConversationActivity,
+    initializeOnActivity: true,
+    create: createTeamsConversationAgent
+  },
+  {
+    id: 'teams-meetings',
+    group: 'Teams',
+    menuLabel: 'Meetings',
+    name: 'Teams meetings',
+    modes: ['latest'],
+    introduction: 'In a scheduled Teams meeting chat, select Observe events. Have a participant join or leave to see an event message.',
+    quickActions: [
+      { label: 'Meeting info', command: 'meeting-info' },
+      { label: 'Observe events', command: 'observe' }
+    ],
+    handlesActivity: ownsMeetingEvent,
+    initializeOnActivity: true,
+    create: createTeamsMeetingAgent
   },
   ...chatScenarios,
   ...httpScenarios,

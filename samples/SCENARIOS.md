@@ -206,3 +206,9 @@ Console telemetry can be enabled in all modes.
 Compat downloads are anonymous and use the SDK HTTPS host allowlist. For a
 trusted file host outside the default list, set
 `OutboundHostValidator__Hosts` in `compat.env` and restart.
+
+## Teams scenarios
+
+**Mode** Latest. Use the [Teams sample guide](teams/TeamsSamples.md) to set up
+the Azure Bot and app manifest, then test attachments, conversations, card actions,
+meetings, message extensions, and task modules.

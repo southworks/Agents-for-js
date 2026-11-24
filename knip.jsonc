@@ -60,11 +60,8 @@
     "samples": {
       "entry": [
         "teams/cardActions.ts",
-        "teams/meetingsExample.ts",
         "teams/msgExtensionExample.ts",
-        "teams/taskModuleExample.ts",
-        "teams/teamsAttachments.ts",
-        "teams/teamsConversationExample.ts"
+        "teams/taskModuleExample.ts"
       ],
       "project": ["**/*.{ts,mjs}"]
     },

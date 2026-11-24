@@ -1,327 +1,246 @@
-# Teams Samples
+# Teams samples
 
-This directory contains sample agents that demonstrate Microsoft Teams integration features using the Microsoft 365 Agents SDK for JavaScript/TypeScript.
+These development samples use `AgentApplication` and the Microsoft 365
+Agents SDK Teams extension. These scenarios run through the same Latest
+mode coordinator and share one Teams app package.
 
-Samples use the modern `AgentApplication` + `TeamsAgentExtension` API.
+## Set up Teams
 
-Samples use `startServer()` from `@microsoft/agents-hosting-express` which starts an Express server on port `3978` (or the `PORT` env variable).
+1. Install Node.js 22 or later and follow the [sample setup](../README.md) to
+   install dependencies, build the SDK, and create `samples/latest.env`.
+2. Configure the Azure Bot's Teams channel. In `samples/latest.env`, set
+   `connections__serviceConnection__settings__clientId`,
+   `connections__serviceConnection__settings__clientSecret`, and
+   `connections__serviceConnection__settings__tenantId`.
+3. From the repository root, run `npm start --workspace samples -- --mode latest`.
+   The default endpoint is `http://localhost:3978/api/messages`. Set `PORT` in
+   `samples/latest.env` if you need a different port.
+4. Expose the endpoint with an HTTPS tunnel, such as
+   [Dev Tunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview).
+   Keep Azure Bot authentication enabled and configure the public endpoint and app
+   package as described below.
 
----
+| Scenario | What to try | Source |
+| --- | --- | --- |
+| [Teams attachments](#teams-attachments) | Personal-chat file download and counting | [attachments.ts](attachments.ts) |
+| [Teams conversations](#teams-conversations) | Member lookup, mentions, quotes, private replies, editable cards, feedback, and events | [conversations.ts](conversations.ts) |
+| [Meetings](#meetings) | Meeting details and lifecycle events | [meetings.ts](meetings.ts) |
 
-## Prerequisites
+## Teams app manifest
 
-1. **Node.js 22+**
-2. **npm workspaces built** — from the repo root run:
-   ```bash
-   npm install
-   npm run build
-   ```
-3. **Azure Bot registration** — you need an Azure Bot resource with a Microsoft App ID and password. Set these in your `.env` file.
-4. **Tunneling** — Teams must be able to reach your local server. Use [Dev Tunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview) or ngrok to expose `localhost:3978`.
-5. **Teams App Manifest** — each sample needs a `manifest.json` sideloaded into Teams. Use the base manifest in `_resources/appManifest` and add the sample-specific sections described for each sample.
+Use [manifest.json](manifest/manifest.json) and the two icons in the same folder.
+Combines upstream Teams capabilities and adapts command declarations to the handlers
+in this repository.
+Manifest version 1.29 includes the targeted-message command fields. App names and
+descriptions identify this combined development app. Icons come from the existing
+local sample app package.
 
-### Environment Variables
+### Configure and package
 
-Create a `.env` file (or use the `--env-file` flag) with at least:
+1. Replace every `${{AAD_APP_CLIENT_ID}}` with your Microsoft Entra bot application
+   client ID, including the manifest ID, bot IDs, and web application ID.
+2. Replace `<<BOT_DOMAIN>>` with your HTTPS host name, without a scheme or path.
+   Replace the example developer website, privacy, and terms URLs with your URLs. Use your tunnel
+   hostname when running locally.
+3. Retain the upstream meeting manifest's web application resource
+   `https://RscPermission`. An SSO-specific `api://<client-id>` resource requires a
+   separate configuration. The upstream manifests omit SSO scopes.
+4. Configure the Azure Bot Teams channel endpoint as `https://<host>/api/messages`.
+   Keep credentials in the existing mode environment file.
+5. Configure the template, then generate a local ZIP containing `manifest.json`,
+   `color.png`, and `outline.png` at the archive root. Upload
+   the custom app where your Teams tenant permits it. The launcher does not replace
+   placeholders automatically.
+6. Increase `version` when updating an installed app. Review the meeting permissions
+   when installing the app for a scheduled meeting.
 
-```env
-connections__serviceConnection__settings__clientId=<your-app-id>
-connections__serviceConnection__settings__clientSecret=<your-app-password>
-connections__serviceConnection__settings__tenantId=<your-tenant-id>
-```
+### Combined declarations
 
-### Running a Sample
+| Source | Features |
+| --- | --- |
+| agent-targeted-messages | Personal, team, and group chat scopes, targeted messages, and the identity and messageTeamMembers permissions |
+| bot-ai-messages | Personal bot support. AI metadata uses the same bot capability. |
+| bot-attachments | supportsFiles enabled |
+| bot-cards | Team and groupChat bot support |
+| bot-meetings | Web application identity and Application RSC permissions OnlineMeeting.ReadBasic.Chat, ChannelMeeting.ReadBasic.Group, OnlineMeetingParticipant.Read.Chat |
+| bot-message-extensions | Search and Create Card commands, settings, and link previews. See the command IDs below. |
+| bot-task-modules | Personal bot support and bot domain for task-module pages |
 
-```bash
-# From the repo root
-npx tsx --env-file .env samples/teams/<sampleFile>.ts
+File support is enabled in the union even though other source samples disable it.
+All features share one bot registration. Meeting permissions are part of the full
+development package. Attachments and member lookup do not use meeting operations.
 
-# Examples
-npx tsx --env-file .env samples/teams/teamsConversationExample.ts
-```
+The manifest enables **Create Card**, link previews, targeted messaging, and
+message extension settings. Upstream reminder commands are outside this sample.
+The local message extension uses `searchQuery` with the `query` parameter and
+the `createCard` action. Link previews use `*.example.com` by default.
 
-The server will start on `http://localhost:3978` and listen for POST requests at `/api/messages`.
+## Teams attachments
 
----
+`M365AttachmentDownloader` puts the downloaded files in turn state.
+Teams shows the file upload control because the manifest enables `supportsFiles`.
 
-## Base Manifest
+Use a **personal chat** with the bot. Select Teams attachments from the coordinator.
+Send a short text message. The sample should report zero downloads and show upload instructions.
+Attach a small image or text file in Teams. Check the downloaded file count.
+Files remain in turn memory and their contents, names, and URLs are not printed.
+If some eligible attachments are not downloaded, the response states that some
+could not be downloaded and suggests checks. Exceptions produce safe guidance.
 
-All samples share the base `manifest.json` in `_resources/appManifest`. Copy it as a starting point and merge in the sample-specific sections documented for each sample below. Package the appManifest content into a `.zip` and sideload it into Teams.
+The scenario constructs `M365AttachmentDownloader` explicitly. It uses the connector
+client supplied by normal authenticated adapter processing, including its outbound
+headers. No anonymous download context or public sample fixture is substituted.
+HTML body attachments are excluded from the file count. Group/channel uploads,
+Copilot, and Playground receive guidance to use a Teams personal chat.
 
----
+Try an unavailable attachment, then select **All scenarios** and open **Generic
+attachments** to compare its separate public image fixture.
 
-## AgentApplication Samples (Root Level)
+### Manifest excerpt for teams attachments
 
-### `teamsConversationExample.ts` — Teams Conversation
-
-Comprehensive sample demonstrating core Teams conversation features using `AgentApplication` with `TeamsAgentExtension`.
-
-**Features illustrated:**
-- Proactive messaging to all team members (`messageall`) via `CreateConversationOptionsBuilder`
-- Targeted messages visible only to specific users (`targeted`) via `TeamsTurnContext.sendTargetedActivity()`
-- Private user-to-agent messages and targeted replies with Prompt Preview
-- @mention a user (`mentionme` / `atmention`)
-- Identify the current user via the Teams API client (`whoami`)
-- Update an existing card in-place (`update`)
-- Delete a card (`delete`)
-- Channel lifecycle events: channel created, renamed, deleted
-- Team renamed event
-- Member added / removed events
-- Hero cards with `MessageBack` actions
-- Quoted replies
-- Custom feedback dialog (`customfeedback`) with thumbs-up/down reactions and optional comments
-
-**How to test:**
-1. Install the sample in a **team channel** or **groupChat**.
-2. Send any message in the channel — the bot replies with a Hero Card containing action buttons.
-3. Click **"Message all members"** — the bot sends a 1:1 proactive message to every team member.
-4. Click **"Who am I?"** — the bot replies with your Teams member name.
-5. Click **"Mention Me"** — the bot replies with an @mention of your name.
-6. Click **"Update Card"** — the card updates in-place showing an incrementing counter.
-7. Click **"Delete Card"** — the card is removed from the conversation.
-8. Click **"Send Targeted"** — the agent sends a separate targeted message to each member, visible only to that member. This action sends messages from the agent; it does not trigger Prompt Preview.
-9. To see Prompt Preview, install the app with `supportsTargetedMessages: true` as shown below. Type `/` in the Teams compose box, select this agent, enter a private message, and send it. Teams delivers that message only to the agent. The agent replies privately, with a preview of your original message above its response.
-10. Add/remove members or create/rename/delete channels or rename the team to see the event handlers fire.
-11. Click **"Custom Feedback"** — select thumbs up or thumbs down on the response, enter optional comments in the dialog, and select **Submit**. The console logs the original activity ID, reaction, and feedback length without logging the comment text.
-
-Custom feedback uses `channelData.feedbackLoop.type: "custom"`. The sample handles `message/fetchTask` to return the Adaptive Card dialog, accepting either a root feedback payload or one wrapped in `data`. Submission arrives as `message/submitAction` with `actionName: "feedback"`; `onTeamsFeedbackLoop` handles it and acknowledges the invoke. The sample does not persist feedback.
-
-Teams does not store custom feedback for the application. For protocol details, see [Bot messages with AI-generated content](https://learn.microsoft.com/microsoftteams/platform/bots/how-to/bot-messages-ai-generated-content#feedback-buttons).
-
-**Manifest — additional sections:**
-
-Set `"supportsTargetedMessages": true` on the bot entry in the base manifest to let users send private messages to the agent through Teams' `/` picker.
+Teams uses `supportsFiles` to show the upload control. Test uploads in the personal bot scope.
 
 ```json
 {
   "bots": [
     {
-      "botId": "<your-app-id>",
-      "scopes": ["personal", "team", "groupChat"],
-      "supportsTargetedMessages": true
-    }
-  ]
-}
-```
-
----
-
-### `cardActions.ts` — Adaptive Card Actions
-
-Demonstrates Adaptive Card `Action.Execute` and `Action.Submit` handling using `AgentApplication.adaptiveCards`.
-
-**Features illustrated:**
-- `adaptiveCards.actionExecute('doStuff', ...)` — handles Universal Action `Action.Execute` and returns an updated Adaptive Card.
-- `adaptiveCards.actionSubmit('doStuff', ...)` — handles `Action.Submit` and processes the submitted data.
-- Sending Adaptive Cards from message commands (`/acExecute`, `/acSubmit`).
-
-**How to test:**
-1. Start the sample and sideload the app.
-2. Send `/acExecute` — the bot sends an Adaptive Card with an `Action.Execute` button. Type text in the input and click **"Execute doStuff"**. The card refreshes with an acknowledgement.
-3. Send `/acSubmit` — the bot sends an Adaptive Card with an `Action.Submit` button. Type text and click **"Submit doStuff"**. The bot sends a text reply with the submitted JSON.
-
-**Manifest — additional sections:**
-
-The base manifest already includes everything needed. No additional sections required.
-
----
-
-### `meetingsExample.ts` — Teams Meetings
-
-Handles Teams meeting lifecycle events using `TeamsAgentExtension.meetings`. Handlers receive `MeetingDetails` plus distinct `MeetingParticipantJoinValue` and `MeetingParticipantLeaveValue` payloads from `@microsoft/teams.api`.
-
-**Features illustrated:**
-- `meetings.onStart(context, state, details: MeetingDetails)` — triggered when a meeting begins, receives meeting details.
-- `meetings.onEnd(context, state, details: MeetingDetails)` — triggered when a meeting ends, receives meeting details.
-- `meetings.onParticipantsJoin(context, state, details: MeetingParticipantJoinValue)` — triggered when participants join, receives participant info.
-- `meetings.onParticipantsLeave(context, state, details: MeetingParticipantLeaveValue)` — triggered when participants leave, receives participant info.
-- Basic message handling with `help` and `meeting info` commands.
-
-**How to test:**
-1. Start the sample and sideload the app.
-2. Add the bot to a Teams meeting (via the meeting chat or the meeting details "Apps" tab).
-3. Start the meeting — the bot sends "Welcome to the meeting!".
-4. Have participants join/leave — the bot announces each event.
-5. End the meeting — the bot sends a farewell message.
-6. In the meeting chat, send `help` for a list of commands.
-
-**Manifest — additional sections:**
-
-Add `authorization` to the base manifest:
-
-```json
-"authorization": {
-  "permissions": {
-    "resourceSpecific": [
-      {
-          "name": "OnlineMeeting.ReadBasic.Chat",
-          "type": "Application"
-      },
-      {
-          "name": "ChannelMeeting.ReadBasic.Group",
-          "type": "Application"
-      },
-      {
-          "name": "OnlineMeetingParticipant.Read.Chat",
-          "type": "Application"
-      }
-    ]
-  }
-}
-```
-
-> **Note:** Meeting events require the bot to be added to the meeting and the meeting must be a scheduled Teams meeting (not an ad-hoc call).
-
----
-
-### `msgExtensionExample.ts` — Message Extensions
-
-Demonstrates search-based and action-based message extensions using `TeamsAgentExtension.messageExtensions`.
-
-**Features illustrated:**
-- `onQuery('searchQuery', ...)` — handles search queries from the compose extension, returning a list of results.
-- `onQueryLink(...)` — handles link unfurling, returning a preview card for pasted URLs.
-- `onSelectItem(...)` — handles item selection from query results, returning a detailed Adaptive Card.
-- `onSubmitAction('createCard', ...)` — handles action-based compose extension submissions, creating cards from user input.
-- `onQuerySettingUrl(...)` — provides a configuration URL when the extension settings are requested.
-
-**How to test:**
-1. Start the sample and sideload the app with the compose extension manifest entries (see below).
-2. In the compose box, click the **"+"** (Actions and Apps) and find your extension.
-3. Type a search term — the bot returns a list of thumbnail cards. Click one to insert a detailed card.
-4. Use the `create card` action command — fill in Title and Description and submit. The bot inserts an Adaptive Card.
-5. Paste a link matching your configured domain — the bot returns a link preview card.
-
-**Manifest — additional sections:**
-
-Add `composeExtensions` to the base manifest:
-
-```json
-{
-  "composeExtensions": [
-    {
-      "botId": "<your-app-id>",
-      "commands": [
-        {
-          "id": "searchQuery",
-          "type": "query",
-          "title": "Search",
-          "description": "Search for items",
-          "initialRun": true,
-          "fetchTask": false,
-          "context": [
-            "commandBox",
-            "compose"
-          ],
-          "parameters": [
-            {
-              "name": "query",
-              "title": "Search query",
-              "description": "Your search query",
-              "inputType": "text"
-            }
-          ]
-        },
-        {
-          "id": "createCard",
-          "type": "action",
-          "title": "Create Card",
-          "description": "Create a card from user input",
-          "initialRun": false,
-          "fetchTask": true,
-          "context": [
-            "commandBox",
-            "compose",
-            "message"
-          ],
-          "parameters": [
-            { "name": "title", "title": "Title", "inputType": "text" },
-            { "name": "description", "title": "Description", "inputType": "text" }
-          ]
-        }
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat"
       ],
-      "messageHandlers": [
-        {
-          "type": "link",
-          "value": { "domains": ["*.example.com"] }
-        }
-      ]
-    }
-  ]
-}
-```
-
-> Replace `*.example.com` in `messageHandlers` with the domain(s) you want link unfurling to activate on (e.g.: github.com).
-
----
-
-### `taskModuleExample.ts` — Task Modules (Dialogs)
-
-Demonstrates task module fetch/submit flows using `TeamsAgentExtension.taskModules`, including multi-step forms.
-
-**Features illustrated:**
-- `onFetch('simple_form', ...)` — returns an Adaptive Card form inside a task module dialog.
-- `onSubmit('simple_form', ...)` — processes the simple form submission and replies.
-- Multi-step form flow: `onFetch('multi_step_form')` → `onSubmit('multi_step_form_submit_name')` → `onSubmit('multi_step_form_submit_email')`.
-- Returning `type: 'continue'` to chain task module steps.
-- Returning `type: 'message'` to close the dialog with a message.
-
-**How to test:**
-1. Start the sample and sideload the app.
-2. Send any message — the bot replies with an Adaptive Card with buttons: **Simple Form**, **Multi-Step Form**.
-3. Click **"Simple Form"** — a task module dialog opens with a name input. Enter a name and click Submit. The bot sends a confirmation message.
-4. Click **"Multi-Step Form"** — Step 1 asks for your name. After submitting, Step 2 asks for your email. After the second submit, the bot confirms both values.
-
-**Manifest — additional sections:**
-
-The base manifest already includes everything needed. No additional sections required.
-
-
-
-> Task modules using `task/fetch` require `Action.Submit` with `msteams.type: "task/fetch"` in the card data. The manifest `validDomains` must include any domain used in web-based task modules.
-
----
-
-### `teamsAttachments.ts` — File Attachments
-
-Demonstrates receiving and counting file attachments sent by users in Teams using `M365AttachmentDownloader`.
-
-**Features illustrated:**
-- `M365AttachmentDownloader` — automatically downloads files attached to incoming messages.
-- Counting received attachments via turn state.
-
-**How to test:**
-1. Start the sample and sideload the app in a personal chat.
-2. Send a message with one or more file attachments (drag & drop or use the attach button).
-3. The bot replies with "You sent X file(s)".
-
-**Manifest — additional sections:**
-
-Set `"supportsFiles": true` on the bot entry in the base manifest:
-
-```json
-{
-  "bots": [
-    {
-      "botId": "<your-app-id>",
-      "scopes": ["personal", "team", "groupChat"],
       "supportsFiles": true
     }
   ]
 }
 ```
 
-> **Important:** `"supportsFiles": true` is required for Teams to show the file upload prompt in conversations with the bot.
+## Teams conversations
 
----
+Install in a personal chat, ordinary group chat, or standard team channel. Select
+**Teams conversations**, then select **Who am I?** to see your Teams member name.
+Select **Mention me** to see a Teams mention of the requesting member. The scenario
+registers `TeamsAgentExtension` and calls its Teams client directly. Team channels
+resolve members against the team ID. Other chats use the conversation ID.
 
-## Sample Summary
+In a group or channel, address typed commands to the bot, for example
+`@YourBot quote`. The coordinator removes the recipient mention. Use **All
+scenarios** to return to the menu. Try the interaction with a second user to
+verify that selections are separate.
+Replies are visible to everyone in the shared conversation. Card actions from an old
+scenario must not execute after exit or after selecting another scenario.
 
-| Sample | API Style | Key Features |
-|--------|-----------|-------------|
-| `teamsConversationExample.ts` | AgentApplication | Proactive messages, targeted messages, @mentions, card update/delete, channel & team events |
-| `cardActions.ts` | AgentApplication | Adaptive Card `Action.Execute` and `Action.Submit` |
-| `meetingsExample.ts` | AgentApplication | Meeting start/end, participant join/leave (typed `MeetingDetails`) |
-| `msgExtensionExample.ts` | AgentApplication | Search query, link unfurling, item select, action submit, settings URL |
-| `taskModuleExample.ts` | AgentApplication | Task module fetch/submit, multi-step form dialogs |
-| `teamsAttachments.ts` | AgentApplication | File attachment download and counting |
+The **Quote reply** action quotes the request. For a visible text quote, mention the
+bot and send `quote` in chat. Select **Show editable card**, then click **Update**
+on that card to increment its counter or **Delete** to remove it. Only the user
+who requested the latest card in that conversation can change it. Exit or opening
+a new editable card expires the old buttons.
+
+Send `targeted` for a sample message addressed only to you. To try Prompt Preview,
+select the bot through the Teams `/` picker and send a private prompt. **Try feedback**
+sends a message with thumbs up/down controls. Select a reaction, then submit the
+optional feedback dialog. The terminal confirms receipt without logging the comment.
+
+The manifest enables `supportsTargetedMessages` for the private prompt flow.
+Targeted replies use `TeamsTurnContext.sendTargetedActivity()`. Custom feedback
+uses `channelData.feedbackLoop.type: "custom"`. The sample handles
+`message/fetchTask` to open the dialog and `message/submitAction` to acknowledge
+the submission through `onTeamsFeedbackLoop`. The handler accepts direct and
+`data`-wrapped payloads. See [Teams custom feedback](https://learn.microsoft.com/microsoftteams/platform/bots/how-to/bot-messages-ai-generated-content#feedback-buttons).
+
+Select **Try message reactions**, then add and remove a reaction on the reply.
+Keep the scenario selected to see both event reports.
+
+In a dedicated test group chat with up to five people, send `message-group` to send
+one sample private chat message to each roster member. The bot reports the number
+of successful sends. To try lifecycle events, send `observe-conversation` in a group
+or channel. Add or remove a member, create, rename, or delete a channel, or rename
+the team. Notices are scoped to
+events delivered to the observed conversation. Exit clears your observation and the
+references for your editable card and feedback message.
+
+### Manifest excerpt for teams conversations
+
+The bot scopes enable the supported chat types. The targeted-message flag enables private prompts, and the permissions cover identity and messaging to team members.
+
+```json
+{
+  "bots": [
+    {
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat"
+      ],
+      "supportsTargetedMessages": true
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ]
+}
+```
+
+## Meetings
+
+The sample uses `TeamsAgentExtension.meetings`. Start and end handlers receive
+`MeetingDetails`. Participant handlers receive distinct
+`MeetingParticipantJoinValue` and `MeetingParticipantLeaveValue` payloads.
+Use a scheduled Teams meeting.
+
+Install the combined manifest and consent to its three Application RSC permissions:
+OnlineMeeting.ReadBasic.Chat, ChannelMeeting.ReadBasic.Group, and
+OnlineMeetingParticipant.Read.Chat. Add the app to a test meeting and open the
+meeting chat. Select Teams meetings and Meeting info: the sample calls the Teams
+meeting API and shows the title when supplied. Outside a meeting, expect guidance.
+
+Select Observe events. Start/end the meeting or join/leave with a test participant.
+The extension reports start, end, participant join, and participant leave events
+only when the activity's conversation and meeting IDs match an active observation.
+Start and end notices show the title when provided. Join and leave notices report
+the number of members in the event payload.
+An event without these identifiers, an active observation, or the sender identity
+required by SDK application state is skipped with a safe terminal message. No
+anonymous user selection or inferred meeting destination is created. Exit removes
+your observation. Another observer in that meeting can keep notices active.
+Notices are visible in the shared meeting conversation. Restart clears observations.
+Transcripts, meeting management, and cross-tenant edge cases remain outside scope.
+
+### Manifest excerpt for meetings
+
+The web application entry and the three application permissions enable the meeting features. Install or add the app in the meeting context to grant access.
+
+```json
+{
+  "webApplicationInfo": {
+    "id": "${{AAD_APP_CLIENT_ID}}",
+    "resource": "https://RscPermission"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "OnlineMeeting.ReadBasic.Chat",
+          "type": "Application"
+        },
+        {
+          "name": "ChannelMeeting.ReadBasic.Group",
+          "type": "Application"
+        },
+        {
+          "name": "OnlineMeetingParticipant.Read.Chat",
+          "type": "Application"
+        }
+      ]
+    }
+  }
+}
+```
+
+## Verify in Teams
+
+Use a test app installation to check rendering, file delivery, permissions,
+and channel events. The sample build and lint checks cover the source.
