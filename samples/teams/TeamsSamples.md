@@ -187,6 +187,43 @@ The bot scopes enable the supported chat types. The targeted-message flag enable
 }
 ```
 
+## Card actions
+
+The sample registers `actionSubmit('sample-submit')` and
+`actionExecute('sample-execute')` on `AgentApplication.adaptiveCards`.
+The scenario card also has a dynamic city picker. Type **Pa** for Paris and
+**zz** for an empty result. Search works from an earlier card after you switch
+scenarios.
+
+Select **Teams card actions**, then **Show card**. Enter sample text and select
+**Submit** to see a character count in chat. With **Execute**, the result card
+replaces the action card for the interacting user and shows the count there.
+Showing another card expires the previous card for that user/conversation. Exit,
+enter Echo, and click either old action. The sample should report that the card
+has expired and keep Echo selected. Repeat as another user and in another chat: the old card must not execute.
+Old callbacks are explicitly routed to their owner, including after a process
+restart, when their token is no longer known. Malformed actions must not be treated
+as valid card submissions. Only the latest card per session is retained in memory.
+
+### Manifest excerpt for card actions
+
+Submit, Execute, and city search use the existing bot entry. The card payload defines these actions, so this scenario adds no manifest setting.
+
+```json
+{
+  "bots": [
+    {
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat"
+      ]
+    }
+  ]
+}
+```
+
 ## Meetings
 
 The sample uses `TeamsAgentExtension.meetings`. Start and end handlers receive
@@ -240,6 +277,148 @@ The web application entry and the three application permissions enable the meeti
       ]
     }
   }
+}
+```
+
+## Message extensions
+
+The sample uses `TeamsAgentExtension.messageExtensions` to handle queries, link
+previews, result selection, action fetch and submit, and requests for the settings
+URL. For link preview testing, replace `*.example.com` in `messageHandlers` with
+a domain you want to test and upload the updated Teams app.
+
+The combined manifest already declares the Search query command with ID searchQuery
+and parameter query. Install/update it, open the app under Apps in the Teams compose
+box, select Search, and enter text. Expect three deterministic results. Select a
+result to insert its card into the compose box, then send it if desired. This flow
+uses sample results, with no external search or model dependency.
+
+Invoke Search before selecting a chat scenario, then while Echo is selected. Both
+return search results without changing chat navigation. Empty input requests a
+query. Routing is based on the explicit invoke name and command ID, not the last
+chat scenario.
+
+Use **Create Card** from the app's compose or message actions. Enter a title and
+description and submit to insert the resulting card. Open **Settings** to see the
+sample setup link. Paste a URL matching the manifest's link-preview domain to
+receive a preview. These callbacks also work with another chat scenario selected.
+
+### Manifest excerpt for message extensions
+
+The extension entry defines **Search**, **Create Card**, its link preview domains, and access to extension settings.
+
+```json
+{
+  "composeExtensions": [
+    {
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "commands": [
+        {
+          "id": "searchQuery",
+          "type": "query",
+          "title": "Search",
+          "description": "Search for items",
+          "initialRun": true,
+          "fetchTask": false,
+          "context": [
+            "commandBox",
+            "compose"
+          ],
+          "parameters": [
+            {
+              "name": "query",
+              "title": "Search query",
+              "description": "Your search query",
+              "inputType": "text"
+            }
+          ]
+        },
+        {
+          "id": "createCard",
+          "type": "action",
+          "title": "Create Card",
+          "description": "Create a card from user input",
+          "initialRun": false,
+          "fetchTask": true,
+          "context": [
+            "commandBox",
+            "compose",
+            "message"
+          ],
+          "parameters": [
+            {
+              "name": "title",
+              "title": "Title",
+              "inputType": "text"
+            },
+            {
+              "name": "description",
+              "title": "Description",
+              "inputType": "text"
+            }
+          ]
+        }
+      ],
+      "messageHandlers": [
+        {
+          "type": "link",
+          "value": {
+            "domains": [
+              "*.example.com"
+            ]
+          }
+        }
+      ],
+      "canUpdateConfiguration": true
+    }
+  ]
+}
+```
+
+## Task modules
+
+Select Teams task modules, then click **Open form** once on its introduction card.
+Enter a name of 1–80 characters and submit. The dialog should show **Form submitted successfully**.
+The name is validated but not stored or printed. Missing or invalid names receive
+retry guidance. Close the dialog to cancel.
+For **Multi-step form**, enter a sample name, select **Next**, then submit a sample
+email address such as `test@example.com`. Expect **Both form steps submitted
+successfully**. Use **Back to step 1** to return to the name field.
+The sample discards both values after validation.
+
+Reopen from the same card after cancellation. After a successful submission,
+send `open-form` while the scenario is selected to get a new card and form token.
+
+Open a form, exit in chat, select Echo, then submit the old form. The sample
+should report that the form has expired and keep Echo selected. Another user or conversation cannot submit your form.
+A successful submission consumes its token. Reusing the token is rejected. Each
+new form replaces the previous token. Restart expires all forms. Fetch and submit
+use TeamsAgentExtension task-module handlers and their normal invoke responses.
+The launcher submits `msteams.type: "task/fetch"` in the card data. The sample
+returns `type: 'continue'` to display a form or move to another step and
+`type: 'message'` to close with a confirmation. These Adaptive Card forms need
+no hosted page. When you adapt the sample to use a web-based dialog, add its
+domain to the manifest's `validDomains`.
+
+### Manifest excerpt for task modules
+
+The task module launcher uses the existing bot entry. The sample uses Adaptive Card dialogs. The shared `validDomains` entry shows where to list your bot host for a web-based dialog.
+
+```json
+{
+  "bots": [
+    {
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat"
+      ]
+    }
+  ],
+  "validDomains": [
+    "<<BOT_DOMAIN>>"
+  ]
 }
 ```
 
