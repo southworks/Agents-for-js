@@ -104,6 +104,24 @@ connector and user token clients. Each scenario card has a local simulation
 button. Use the [HTTP walkthrough](README.md#try-the-http-scenarios) to exercise
 the real host.
 
+## Rate limiting
+
+**Mode** Latest. With a fresh 10-second window, **User burst** accepts 3 of 4,
+**Conversation burst** accepts 5 of 6, and **Combined burst** accepts 3 of 4
+because the user rule is checked first. These are local SDK simulations. The
+card shows one row per limit. A single-limit action replaces only that row.
+A combined action updates both and shows checks skipped after the user rule
+throttles a turn.
+Repeated bursts and ordinary turns share the counters. Results update the scenario
+card in place. A channel that cannot update the original activity receives a
+replacement card.
+
+To exercise real turns, send `1` (user), `2` (conversation), or `3` (both).
+Wait the reported time before retrying. Use several users in one conversation to
+exercise overlapping rules. Menu navigation stays outside the limiter.
+
+<a id="setup-attachments"></a>
+
 ## Generic attachments
 
 **Mode** Latest. Select **Test sample attachment** to download and preview the
@@ -129,6 +147,30 @@ another stream or leaving is blocked until the stream settles.
 
 <a id="setup-long-running"></a>
 
+## Long-running turns
+
+**Mode** Latest. Use a channel that supports conversation continuation with
+configured bot credentials. Select **Start work**, then **Send a message**
+while it runs. Expect an immediate acknowledgement, progress updates where
+supported, and a result after about five seconds. **Test failure** exercises
+the error path. Retry after it settles. In-progress work is local to the process,
+and **All scenarios** is blocked while the continuation runs.
+
+<a id="setup-proactive"></a>
+
+## Proactive messaging
+
+**Mode** Latest. Use a channel that supports proactive delivery with bot
+credentials. Select **Send proactive message** for a separate reply, or
+**Remind me in 5 seconds** for delayed delivery. **Cancel reminder** cancels a
+pending timer. Wait for a send in progress before leaving.
+
+**Create browser link** shows a one-time link valid for two minutes. Select
+**Send from browser** and look for the new message in chat. Set
+`SAMPLES_PROACTIVE_BASE_URL` to the coordinator's browser-accessible origin if
+localhost is unavailable. The scenario uses an in-memory timer. Restart clears
+pending reminders and links.
+
 ## Transcripts
 
 **Mode** Latest. Start Azurite or configure `BLOB_STORAGE_CONNECTION_STRING`
@@ -140,6 +182,15 @@ After leaving, send a message in another scenario and verify it does not appear
 when you return to **Transcripts** and select **List**.
 
 <a id="setup-telemetry"></a>
+
+## Telemetry
+
+**Mode** Latest. Set `SAMPLES_TELEMETRY=on` and restart. **Successful turn**
+emits OK spans. **Controlled error** emits ERROR spans and a safe chat message.
+**Trace activity** sends a fixed channel diagnostic that some clients show only
+in inspection tools. The exporter prints span names, status, and duration.
+Leave and reopen the scenario to check that it does not duplicate span lines.
+Console telemetry can be enabled in all modes.
 
 ## Compatibility
 
