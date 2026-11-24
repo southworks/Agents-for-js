@@ -19,12 +19,6 @@ export function scenarioSettings (mode: Mode, scenarioId: string): readonly stri
   return settings[scenarioId] ?? []
 }
 
-export function oauthConnectionKey (mode: Mode, handlerId: string): string {
-  return mode === 'latest'
-    ? `AgentApplication__UserAuthorization__Handlers__${handlerId}__Settings__azureBotOAuthConnectionName`
-    : `${handlerId}_connectionName`
-}
-
 export function templateHostCredentials (mode: Mode): string {
   return modes[mode].hostCredentials.join(', ')
 }
