@@ -1,0 +1,26 @@
+{
+  "latest": {
+    "hostCredentials": [
+      "connections__serviceConnection__settings__clientId",
+      "connections__serviceConnection__settings__clientSecret",
+      "connections__serviceConnection__settings__tenantId"
+    ],
+    "scenarios": {}
+  },
+  "legacy": {
+    "hostCredentials": [
+      "clientId",
+      "clientSecret",
+      "tenantId"
+    ],
+    "scenarios": {}
+  },
+  "compat": {
+    "hostCredentials": [
+      "clientId",
+      "clientSecret",
+      "tenantId"
+    ],
+    "scenarios": {}
+  }
+}

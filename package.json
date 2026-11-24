@@ -46,13 +46,12 @@
   "license": "MIT",
   "workspaces": [
     "packages/*",
-    "test-agents/*"
+    "test-agents/*",
+    "samples"
   ],
   "devDependencies": {
     "@microsoft/api-extractor": "7.59.0",
     "@microsoft/m365agentsplayground": "0.2.29",
-    "@microsoft/microsoft-graph-client": "3.0.7",
-    "@microsoft/microsoft-graph-types": "2.43.1",
     "@types/debug": "4.1.13",
     "@types/express": "5.0.6",
     "@types/node": "22.20.4",

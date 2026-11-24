@@ -3,11 +3,25 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "tsx agent.ts",
+    "start:reload": "tsx agent.ts --reload",
     "authorization:absGraphLatest": "tsx --env-file ./authorization/absGraphLatest.env ./authorization/absGraphLatest.ts",
     "authorization:absGraphLegacy": "tsx --env-file ./authorization/absGraphLegacy.env ./authorization/absGraphLegacy.ts",
     "rateLimit": "tsx --env-file ./.env ./basic/rateLimit.ts"
   },
   "devDependencies": {
-    "tsx": "4.21.0"
+    "@clack/prompts": "1.9.0",
+    "@microsoft/microsoft-graph-client": "3.0.7",
+    "@microsoft/microsoft-graph-types": "2.43.1",
+    "express": "5.2.1"
+  },
+  "peerDependencies": {
+    "@microsoft/agents-activity": "*",
+    "@microsoft/agents-copilotstudio-client": "*",
+    "@microsoft/agents-hosting": "*",
+    "@microsoft/agents-hosting-express": "*",
+    "@microsoft/agents-hosting-extensions-msteams": "*",
+    "@microsoft/agents-hosting-storage-blob": "*",
+    "@microsoft/agents-hosting-storage-cosmos": "*"
   }
 }
