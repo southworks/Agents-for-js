@@ -1,11 +1,15 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+import { createAttachmentAgent } from '../attachments/agent.js'
+import { createStreamingAgent } from '../streaming/agent.js'
 import type { CloudAdapter, TurnContext } from '@microsoft/agents-hosting'
 import type { Mode } from '../agent.js'
 import { createEchoAgent } from '../echo/agent.js'
 import { authorizationScenario } from '../authorization/scenario.js'
+import { chatScenarios } from './chatScenarios.js'
 import { additionalScenarios } from './additionalScenarios.js'
+import { httpScenarios } from './httpScenarios.js'
 
 export interface ScenarioAgent {
   selectedFlow?: (context: TurnContext) => { id: string, label: string } | undefined
@@ -49,5 +53,31 @@ export const scenarios: Scenario[] = [
     create: createEchoAgent
   },
   authorizationScenario,
+  {
+    id: 'attachments',
+    group: 'Messaging',
+    name: 'Generic attachments',
+    modes: ['latest'],
+    introduction: 'Preview a sample image or upload a file in a channel that supports attachments.',
+    quickActions: [{ label: 'Test sample attachment', command: 'test-sample-attachment' }],
+    create: createAttachmentAgent
+  },
+  {
+    id: 'streaming',
+    group: 'Messaging',
+    name: 'Streaming',
+    modes: ['latest'],
+    introduction: 'Try a regular or streamed reply with citations, or test a failure halfway through a stream.',
+    quickActions: [
+      { label: 'Start stream', command: 'stream' },
+      { label: 'Test failure', command: 'stream-error' },
+      { label: 'Send cited reply', command: 'cited-reply' },
+      { label: 'Web Chat citations', command: 'webchat-citations' }
+    ],
+    blockedExitMessage: 'A response is still streaming. Wait for it to finish, then select All scenarios. Use samples/SCENARIOS.md for guidance.',
+    create: createStreamingAgent
+  },
+  ...chatScenarios,
+  ...httpScenarios,
   ...additionalScenarios
 ]

@@ -59,3 +59,54 @@ prompt. When the card shows that you are signed in, send a message. Send a
 follow-up in the same chat to exercise session reuse. A different user or chat gets its own session. Select
 **Sign out** or send `/logout` to sign out of this scenario and clear its chat
 session. The local session map lasts until process restart.
+
+## Route matching
+
+**Mode** Latest. Select the exact-match actions for `foo` and `fooBar`. Use
+`dupText` to see the higher-ranked of two matching handlers, then send `hello`
+to see the fallback.
+
+## HTTP scenarios
+
+**Mode** Latest. **Expect replies** buffers three native replies in one HTTP
+response. **Header propagation** checks the fixed test header on the SDK's
+connector and user token clients. Each scenario card has a local simulation
+button. Use the [HTTP walkthrough](README.md#try-the-http-scenarios) to exercise
+the real host.
+
+## Generic attachments
+
+**Mode** Latest. Select **Test sample attachment** to download and preview the
+fixed public Adaptive Cards PNG through the SDK. In a supported channel, upload a
+small file to test the channel's attachment path. Text alone reports zero files.
+HTML attachments are excluded and downloaded files stay in turn memory. For a
+failed download, check file access, channel credentials, and the outbound URL
+policy.
+
+<a id="setup-streaming"></a>
+
+## Streaming
+
+**Mode** Latest. Select **Send cited reply** for a regular message with citations
+and the AI-generated label. **Start stream** shows progress, then streamed text
+and citations. **Test failure** stops partway and marks the response incomplete.
+Retry once the stream settles. **Web Chat citations** uses the bundled Markdown
+citation fixture for client rendering checks. The result card contains the response text and breadcrumbs.
+
+The content is deterministic and requires no AI credentials. Inspect activity
+payloads when the client renders progress or citations differently. Starting
+another stream or leaving is blocked until the stream settles.
+
+<a id="setup-long-running"></a>
+
+## Transcripts
+
+**Mode** Latest. Start Azurite or configure `BLOB_STORAGE_CONNECTION_STRING`
+for a sample storage account. Open **Transcripts** and send a test message.
+Select **List** to read stored activities for the current conversation and
+**Delete** to remove them. Turns in the Transcripts scenario are recorded,
+including the delete turn, so a transcript can contain new records after deletion.
+After leaving, send a message in another scenario and verify it does not appear
+when you return to **Transcripts** and select **List**.
+
+<a id="setup-telemetry"></a>
