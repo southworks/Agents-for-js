@@ -59,8 +59,6 @@
 
     "samples": {
       "entry": [
-        "basic/longRunning.ts",
-        "basic/proactive.ts",
         "teams/cardActions.ts",
         "teams/meetingsExample.ts",
         "teams/msgExtensionExample.ts",

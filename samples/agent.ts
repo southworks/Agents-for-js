@@ -166,10 +166,15 @@ async function main () {
 
   const environmentPath = loadEnvironment(mode)
   log.info(`Mode: ${mode}\nEnvironment: ${environmentPath}`)
+  const { initializeTelemetry } = await import('./telemetry/setup.js')
+  initializeTelemetry()
   // Import SDK consumers only after the selected environment is loaded.
   const { startServer } = await import('@microsoft/agents-hosting-express')
   const { SamplesCoordinator } = await import('./_coordinator/coordinator.js')
-  startServer(new SamplesCoordinator(mode))
+  const { registerProactiveTriggerRoutes } = await import('./proactive/httpTrigger.js')
+  startServer(new SamplesCoordinator(mode), {
+    beforeListen: mode === 'latest' ? registerProactiveTriggerRoutes : undefined
+  })
   outro('Connect chat to /api/messages. Send a message to see the scenarios.')
   process.send?.({ type: 'samples-ready', mode })
 }

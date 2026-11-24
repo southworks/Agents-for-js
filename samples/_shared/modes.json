@@ -19,6 +19,9 @@
       "transcripts": [
         "BLOB_STORAGE_CONNECTION_STRING"
       ],
+      "telemetry": [
+        "SAMPLES_TELEMETRY"
+      ],
       "authorization": [
         "AgentApplication__UserAuthorization__Handlers__auth__Settings__azureBotOAuthConnectionName",
         "AgentApplication__UserAuthorization__Handlers__sso__Settings__azureBotOAuthConnectionName",
