@@ -58,6 +58,16 @@
     },
 
     "samples": {
+      "entry": [
+        "basic/longRunning.ts",
+        "basic/proactive.ts",
+        "teams/cardActions.ts",
+        "teams/meetingsExample.ts",
+        "teams/msgExtensionExample.ts",
+        "teams/taskModuleExample.ts",
+        "teams/teamsAttachments.ts",
+        "teams/teamsConversationExample.ts"
+      ],
       "project": ["**/*.{ts,mjs}"]
     },
 
