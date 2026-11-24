@@ -80,7 +80,6 @@
         "compat/cardFactoryHandler.ts",
         "compat/multiFeatureHandler.ts",
         "compat/stateManagementHandler.ts",
-        "mcs/mcsAgent.ts",
         "state/blob2Cnx.ts",
         "state/blobDemo.ts",
         "state/stateDemo.ts",

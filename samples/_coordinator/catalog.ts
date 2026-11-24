@@ -4,6 +4,8 @@
 import type { CloudAdapter, TurnContext } from '@microsoft/agents-hosting'
 import type { Mode } from '../agent.js'
 import { createEchoAgent } from '../echo/agent.js'
+import { authorizationScenario } from '../authorization/scenario.js'
+import { additionalScenarios } from './additionalScenarios.js'
 
 export interface ScenarioAgent {
   selectedFlow?: (context: TurnContext) => { id: string, label: string } | undefined
@@ -46,4 +48,6 @@ export const scenarios: Scenario[] = [
     modes: ['latest'],
     create: createEchoAgent
   },
+  authorizationScenario,
+  ...additionalScenarios
 ]
