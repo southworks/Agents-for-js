@@ -266,11 +266,11 @@ The CI pipeline (`.github/workflows/ci.yml`) runs:
 
 ## Node Version
 
-**Requires Node.js 22+**. Development and CI use Node.js 24. Test agents and samples use the native `--env-file` flag to load `.env` files without the `dotenv` package.
+**Requires Node.js 22+**. Development and CI use Node.js 24. Test agents use the native `--env-file` flag. The development samples coordinator loads the selected mode file.
 
 ## Environment Variables
 
-Test agents and samples load configuration from `.env` files using Node's `--env-file` flag. Common variables include authentication settings (app ID, password, tenant ID) and service endpoints.
+Test agents load `.env` with Node's `--env-file` flag. The samples coordinator loads `latest.env`, `legacy.env`, or `compat.env` from `samples/`. Common variables include authentication settings (app ID, password, tenant ID) and service endpoints.
 
 ## Package Publishing
 
