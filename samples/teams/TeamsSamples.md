@@ -1,7 +1,7 @@
 # Teams samples
 
 These development samples use `AgentApplication` and the Microsoft 365
-Agents SDK Teams extension. All six scenarios run through the same Latest
+Agents SDK Teams extension. These scenarios run through the same Latest
 mode coordinator and share one Teams app package.
 
 ## Set up Teams
@@ -24,10 +24,7 @@ mode coordinator and share one Teams app package.
 | --- | --- | --- |
 | [Teams attachments](#teams-attachments) | Personal-chat file download and counting | [attachments.ts](attachments.ts) |
 | [Teams conversations](#teams-conversations) | Member lookup, mentions, quotes, private replies, editable cards, feedback, and events | [conversations.ts](conversations.ts) |
-| [Card actions](#card-actions) | City search, Submit, and Execute | [cards.ts](cards.ts) |
 | [Meetings](#meetings) | Meeting details and lifecycle events | [meetings.ts](meetings.ts) |
-| [Message extensions](#message-extensions) | Search, Create Card, link previews, and settings | [messageExtensions.ts](messageExtensions.ts) |
-| [Task modules](#task-modules) | Simple and multi-step forms | [tasks.ts](tasks.ts) |
 
 ## Teams app manifest
 
