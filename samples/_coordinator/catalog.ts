@@ -1,11 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+import { MemoryStorage } from '@microsoft/agents-hosting'
+import { StateManagementHandler } from '../compat/stateManagementHandler.js'
 import { createAttachmentAgent } from '../attachments/agent.js'
 import { createStreamingAgent } from '../streaming/agent.js'
 import type { CloudAdapter, TurnContext } from '@microsoft/agents-hosting'
 import type { Mode } from '../agent.js'
 import { createEchoAgent } from '../echo/agent.js'
+import { stateScenarios } from '../state/scenarios.js'
 import { authorizationScenario } from '../authorization/scenario.js'
 import { chatScenarios } from './chatScenarios.js'
 import { additionalScenarios } from './additionalScenarios.js'
@@ -52,7 +55,21 @@ export const scenarios: Scenario[] = [
     modes: ['latest'],
     create: createEchoAgent
   },
+  ...stateScenarios,
   authorizationScenario,
+  {
+    id: 'compat-state',
+    group: 'Compatibility',
+    menuLabel: 'State',
+    name: 'Compatibility state',
+    modes: ['compat'],
+    introduction: 'Start the name prompt, then type your name. Send another message to try the stored profile.',
+    quickActions: [
+      { label: 'Start name prompt', command: '/start' },
+      { label: 'Reset state', command: '/reset' }
+    ],
+    create: () => new StateManagementHandler(new MemoryStorage())
+  },
   {
     id: 'attachments',
     group: 'Messaging',

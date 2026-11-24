@@ -1,48 +1,34 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { startServer } from '@microsoft/agents-hosting-express'
-import { ActivityHandler, CardFactory, MessageFactory, TurnContext } from '@microsoft/agents-hosting'
-import { ActionTypes, Activity, ActivityTypes, Attachment, EndOfConversationCodes } from '@microsoft/agents-activity'
-import path from 'path'
-import fs from 'fs'
+import { ActivityHandler, AttachmentDownloader, CloudAdapter, createOutboundHostValidator, MessageFactory, MsalConnectionManager, TurnContext } from '@microsoft/agents-hosting'
+import { Activity, ActivityTypes, Attachment, EndOfConversationCodes } from '@microsoft/agents-activity'
+import path from 'node:path'
+import { readFileSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 
 export class MultiFeatureHandler extends ActivityHandler {
-  // conversationReferences: { [key: string]: ConversationReference }
+  private readonly downloader = new AttachmentDownloader(undefined, createOutboundHostValidator({ enabled: true }))
+  private readonly downloadAdapter = new CloudAdapter()
+
   constructor () {
     super()
-    // this.conversationReferences = conversationReferences
-
-    this.onMembersAdded(async (context, next) => {
-      const membersAdded = context.activity.membersAdded
-      if (membersAdded != null) {
-        for (let cnt = 0; cnt < membersAdded.length; cnt++) {
-          if ((context.activity.recipient != null) && membersAdded[cnt].id !== context.activity.recipient.id) {
-            // If the Activity is a ConversationUpdate, send a greeting message to the user.
-            await context.sendActivity('Welcome to the Multi Feature sample!')
-            await context.sendActivity('For attachments, if you send "Display Attachment options" you would see the options. You can also send me an attachment and I will save it, and alternatively, I can send you an attachment.')
-            await context.sendActivity('You can also send "wait" and watch me typing, or send "end" or "stop" to finish the conversation.')
-            // await context.sendActivity('Navigate to http://<your-server>/api/notify to proactively message everyone who has previously messaged this agent. Remember to add an Authorization header with your Bearer token')
-
-            // By calling next() you ensure that the next Handler is run.
-            await next()
-          }
-        }
-      }
-    })
+    // Compat downloads are anonymous. Never forward the bot token to an attachment URL.
+    this.downloadAdapter.connectionManager = new MsalConnectionManager(new Map([['anonymous', {}]]))
 
     this.onMessage(async (context, next) => {
-      if (context.activity.text !== undefined) {
-        switch (context.activity.text.toLowerCase()) {
+      const attachments = context.activity.attachments?.filter(attachment => !attachment.contentType.startsWith('text/html')) ?? []
+      if (attachments.length > 0) {
+        await this.saveAttachments(context, attachments)
+      } else if (context.activity.text?.trim()) {
+        switch (context.activity.text.trim().toLowerCase()) {
           case 'end':
           case 'stop':
-            await context.sendActivity(Activity.fromObject(
-              {
-                type: ActivityTypes.EndOfConversation,
-                code: EndOfConversationCodes.CompletedSuccessfully
-              }
-            )
-            )
+            await context.sendActivity(Activity.fromObject({
+              type: ActivityTypes.EndOfConversation,
+              code: EndOfConversationCodes.CompletedSuccessfully
+            }))
             break
           case 'wait':
             await context.sendActivities([
@@ -51,39 +37,23 @@ export class MultiFeatureHandler extends ActivityHandler {
               Activity.fromObject({ type: ActivityTypes.Message, text: 'Finished typing' })
             ])
             break
-          case 'display attachment options':
-            await this.displayAttachmentOptions(context)
-            break
           case '1':
           case '2':
             // Since no attachment was received, send an attachment to the user.
             await this.handleOutgoingAttachment(context)
-            // Send a HeroCard with potential options for the user to select.
-            await this.displayAttachmentOptions(context)
             break
           default:
-            await context.sendActivity(MessageFactory.text('Your input was not recognized, please try again.'))
+            await context.sendActivity(MessageFactory.text('Choose an attachment action or upload a file.'))
         }
       } else {
-        if ((context.activity.attachments != null) && context.activity.attachments.length > 0) {
-          const validAttachments = context.activity.attachments.filter((a: { contentType: string }) => a.contentType !== 'text/html')
-          if (validAttachments.length > 0) {
-            // The user sent an attachment and the agent should handle the incoming attachment.
-            await this.handleIncomingAttachment(context, validAttachments)
-          } else {
-            const reply: Activity = new Activity(ActivityTypes.Message)
-            reply.text = 'Invalid attachment, please try again.'
-            await context.sendActivity(reply)
-          }
-        }
+        await context.sendActivity('Choose an attachment action or upload a supported file.')
       }
 
-      // By calling next() you ensure that the next Handler is run.
       await next()
     })
 
     this.onReactionsAdded(async (context) => {
-      await Promise.all((context.activity.reactionsAdded ?? []).map(async (reaction: { type: any }) => {
+      await Promise.all((context.activity.reactionsAdded ?? []).map(async reaction => {
         if (context.activity.replyToId !== undefined) {
           const newReaction = `You reacted with '${reaction.type}' to the following message: '${context.activity.replyToId}'`
           await context.sendActivity(newReaction)
@@ -92,7 +62,7 @@ export class MultiFeatureHandler extends ActivityHandler {
     })
 
     this.onReactionsRemoved(async (context) => {
-      await Promise.all((context.activity.reactionsRemoved ?? []).map(async (reaction: { type: any }) => {
+      await Promise.all((context.activity.reactionsRemoved ?? []).map(async reaction => {
         if (context.activity.replyToId !== undefined) {
           const newReaction = `You removed the reaction '${reaction.type}' from the message: '${context.activity.replyToId}'`
           await context.sendActivity(newReaction)
@@ -162,76 +132,30 @@ export class MultiFeatureHandler extends ActivityHandler {
     })
   }
 
-  async handleIncomingAttachment (turnContext: TurnContext, validAttachments: Attachment[]): Promise<void> {
-    if (turnContext.activity.attachments === undefined) {
-      throw new Error('Invalid Activity Attachments: undefined')
-    }
-    const promises = validAttachments.map(async a => await this.downloadAttachmentAndWrite(a))
-    const successfulSaves = await Promise.all(promises)
-
-    async function replyForReceivedAttachments (localAttachmentData: {
-      fileName: string
-      localPath: string
-    } | undefined): Promise<void> {
-      if (localAttachmentData != null) {
-        await turnContext.sendActivity(`Attachment "${localAttachmentData.fileName}" ` +
-                `has been received and saved to "${localAttachmentData.localPath}".`)
-      } else {
-        await turnContext.sendActivity('Attachment was not successfully saved to disk.')
-      }
-    }
-
-    const replyPromises = successfulSaves.map(replyForReceivedAttachments.bind(turnContext))
-    await Promise.all(replyPromises)
-  }
-
-  async downloadAttachmentAndWrite (attachment: Attachment): Promise<{
-    fileName: string
-    localPath: string
-  } | undefined> {
-    // Retrieve the attachment via url.
-    // Use content.downloadURL if available as that contains needed auth token for working with ms teams
-    // console.log('Attachment URL:', attachment)
-    // const attachmentContent = (attachment.content) as { downloadUrl: string }
-    // const url = attachmentContent.downloadUrl ?? attachment.contentUrl
-
-    if (attachment.name === undefined) {
-      throw new Error('Invalid Attachment name: undefined')
-    }
-
-    // Local file path for the agent to save the attachment.
-    const localFileName = path.join(import.meta.dirname, attachment.name)
-
-    try {
-      const response = await fetch(attachment.contentUrl!)
-      let data: any
-      // If user uploads JSON file, this prevents it from being written as "{"type":"Buffer","data":[123,13,10,32,32,34,108..."
-      if (response.headers.get('content-type') === 'application/json') {
-        const json = await response.json()
-        data = JSON.parse(JSON.stringify(json), (key, value) => {
-          return value !== undefined && value.type === 'Buffer'
-            ? Buffer.from(value.data)
-            : value
-        })
-      } else {
-        // arraybuffer is necessary for images
-        const arrayBuffer = await response.arrayBuffer()
-        data = Buffer.from(arrayBuffer)
+  private async saveAttachments (context: TurnContext, attachments: Attachment[]): Promise<void> {
+    const directory = path.join(import.meta.dirname, '../.attachments')
+    await mkdir(directory, { recursive: true })
+    for (const attachment of attachments) {
+      const name = attachment.name && path.basename(attachment.name)
+      if (!name || !attachment.contentUrl) {
+        await context.sendActivity('This attachment is missing a file name or download URL. Upload the file again.')
+        continue
       }
 
-      fs.writeFile(localFileName, data, (fsError) => {
-        if (fsError != null) {
-          throw fsError
+      try {
+        const activity = Activity.fromObject({ serviceUrl: attachment.contentUrl, attachments: [attachment], type: 'message' })
+        const downloadContext = new TurnContext(this.downloadAdapter, activity, { aud: 'compat-attachments' })
+        const [file] = await this.downloader.downloadFiles(downloadContext)
+        if (!file) {
+          await context.sendActivity(`Could not download "${name}". Check file access and the outbound URL policy.`)
+          continue
         }
-      })
-    } catch (error) {
-      console.error(error)
-      return undefined
-    }
-
-    return {
-      fileName: attachment.name,
-      localPath: localFileName
+        const filename = `${randomUUID()}-${name}`
+        await writeFile(path.join(directory, filename), file.content, { flag: 'wx' })
+        await context.sendActivity(`Saved the attachment as "${filename}" in samples/.attachments/.`)
+      } catch {
+        await context.sendActivity(`Could not save "${name}". Check file access and the sample directory permissions, then retry.`)
+      }
     }
   }
 
@@ -239,7 +163,7 @@ export class MultiFeatureHandler extends ActivityHandler {
     const reply: Activity = new Activity(ActivityTypes.Message)
 
     if (turnContext.activity.text === undefined) {
-      throw new Error('Invalid Activity Text: undefined')
+      return
     }
 
     // Look at the user input, and figure out what type of attachment to send.
@@ -256,38 +180,19 @@ export class MultiFeatureHandler extends ActivityHandler {
       reply.text = 'This is an internet attachment.'
     } else {
       // The user did not enter input that this agent was built to handle.
-      reply.text = 'Your input was not recognized, please try again.'
+      reply.text = 'Choose an attachment action or upload a file.'
     }
     await turnContext.sendActivity(reply)
   }
 
-  async displayAttachmentOptions (turnContext: TurnContext): Promise<void> {
-    const reply: Activity = new Activity(ActivityTypes.Message)
-
-    // Note that some channels require different values to be used in order to get buttons to display text.
-    // In this code the emulator is accounted for with the 'title' parameter, but in other channels you may
-    // need to provide a value for other parameters like 'text' or 'displayText'.
-    const buttons = [
-      { type: ActionTypes.ImBack, title: '1. Inline Attachment', value: '1' },
-      { type: ActionTypes.ImBack, title: '2. Internet Attachment', value: '2' }
-    ]
-
-    const card = CardFactory.heroCard('', undefined,
-      buttons, { text: 'You can upload an image or select one of the following choices.' })
-
-    reply.attachments = [card]
-
-    await turnContext.sendActivity(reply)
-  }
-
   getInlineAttachment (): Attachment {
-    const imageData = fs.readFileSync(path.join(import.meta.dirname, './../_resources/multi-agents.jpg'))
+    const imageData = readFileSync(path.join(import.meta.dirname, './../_resources/multi-agents.jpg'))
     const base64Image = Buffer.from(imageData).toString('base64')
 
     return {
-      name: 'architecture-resize.png',
-      contentType: 'image/png',
-      contentUrl: `data:image/png;base64,${base64Image}`
+      name: 'multi-agents.jpg',
+      contentType: 'image/jpeg',
+      contentUrl: `data:image/jpeg;base64,${base64Image}`
     }
   }
 
@@ -300,4 +205,3 @@ export class MultiFeatureHandler extends ActivityHandler {
     }
   }
 }
-startServer(new MultiFeatureHandler())

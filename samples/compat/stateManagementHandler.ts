@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-import { startServer } from '@microsoft/agents-hosting-express'
-import { ActivityHandler, ConversationState, TurnContext, UserState, AgentStatePropertyAccessor, MemoryStorage, Storage } from '@microsoft/agents-hosting'
+import { ActivityHandler, ConversationState, TurnContext, UserState, AgentStatePropertyAccessor, Storage } from '@microsoft/agents-hosting'
 
 interface ConversationData {
   promptedForUserName: boolean;
@@ -30,48 +29,35 @@ export class StateManagementHandler extends ActivityHandler {
 
     this.onMessage(async (turnContext, next) => {
       try {
-        const userProfile = await this.userProfileAccessor.get(turnContext, {})
-        console.log('User Profile:', userProfile)
-
-        const conversationData = await this.conversationDataAccessor.get(turnContext, { promptedForUserName: false })
-        console.log('Conversation Data:', conversationData)
-
-        if (!userProfile.name) {
-          if (conversationData.promptedForUserName) {
-            userProfile.name = turnContext.activity.text
-
-            await turnContext.sendActivity(`Thanks ${userProfile.name}. To see conversation data, type anything.`)
-
-            conversationData.promptedForUserName = false
-          } else {
-            await turnContext.sendActivity('What is your name?')
-            conversationData.promptedForUserName = true
-          }
+        const text = turnContext.activity.text?.trim()
+        if (text === '/reset') {
+          await this.conversationDataAccessor.delete(turnContext)
+          await this.userProfileAccessor.delete(turnContext)
+          await turnContext.sendActivity('Conversation and user state cleared.')
         } else {
-          conversationData.timestamp = turnContext.activity.timestamp!.toLocaleString()
-          conversationData.channelId = turnContext.activity.channelId
+          const profile = await this.userProfileAccessor.get(turnContext, {})
+          const conversation = await this.conversationDataAccessor.get(turnContext, { promptedForUserName: false })
 
-          await turnContext.sendActivity(`${userProfile.name} sent: ${turnContext.activity.text}`)
-
-          if (turnContext.activity.text === '/reset') {
-            await this.conversationDataAccessor.delete(turnContext)
-            await this.userProfileAccessor.delete(turnContext)
+          if (!profile.name) {
+            if (conversation.promptedForUserName && text && text !== '/start') {
+              profile.name = text
+              conversation.promptedForUserName = false
+              await turnContext.sendActivity(`Thanks, ${profile.name}. Send a message to try the stored profile.`)
+            } else {
+              conversation.promptedForUserName = true
+              await turnContext.sendActivity('What is your name?')
+            }
+          } else if (text === '/start') {
+            await turnContext.sendActivity(`Your stored name is ${profile.name}. Send a message to continue.`)
+          } else {
+            conversation.timestamp = (turnContext.activity.timestamp ?? new Date()).toLocaleString()
+            conversation.channelId = turnContext.activity.channelId
+            await turnContext.sendActivity(`${profile.name} sent: ${text ?? ''}`)
           }
         }
       } catch (error) {
         console.error('State accessor error:', error)
         await turnContext.sendActivity('Sorry, there was an error processing your message.')
-      }
-
-      await next()
-    })
-
-    this.onMembersAdded(async (context, next) => {
-      const membersAdded = context.activity.membersAdded!
-      for (let cnt = 0; cnt < membersAdded.length; ++cnt) {
-        if (membersAdded[cnt].id !== context.activity.recipient!.id) {
-          await context.sendActivity('Welcome to State Sample. Type anything to get started.')
-        }
       }
 
       await next()
@@ -85,4 +71,3 @@ export class StateManagementHandler extends ActivityHandler {
     await this.userState.saveChanges(context, false)
   }
 }
-startServer(new StateManagementHandler(new MemoryStorage()))
