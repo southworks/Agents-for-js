@@ -1,9 +1,10 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "allowJs": true,
     "outDir": "./dist/samples/",
     "rootDir": "./samples"
   },
-  "include": ["samples/**/*.ts", "samples/_resources/*.json"],
+  "include": ["samples/**/*.ts", "samples/_resources/*.json", "samples/_shared/modes.json", "samples/_shared/environment.mjs"],
   "exclude": ["node_modules", "dist"]
 }

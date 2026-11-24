@@ -11,3 +11,6 @@ tsconfig.tsbuildinfo
 devTools/
 compat/generated/
 scripts/logs/
+
+samples/.state-files/
+samples/.attachments/
