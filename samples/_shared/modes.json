@@ -6,6 +6,16 @@
       "connections__serviceConnection__settings__tenantId"
     ],
     "scenarios": {
+      "state-blob": [
+        "BLOB_STORAGE_CONNECTION_STRING",
+        "BLOB_CONTAINER_ID"
+      ],
+      "state-cosmos": [
+        "COSMOS_ENDPOINT",
+        "COSMOS_KEY",
+        "COSMOS_DATABASE_ID",
+        "COSMOS_CONTAINER_ID"
+      ],
       "transcripts": [
         "BLOB_STORAGE_CONNECTION_STRING"
       ],

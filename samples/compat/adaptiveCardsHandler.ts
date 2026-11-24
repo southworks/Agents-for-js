@@ -1,81 +1,59 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { startServer } from '@microsoft/agents-hosting-express'
 import { ActivityHandler, CardFactory, MessageFactory, TurnContext } from '@microsoft/agents-hosting'
 import AdaptiveCardActions from '../_resources/AdaptiveCardActions.json'
 import ToggleVisible from '../_resources/ToggleVisibleCard.json'
 
-const commandString = 'Please use one of these commands: **Card Actions** for Adaptive Card actions, **Suggested Actions** for suggested actions, and **ToggleVisibility** for toggling the visibility of the card.'
+const colors = ['Red', 'Green', 'Blue']
 
 export class AdaptiveCardHandler extends ActivityHandler {
   constructor () {
     super()
 
-    this.onMembersAdded(async (context) => {
-      await context.sendActivity(MessageFactory.text(commandString))
-    })
-
     this.onMessage(async (context, next) => {
-      if (context.activity.text != null) {
-        const text = context.activity.text?.toLowerCase() ?? ''
+      const text = context.activity.text?.trim().toLowerCase()
+      const data = context.activity.value as { name?: unknown, value?: unknown, color?: unknown } | undefined
+      const color = colors.find(choice => choice.toLowerCase() === text || choice === data?.color)
 
-        if (text.includes('card actions')) {
-          await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard(AdaptiveCardActions)))
-        } else if (text.includes('suggested actions')) {
-          await context.sendActivity('Please select a color from the suggested action choices.')
-          await AdaptiveCardHandler.sendSuggestedActionsAsync(context)
-        } else if (text.includes('togglevisibility')) {
-          await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard(ToggleVisible)))
-        } else if (text.includes('red') || text.includes('blue') || text.includes('green')) {
-          const responseText = AdaptiveCardHandler.processInput(text)
-          await context.sendActivity(responseText)
-          await AdaptiveCardHandler.sendSuggestedActionsAsync(context)
-        } else {
-          await context.sendActivity(MessageFactory.text(commandString))
-        }
+      if (text === 'card actions') {
+        await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard(AdaptiveCardActions)))
+      } else if (text === 'suggested actions') {
+        await AdaptiveCardHandler.sendColorChoices(context)
+      } else if (text === 'togglevisibility') {
+        await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard(ToggleVisible)))
+      } else if (color) {
+        await context.sendActivity(`You selected ${color}.`)
+      } else if (typeof data?.name === 'string' && data.name.trim()) {
+        await context.sendActivity(`Form submitted. Name: ${data.name.trim()}`)
+      } else if (data?.value === 'The button has been clicked') {
+        await context.sendActivity('The nested card button was clicked.')
+      } else {
+        await context.sendActivity('Open Adaptive Cards from the breadcrumb to choose an action.')
       }
 
-      await this.sendDataOnCardActions(context)
+      await next()
     })
   }
 
-  private static processInput (text: string): string {
-    const colorText = 'is the best color, I agree.'
-    switch (text) {
-      case 'red':
-        return `Red ${colorText}`
-      case 'green':
-        return `Green ${colorText}`
-      case 'blue':
-        return `Blue ${colorText}`
-      default:
-        return 'Please select a color from the suggested action choices.'
+  private static async sendColorChoices (context: TurnContext): Promise<void> {
+    // Playground does not support the native imBack buttons.
+    if (context.activity.channelId === 'emulator' || context.activity.channelId === 'webchat') {
+      await context.sendActivity(MessageFactory.attachment(CardFactory.adaptiveCard({
+        type: 'AdaptiveCard',
+        version: '1.3',
+        body: [{ type: 'TextBlock', text: 'What is your favorite color?', wrap: true }],
+        actions: colors.map(color => ({ type: 'Action.Submit', title: color, data: { color } }))
+      })))
+      return
     }
-  }
 
-  // ActionTypes.ImBack
-  private static async sendSuggestedActionsAsync (turnContext: TurnContext): Promise<void> {
     const reply = MessageFactory.text('What is your favorite color?')
     reply.suggestedActions = {
-      actions: [
-        { title: 'Red', type: 'imBack', value: 'Red' },
-        { title: 'Green', type: 'imBack', value: 'Green' },
-        { title: 'Blue', type: 'imBack', value: 'Blue' }
-      ],
-      to: [turnContext.activity.from?.id ?? 'defaultId']
+      actions: colors.map(color => ({ title: color, type: 'imBack', value: color })),
+      to: [context.activity.from?.id ?? 'defaultId']
     }
 
-    await turnContext.sendActivity(reply)
-  }
-
-  private async sendDataOnCardActions (turnContext: TurnContext): Promise<void> {
-    if (turnContext.activity.value != null) {
-      const submittedData = JSON.stringify(turnContext.activity.value, null, 2)
-      const replyText = `Data Submitted:\n${submittedData}`
-
-      await turnContext.sendActivity(MessageFactory.text(replyText))
-    }
+    await context.sendActivity(reply)
   }
 }
-startServer(new AdaptiveCardHandler())

@@ -1,9 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { CardFactory, MessageFactory } from '@microsoft/agents-hosting'
+import { CardFactory, MessageFactory, type TurnContext } from '@microsoft/agents-hosting'
 import { scenarioGroups, type Scenario } from './catalog.js'
 import type { Mode } from '../agent.js'
+import { getSessionKey } from '../_shared/sessionKey.js'
 import { headerWithMode, scenarioHeader } from './navigation.js'
 
 export function menuCard (mode: Mode, scenarios: Scenario[]) {
@@ -52,7 +53,7 @@ function quickActionRows (scenario: Pick<Scenario, 'id' | 'quickActions'>) {
   }))
 }
 
-type ScenarioCardDetails = Pick<Scenario, 'id' | 'name' | 'introduction' | 'cardBody' | 'quickActions'>
+export type ScenarioCardDetails = Pick<Scenario, 'id' | 'name' | 'introduction' | 'cardBody' | 'quickActions'>
 
 export function scenarioCard (mode: Mode, scenario: ScenarioCardDetails) {
   return MessageFactory.attachment(CardFactory.adaptiveCard({
@@ -65,4 +66,43 @@ export function scenarioCard (mode: Mode, scenario: ScenarioCardDetails) {
       ...quickActionRows(scenario)
     ]
   }))
+}
+
+export function createEditableScenarioCard (mode: Mode, scenario: ScenarioCardDetails) {
+  const cardIds = new Map<string, string>()
+
+  async function show (context: TurnContext, body: object[] | undefined, update: boolean): Promise<void> {
+    const card = scenarioCard(mode, { ...scenario, cardBody: body ?? scenario.cardBody })
+    const key = getSessionKey(context)
+    const id = key && cardIds.get(key)
+
+    if (update && id) {
+      try {
+        card.id = id
+        await context.updateActivity(card)
+        return
+      } catch {
+        // A missing card or a channel without activity updates needs a replacement.
+        card.id = undefined
+      }
+    }
+
+    const sent = await context.sendActivity(card)
+    if (key && sent?.id) {
+      cardIds.set(key, sent.id)
+    } else if (key) {
+      cardIds.delete(key)
+    }
+  }
+
+  return {
+    open: (context: TurnContext, body?: object[]) => show(context, body, false),
+    update: (context: TurnContext, body: object[]) => show(context, body, true),
+    async onExit (context: TurnContext) {
+      const key = getSessionKey(context)
+      if (key) {
+        cardIds.delete(key)
+      }
+    }
+  }
 }

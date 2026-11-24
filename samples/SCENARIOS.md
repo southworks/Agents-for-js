@@ -12,6 +12,36 @@ stays in Echo. Return to the menu and reopen Echo to check routing.
 
 <a id="setup-state"></a>
 
+## State and storage
+
+**Mode** Latest. Memory, Blob, and Cosmos demonstrate the same conversation
+counter with different SDK providers. File uses local persistence and maintains
+both a user counter and a conversation counter.
+
+| Scenario | Setup | Restart behavior |
+| --- | --- | --- |
+| State - Memory | None | Counters reset |
+| State - File | Writable `samples/.state-files/` | Counters persist in local files |
+| State - Blob | `BLOB_STORAGE_CONNECTION_STRING` and `BLOB_CONTAINER_ID` in `latest.env`. The template defaults to local Azurite. | Counters persist in the container |
+| State - Cosmos | `COSMOS_ENDPOINT`, `COSMOS_KEY`, `COSMOS_DATABASE_ID`, and `COSMOS_CONTAINER_ID` in `latest.env`. Create a container with partition key `/id`. | Counters persist in the container |
+
+1. Select **Reset**, then **Increment** twice. Expect the counter on
+   the same card to be 2. File reports both counters. A channel that cannot
+   update the original activity receives a replacement card.
+2. Leave and reopen the same scenario. The card should show the same value.
+3. Open the scenario in another conversation. Expect an independent
+   conversation counter. File's user counter follows the same user across chats.
+4. Restart and reopen the same conversation to check persistence. Reset the first
+   conversation and verify the other conversation's counter is unchanged.
+
+Use a dedicated container for each persistent provider. Start the emulator before
+testing. For Cosmos, trust the emulator certificate through
+`NODE_EXTRA_CA_CERTS` or, on supported Windows Node versions, start with
+`NODE_OPTIONS=--use-system-ca`. Set these options before launching Node. If a
+write fails, reopen the scenario and check the counter before retrying.
+
+<a id="setup-authorization"></a>
+
 ## Authorization
 
 **Modes** Latest and Legacy. Configure an Azure Bot, its OAuth connections, and
@@ -110,3 +140,18 @@ After leaving, send a message in another scenario and verify it does not appear
 when you return to **Transcripts** and select **List**.
 
 <a id="setup-telemetry"></a>
+
+## Compatibility
+
+**Mode** Compat. These scenarios exercise the SDK's older programming interfaces.
+
+| Scenario | What to try |
+| --- | --- |
+| State | Select **Start name prompt**, enter a name, then send another message. Reopen to check the stored name. **Reset state** clears it and restarting clears memory. |
+| Adaptive Cards | Try **Card actions**, **Suggested actions**, and **Toggle visibility** in a channel that renders them. |
+| Card Factory | Select a card type and inspect its payload or rendering. For classic previews, use the breadcrumb on the selector card. |
+| Events and attachments | Try the inline and internet attachment actions or **Typing demonstration**. Upload a small file with a caption and confirm the saved file in `samples/.attachments/`. Supported channels also deliver edits, deletes, and reactions. |
+
+Compat downloads are anonymous and use the SDK HTTPS host allowlist. For a
+trusted file host outside the default list, set
+`OutboundHostValidator__Hosts` in `compat.env` and restart.

@@ -1,32 +1,21 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-import { startServer } from '@microsoft/agents-hosting-express'
 
-import { ActivityHandler, CardFactory, TurnContext } from '@microsoft/agents-hosting'
+import { ActivityHandler, CardFactory, MessageFactory, TurnContext } from '@microsoft/agents-hosting'
 import CardFactoryCard from '../_resources/CardFactoryCard.json'
-import { ActionTypes, Activity, ActivityTypes, Attachment } from '@microsoft/agents-activity'
+import type { Attachment } from '@microsoft/agents-activity'
+
+const cardTypes = ['Adaptive Card', 'Animation Card', 'Audio Card', 'Hero Card', 'Receipt Card', 'Office 365 Connector Card', 'Sign-in Card', 'Thumbnail Card', 'Video Card']
+
+export const cardFactoryActions = cardTypes.map((label, index) => ({ label, command: String(index + 1) }))
 
 export class CardFactoryHandler extends ActivityHandler {
   constructor () {
     super()
 
-    this.onMembersAdded(async (context, next) => {
-      const membersAdded = context.activity.membersAdded
-      for (let cnt = 0; cnt < membersAdded!.length; cnt++) {
-        if ((context.activity.recipient != null) && membersAdded![cnt].id !== context.activity.recipient.id) {
-          await CardFactoryHandler.sendIntroCard(context)
-
-          await next()
-        }
-      }
-    })
-
     this.onMessage(async (context, next) => {
       if (context.activity.text !== undefined) {
         switch (context.activity.text.toLowerCase()) {
-          case 'display cards options':
-            await CardFactoryHandler.sendIntroCard(context)
-            break
           case '1':
             await CardFactoryHandler.sendCard(context, CardFactory.adaptiveCard(CardFactoryCard))
             break
@@ -54,45 +43,12 @@ export class CardFactoryHandler extends ActivityHandler {
           case '9':
             await CardFactoryHandler.sendVideoCard(context)
             break
-          default: {
-            const reply: Activity = Activity.fromObject(
-              {
-                type: ActivityTypes.Message,
-                text: 'Your input was not recognized, please try again.'
-              }
-            )
-            await context.sendActivity(reply)
-            await CardFactoryHandler.sendIntroCard(context)
-          }
+          default:
+            await context.sendActivity('Open CardFactory from the breadcrumb to choose a card type.')
         }
-      } else {
-        await context.sendActivity('This sample is only for testing Cards using CardFactory methods. Please refer to other samples to test out more functionalities.')
       }
-
       await next()
     })
-  }
-
-  static async sendIntroCard (context: TurnContext): Promise<void> {
-    // Note that some channels require different values to be used in order to get buttons to display text.
-    // In this code the emulator is accounted for with the 'title' parameter, but in other channels you may
-    // need to provide a value for other parameters like 'text' or 'displayText'.
-    const buttons = [
-      { type: ActionTypes.ImBack, title: '1. Adaptive Card', value: '1' },
-      { type: ActionTypes.ImBack, title: '2. Animation Card', value: '2' },
-      { type: ActionTypes.ImBack, title: '3. Audio Card', value: '3' },
-      { type: ActionTypes.ImBack, title: '4. Hero Card', value: '4' },
-      { type: ActionTypes.ImBack, title: '5. Receipt Card', value: '5' },
-      { type: ActionTypes.ImBack, title: '6. o365Connector Card', value: '6' },
-      { type: ActionTypes.ImBack, title: '7. Signin Card', value: '7' },
-      { type: ActionTypes.ImBack, title: '8. Thumbnail Card', value: '8' },
-      { type: ActionTypes.ImBack, title: '9. Video Card', value: '9' },
-    ]
-
-    const card = CardFactory.heroCard('', undefined,
-      buttons, { text: 'Select one of the following choices' })
-
-    await CardFactoryHandler.sendCard(context, card)
   }
 
   static async sendAnimationCard (context: TurnContext): Promise<void> {
@@ -281,13 +237,6 @@ export class CardFactoryHandler extends ActivityHandler {
   }
 
   static async sendCard (context: TurnContext, card: Attachment): Promise<void> {
-    await context.sendActivity(Activity.fromObject(
-      {
-        type: ActivityTypes.Message,
-        attachments: [card]
-      }
-    )
-    )
+    await context.sendActivity(MessageFactory.attachment(card))
   }
 }
-startServer(new CardFactoryHandler())

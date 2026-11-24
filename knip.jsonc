@@ -59,20 +59,8 @@
 
     "samples": {
       "entry": [
-        "_shared/githubApiClient.ts",
-        "basic/cardsWithInvoke.ts",
         "basic/longRunning.ts",
-        "basic/messageReactions.ts",
         "basic/proactive.ts",
-        "basic/typeAheadSearch.ts",
-        "compat/adaptiveCardsHandler.ts",
-        "compat/cardFactoryHandler.ts",
-        "compat/multiFeatureHandler.ts",
-        "compat/stateManagementHandler.ts",
-        "state/blob2Cnx.ts",
-        "state/blobDemo.ts",
-        "state/stateDemo.ts",
-        "state/userState.ts",
         "teams/cardActions.ts",
         "teams/meetingsExample.ts",
         "teams/msgExtensionExample.ts",

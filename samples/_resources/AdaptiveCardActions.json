@@ -1,7 +1,7 @@
 {
   "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
   "type": "AdaptiveCard",
-  "version": "1.0",
+  "version": "1.5",
   "body": [
     {
       "type": "TextBlock",
@@ -16,7 +16,7 @@
     },
     {
       "type": "Action.ShowCard",
-      "title": "Action Submit",
+      "title": "Submit a name",
       "card": {
         "type": "AdaptiveCard",
         "version": "1.5",
@@ -39,7 +39,7 @@
     },
     {
       "type": "Action.ShowCard",
-      "title": "Action ShowCard",
+      "title": "Show nested card",
       "card": {
         "type": "AdaptiveCard",
         "version": "1.0",
@@ -55,6 +55,7 @@
             "title": "Action.ShowCard",
             "card": {
               "type": "AdaptiveCard",
+              "version": "1.2",
               "body": [
                 {
                   "type": "TextBlock",
