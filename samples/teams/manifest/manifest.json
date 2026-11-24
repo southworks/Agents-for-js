@@ -1,0 +1,133 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.29/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.29",
+  "supportsChannelFeatures": "tier1",
+  "version": "1.0.0",
+  "id": "${{AAD_APP_CLIENT_ID}}",
+  "developer": {
+    "name": "Microsoft, Inc.",
+    "websiteUrl": "https://example.azurewebsites.net",
+    "privacyUrl": "https://example.azurewebsites.net/privacy",
+    "termsOfUseUrl": "https://example.azurewebsites.net/termsofuse"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Teams Dev Samples",
+    "full": "Agents SDK Teams Development Samples"
+  },
+  "description": {
+    "short": "Teams development samples for the Microsoft 365 Agents SDK.",
+    "full": "Combined development manifest for Teams attachments, conversations, targeted messages, cards, AI messages, meetings, message extensions, and task modules."
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "scopes": [
+        "personal",
+        "team",
+        "groupChat"
+      ],
+      "supportsFiles": true,
+      "isNotificationOnly": false,
+      "supportsTargetedMessages": true
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "<<BOT_DOMAIN>>"
+  ],
+  "webApplicationInfo": {
+    "id": "${{AAD_APP_CLIENT_ID}}",
+    "resource": "https://RscPermission"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "OnlineMeeting.ReadBasic.Chat",
+          "type": "Application"
+        },
+        {
+          "name": "ChannelMeeting.ReadBasic.Group",
+          "type": "Application"
+        },
+        {
+          "name": "OnlineMeetingParticipant.Read.Chat",
+          "type": "Application"
+        }
+      ]
+    }
+  },
+  "composeExtensions": [
+    {
+      "botId": "${{AAD_APP_CLIENT_ID}}",
+      "commands": [
+        {
+          "id": "searchQuery",
+          "type": "query",
+          "title": "Search",
+          "description": "Search for items",
+          "initialRun": true,
+          "fetchTask": false,
+          "context": [
+            "commandBox",
+            "compose"
+          ],
+          "parameters": [
+            {
+              "name": "query",
+              "title": "Search query",
+              "description": "Your search query",
+              "inputType": "text"
+            }
+          ]
+        },
+        {
+          "id": "createCard",
+          "type": "action",
+          "title": "Create Card",
+          "description": "Create a card from user input",
+          "initialRun": false,
+          "fetchTask": true,
+          "context": [
+            "commandBox",
+            "compose",
+            "message"
+          ],
+          "parameters": [
+            {
+              "name": "title",
+              "title": "Title",
+              "inputType": "text"
+            },
+            {
+              "name": "description",
+              "title": "Description",
+              "inputType": "text"
+            }
+          ]
+        }
+      ],
+      "messageHandlers": [
+        {
+          "type": "link",
+          "value": {
+            "domains": [
+              "*.example.com"
+            ]
+          }
+        }
+      ],
+      "canUpdateConfiguration": true
+    }
+  ],
+  "configurableTabs": [],
+  "staticTabs": []
+}
