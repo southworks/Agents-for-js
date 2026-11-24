@@ -5,7 +5,19 @@
       "connections__serviceConnection__settings__clientSecret",
       "connections__serviceConnection__settings__tenantId"
     ],
-    "scenarios": {}
+    "scenarios": {
+      "authorization": [
+        "AgentApplication__UserAuthorization__Handlers__auth__Settings__azureBotOAuthConnectionName",
+        "AgentApplication__UserAuthorization__Handlers__sso__Settings__azureBotOAuthConnectionName",
+        "AgentApplication__UserAuthorization__Handlers__obo_auto__Settings__azureBotOAuthConnectionName",
+        "AgentApplication__UserAuthorization__Handlers__obo_manual__Settings__azureBotOAuthConnectionName"
+      ],
+      "copilot-studio": [
+        "environmentId",
+        "schemaName",
+        "AgentApplication__UserAuthorization__Handlers__mcs__Settings__azureBotOAuthConnectionName"
+      ]
+    }
   },
   "legacy": {
     "hostCredentials": [
@@ -13,7 +25,19 @@
       "clientSecret",
       "tenantId"
     ],
-    "scenarios": {}
+    "scenarios": {
+      "authorization": [
+        "auth_connectionName",
+        "sso_connectionName",
+        "obo_auto_connectionName",
+        "obo_manual_connectionName"
+      ],
+      "copilot-studio": [
+        "environmentId",
+        "schemaName",
+        "mcs_connectionName"
+      ]
+    }
   },
   "compat": {
     "hostCredentials": [

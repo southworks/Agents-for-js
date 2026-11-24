@@ -8,6 +8,9 @@ import { scenarios, type Scenario, type ScenarioAgent } from './catalog.js'
 import { menuCard, scenarioCard } from './cards.js'
 import { addBreadcrumbs } from './navigation.js'
 import { getSessionKey } from '../_shared/sessionKey.js'
+import { ownsCopilotStudioActivity } from '../copilot-studio/agent.js'
+import { isAuthorizationActivity } from '../authorization/agent.js'
+import { authorizationScenarioId } from '../authorization/flows.js'
 import { readSetting, scenarioSettings, templateHostCredentials } from '../_shared/config.js'
 
 function readCardCommand (context: TurnContext) {
@@ -117,7 +120,7 @@ export class SamplesCoordinator extends AgentApplication<TurnState> {
         await this.leaveScenario(context, sessionKey, selectedScenario)
         return
       }
-      if (card.command !== 'authorization' || selectedScenario.id !== 'authorization') {
+      if (card.command !== 'authorization' || selectedScenario.id !== authorizationScenarioId) {
         const action = card.command === 'run' && selectedScenario.quickActions?.find(action => action.command === card.action)
         if (!action) {
           await this.showScenario(context, selectedScenario)
@@ -245,6 +248,19 @@ export class SamplesCoordinator extends AgentApplication<TurnState> {
   }
 
   private findCallbackOwner (context: TurnContext): Scenario | undefined {
+    // Copilot Studio callbacks carry a dedicated OAuth connection name.
+    if (ownsCopilotStudioActivity(context, this.mode)) {
+      return this.availableScenarios.find(scenario => scenario.id === 'copilot-studio')
+    }
+
+    // Other sign-in callbacks follow the scenario that started the operation.
+    if (isAuthorizationActivity(context)) {
+      const owner = this.authorizationOwners.get(this.authorizationKey(context))
+      if (owner) {
+        return owner
+      }
+    }
+
     return this.availableScenarios.find(scenario => scenario.handlesActivity?.(context))
   }
 
