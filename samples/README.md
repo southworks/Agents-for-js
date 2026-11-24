@@ -83,6 +83,55 @@ Navigation uses buttons. See [SCENARIOS.md](SCENARIOS.md) for every sample's set
 expected behavior, and limitations. The [Teams guide](teams/TeamsSamples.md)
 covers app setup, manifest permissions, and Teams-specific walkthroughs.
 
+## HTTP demonstrations
+
+Expect replies and Header propagation each provide a button running a local SDK
+simulation. The following walkthrough exercises the HTTP host itself.
+
+### Try the HTTP scenarios
+
+Start the coordinator in Latest mode. Run the following in PowerShell against
+a local anonymous development host. Adjust the URL if you changed the port.
+Each scenario must be selected in the same conversation that sends the test request.
+
+```powershell
+$endpoint = 'http://localhost:3978/api/messages'
+$activity = @{
+  type = 'message'
+  channelId = 'emulator'
+  from = @{ id = 'http-sample-user' }
+  recipient = @{ id = 'http-sample-agent' }
+  conversation = @{ id = "http-samples-$([guid]::NewGuid())" }
+  deliveryMode = 'expectReplies'
+}
+
+function Send-SampleActivity($message, $headers = @{}) {
+  $activity.text = $message
+  Invoke-RestMethod -Method Post -Uri $endpoint -ContentType 'application/json' `
+    -Headers $headers -Body ($activity | ConvertTo-Json -Depth 5)
+}
+
+$null = Send-SampleActivity 'expect-replies'
+(Send-SampleActivity 'test').activities.text
+
+$activity.value = @{ samplesCommand = 'back'; scenarioId = 'expect-replies' }
+$null = Send-SampleActivity ''
+$activity.Remove('value')
+$null = Send-SampleActivity 'header-propagation'
+(Send-SampleActivity 'check' @{ 'x-samples-header' = 'demo' }).activities.text
+
+$activity.serviceUrl = 'http://localhost:3978'
+(Send-SampleActivity 'check' @{ 'x-samples-header' = 'demo' }).activities.text
+```
+
+**Expect replies** returns `Reply 1 of 3` through `Reply 3 of 3` in one response.
+**Header propagation** reports matches on the user token client. The last request
+also creates a connector client by providing a service URL. Replies remain in the
+HTTP response, so the adapter does not send a request to that service URL.
+Use a service URL allowed by the host if outbound URL validation is enabled.
+Repeat without the test header to see the sample headers reported as missing.
+The diagnostic reports match status for the fixed sample headers only.
+
 ## Add a scenario
 
 Export an agent factory from the relevant sample folder and register it in the

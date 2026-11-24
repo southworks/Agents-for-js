@@ -11,6 +11,7 @@ import { getSessionKey } from '../_shared/sessionKey.js'
 import { ownsCopilotStudioActivity } from '../copilot-studio/agent.js'
 import { isAuthorizationActivity } from '../authorization/agent.js'
 import { authorizationScenarioId } from '../authorization/flows.js'
+import { configureSampleHeaders } from './httpScenarios.js'
 import { readSetting, scenarioSettings, templateHostCredentials } from '../_shared/config.js'
 
 function readCardCommand (context: TurnContext) {
@@ -36,7 +37,7 @@ export class SamplesCoordinator extends AgentApplication<TurnState> {
   constructor (private readonly mode: Mode, private readonly hostAdapter = new CloudAdapter()) {
     // The SDK discovers mode-wide auth handlers on every application and requires
     // a store for them. Navigation still lives only in the selections map.
-    super({ adapter: hostAdapter, storage: new MemoryStorage() })
+    super({ adapter: hostAdapter, storage: new MemoryStorage(), headerPropagation: configureSampleHeaders })
     this.availableScenarios = scenarios.filter(scenario => scenario.modes.includes(mode))
     this.onError(async (context, error) => {
       await context.sendActivity('The sample turn failed. Check configuration and retry, or use All scenarios.')
