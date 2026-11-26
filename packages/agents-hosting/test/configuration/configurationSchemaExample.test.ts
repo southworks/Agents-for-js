@@ -143,7 +143,9 @@ describe('agents-configuration.schema.json / JavaScript consistency', () => {
       ],
       connectionMapItem: ['serviceUrl', 'audience', 'connection'],
       cloudAdapterOptions: ['emitStackTrace', 'validateServiceUrl'],
-      outboundHostValidator: ['enabled', 'includeDefaultMicrosoftHosts', 'allowPrivateNetworkAddresses', 'hosts']
+      outboundHostValidator: [
+        'enabled', 'includeDefaultMicrosoftHosts', 'allowPrivateNetworkAddresses', 'allowHttpForLoopback', 'hosts'
+      ]
     } as const
 
     for (const [definition, properties] of Object.entries(expected)) {
@@ -274,6 +276,7 @@ describe('agents-configuration.schema.json / JavaScript consistency', () => {
       enabled: true,
       includeDefaultMicrosoftHosts: true,
       allowPrivateNetworkAddresses: false,
+      allowHttpForLoopback: false,
       hosts: ['api.contoso.com']
     })
     const graph = snapshot.agentApplication.userAuthorization.handlers.get('graph')

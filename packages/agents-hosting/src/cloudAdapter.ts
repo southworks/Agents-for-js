@@ -81,7 +81,7 @@ export interface CloudAdapterOptions {
   emitStackTrace?: boolean
 
   /**
-   * When `true`, an inbound activity whose `serviceUrl` host does not match
+   * When `true`, an inbound activity whose `serviceUrl` origin does not match
    * the `serviceurl` claim on the caller's identity is rejected with HTTP 400.
    * When `false` (default for backward compatibility), the mismatch is logged
    * as a warning but the activity is still processed.
@@ -644,8 +644,8 @@ export class CloudAdapter extends BaseAdapter {
   }
 
   /**
-   * Compares the host of `activity.serviceUrl` against the `serviceurl` claim
-   * on the caller's identity. When enabled and the hosts differ (or either
+   * Compares the origin of `activity.serviceUrl` against the `serviceurl` claim
+   * on the caller's identity. When enabled and the origins differ (or either
    * URL is malformed), the request is rejected with HTTP 400; when disabled,
    * the mismatch is logged as a warning.
    *
@@ -669,16 +669,20 @@ export class CloudAdapter extends BaseAdapter {
       return true
     }
 
-    let claimHost: string | undefined
-    let activityHost: string | undefined
+    let claimUrl: URL | undefined
+    let activityUrl: URL | undefined
     try {
-      claimHost = new URL(claimValue).hostname.toLowerCase()
-    } catch { /* invalid */ }
-    try {
-      activityHost = new URL(activity.serviceUrl).hostname.toLowerCase()
-    } catch { /* invalid */ }
+      claimUrl = new URL(claimValue)
+      activityUrl = new URL(activity.serviceUrl)
+    } catch { /* Invalid URLs are treated as mismatches. */ }
 
-    if (claimHost && activityHost && claimHost === activityHost) {
+    // URL normalizes explicitly specified default ports to an empty string.
+    if (
+      claimUrl?.hostname && activityUrl &&
+      claimUrl.protocol === activityUrl.protocol &&
+      claimUrl.hostname.toLowerCase() === activityUrl.hostname.toLowerCase() &&
+      claimUrl.port === activityUrl.port
+    ) {
       return true
     }
 

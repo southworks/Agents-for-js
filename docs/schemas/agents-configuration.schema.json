@@ -330,7 +330,12 @@
           "default": true
         },
         "allowPrivateNetworkAddresses": {
-          "description": "Allow allowlisted HTTPS attachment destinations to use private, shared (RFC 6598), loopback, link-local, or unspecified addresses. Does not bypass host validation.",
+          "description": "Permit allowlisted destinations on private, shared (RFC 6598), loopback, link-local, or unspecified addresses.",
+          "type": "boolean",
+          "default": false
+        },
+        "allowHttpForLoopback": {
+          "description": "Permit HTTP for local development with an allowlisted loopback host and allowPrivateNetworkAddresses enabled.",
           "type": "boolean",
           "default": false
         },
@@ -540,6 +545,7 @@
         "enabled": true,
         "includeDefaultMicrosoftHosts": true,
         "allowPrivateNetworkAddresses": false,
+        "allowHttpForLoopback": false,
         "hosts": [
           "api.contoso.com"
         ]

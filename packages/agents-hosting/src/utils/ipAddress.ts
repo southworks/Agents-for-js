@@ -24,6 +24,15 @@ function mappedIPv4 (address: string): string | undefined {
   return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`
 }
 
+export function isLoopbackAddress (address: string): boolean {
+  const normalized = normalizeAddress(address)
+  if (!normalized) {
+    return false
+  }
+
+  return normalized === '::1' || (mappedIPv4(normalized) ?? normalized).startsWith('127.')
+}
+
 export function isPrivateOrLoopbackAddress (address: string): boolean {
   const normalized = normalizeAddress(address)
   if (!normalized) {

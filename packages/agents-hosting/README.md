@@ -328,6 +328,7 @@ It can be configured with environment variables:
 OutboundHostValidator__Enabled=true
 OutboundHostValidator__IncludeDefaultMicrosoftHosts=true
 OutboundHostValidator__AllowPrivateNetworkAddresses=false
+OutboundHostValidator__AllowHttpForLoopback=false
 OutboundHostValidator__Hosts=contoso.com,fabrikam.com
 ```
 
@@ -335,9 +336,12 @@ Indexed host variables such as `OutboundHostValidator__Hosts__0=contoso.com` are
 also supported. A host entry matches both the exact host and its subdomains, and
 is normalized (scheme/port/path stripped; a leading `*.` is accepted and ignored).
 
-When enforcement is enabled, `CloudAdapter` rejects inbound activities whose
-`serviceUrl` host is not allowlisted, and it also rejects `serviceurl` claim
-mismatches (equivalent to `CloudAdapterOptions.validateServiceUrl=true`).
+When enforcement is enabled, `CloudAdapter` validates the activity's `serviceUrl`
+against the outbound policy. If the token contains a `serviceurl` claim, the URL
+must also match the claim's scheme, hostname, and effective port. Paths can differ,
+and an explicit default port is equivalent to an implicit one. The deprecated
+`CloudAdapterOptions.validateServiceUrl` option also enables claim validation.
+When both options are off, a claim mismatch only produces a warning.
 
 For explicit configuration, reuse the same immutable policy in the adapter and
 attachment downloaders:
@@ -363,7 +367,7 @@ const agent = new AgentApplication({
 })
 ```
 
-When enforcement is enabled, URLs must use HTTPS and must not contain userinfo.
+When enforcement is enabled, HTTPS is required by default and userinfo is rejected.
 Both attachment downloaders validate the actual download destination and every
 redirect before requesting it. They check all DNS answers and reject private,
 shared (RFC 6598 `100.64.0.0/10`), loopback, link-local, unique-local,
@@ -374,12 +378,23 @@ rejected destination. Warnings use `DEBUG=agents:attachmentDownloader:*` or
 `DEBUG=agents:outboundHostValidator:*` and do not include URL query strings or
 credentials.
 
-To deliberately access an allowlisted private or shared-network attachment destination,
-set `allowPrivateNetworkAddresses: true` (or the equivalent environment variable
-above). This exception does not bypass HTTPS, userinfo checks, or the host
-allowlist. Existing custom `OutboundUrlPolicy` implementations remain supported;
-enabled custom policies are checked at every hop and receive the same HTTPS and
-public-address safeguards, without the built-in private-network exception.
+`allowPrivateNetworkAddresses: true` permits allowlisted private and shared-network
+destinations. For local development, the built-in policy can also permit HTTP for
+`localhost` and loopback IP addresses. Enable both options and allowlist the exact
+host used by the callback or attachment URL. For example, a local agent using
+`http://localhost:3978` can use these settings.
+
+```dotenv
+OutboundHostValidator__Enabled=true
+OutboundHostValidator__Hosts=localhost
+OutboundHostValidator__AllowPrivateNetworkAddresses=true
+OutboundHostValidator__AllowHttpForLoopback=true
+```
+
+Use `allowHttpForLoopback` and `allowPrivateNetworkAddresses` for the equivalent
+programmatic or structured configuration. Non-loopback hosts still require HTTPS.
+The attachment client applies HTTPS and public-address checks to enabled custom
+`OutboundUrlPolicy` implementations at every hop.
 
 Initial request headers, including authorization, are not forwarded to any
 redirect, even on the same origin. Services requiring authorization on a

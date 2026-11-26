@@ -1243,6 +1243,7 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
 
 // @public
 export interface OutboundHostValidatorOptions {
+    allowHttpForLoopback?: boolean;
     allowPrivateNetworkAddresses?: boolean;
     configurationContext?: ConfigurationContext;
     enabled?: boolean;

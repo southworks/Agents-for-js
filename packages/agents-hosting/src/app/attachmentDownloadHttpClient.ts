@@ -8,7 +8,7 @@ import { debug } from '@microsoft/agents-telemetry'
 import { Errors } from '../errorHelper'
 import { HttpClient, HttpError, HttpResponse } from '../httpClient'
 import { OutboundHostValidator, OutboundUrlPolicy } from '../outboundHostValidator'
-import { getHttpsUrl, hasAllowedOutboundAddresses } from '../utils/outboundUrl'
+import { getHttpUrl, hasAllowedOutboundAddresses } from '../utils/outboundUrl'
 
 const logger = debug('agents:attachmentDownloader')
 const REDIRECT_STATUSES = new Set([300, 301, 302, 303, 307, 308])
@@ -30,10 +30,11 @@ export class AttachmentDownloadHttpClient {
 
     let currentUrl = url
     for (let redirects = 0; ; redirects++) {
-      const parsed = getHttpsUrl(currentUrl)
+      const parsed = getHttpUrl(currentUrl)
       const allowed = parsed && (this.hostValidator instanceof OutboundHostValidator
         ? await this.hostValidator.isAllowedAsync(parsed)
-        : this.hostValidator.isAllowed(currentUrl) && await hasAllowedOutboundAddresses(parsed))
+        : parsed.protocol === 'https:' && this.hostValidator.isAllowed(currentUrl) &&
+          await hasAllowedOutboundAddresses(parsed))
       if (!allowed) {
         return this.blocked(currentUrl)
       }
