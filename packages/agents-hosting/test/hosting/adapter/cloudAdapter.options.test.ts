@@ -5,7 +5,7 @@ import { strict as assert } from 'assert'
 import { createRequire } from 'node:module'
 import { afterEach, describe, it } from 'node:test'
 import sinon from 'sinon'
-import { Activity, ActivityTypes, ConversationParameters, ConversationReference } from '@microsoft/agents-activity'
+import { Activity, ActivityTypes, ConversationParameters, ConversationReference, DeliveryModes } from '@microsoft/agents-activity'
 import {
   AuthConfiguration,
   CloudAdapter,
@@ -29,7 +29,7 @@ import { JwtPayload } from 'jsonwebtoken'
 
 /**
  * Tests for the CloudAdapter options surface ported from Agents-for-net PR #838:
- *   - `validateServiceUrl` (host comparison between `serviceurl` claim and Activity.serviceUrl)
+ *   - `validateServiceUrl` (origin comparison between `serviceurl` claim and Activity.serviceUrl)
  *   - `emitStackTrace` (default onTurnError stack-trace toggle)
  *   - Logging the invalid-activity payload on 400 BadRequest
  *   - Env-var fallback
@@ -167,12 +167,12 @@ describe('CloudAdapter options (PR #838 parity)', () => {
   // --- validateServiceUrl --------------------------------------------------
 
   describe('validateServiceUrl', () => {
-    it('matching hosts pass when enabled', async () => {
+    it('matches origins despite hostname casing, different paths, and an explicit default port', async () => {
       const adapter = buildAdapter({ validateServiceUrl: true })
       const activity = makeActivity(ActivityTypes.Message, 'https://smba.trafficmanager.net/teams/')
       stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       const res = buildRes()
-      await adapter.process(buildReq({ serviceurl: 'https://smba.trafficmanager.net/other/' } as any), res as Response, async () => {})
+      await processWithServiceUrl(adapter, 'HTTPS://SMBA.trafficmanager.net:443/other/', res)
       assertStatus(res, 400, false)
     })
 
@@ -185,13 +185,18 @@ describe('CloudAdapter options (PR #838 parity)', () => {
       assertStatus(res, 400, true)
     })
 
-    it('mismatched hosts do not return 400 when disabled (warn only)', async () => {
+    it('warns and processes the activity when origin validation is disabled', async () => {
       const adapter = buildAdapter({ validateServiceUrl: false })
       const activity = makeActivity(ActivityTypes.Message, 'https://smba.trafficmanager.net/teams/')
       stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       const res = buildRes()
-      await adapter.process(buildReq({ serviceurl: 'https://evil.example.com/callback/' } as any), res as Response, async () => {})
+      const run = sinon.stub().resolves()
+      const output = await captureDebugLog(async () => {
+        await adapter.process(buildReq({ serviceurl: 'https://smba.trafficmanager.net:8443/' }), res as Response, run)
+      })
       assertStatus(res, 400, false)
+      assert.match(output, /Invalid service URL Claim=/)
+      sinon.assert.calledOnce(run)
     })
 
     it('passes when identity has no serviceurl claim', async () => {
@@ -230,14 +235,13 @@ describe('CloudAdapter options (PR #838 parity)', () => {
       assertStatus(res, 400, true)
     })
 
-    it('matches hosts regardless of port differences (.NET Uri.Host parity)', async () => {
-      // .NET Uri.Host excludes port; we use URL.hostname for the same semantic.
+    it('rejects a mismatched port with legacy claim-only enforcement enabled', async () => {
       const adapter = buildAdapter({ validateServiceUrl: true })
       const activity = makeActivity(ActivityTypes.Message, 'https://channel.example.com/teams/')
       stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
       const res = buildRes()
-      await adapter.process(buildReq({ serviceurl: 'https://channel.example.com:8443/teams/' } as any), res as Response, async () => {})
-      assertStatus(res, 400, false)
+      await processWithServiceUrl(adapter, 'https://channel.example.com:8443/teams/', res)
+      assertStatus(res, 400, true)
     })
 
     it('rejects when claim has a userinfo-spoofed host', async () => {
@@ -632,6 +636,69 @@ describe('CloudAdapter options (PR #838 parity)', () => {
 
       const responseStatus = (res as any).status
       sinon.assert.calledWith(responseStatus, 400)
+    })
+
+    it('rejects a scheme mismatch before processing a message in normal delivery', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://smba.trafficmanager.net:8443/teams/')
+      activity.deliveryMode = DeliveryModes.Normal
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+      const run = sinon.stub().resolves()
+      const req = buildReq({ serviceurl: 'http://smba.trafficmanager.net:8443/' })
+
+      await adapter.process(req, res as Response, run)
+
+      assertStatus(res, 400, true)
+      sinon.assert.notCalled(run)
+    })
+
+    it('rejects a port mismatch before processing an invoke in normal delivery', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true }))
+      const activity = makeActivity(ActivityTypes.Invoke, 'https://smba.trafficmanager.net:8443/teams/')
+      activity.deliveryMode = DeliveryModes.Normal
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+      const run = sinon.stub().resolves()
+      const req = buildReq({ serviceurl: 'https://smba.trafficmanager.net:9443/' })
+
+      await adapter.process(req, res as Response, run)
+
+      assertStatus(res, 400, true)
+      sinon.assert.notCalled(run)
+    })
+
+    it('rejects a port mismatch before processing a message in ExpectReplies delivery', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({ enabled: true }))
+      const activity = makeActivity(ActivityTypes.Message, 'https://smba.trafficmanager.net:8443/teams/')
+      activity.deliveryMode = DeliveryModes.ExpectReplies
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+      const run = sinon.stub().resolves()
+      const req = buildReq({ serviceurl: 'https://smba.trafficmanager.net:9443/' })
+
+      await adapter.process(req, res as Response, run)
+
+      assertStatus(res, 400, true)
+      sinon.assert.notCalled(run)
+    })
+
+    it('processes an opted-in loopback HTTP activity with a matching claim origin', async () => {
+      const adapter = buildAdapter(undefined, new OutboundHostValidator({
+        enabled: true,
+        allowHttpForLoopback: true,
+        allowPrivateNetworkAddresses: true,
+        hosts: ['localhost']
+      }))
+      const activity = makeActivity(ActivityTypes.Message, 'http://localhost:80/teams/')
+      stubFromObject = sinon.stub(Activity, 'fromObject').returns(activity)
+      const res = buildRes()
+      const run = sinon.stub().resolves()
+
+      await adapter.process(buildReq({ serviceurl: 'http://localhost/claim/' }), res as Response, run)
+
+      assertStatus(res, 200, true)
+      sinon.assert.calledOnce(run)
     })
 
     it('rejects a disallowed continuation ServiceUrl before creating a connector client', async () => {

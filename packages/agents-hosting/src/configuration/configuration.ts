@@ -28,6 +28,7 @@ export type OutboundHostValidatorConfigurationPatch = Partial<{
   enabled: boolean
   includeDefaultMicrosoftHosts: boolean
   allowPrivateNetworkAddresses: boolean
+  allowHttpForLoopback: boolean
   hosts: readonly string[]
 }>
 export type AuthorizationHandlerPatch = Record<string, unknown>
@@ -107,6 +108,7 @@ const outboundHostValidatorParsers = {
   enabled: asBoolean,
   includeDefaultMicrosoftHosts: asBoolean,
   allowPrivateNetworkAddresses: asBoolean,
+  allowHttpForLoopback: asBoolean,
   hosts: asList
 } satisfies Record<string, (value: string) => unknown>
 
@@ -491,7 +493,7 @@ function parseValue (
     ? parseDocumentValue(parser, value)
     : typeof value === 'string' ? parser(value) : undefined
   if (parsed === undefined) {
-    if (key === 'validateIssuer' || key === 'allowPrivateNetworkAddresses') {
+    if (key === 'validateIssuer' || key === 'allowPrivateNetworkAddresses' || key === 'allowHttpForLoopback') {
       throw ExceptionHelper.generateException(
         TypeError,
         Errors.InvalidBooleanConfigurationValue,
@@ -600,7 +602,8 @@ export function setConfigurationValue (
     if (parsed.key === 'hosts') {
       ;(target.outboundHostValidator as OutboundHostValidatorConfigurationPatch).hosts = parsed.value as string[]
     } else {
-      ;(target.outboundHostValidator as OutboundHostValidatorConfigurationPatch)[parsed.key as 'enabled' | 'includeDefaultMicrosoftHosts' | 'allowPrivateNetworkAddresses'] = parsed.value as boolean
+      const key = parsed.key as Exclude<keyof OutboundHostValidatorConfigurationPatch, 'hosts'>
+      ;(target.outboundHostValidator as OutboundHostValidatorConfigurationPatch)[key] = parsed.value as boolean
     }
     return
   }

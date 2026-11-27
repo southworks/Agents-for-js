@@ -9,7 +9,8 @@ import {
 } from './configuration/configuration'
 import { loadModernEnvironmentConfiguration } from './configuration/environmentConfiguration'
 import { mergeDefined } from './utils'
-import { getHttpsUrl, hasAllowedOutboundAddresses, isLocalOrBlockedHost } from './utils/outboundUrl'
+import { isLoopbackAddress } from './utils/ipAddress'
+import { getHttpUrl, hasAllowedOutboundAddresses, isLocalOrBlockedHost } from './utils/outboundUrl'
 
 /** Hosts used by Microsoft channel callbacks and hosted attachments. */
 const DEFAULT_MICROSOFT_HOSTS = Object.freeze([
@@ -39,10 +40,16 @@ export interface OutboundHostValidatorOptions {
   includeDefaultMicrosoftHosts?: boolean
 
   /**
-   * Allows allowlisted HTTPS destinations to use private, shared (RFC 6598),
+   * Allows allowlisted destinations to use private, shared (RFC 6598),
    * loopback, link-local, or unspecified addresses. Defaults to `false`.
    */
   allowPrivateNetworkAddresses?: boolean
+
+  /**
+   * Allows HTTP to allowlisted loopback destinations for local development.
+   * Requires `allowPrivateNetworkAddresses`. Defaults to `false`.
+   */
+  allowHttpForLoopback?: boolean
 
   /** Additional exact hosts or host suffixes to allow.
    * An entry matches a request host when the host equals the entry or is a subdomain of it (e.g. `contoso.com` matches `contoso.com` and `files.contoso.com`).
@@ -69,7 +76,7 @@ export interface OutboundUrlPolicy {
  *
  * A configured suffix matches both the exact host and its subdomains. The
  * policy is disabled by default to preserve existing SDK behavior. Enabled
- * policies require HTTPS without userinfo and restrict private addresses.
+ * policies require HTTPS by default, reject userinfo, and restrict private addresses.
  * Attachment downloaders additionally validate DNS answers and redirect hops.
  */
 export class OutboundHostValidator implements OutboundUrlPolicy {
@@ -77,6 +84,7 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
   public readonly enabled: boolean
   private readonly suffixes: ReadonlySet<string>
   private readonly allowPrivateNetworkAddresses: boolean
+  private readonly allowHttpForLoopback: boolean
 
   /**
    * Creates an outbound host validator.
@@ -89,6 +97,7 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
       : options
     this.enabled = resolved.enabled ?? false
     this.allowPrivateNetworkAddresses = resolved.allowPrivateNetworkAddresses ?? false
+    this.allowHttpForLoopback = resolved.allowHttpForLoopback ?? false
 
     const suffixes = new Set<string>()
     if (resolved.includeDefaultMicrosoftHosts ?? true) {
@@ -108,17 +117,17 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
   }
 
   /**
-   * Determines whether a URL's host matches the configured allowlist.
+   * Determines whether a URL uses an allowed transport and matches the host allowlist.
    *
    * @param input The absolute URL to validate.
-   * @returns `true` when validation is disabled or the host is allowed.
+   * @returns `true` when validation is disabled or the URL is allowed.
    */
   public isAllowed (input: string | URL | null | undefined): boolean {
     if (!this.enabled) {
       return true
     }
 
-    const url = getHttpsUrl(input)
+    const url = this.getAllowedTransportUrl(input)
     if (!url) {
       return false
     }
@@ -147,8 +156,21 @@ export class OutboundHostValidator implements OutboundUrlPolicy {
     if (!this.enabled) {
       return true
     }
-    const url = getHttpsUrl(input)
+    const url = this.getAllowedTransportUrl(input)
     return url !== undefined && await hasAllowedOutboundAddresses(url, this.allowPrivateNetworkAddresses)
+  }
+
+  private getAllowedTransportUrl (input: string | URL | null | undefined): URL | undefined {
+    const url = getHttpUrl(input)
+    if (url?.protocol === 'https:') {
+      return url
+    }
+    if (url && this.allowHttpForLoopback && this.allowPrivateNetworkAddresses &&
+      (url.hostname === 'localhost' || isLoopbackAddress(url.hostname))) {
+      return url
+    }
+
+    return undefined
   }
 }
 
@@ -185,6 +207,9 @@ function resolveOutboundHostValidatorOptions (
   }
   if (options.allowPrivateNetworkAddresses !== undefined) {
     direct.allowPrivateNetworkAddresses = options.allowPrivateNetworkAddresses
+  }
+  if (options.allowHttpForLoopback !== undefined) {
+    direct.allowHttpForLoopback = options.allowHttpForLoopback
   }
   return mergeDefined<OutboundHostValidatorOptions>(
     external.fallback.outboundHostValidator,

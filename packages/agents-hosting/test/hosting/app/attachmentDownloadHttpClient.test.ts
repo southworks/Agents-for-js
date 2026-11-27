@@ -209,6 +209,27 @@ describe('validated attachment fetching', () => {
     sinon.assert.notCalled(lookup)
   })
 
+  it('allows opted-in loopback HTTP on initial requests and redirect hops', async () => {
+    const fetchStub = sinon.stub(globalThis, 'fetch')
+    fetchStub.onFirstCall().resolves(new Response(null, {
+      status: 302, headers: { location: 'http://127.0.0.1:3978/file' }
+    }))
+    fetchStub.onSecondCall().resolves(new Response('local'))
+    const downloader = client(new OutboundHostValidator({
+      enabled: true,
+      allowHttpForLoopback: true,
+      allowPrivateNetworkAddresses: true,
+      hosts: ['localhost', '127.0.0.1']
+    }))
+
+    const result = await downloader.get('http://localhost:3978/redirect', headers)
+
+    assert.equal(Buffer.from(result!.data).toString(), 'local')
+    assert.equal(fetchStub.secondCall.args[0], 'http://127.0.0.1:3978/file')
+    assert.equal(new Headers(fetchStub.secondCall.args[1]?.headers).get('authorization'), null)
+    sinon.assert.calledTwice(fetchStub)
+  })
+
   it('does not log credentials, signed queries, or raw DNS error details', async () => {
     const previous = createDebug.disable()
     const messages: string[] = []

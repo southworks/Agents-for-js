@@ -250,6 +250,7 @@ function bindOutboundHostValidator (
   if (parts.length !== 2 || !parts[1]?.trim()) {
     return
   }
+  const property = parts[1].toLowerCase()
   if (reportDiagnostics) {
     const suggestedProperty = suggestedLeaf(`outboundHostValidator.${parts[1]}`)
     if (suggestedProperty) {
@@ -261,7 +262,7 @@ function bindOutboundHostValidator (
     `outboundHostValidator.${parts[1]}`,
     value,
     sourceName,
-    parts[1].toLowerCase() === 'allowprivatenetworkaddresses'
+    property === 'allowprivatenetworkaddresses' || property === 'allowhttpforloopback'
   )
 }
 

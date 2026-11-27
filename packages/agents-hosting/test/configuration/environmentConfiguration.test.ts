@@ -51,6 +51,7 @@ describe('environment configuration adapters', () => {
       CloudAdapterOptions__emitStackTrace: '1',
       OutboundHostValidator__Enabled: 'true',
       OutboundHostValidator__AllowPrivateNetworkAddresses: 'false',
+      OutboundHostValidator__AllowHttpForLoopback: 'true',
       OutboundHostValidator__Hosts: 'api.example, graph.example',
       OutboundHostValidator__Hosts__4: 'files.example',
       AgentApplication__UserAuthorization__Handlers__Graph__Settings__type: 'AgenticUserAuthorization',
@@ -69,6 +70,7 @@ describe('environment configuration adapters', () => {
     assert.deepEqual(layer.outboundHostValidator, {
       enabled: true,
       allowPrivateNetworkAddresses: false,
+      allowHttpForLoopback: true,
       hosts: ['api.example', 'graph.example', 'files.example']
     })
     assert.deepEqual(

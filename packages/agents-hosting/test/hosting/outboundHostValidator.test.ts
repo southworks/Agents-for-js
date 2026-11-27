@@ -248,6 +248,34 @@ describe('OutboundHostValidator', () => {
     }
   })
 
+  it('allows HTTP only to explicitly allowlisted loopback hosts with both development options', async () => {
+    const loopbackHosts = ['localhost', '127.0.0.2', '[::1]', '[::ffff:127.0.0.1]']
+    const otherHosts = ['files.example', 'dev.localhost', '10.1.2.3', '0.0.0.0', '[::]']
+    const options = { enabled: true, hosts: [...loopbackHosts, ...otherHosts] }
+    const validator = new OutboundHostValidator({
+      ...options, allowHttpForLoopback: true, allowPrivateNetworkAddresses: true
+    })
+    for (const host of loopbackHosts) {
+      const url = `http://${host}:3978/file`
+      assert.equal(validator.isAllowed(url), true, url)
+      assert.equal(await validator.isAllowedAsync(url), true, url)
+    }
+
+    for (const url of [
+      ...otherHosts.map(host => `http://${host}/file`),
+      'http://127.0.0.1/file',
+      'http://graph.microsoft.com/file',
+      'http://user@localhost/file'
+    ]) {
+      assert.equal(validator.isAllowed(url), false, url)
+      assert.equal(await validator.isAllowedAsync(url), false, url)
+    }
+
+    const privateAddressesRequired = new OutboundHostValidator({ ...options, allowHttpForLoopback: true })
+    assert.equal(privateAddressesRequired.isAllowed('http://localhost/file'), false)
+    assert.equal(await privateAddressesRequired.isAllowedAsync('http://localhost/file'), false)
+  })
+
   for (const host of [
     '127.0.0.1', '10.1.2.3', '169.254.169.254', '0.0.0.0', '[::]', '[::1]',
     '[fd12::1]', '[fe80::1]', '[::ffff:127.0.0.1]', 'localhost',
@@ -336,6 +364,25 @@ describe('OutboundHostValidator', () => {
     }).isAllowed('https://127.0.0.1/file'), false)
   })
 
+  it('applies the loopback HTTP exception from environment and structured configuration', async () => {
+    setEnvironment('OutboundHostValidator__AllowHttpForLoopback', 'true')
+    setEnvironment('OutboundHostValidator__AllowPrivateNetworkAddresses', 'true')
+    const options = { enabled: true, hosts: ['localhost'] }
+    const url = 'http://localhost:3978/file'
+    const configurationContext = await createConfigurationContext([{
+      mode: 'enforce',
+      source: {
+        name: 'local-transport',
+        async load () {
+          return { format: 'document', value: { outboundHostValidator: { allowHttpForLoopback: false } } } as const
+        }
+      }
+    }])
+
+    assert.equal(createOutboundHostValidator(options).isAllowed(url), true)
+    assert.equal(createOutboundHostValidator({ ...options, allowHttpForLoopback: false }).isAllowed(url), false)
+    assert.equal(createOutboundHostValidator({ ...options, configurationContext }).isAllowed(url), false)
+  })
   for (const mode of ['fallback', 'overrideEnvironment', 'enforce'] as const) {
     it(`resolves the private-network exception through ${mode} precedence`, async () => {
       setEnvironment('OutboundHostValidator__AllowPrivateNetworkAddresses', 'false')

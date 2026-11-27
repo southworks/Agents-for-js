@@ -10,13 +10,14 @@ import { isBlockedOutboundAddress } from './ipAddress'
 
 const logger = debug('agents:outboundHostValidator')
 
-export function getHttpsUrl (input: string | URL | null | undefined): URL | undefined {
+export function getHttpUrl (input: string | URL | null | undefined): URL | undefined {
   if (!input) {
     return undefined
   }
   try {
     const url = input instanceof URL ? input : new URL(input)
-    return url.protocol === 'https:' && !url.username && !url.password ? url : undefined
+    const isHttp = url.protocol === 'https:' || url.protocol === 'http:'
+    return isHttp && !url.username && !url.password ? url : undefined
   } catch {
     return undefined
   }
